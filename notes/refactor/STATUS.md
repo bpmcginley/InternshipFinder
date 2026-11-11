@@ -99,7 +99,7 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 5 | WP-3.5 Import consumers | Unassigned | - | - | Queued | Point consumers to new modules; retain compatibility exports. |
 | 5 | WP-4.3 Route table | Unassigned | - | - | Queued / question | Characterize responses first; financial wrapper changes paused under Q3. |
 | 5 | WP-5.2 First extension leaf moves | wp14_logging | `refactor/wp-5.2-extension-leaves` | [#251](https://github.com/bpmcginley/InternshipFinder/pull/251) | In review | Page-state and file helpers only. All existing imports and safety tests remain valid. |
-| 5 | WP-5.2 Background agent and onboarding | wp14_logging | `refactor/wp-5.2-extension-remaining` | This PR | In review | Extract prompt, snapshot, field options and interview prompt in separate commits. Existing loaders, state, safety tests and version are unchanged. |
+| 5 | WP-5.2 Background agent and onboarding | wp14_logging | `refactor/wp-5.2-extension-remaining` | [#257](https://github.com/bpmcginley/InternshipFinder/pull/257) | In review | Extract prompt, snapshot, field options and interview prompt in separate commits. Existing loaders, state, safety tests and version are unchanged. |
 | 6 | WP-2.1 Vocabulary code | Unassigned | - | - | Queued | After inventory and resolution of meaningful differences. |
 | 6 | WP-2.2 Design tokens | Unassigned | - | - | Queued | After Phase 3; preserve inlined output and distinct values. |
 | 6 | WP-5.1 Core modules | Unassigned | - | - | Question | Browser-support decision Q2 precedes implementation. |
