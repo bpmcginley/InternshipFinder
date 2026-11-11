@@ -319,7 +319,7 @@ The golden harness now covers static assets as well as generated pages. Each sit
 | C | P-2.3u Optional employer publication | audit_site | `codex/product-p2.3u-publication` | [#410](https://github.com/bpmcginley/InternshipFinder/pull/410) | Draft needs-bruce; review/CI pending | Explicit publisher option stages and renders one captured selected export. Default artifacts unchanged; browser/Worker collection stays off. |
 | C | P-2.3w optional employer capture publisher | audit_growth_generated | `codex/product-p2.3w-publisher-capture` | [#453](https://github.com/bpmcginley/InternshipFinder/pull/453) | Draft needs-bruce; reviewed source preserved in normal integration | Exact `e0ba2164` independent native/golden review passed. Integrated published `bc7af80e`; all 37 non-tracker package blobs unchanged. Fresh hosted checks and integration review pending; publication and activation remain separate. |
 
-| D | P-2.2am Attached checkout recovery | mylist_review | `codex/product-p2.2am-attached-recovery` | Draft claim | Needs-bruce | Account-owned attached Checkout, bounded historical evidence and existing recovery only. Route and enablement pending. |
+| D | P-2.2am Attached checkout recovery | mylist_review | `codex/product-p2.2am-attached-recovery` | [#464](https://github.com/bpmcginley/InternshipFinder/pull/464) | Draft needs-bruce | GET-only recovery of one account-owned attached Checkout with verified historical mode and existing settlement. Independent review, route integration and enablement pending. |
 
 ## Waiting for Bruce
 
@@ -331,7 +331,7 @@ Dates are when the item was recorded, not a claim that a separate message was se
 
 | Recorded | Item | Ready artifact / next action | Done |
 |---|---|---|---|
-| 2026-11-11 | Attached checkout recovery | P-2.2am design and draft implementation. Independent review and owner release pending. | Needs-bruce. |
+| 2026-11-11 | Attached checkout recovery | Draft [#464](https://github.com/bpmcginley/InternshipFinder/pull/464) adds dormant attached recovery. Independent review, route integration and owner release pending. | Needs-bruce. |
 | 2026-11-11 | P-2.2aj Purchased Auto-Apply balance | [#460](https://github.com/bpmcginley/InternshipFinder/pull/460) projects spendable purchased runs for the signed-in account in `GET /me`. Separate invite attribution and preserve the compatibility remainder. Focused Node and local Workers/D1 tests passed, including signed-in isolation, held and refunded runs, and disabled creation. | Draft needs-bruce. Exact review, hosted checks and coordinated release remain. |
 | 2026-11-11 | P-2.2ah Pending payment during account deletion | [#454](https://github.com/bpmcginley/InternshipFinder/pull/454) maps the atomic top-up deletion trigger to a pending-payment 409 with retry guidance. Original exact independent review and hosted checks passed. Current-main integration requires fresh exact proof. | Needs-bruce. |
 | 2026-11-11 | P-2.2ae retirement Worker package | [#420](https://github.com/bpmcginley/InternshipFinder/pull/420) on reviewed #416 adds dormant provenance and atomic retirement. Policy approved; independent review, CI and owner release remain. Unknown history/manual resolution and production scheduling are separate. No production operation. | Needs-bruce |

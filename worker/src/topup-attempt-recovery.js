@@ -13,7 +13,7 @@ export async function recoverTopupAttempt(
   attemptId,
   originalOffer,
   fetchImpl,
-  { candidateCheckoutId, clock = () => new Date() } = {},
+  { candidateCheckoutId, clock = () => new Date(), beforeApply } = {},
 ) {
   if (typeof fetchImpl !== "function" || typeof clock !== "function") return pending();
   let offer;
@@ -38,12 +38,16 @@ export async function recoverTopupAttempt(
     get,
     candidateCheckoutId ?? captured.checkout_id,
   );
-  if (payment.status === "expired_evidence") return expireTopupCheckout(db, captured, payment);
+  if (payment.status === "expired_evidence") {
+    if (beforeApply && !(await beforeApply())) return pending();
+    return expireTopupCheckout(db, captured, payment);
+  }
   if (payment.status !== "paid_evidence") return pending();
   // The same payment object supplies charge/mode/amount identity to the reversal reader
   // and settlement. Neither HTTP claims nor a provisional reader disposition is accepted.
   const reversals = await readTopupReversalEvidence(config, payment, get);
   if (reversals.status !== "reversal_evidence") return pending();
+  if (beforeApply && !(await beforeApply())) return pending();
   let now;
   try {
     const value = clock();
