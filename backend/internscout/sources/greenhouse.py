@@ -5,6 +5,7 @@ from __future__ import annotations
 from .base import client
 from .common import board_item, counts_of, html_to_text, reported_count, stamp_board_newest
 from ..classify import is_internship
+from ..console_log import console_exception
 from ..region import board_state, maybe_in_region, place_bare_cities
 
 LIST_URL = "https://boards-api.greenhouse.io/v1/boards/{token}/jobs"
@@ -71,8 +72,8 @@ def fetch_greenhouse_board(c, co: dict) -> list[dict]:
                 # 2026-10-23: extract eligibility before public trimming; was: [:4000].
                 # Revert: restore [:4000] here (DQ-1).
                 it["description"] = html_to_text(d.json().get("content"))
-        except Exception:
-            pass
+        except Exception as error:
+            console_exception("[greenhouse] job detail failed", type(error).__name__)
     co["_scan_complete"] = True  # list endpoint is exhaustive; detail limits do not truncate it
     return items
 

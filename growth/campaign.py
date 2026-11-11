@@ -48,6 +48,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "backend"))
 sys.path.insert(0, HERE)
 from internscout import seo_pages as sp  # noqa: E402
+from internscout.console_log import console  # noqa: E402
 
 SITE = sp.SITE
 SIZES = {"feed": (1080, 1350), "tall": (1080, 1920)}
@@ -516,7 +517,7 @@ def build(site_dir: str, out_dir: str, now: datetime | None = None) -> dict | No
     now = now or datetime.now(timezone.utc)
     pick = search_pick(d["listings"], export)
     if not pick:
-        print("[campaign] no field has enough open roles in a search place this week")
+        console("[campaign] no field has enough open roles in a search place this week")
         return None
     campaign = f"weekly-{week_tag(now)}"
     search = search_slides(pick, export, d["baseline"])
@@ -532,7 +533,12 @@ def build(site_dir: str, out_dir: str, now: datetime | None = None) -> dict | No
     ]
     if problems:
         for kind, where, found in problems:
-            print(f"[campaign] {kind} {where}: {', '.join(found)}")
+            message = f"[campaign] {kind} {where}: {', '.join(found)}"
+            console(
+                f"[campaign] {kind} {where}: lint rejected campaign content"
+                if os.environ.get("INTERNSCOUT_LOG_FORMAT") == "json"
+                else message
+            )
         return None
     os.makedirs(out_dir, exist_ok=True)
     pack = {
@@ -568,8 +574,9 @@ def main(argv: list[str]) -> int:
     pack = build(args[0] if args else "docs", out)
     if not pack:
         return 1
-    print(
-        f"[campaign] {pack['week']}: search '{pack['search']['title']}', tip '{pack['tip']['title']}' -> {out}"
+    message = f"[campaign] {pack['week']}: search '{pack['search']['title']}', tip '{pack['tip']['title']}' -> {out}"
+    console(
+        "[campaign] pack written" if os.environ.get("INTERNSCOUT_LOG_FORMAT") == "json" else message
     )
     return 0
 

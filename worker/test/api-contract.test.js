@@ -10,6 +10,7 @@ import { handle } from "../src/index.js";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const read = (path) => readFileSync(join(root, path), "utf8").replaceAll("\r\n", "\n");
+const publicWorkerOrigin = JSON.parse(read("config/public.json")).workerOrigin;
 const key = (method, path) => `${method} ${path.split("?")[0].replace(/\/+$/, "") || "/"}`;
 const declared = new Set(ROUTES.map((r) => key(r.method, r.path)));
 
@@ -116,6 +117,15 @@ const called = (node) =>
 const property = (node, key) => node?.properties?.find((p) => name(p.key) === key)?.value;
 const BASE = "https://worker-contract.test";
 const UNKNOWN = "<computed>";
+const configuredTarget = (value, origin) => {
+  if (!value.startsWith(origin)) return false;
+  const suffix = value.slice(origin.length);
+  return suffix === "" || /^[/?#]/.test(suffix) || suffix.startsWith(UNKNOWN);
+};
+const workerTarget = (value, origin) =>
+  value.startsWith(BASE) ||
+  configuredTarget(value, origin) ||
+  /^https:\/\/[^/]+\.workers\.dev(?:\/|$)/.test(value);
 
 function scriptsIn(html) {
   return [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)]
@@ -210,6 +220,8 @@ function methodOf(init, client) {
 
 function workerCalls(client, billingKinds) {
   const found = [];
+  const mentionsLiteral = (value) =>
+    configuredTarget(value, client.origin) || /\.workers\.dev/.test(value);
   for (const { node, parents } of client.calls) {
     const callee = called(node),
       args = node.arguments;
@@ -245,23 +257,20 @@ function workerCalls(client, billingKinds) {
         if (
           part.type === "Identifier" &&
           client.constants.has(part.name) &&
-          strings(client.constants.get(part.name), client).some((value) =>
-            /\.workers\.dev/.test(value),
-          )
+          strings(client.constants.get(part.name), client).some(mentionsLiteral)
         )
           mentionsWorker = true;
         if (
           part.type === "Literal" &&
           typeof part.value === "string" &&
-          /\.workers\.dev/.test(part.value)
+          mentionsLiteral(part.value)
         )
           mentionsWorker = true;
       });
       if (mentionsWorker && targets.every((target) => target === UNKNOWN))
         assert.fail(`unresolved Worker target in ${client.path}`);
       for (const target of targets) {
-        if (!(target.startsWith(BASE) || /^https:\/\/[^/]+\.workers\.dev(?:\/|$)/.test(target)))
-          continue;
+        if (!workerTarget(target, client.origin)) continue;
         assert.ok(
           !target.split("?")[0].includes(UNKNOWN),
           `unresolved Worker target in ${client.path}`,
@@ -278,15 +287,13 @@ function workerCalls(client, billingKinds) {
   return found;
 }
 
-function parseClient(path, source) {
+function parseClient(path, source, origin = publicWorkerOrigin) {
   const ast = parse(source, { ecmaVersion: "latest", sourceType: "module" });
   const calls = [],
     constants = new Map(),
     functions = new Map();
   const workerExpression = (expression) =>
-    strings(expression, { path, constants }).some(
-      (value) => value.startsWith(BASE) || /^https:\/\/[^/]+\.workers\.dev(?:\/|$)/.test(value),
-    );
+    strings(expression, { path, constants }).some((value) => workerTarget(value, origin));
   walk(ast, (node, parents) => {
     if (node.type === "CallExpression") calls.push({ node, parents });
     if (node.type === "FunctionDeclaration") functions.set(node.id.name, node);
@@ -299,7 +306,7 @@ function parseClient(path, source) {
       constants.set(node.id.name, node.init);
     }
   });
-  return { path, calls, constants, functions };
+  return { path, origin, calls, constants, functions };
 }
 
 test("all current site and extension Worker calls are covered, including wrappers and inline scripts", () => {
@@ -374,8 +381,32 @@ test("AST inventory handles nested literals and rejects unknown routes or comput
     ["GET /config"],
   );
   assert.ok(!declared.has(workerCalls(client, [])[0]));
+  assert.deepEqual(
+    workerCalls(
+      parseClient(
+        "new.js",
+        'const API="https://worker.example.test/config"; fetch(API);' +
+          'fetch("https://worker.example.test.other/not-a-worker");',
+        "https://worker.example.test",
+      ),
+      [],
+    ),
+    ["GET /config"],
+  );
   assert.throws(
     () => workerCalls(parseClient("new.js", "fetch(`${WORKER_URL}${arbitrary}`)"), []),
+    /unresolved Worker target/,
+  );
+  assert.throws(
+    () =>
+      workerCalls(
+        parseClient(
+          "new.js",
+          'const API="https://worker.example.test"; fetch(API + arbitrary);',
+          "https://worker.example.test",
+        ),
+        [],
+      ),
     /unresolved Worker target/,
   );
   assert.throws(
@@ -388,6 +419,16 @@ test("AST inventory handles nested literals and rejects unknown routes or comput
         "new.js",
         '(()=>{const API="https://api.workers.dev/unlisted";fetch(API)})();' +
           '(()=>{const API="https://api.workers.dev/config";fetch(API)})();',
+      ),
+    /ambiguous Worker binding/,
+  );
+  assert.throws(
+    () =>
+      parseClient(
+        "new.js",
+        '(()=>{const API="https://worker.example.test/unlisted";fetch(API)})();' +
+          '(()=>{const API="https://example.test/not-a-worker";fetch(API)})();',
+        "https://worker.example.test",
       ),
     /ambiguous Worker binding/,
   );

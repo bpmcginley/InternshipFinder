@@ -1,0 +1,1282 @@
+[
+  {
+    "phase": "before",
+    "width": 1280,
+    "colorScheme": "light",
+    "mode": "live",
+    "header": 259.1875,
+    "brand": 30.5,
+    "overflow": false,
+    "logo": {
+      "x": 28,
+      "y": 26.75,
+      "width": 142.046875,
+      "height": 28,
+      "top": 26.75,
+      "right": 170.046875,
+      "bottom": 54.75,
+      "left": 28
+    },
+    "links": [
+      {
+        "text": "Browse",
+        "x": 194.046875,
+        "y": 34.75,
+        "width": 50.59375,
+        "height": 22.5,
+        "top": 34.75,
+        "right": 244.640625,
+        "bottom": 57.25,
+        "left": 194.046875
+      },
+      {
+        "text": "Weekly email",
+        "x": 258.640625,
+        "y": 34.75,
+        "width": 89.640625,
+        "height": 22.5,
+        "top": 34.75,
+        "right": 348.28125,
+        "bottom": 57.25,
+        "left": 258.640625
+      },
+      {
+        "text": "Auto-Apply (free)",
+        "x": 362.28125,
+        "y": 34.75,
+        "width": 116.359375,
+        "height": 22.5,
+        "top": 34.75,
+        "right": 478.640625,
+        "bottom": 57.25,
+        "left": 362.28125
+      },
+      {
+        "text": "Pricing",
+        "x": 492.640625,
+        "y": 34.75,
+        "width": 45.9375,
+        "height": 22.5,
+        "top": 34.75,
+        "right": 538.578125,
+        "bottom": 57.25,
+        "left": 492.640625
+      },
+      {
+        "text": "Compare",
+        "x": 552.578125,
+        "y": 34.75,
+        "width": 61.1875,
+        "height": 22.5,
+        "top": 34.75,
+        "right": 613.765625,
+        "bottom": 57.25,
+        "left": 552.578125
+      },
+      {
+        "text": "About",
+        "x": 627.765625,
+        "y": 34.75,
+        "width": 40.5,
+        "height": 22.5,
+        "top": 34.75,
+        "right": 668.265625,
+        "bottom": 57.25,
+        "left": 627.765625
+      },
+      {
+        "text": "Hire interns",
+        "x": 682.265625,
+        "y": 34.75,
+        "width": 78.609375,
+        "height": 22.5,
+        "top": 34.75,
+        "right": 760.875,
+        "bottom": 57.25,
+        "left": 682.265625
+      }
+    ],
+    "footer": [
+      {
+        "text": "Browse by field, state or major",
+        "x": 28,
+        "y": 1642.109375,
+        "width": 177.296875,
+        "height": 25.5,
+        "top": 1642.109375,
+        "right": 205.296875,
+        "bottom": 1667.609375,
+        "left": 28
+      },
+      {
+        "text": "Employers hiring now",
+        "x": 229.296875,
+        "y": 1642.109375,
+        "width": 125.515625,
+        "height": 25.5,
+        "top": 1642.109375,
+        "right": 354.8125,
+        "bottom": 1667.609375,
+        "left": 229.296875
+      },
+      {
+        "text": "Privacy",
+        "x": 378.8125,
+        "y": 1642.109375,
+        "width": 42.03125,
+        "height": 25.5,
+        "top": 1642.109375,
+        "right": 420.84375,
+        "bottom": 1667.609375,
+        "left": 378.8125
+      },
+      {
+        "text": "Terms",
+        "x": 444.84375,
+        "y": 1642.109375,
+        "width": 36.1875,
+        "height": 25.5,
+        "top": 1642.109375,
+        "right": 481.03125,
+        "bottom": 1667.609375,
+        "left": 444.84375
+      },
+      {
+        "text": "For employers",
+        "x": 505.03125,
+        "y": 1642.109375,
+        "width": 83.5,
+        "height": 25.5,
+        "top": 1642.109375,
+        "right": 588.53125,
+        "bottom": 1667.609375,
+        "left": 505.03125
+      },
+      {
+        "text": "Feedback",
+        "x": 28,
+        "y": 1675.609375,
+        "width": 56.640625,
+        "height": 25.5,
+        "top": 1675.609375,
+        "right": 84.640625,
+        "bottom": 1701.109375,
+        "left": 28
+      },
+      {
+        "text": "GitHub Issues",
+        "x": 108.640625,
+        "y": 1675.609375,
+        "width": 82.671875,
+        "height": 25.5,
+        "top": 1675.609375,
+        "right": 191.3125,
+        "bottom": 1701.109375,
+        "left": 108.640625
+      },
+      {
+        "text": "Install extension",
+        "x": 215.3125,
+        "y": 1675.609375,
+        "width": 97.265625,
+        "height": 25.5,
+        "top": 1675.609375,
+        "right": 312.578125,
+        "bottom": 1701.109375,
+        "left": 215.3125
+      },
+      {
+        "text": "Also check Handshake",
+        "x": 336.578125,
+        "y": 1675.609375,
+        "width": 131.546875,
+        "height": 25.5,
+        "top": 1675.609375,
+        "right": 468.125,
+        "bottom": 1701.109375,
+        "left": 336.578125
+      },
+      {
+        "text": "NSF REU research",
+        "x": 492.125,
+        "y": 1675.609375,
+        "width": 105.75,
+        "height": 25.5,
+        "top": 1675.609375,
+        "right": 597.875,
+        "bottom": 1701.109375,
+        "left": 492.125
+      },
+      {
+        "text": "UMass campus jobs",
+        "x": 28,
+        "y": 1709.109375,
+        "width": 115.53125,
+        "height": 25.5,
+        "top": 1709.109375,
+        "right": 143.53125,
+        "bottom": 1734.609375,
+        "left": 28
+      }
+    ]
+  },
+  {
+    "phase": "before",
+    "width": 1280,
+    "colorScheme": "light",
+    "mode": "static",
+    "header": 253.6875,
+    "brand": 30.5,
+    "overflow": false,
+    "logo": {
+      "x": 28,
+      "y": 24,
+      "width": 142.046875,
+      "height": 28,
+      "top": 24,
+      "right": 170.046875,
+      "bottom": 52,
+      "left": 28
+    },
+    "links": [
+      {
+        "text": "Browse",
+        "x": 194.046875,
+        "y": 32,
+        "width": 50.59375,
+        "height": 22.5,
+        "top": 32,
+        "right": 244.640625,
+        "bottom": 54.5,
+        "left": 194.046875
+      },
+      {
+        "text": "Weekly email",
+        "x": 258.640625,
+        "y": 32,
+        "width": 89.640625,
+        "height": 22.5,
+        "top": 32,
+        "right": 348.28125,
+        "bottom": 54.5,
+        "left": 258.640625
+      },
+      {
+        "text": "Auto-Apply (free)",
+        "x": 362.28125,
+        "y": 32,
+        "width": 116.359375,
+        "height": 22.5,
+        "top": 32,
+        "right": 478.640625,
+        "bottom": 54.5,
+        "left": 362.28125
+      },
+      {
+        "text": "Pricing",
+        "x": 492.640625,
+        "y": 32,
+        "width": 45.9375,
+        "height": 22.5,
+        "top": 32,
+        "right": 538.578125,
+        "bottom": 54.5,
+        "left": 492.640625
+      },
+      {
+        "text": "Compare",
+        "x": 552.578125,
+        "y": 32,
+        "width": 61.1875,
+        "height": 22.5,
+        "top": 32,
+        "right": 613.765625,
+        "bottom": 54.5,
+        "left": 552.578125
+      },
+      {
+        "text": "About",
+        "x": 627.765625,
+        "y": 32,
+        "width": 40.5,
+        "height": 22.5,
+        "top": 32,
+        "right": 668.265625,
+        "bottom": 54.5,
+        "left": 627.765625
+      },
+      {
+        "text": "Hire interns",
+        "x": 682.265625,
+        "y": 32,
+        "width": 78.609375,
+        "height": 22.5,
+        "top": 32,
+        "right": 760.875,
+        "bottom": 54.5,
+        "left": 682.265625
+      }
+    ],
+    "footer": []
+  },
+  {
+    "phase": "before",
+    "width": 1280,
+    "colorScheme": "dark",
+    "mode": "live",
+    "header": 259.1875,
+    "brand": 30.5,
+    "overflow": false,
+    "logo": {
+      "x": 28,
+      "y": 26.75,
+      "width": 142.046875,
+      "height": 28,
+      "top": 26.75,
+      "right": 170.046875,
+      "bottom": 54.75,
+      "left": 28
+    },
+    "links": [
+      {
+        "text": "Browse",
+        "x": 194.046875,
+        "y": 34.75,
+        "width": 50.59375,
+        "height": 22.5,
+        "top": 34.75,
+        "right": 244.640625,
+        "bottom": 57.25,
+        "left": 194.046875
+      },
+      {
+        "text": "Weekly email",
+        "x": 258.640625,
+        "y": 34.75,
+        "width": 89.640625,
+        "height": 22.5,
+        "top": 34.75,
+        "right": 348.28125,
+        "bottom": 57.25,
+        "left": 258.640625
+      },
+      {
+        "text": "Auto-Apply (free)",
+        "x": 362.28125,
+        "y": 34.75,
+        "width": 116.359375,
+        "height": 22.5,
+        "top": 34.75,
+        "right": 478.640625,
+        "bottom": 57.25,
+        "left": 362.28125
+      },
+      {
+        "text": "Pricing",
+        "x": 492.640625,
+        "y": 34.75,
+        "width": 45.9375,
+        "height": 22.5,
+        "top": 34.75,
+        "right": 538.578125,
+        "bottom": 57.25,
+        "left": 492.640625
+      },
+      {
+        "text": "Compare",
+        "x": 552.578125,
+        "y": 34.75,
+        "width": 61.1875,
+        "height": 22.5,
+        "top": 34.75,
+        "right": 613.765625,
+        "bottom": 57.25,
+        "left": 552.578125
+      },
+      {
+        "text": "About",
+        "x": 627.765625,
+        "y": 34.75,
+        "width": 40.5,
+        "height": 22.5,
+        "top": 34.75,
+        "right": 668.265625,
+        "bottom": 57.25,
+        "left": 627.765625
+      },
+      {
+        "text": "Hire interns",
+        "x": 682.265625,
+        "y": 34.75,
+        "width": 78.609375,
+        "height": 22.5,
+        "top": 34.75,
+        "right": 760.875,
+        "bottom": 57.25,
+        "left": 682.265625
+      }
+    ],
+    "footer": [
+      {
+        "text": "Browse by field, state or major",
+        "x": 28,
+        "y": 1642.109375,
+        "width": 177.296875,
+        "height": 25.5,
+        "top": 1642.109375,
+        "right": 205.296875,
+        "bottom": 1667.609375,
+        "left": 28
+      },
+      {
+        "text": "Employers hiring now",
+        "x": 229.296875,
+        "y": 1642.109375,
+        "width": 125.515625,
+        "height": 25.5,
+        "top": 1642.109375,
+        "right": 354.8125,
+        "bottom": 1667.609375,
+        "left": 229.296875
+      },
+      {
+        "text": "Privacy",
+        "x": 378.8125,
+        "y": 1642.109375,
+        "width": 42.03125,
+        "height": 25.5,
+        "top": 1642.109375,
+        "right": 420.84375,
+        "bottom": 1667.609375,
+        "left": 378.8125
+      },
+      {
+        "text": "Terms",
+        "x": 444.84375,
+        "y": 1642.109375,
+        "width": 36.1875,
+        "height": 25.5,
+        "top": 1642.109375,
+        "right": 481.03125,
+        "bottom": 1667.609375,
+        "left": 444.84375
+      },
+      {
+        "text": "For employers",
+        "x": 505.03125,
+        "y": 1642.109375,
+        "width": 83.5,
+        "height": 25.5,
+        "top": 1642.109375,
+        "right": 588.53125,
+        "bottom": 1667.609375,
+        "left": 505.03125
+      },
+      {
+        "text": "Feedback",
+        "x": 28,
+        "y": 1675.609375,
+        "width": 56.640625,
+        "height": 25.5,
+        "top": 1675.609375,
+        "right": 84.640625,
+        "bottom": 1701.109375,
+        "left": 28
+      },
+      {
+        "text": "GitHub Issues",
+        "x": 108.640625,
+        "y": 1675.609375,
+        "width": 82.671875,
+        "height": 25.5,
+        "top": 1675.609375,
+        "right": 191.3125,
+        "bottom": 1701.109375,
+        "left": 108.640625
+      },
+      {
+        "text": "Install extension",
+        "x": 215.3125,
+        "y": 1675.609375,
+        "width": 97.265625,
+        "height": 25.5,
+        "top": 1675.609375,
+        "right": 312.578125,
+        "bottom": 1701.109375,
+        "left": 215.3125
+      },
+      {
+        "text": "Also check Handshake",
+        "x": 336.578125,
+        "y": 1675.609375,
+        "width": 131.546875,
+        "height": 25.5,
+        "top": 1675.609375,
+        "right": 468.125,
+        "bottom": 1701.109375,
+        "left": 336.578125
+      },
+      {
+        "text": "NSF REU research",
+        "x": 492.125,
+        "y": 1675.609375,
+        "width": 105.75,
+        "height": 25.5,
+        "top": 1675.609375,
+        "right": 597.875,
+        "bottom": 1701.109375,
+        "left": 492.125
+      },
+      {
+        "text": "UMass campus jobs",
+        "x": 28,
+        "y": 1709.109375,
+        "width": 115.53125,
+        "height": 25.5,
+        "top": 1709.109375,
+        "right": 143.53125,
+        "bottom": 1734.609375,
+        "left": 28
+      }
+    ]
+  },
+  {
+    "phase": "before",
+    "width": 1280,
+    "colorScheme": "dark",
+    "mode": "static",
+    "header": 253.6875,
+    "brand": 30.5,
+    "overflow": false,
+    "logo": {
+      "x": 28,
+      "y": 24,
+      "width": 142.046875,
+      "height": 28,
+      "top": 24,
+      "right": 170.046875,
+      "bottom": 52,
+      "left": 28
+    },
+    "links": [
+      {
+        "text": "Browse",
+        "x": 194.046875,
+        "y": 32,
+        "width": 50.59375,
+        "height": 22.5,
+        "top": 32,
+        "right": 244.640625,
+        "bottom": 54.5,
+        "left": 194.046875
+      },
+      {
+        "text": "Weekly email",
+        "x": 258.640625,
+        "y": 32,
+        "width": 89.640625,
+        "height": 22.5,
+        "top": 32,
+        "right": 348.28125,
+        "bottom": 54.5,
+        "left": 258.640625
+      },
+      {
+        "text": "Auto-Apply (free)",
+        "x": 362.28125,
+        "y": 32,
+        "width": 116.359375,
+        "height": 22.5,
+        "top": 32,
+        "right": 478.640625,
+        "bottom": 54.5,
+        "left": 362.28125
+      },
+      {
+        "text": "Pricing",
+        "x": 492.640625,
+        "y": 32,
+        "width": 45.9375,
+        "height": 22.5,
+        "top": 32,
+        "right": 538.578125,
+        "bottom": 54.5,
+        "left": 492.640625
+      },
+      {
+        "text": "Compare",
+        "x": 552.578125,
+        "y": 32,
+        "width": 61.1875,
+        "height": 22.5,
+        "top": 32,
+        "right": 613.765625,
+        "bottom": 54.5,
+        "left": 552.578125
+      },
+      {
+        "text": "About",
+        "x": 627.765625,
+        "y": 32,
+        "width": 40.5,
+        "height": 22.5,
+        "top": 32,
+        "right": 668.265625,
+        "bottom": 54.5,
+        "left": 627.765625
+      },
+      {
+        "text": "Hire interns",
+        "x": 682.265625,
+        "y": 32,
+        "width": 78.609375,
+        "height": 22.5,
+        "top": 32,
+        "right": 760.875,
+        "bottom": 54.5,
+        "left": 682.265625
+      }
+    ],
+    "footer": []
+  },
+  {
+    "phase": "before",
+    "width": 375,
+    "colorScheme": "light",
+    "mode": "live",
+    "header": 506.78125,
+    "brand": 85,
+    "overflow": false,
+    "logo": {
+      "x": 16,
+      "y": 24,
+      "width": 142.046875,
+      "height": 28,
+      "top": 24,
+      "right": 158.046875,
+      "bottom": 52,
+      "left": 16
+    },
+    "links": [
+      {
+        "text": "Browse",
+        "x": 16,
+        "y": 60,
+        "width": 50.59375,
+        "height": 22.5,
+        "top": 60,
+        "right": 66.59375,
+        "bottom": 82.5,
+        "left": 16
+      },
+      {
+        "text": "Weekly email",
+        "x": 80.59375,
+        "y": 60,
+        "width": 89.640625,
+        "height": 22.5,
+        "top": 60,
+        "right": 170.234375,
+        "bottom": 82.5,
+        "left": 80.59375
+      },
+      {
+        "text": "Auto-Apply (free)",
+        "x": 184.234375,
+        "y": 60,
+        "width": 116.359375,
+        "height": 22.5,
+        "top": 60,
+        "right": 300.59375,
+        "bottom": 82.5,
+        "left": 184.234375
+      },
+      {
+        "text": "Pricing",
+        "x": 16,
+        "y": 86.5,
+        "width": 45.9375,
+        "height": 22.5,
+        "top": 86.5,
+        "right": 61.9375,
+        "bottom": 109,
+        "left": 16
+      },
+      {
+        "text": "Compare",
+        "x": 75.9375,
+        "y": 86.5,
+        "width": 61.1875,
+        "height": 22.5,
+        "top": 86.5,
+        "right": 137.125,
+        "bottom": 109,
+        "left": 75.9375
+      },
+      {
+        "text": "About",
+        "x": 151.125,
+        "y": 86.5,
+        "width": 40.5,
+        "height": 22.5,
+        "top": 86.5,
+        "right": 191.625,
+        "bottom": 109,
+        "left": 151.125
+      },
+      {
+        "text": "Hire interns",
+        "x": 205.625,
+        "y": 86.5,
+        "width": 78.609375,
+        "height": 22.5,
+        "top": 86.5,
+        "right": 284.234375,
+        "bottom": 109,
+        "left": 205.625
+      }
+    ],
+    "footer": [
+      {
+        "text": "Browse by field, state or major",
+        "x": 16,
+        "y": 2881.578125,
+        "width": 177.296875,
+        "height": 25.5,
+        "top": 2881.578125,
+        "right": 193.296875,
+        "bottom": 2907.078125,
+        "left": 16
+      },
+      {
+        "text": "Employers hiring now",
+        "x": 217.296875,
+        "y": 2881.578125,
+        "width": 125.515625,
+        "height": 25.5,
+        "top": 2881.578125,
+        "right": 342.8125,
+        "bottom": 2907.078125,
+        "left": 217.296875
+      },
+      {
+        "text": "Privacy",
+        "x": 16,
+        "y": 2915.078125,
+        "width": 42.03125,
+        "height": 25.5,
+        "top": 2915.078125,
+        "right": 58.03125,
+        "bottom": 2940.578125,
+        "left": 16
+      },
+      {
+        "text": "Terms",
+        "x": 82.03125,
+        "y": 2915.078125,
+        "width": 36.1875,
+        "height": 25.5,
+        "top": 2915.078125,
+        "right": 118.21875,
+        "bottom": 2940.578125,
+        "left": 82.03125
+      },
+      {
+        "text": "For employers",
+        "x": 142.21875,
+        "y": 2915.078125,
+        "width": 83.5,
+        "height": 25.5,
+        "top": 2915.078125,
+        "right": 225.71875,
+        "bottom": 2940.578125,
+        "left": 142.21875
+      },
+      {
+        "text": "Feedback",
+        "x": 249.71875,
+        "y": 2915.078125,
+        "width": 56.640625,
+        "height": 25.5,
+        "top": 2915.078125,
+        "right": 306.359375,
+        "bottom": 2940.578125,
+        "left": 249.71875
+      },
+      {
+        "text": "GitHub Issues",
+        "x": 16,
+        "y": 2948.578125,
+        "width": 82.671875,
+        "height": 25.5,
+        "top": 2948.578125,
+        "right": 98.671875,
+        "bottom": 2974.078125,
+        "left": 16
+      },
+      {
+        "text": "Install extension",
+        "x": 122.671875,
+        "y": 2948.578125,
+        "width": 97.265625,
+        "height": 25.5,
+        "top": 2948.578125,
+        "right": 219.9375,
+        "bottom": 2974.078125,
+        "left": 122.671875
+      },
+      {
+        "text": "Also check Handshake",
+        "x": 16,
+        "y": 2982.078125,
+        "width": 131.546875,
+        "height": 25.5,
+        "top": 2982.078125,
+        "right": 147.546875,
+        "bottom": 3007.578125,
+        "left": 16
+      },
+      {
+        "text": "NSF REU research",
+        "x": 171.546875,
+        "y": 2982.078125,
+        "width": 105.75,
+        "height": 25.5,
+        "top": 2982.078125,
+        "right": 277.296875,
+        "bottom": 3007.578125,
+        "left": 171.546875
+      },
+      {
+        "text": "UMass campus jobs",
+        "x": 16,
+        "y": 3015.578125,
+        "width": 115.53125,
+        "height": 25.5,
+        "top": 3015.578125,
+        "right": 131.53125,
+        "bottom": 3041.078125,
+        "left": 16
+      }
+    ]
+  },
+  {
+    "phase": "before",
+    "width": 375,
+    "colorScheme": "light",
+    "mode": "static",
+    "header": 446.78125,
+    "brand": 85,
+    "overflow": false,
+    "logo": {
+      "x": 16,
+      "y": 24,
+      "width": 142.046875,
+      "height": 28,
+      "top": 24,
+      "right": 158.046875,
+      "bottom": 52,
+      "left": 16
+    },
+    "links": [
+      {
+        "text": "Browse",
+        "x": 16,
+        "y": 60,
+        "width": 50.59375,
+        "height": 22.5,
+        "top": 60,
+        "right": 66.59375,
+        "bottom": 82.5,
+        "left": 16
+      },
+      {
+        "text": "Weekly email",
+        "x": 80.59375,
+        "y": 60,
+        "width": 89.640625,
+        "height": 22.5,
+        "top": 60,
+        "right": 170.234375,
+        "bottom": 82.5,
+        "left": 80.59375
+      },
+      {
+        "text": "Auto-Apply (free)",
+        "x": 184.234375,
+        "y": 60,
+        "width": 116.359375,
+        "height": 22.5,
+        "top": 60,
+        "right": 300.59375,
+        "bottom": 82.5,
+        "left": 184.234375
+      },
+      {
+        "text": "Pricing",
+        "x": 16,
+        "y": 86.5,
+        "width": 45.9375,
+        "height": 22.5,
+        "top": 86.5,
+        "right": 61.9375,
+        "bottom": 109,
+        "left": 16
+      },
+      {
+        "text": "Compare",
+        "x": 75.9375,
+        "y": 86.5,
+        "width": 61.1875,
+        "height": 22.5,
+        "top": 86.5,
+        "right": 137.125,
+        "bottom": 109,
+        "left": 75.9375
+      },
+      {
+        "text": "About",
+        "x": 151.125,
+        "y": 86.5,
+        "width": 40.5,
+        "height": 22.5,
+        "top": 86.5,
+        "right": 191.625,
+        "bottom": 109,
+        "left": 151.125
+      },
+      {
+        "text": "Hire interns",
+        "x": 205.625,
+        "y": 86.5,
+        "width": 78.609375,
+        "height": 22.5,
+        "top": 86.5,
+        "right": 284.234375,
+        "bottom": 109,
+        "left": 205.625
+      }
+    ],
+    "footer": []
+  },
+  {
+    "phase": "before",
+    "width": 375,
+    "colorScheme": "dark",
+    "mode": "live",
+    "header": 506.78125,
+    "brand": 85,
+    "overflow": false,
+    "logo": {
+      "x": 16,
+      "y": 24,
+      "width": 142.046875,
+      "height": 28,
+      "top": 24,
+      "right": 158.046875,
+      "bottom": 52,
+      "left": 16
+    },
+    "links": [
+      {
+        "text": "Browse",
+        "x": 16,
+        "y": 60,
+        "width": 50.59375,
+        "height": 22.5,
+        "top": 60,
+        "right": 66.59375,
+        "bottom": 82.5,
+        "left": 16
+      },
+      {
+        "text": "Weekly email",
+        "x": 80.59375,
+        "y": 60,
+        "width": 89.640625,
+        "height": 22.5,
+        "top": 60,
+        "right": 170.234375,
+        "bottom": 82.5,
+        "left": 80.59375
+      },
+      {
+        "text": "Auto-Apply (free)",
+        "x": 184.234375,
+        "y": 60,
+        "width": 116.359375,
+        "height": 22.5,
+        "top": 60,
+        "right": 300.59375,
+        "bottom": 82.5,
+        "left": 184.234375
+      },
+      {
+        "text": "Pricing",
+        "x": 16,
+        "y": 86.5,
+        "width": 45.9375,
+        "height": 22.5,
+        "top": 86.5,
+        "right": 61.9375,
+        "bottom": 109,
+        "left": 16
+      },
+      {
+        "text": "Compare",
+        "x": 75.9375,
+        "y": 86.5,
+        "width": 61.1875,
+        "height": 22.5,
+        "top": 86.5,
+        "right": 137.125,
+        "bottom": 109,
+        "left": 75.9375
+      },
+      {
+        "text": "About",
+        "x": 151.125,
+        "y": 86.5,
+        "width": 40.5,
+        "height": 22.5,
+        "top": 86.5,
+        "right": 191.625,
+        "bottom": 109,
+        "left": 151.125
+      },
+      {
+        "text": "Hire interns",
+        "x": 205.625,
+        "y": 86.5,
+        "width": 78.609375,
+        "height": 22.5,
+        "top": 86.5,
+        "right": 284.234375,
+        "bottom": 109,
+        "left": 205.625
+      }
+    ],
+    "footer": [
+      {
+        "text": "Browse by field, state or major",
+        "x": 16,
+        "y": 2881.578125,
+        "width": 177.296875,
+        "height": 25.5,
+        "top": 2881.578125,
+        "right": 193.296875,
+        "bottom": 2907.078125,
+        "left": 16
+      },
+      {
+        "text": "Employers hiring now",
+        "x": 217.296875,
+        "y": 2881.578125,
+        "width": 125.515625,
+        "height": 25.5,
+        "top": 2881.578125,
+        "right": 342.8125,
+        "bottom": 2907.078125,
+        "left": 217.296875
+      },
+      {
+        "text": "Privacy",
+        "x": 16,
+        "y": 2915.078125,
+        "width": 42.03125,
+        "height": 25.5,
+        "top": 2915.078125,
+        "right": 58.03125,
+        "bottom": 2940.578125,
+        "left": 16
+      },
+      {
+        "text": "Terms",
+        "x": 82.03125,
+        "y": 2915.078125,
+        "width": 36.1875,
+        "height": 25.5,
+        "top": 2915.078125,
+        "right": 118.21875,
+        "bottom": 2940.578125,
+        "left": 82.03125
+      },
+      {
+        "text": "For employers",
+        "x": 142.21875,
+        "y": 2915.078125,
+        "width": 83.5,
+        "height": 25.5,
+        "top": 2915.078125,
+        "right": 225.71875,
+        "bottom": 2940.578125,
+        "left": 142.21875
+      },
+      {
+        "text": "Feedback",
+        "x": 249.71875,
+        "y": 2915.078125,
+        "width": 56.640625,
+        "height": 25.5,
+        "top": 2915.078125,
+        "right": 306.359375,
+        "bottom": 2940.578125,
+        "left": 249.71875
+      },
+      {
+        "text": "GitHub Issues",
+        "x": 16,
+        "y": 2948.578125,
+        "width": 82.671875,
+        "height": 25.5,
+        "top": 2948.578125,
+        "right": 98.671875,
+        "bottom": 2974.078125,
+        "left": 16
+      },
+      {
+        "text": "Install extension",
+        "x": 122.671875,
+        "y": 2948.578125,
+        "width": 97.265625,
+        "height": 25.5,
+        "top": 2948.578125,
+        "right": 219.9375,
+        "bottom": 2974.078125,
+        "left": 122.671875
+      },
+      {
+        "text": "Also check Handshake",
+        "x": 16,
+        "y": 2982.078125,
+        "width": 131.546875,
+        "height": 25.5,
+        "top": 2982.078125,
+        "right": 147.546875,
+        "bottom": 3007.578125,
+        "left": 16
+      },
+      {
+        "text": "NSF REU research",
+        "x": 171.546875,
+        "y": 2982.078125,
+        "width": 105.75,
+        "height": 25.5,
+        "top": 2982.078125,
+        "right": 277.296875,
+        "bottom": 3007.578125,
+        "left": 171.546875
+      },
+      {
+        "text": "UMass campus jobs",
+        "x": 16,
+        "y": 3015.578125,
+        "width": 115.53125,
+        "height": 25.5,
+        "top": 3015.578125,
+        "right": 131.53125,
+        "bottom": 3041.078125,
+        "left": 16
+      }
+    ]
+  },
+  {
+    "phase": "before",
+    "width": 375,
+    "colorScheme": "dark",
+    "mode": "static",
+    "header": 446.78125,
+    "brand": 85,
+    "overflow": false,
+    "logo": {
+      "x": 16,
+      "y": 24,
+      "width": 142.046875,
+      "height": 28,
+      "top": 24,
+      "right": 158.046875,
+      "bottom": 52,
+      "left": 16
+    },
+    "links": [
+      {
+        "text": "Browse",
+        "x": 16,
+        "y": 60,
+        "width": 50.59375,
+        "height": 22.5,
+        "top": 60,
+        "right": 66.59375,
+        "bottom": 82.5,
+        "left": 16
+      },
+      {
+        "text": "Weekly email",
+        "x": 80.59375,
+        "y": 60,
+        "width": 89.640625,
+        "height": 22.5,
+        "top": 60,
+        "right": 170.234375,
+        "bottom": 82.5,
+        "left": 80.59375
+      },
+      {
+        "text": "Auto-Apply (free)",
+        "x": 184.234375,
+        "y": 60,
+        "width": 116.359375,
+        "height": 22.5,
+        "top": 60,
+        "right": 300.59375,
+        "bottom": 82.5,
+        "left": 184.234375
+      },
+      {
+        "text": "Pricing",
+        "x": 16,
+        "y": 86.5,
+        "width": 45.9375,
+        "height": 22.5,
+        "top": 86.5,
+        "right": 61.9375,
+        "bottom": 109,
+        "left": 16
+      },
+      {
+        "text": "Compare",
+        "x": 75.9375,
+        "y": 86.5,
+        "width": 61.1875,
+        "height": 22.5,
+        "top": 86.5,
+        "right": 137.125,
+        "bottom": 109,
+        "left": 75.9375
+      },
+      {
+        "text": "About",
+        "x": 151.125,
+        "y": 86.5,
+        "width": 40.5,
+        "height": 22.5,
+        "top": 86.5,
+        "right": 191.625,
+        "bottom": 109,
+        "left": 151.125
+      },
+      {
+        "text": "Hire interns",
+        "x": 205.625,
+        "y": 86.5,
+        "width": 78.609375,
+        "height": 22.5,
+        "top": 86.5,
+        "right": 284.234375,
+        "bottom": 109,
+        "left": 205.625
+      }
+    ],
+    "footer": []
+  }
+]
