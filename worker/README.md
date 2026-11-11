@@ -62,16 +62,21 @@ Workers Logs stay off for the same reason.
 
 ## Run locally
 
-Requires Node 20+.
+Use Node 22, matching CI. The Node tests use the built-in `node:sqlite` module and the pinned
+test-only API contract parser, so install dependencies before running either suite.
 
 ```bash
 cd worker
-npm install
-npm test                  # unit tests (node --test)
-npm run test:workers      # vitest inside the Workers runtime
+npm ci
+npm test                  # Node tests, including an in-memory SQLite D1 adapter
+npm run test:workers      # Vitest inside workerd with local D1
 npx wrangler d1 execute internscout --local --file=schema.sql
 npm run dev               # http://localhost:8787
 ```
+
+See [TESTING.md](TESTING.md) for focused commands, test isolation and the intentional overlap
+between the Node and Workers-runtime suites. Tests use synthetic data and provider doubles; they do
+not require production credentials or a deployment.
 
 For `wrangler dev`, put local-only secrets in `worker/.dev.vars` (git-ignored), for example
 `HASH_SALT=dev-salt`. Use a test Gemini key there, never the production one.
