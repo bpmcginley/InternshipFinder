@@ -19,6 +19,7 @@ from collections import Counter
 
 from .console_log import console
 from .public_data import public_data_dir
+from .vocabulary import HOME_STATE_CODES
 
 # Google Jobs results are tagged from their titles alone (normalize.py: classify(title)), so a query
 # only helps its field if the titles it brings back classify into that field and read as a student
@@ -130,7 +131,7 @@ SEARCHES: dict[str, list[str]] = {
     "nonprofit": ["nonprofit internship summer 2027", "nonprofit program internship"],
 }
 
-HOME = {"MA", "CT", "RI", "NH", "VT", "ME", "NY", "NJ", "remote"}
+HOME = set(HOME_STATE_CODES)
 FIELDS = 3  # fields focused on at once
 ENOUGH = 60  # a field with this many open roles nearby is not thin
 
