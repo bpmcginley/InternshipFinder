@@ -264,6 +264,33 @@ export function createFollowArchiveReader({
     return { bytes, snapshot };
   }
 
+  async function latest(effectiveLower) {
+    return (
+      (await run(async (read) => {
+        const entry = (await manifest(read)).at(-1);
+        if (
+          !entry ||
+          now() < followInstant(entry.generated_at) ||
+          now() >= followInstant(entry.enqueue_until)
+        )
+          fail();
+        const { bytes, snapshot } = await blob(read, entry, l.maxBytes);
+        if (now() >= followInstant(entry.enqueue_until)) fail();
+        if (effectiveLower !== undefined) {
+          if (effectiveLower > entry.generated_at) return unavailable();
+          if (effectiveLower < snapshot.covers_after) return { status: "gap" };
+        }
+        return {
+          status: "ready",
+          at: entry.generated_at,
+          enqueueUntil: entry.enqueue_until,
+          digest: entry.sha256,
+          bytes,
+        };
+      })) ?? unavailable()
+    );
+  }
+
   return Object.freeze({
     // Compatible with #298 loadSnapshot({at,digest,maxBytes}); independent of latest.
     async loadSnapshot({ at, digest, maxBytes } = {}) {
@@ -284,28 +311,11 @@ export function createFollowArchiveReader({
     },
     async latest({ effectiveLower } = {}) {
       if (followInstant(effectiveLower) === null) return unavailable();
-      return (
-        (await run(async (read) => {
-          const entry = (await manifest(read)).at(-1);
-          if (
-            !entry ||
-            now() < followInstant(entry.generated_at) ||
-            now() >= followInstant(entry.enqueue_until)
-          )
-            fail();
-          const { bytes, snapshot } = await blob(read, entry, l.maxBytes);
-          if (now() >= followInstant(entry.enqueue_until)) fail();
-          if (effectiveLower > entry.generated_at) return unavailable();
-          if (effectiveLower < snapshot.covers_after) return { status: "gap" };
-          return {
-            status: "ready",
-            at: entry.generated_at,
-            enqueueUntil: entry.enqueue_until,
-            digest: entry.sha256,
-            bytes,
-          };
-        })) ?? unavailable()
-      );
+      return latest(effectiveLower);
+    },
+    // A batch checks subscriber-specific coverage in the existing matcher and CAS.
+    latestSnapshot() {
+      return latest();
     },
   });
 }
