@@ -1,11 +1,12 @@
 // Paid listings ("placements") on the dashboard (2026-10-14, B2 plan section 5.4; rows S5 and S6). The rule
 // these tests hold the code to: payment never changes any score, order, filter, count or what Auto-Apply
 // does. docs/js/core.js, docs/js/placements.js and docs/js/app.js are loaded the way the page loads them,
-// against a stand-in `window`; T1 runs on real listing files from docs/data/listings.
+// against a stand-in `window`; T1 uses synthetic listing shards.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import vm from "node:vm";
+import { LISTING_CLOCK, MAJORS, listingRows } from "./fixtures/listing_cases.mjs";
 
 const read = p => readFileSync(new URL("../../" + p, import.meta.url), "utf8");
 const CORE_SRC = read("docs/js/core.js");
@@ -40,20 +41,8 @@ const plain = v => JSON.parse(JSON.stringify(v));
 
 // ---------- fixtures ----------
 const DAY = "2026-11-03";
-let realCache = null;
-function realRows() {
-  if (realCache) return realCache;
-  const dir = new URL("../../docs/data/listings/", import.meta.url);
-  const byId = new Map();
-  for (const f of ["MA.json", "NY.json", "CA.json", "TX.json", "remote.json"]) {
-    if (!readdirSync(dir).includes(f)) continue;
-    for (const x of JSON.parse(readFileSync(new URL(f, dir), "utf8"))) if (x && x.id != null && !byId.has(x.id)) byId.set(x.id, x);
-  }
-  return (realCache = [...byId.values()]);
-}
 const deepFreeze = o => { Object.values(o).forEach(v => v && typeof v === "object" && !Object.isFrozen(v) && deepFreeze(v)); return Object.freeze(o); };
 const BASE_F = { q: "", fields: [], states: [], company: [], where: "", stage: "", year: "", sector: "", status: "open", app_state: "", new_only: false, eligible: false, sort: "new", hide_citizen: false, paid: "" };
-const MAJORS = JSON.parse(read("docs/data/majors.json"));
 const PROFILE = { majors: ["Computer Science"], class_year: "junior", grad_term: "Spring 2028", states: ["MA", "NY"], work_auth: "visa", terms: ["Summer 2027"], stages: ["internship"] };
 function envFor(IS, p, all) {
   const { direct, related } = IS.profileFields(p, MAJORS);
@@ -72,13 +61,13 @@ const placementFor = (x, extra) => ({ id: "p-" + x.id, listing_id: String(x.id),
 
 // ---------- T1: a placement cannot change any row, order or score ----------
 test("T1: with or without placements, every row, its order and its score are the same", () => {
-  const { IS, P } = loadBoth();
+  const { IS, P } = loadBoth({ Date: class extends Date { static now() { return LISTING_CLOCK; } } });
   // A write to a listing would throw. core.js keeps two caches on each listing (hidden _regs and _keys
   // properties, from IS.regs and IS.shardKeys), so they are filled in first; any other write fails the test.
-  const listings = structuredClone(realRows());
+  const listings = listingRows();
   listings.forEach(x => { IS.regs(x); IS.shardKeys(x); });
   deepFreeze(listings);
-  assert.ok(listings.length > 500, "listing files should be in docs/data/listings");
+  assert.ok(listings.length > 500, "fixture must contain more than 500 listings");
   const words = IS.placeWords(listings);
   let picked = 0;
   for (const prof of [null, PROFILE]) {
@@ -98,8 +87,9 @@ test("T1: with or without placements, every row, its order and its score are the
       const malformed = P.clean({ placements: [null, 7, { id: "bad id!" }, { id: "x", listing_id: "1", apply_url: "http://x", start: "2026", end: "2027" }] });
       for (const placements of [[], matching, failing, malformed]) {
         for (const rand of [() => 0, () => 0.99]) {
-          if (P.pick({ placements, rows: Object.freeze(before.rows.slice()), rel: before.rel, ranked: before.ranked, fieldsSet: f.fields.length > 0,
-            appState: f.app_state, loading: false, day: DAY, exclude: () => false, hidden: false, prev: null, rand })) picked++;
+          const selection = P.pick({ placements, rows: Object.freeze(before.rows.slice()), rel: before.rel, ranked: before.ranked, fieldsSet: f.fields.length > 0,
+            appState: f.app_state, loading: false, day: DAY, exclude: () => false, hidden: false, prev: null, rand });
+          if (placements === matching && selection) picked++;
           const after = IS.listRows(listings, f, env);
           assert.deepEqual(plain([after.rows.map(x => String(x.id)), after.rows.map(x => IS.score(x, env.ctx))]), snap,
             `${prof ? "profile" : "no profile"}, ${JSON.stringify(extra)}, ${placements.length} placements`);
@@ -128,7 +118,7 @@ test("T1b: the ranking code has no way in", () => {
 // ---------- T2: every filter passes through ----------
 test("T2: a placement whose listing isn't in the student's rows, or fails a check, is never picked", () => {
   const { IS, P } = loadBoth();
-  const listings = realRows();
+  const listings = listingRows();
   const words = IS.placeWords(listings);
   const env0 = envFor(IS, null, listings);
   const base = { loading: false, day: DAY, exclude: () => false, hidden: false, prev: null, rand: () => 0, appState: "" };
