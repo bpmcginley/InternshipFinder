@@ -47,3 +47,4 @@ import "./topup-allocation.test.js";
 import "./topup-checkout.test.js";
 import "./topup-stripe.test.js";
 import "./topup-payment-evidence.test.js";
+import "./topup-reversal-evidence.test.js";
