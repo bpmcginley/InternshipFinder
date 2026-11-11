@@ -101,6 +101,24 @@ export async function deletionBlocksUnresolved(db) {
     }
 }
 
+export async function deletionUsesScopedResolvedIndex(db) {
+  const { results } = await db
+    .prepare(
+      "EXPLAIN QUERY PLAN DELETE FROM topup_checkout_attempts " +
+        "WHERE user_hash = ? AND state IN ('expired', 'settled')",
+    )
+    .bind(user)
+    .all();
+  assert.ok(
+    results.some((row) =>
+      /SEARCH topup_checkout_attempts USING INDEX topup_checkout_resolved_user \(user_hash=\?\)/.test(
+        row.detail,
+      ),
+    ),
+    "resolved deletion must look up only the requested owner's index entries",
+  );
+}
+
 export async function deletionErasesLinkedDataOnly(db) {
   await reset(db);
   const owned = await purchase(db),

@@ -823,6 +823,8 @@ CREATE TABLE IF NOT EXISTS topup_attempt_revisions (
 
 -- Account deletion is the sole INSERT/UPSERT writer of forget. Monthly cleanup only DELETEs.
 -- RAISE aborts deleteUser's whole D1 batch; no new identity or retention is introduced.
+CREATE INDEX IF NOT EXISTS topup_checkout_resolved_user ON topup_checkout_attempts(user_hash)
+  WHERE state IN ('expired', 'settled');
 CREATE TRIGGER IF NOT EXISTS topup_account_deletion BEFORE INSERT ON forget
 BEGIN
   SELECT RAISE(ABORT, 'topup_payment_pending') WHERE EXISTS (
