@@ -7,6 +7,7 @@ import os
 from .base import client
 from .common import ScanCounts, board_item, html_to_text, report_source, reported_count, rows_of
 from ..classify import is_internship
+from ..console_log import console
 
 API = "https://data.usajobs.gov/api/search"
 PAGE, MAX_PAGES = 500, 10
@@ -118,7 +119,7 @@ def fetch_usajobs(api_key: str | None = None, email: str | None = None, report=N
     api_key = api_key or os.environ.get("USAJOBS_API_KEY")
     email = email or os.environ.get("USAJOBS_EMAIL")
     if not (api_key and email):
-        print("[usajobs] no USAJOBS_API_KEY/USAJOBS_EMAIL set; skipping")
+        console("[usajobs] no USAJOBS_API_KEY/USAJOBS_EMAIL set; skipping")
         report_source(report, "usajobs", skipped="no_api_key")
         return []
     headers = {"Host": "data.usajobs.gov", "User-Agent": email, "Authorization-Key": api_key}
@@ -156,7 +157,7 @@ def fetch_usajobs(api_key: str | None = None, email: str | None = None, report=N
     except Exception as e:
         error = e
         print(f"[usajobs] failed: {e}")
-    print(f"[usajobs] {len(out)} student postings")
+    console(f"[usajobs] {len(out)} student postings")
     # A failure part way through is still a failure, whatever it returned before it.
     report_source(report, "usajobs", items=out, error=error, counts=counts)
     return out

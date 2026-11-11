@@ -168,3 +168,33 @@ def test_the_workflow_builds_the_pack_weekly_and_posts_nothing():
     assert "python growth/campaign.py docs --out=campaign" in wf and "upload-artifact" in wf
     assert "cron:" in wf and "--send" not in wf and "secrets." not in wf
     assert "contents: read" in wf
+
+
+@pytest.mark.parametrize("json_mode", [False, True])
+def test_campaign_summary_keeps_default_text_and_redacts_json(monkeypatch, capsys, json_mode):
+    if json_mode:
+        monkeypatch.setenv("INTERNSCOUT_LOG_FORMAT", "json")
+    else:
+        monkeypatch.delenv("INTERNSCOUT_LOG_FORMAT", raising=False)
+    pack = {
+        "week": "2026w44",
+        "search": {"title": "Search title"},
+        "tip": {"title": "Tip title"},
+    }
+    calls = []
+
+    def build(site, out):
+        calls.append((site, out))
+        return pack
+
+    monkeypatch.setattr(campaign, "build", build)
+    assert campaign.main(["campaign.py", "fixture-site", "--out=fixture-output"]) == 0
+    assert calls == [("fixture-site", "fixture-output")]
+    output = capsys.readouterr()
+    assert output.err == ""
+    if json_mode:
+        assert json.loads(output.out) == {"level": "INFO", "message": "[campaign] pack written"}
+    else:
+        assert output.out == (
+            "[campaign] 2026w44: search 'Search title', tip 'Tip title' -> fixture-output\n"
+        )

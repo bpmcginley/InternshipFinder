@@ -22,8 +22,8 @@ import re
 from collections import Counter
 from datetime import datetime, timezone
 
-from . import seo_pages as sp
-from .placements import _deadline_passed, unpaid
+from .site import source
+from .site.paid_rules import _deadline_passed, unpaid
 
 FOLDER = os.path.join("data", "roles")
 
@@ -43,7 +43,7 @@ def qualifies(x: dict, today: str) -> bool:
     https, which is also all a placement accepts (placements._well_formed)."""
     return (
         x.get("status") == "open"
-        and sp.real_company(x.get("company_name") or "")
+        and source.real_company(x.get("company_name") or "")
         and str(x.get("apply_url") or "").startswith("https://")
         and not _deadline_passed(x, today)
         and bool(_ID.match(str(x.get("id"))))
@@ -57,15 +57,15 @@ def roles(listings: list[dict], today: str) -> list[dict]:
     rows = [
         {
             "id": x["id"],
-            "k": sp.employer_key(x["company_name"]),
+            "k": source.employer_key(x["company_name"]),
             "co": x["company_name"],
             "t": x.get("title") or "",
-            "loc": sp.place(x),
+            "loc": source.place(x),
             "u": x["apply_url"],
             "f": list(x.get("field_tags") or []),
             "unpaid": unpaid(x),
         }
-        for x in sp.unique_roles([x for x in listings if qualifies(x, today)])
+        for x in source.unique_roles([x for x in listings if qualifies(x, today)])
     ]
     return sorted(rows, key=lambda r: (r["co"].lower(), r["t"].lower(), r["id"]))
 
