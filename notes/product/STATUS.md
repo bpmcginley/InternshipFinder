@@ -491,3 +491,7 @@ Node 22 serial site suite passed 316/316 and both golden tests passed. Both stam
 ## P-0.2 final disclosure integration
 
 Normally integrated published dashboard main `2a8176db`, preserving reviewed privacy source and all 16 screenshots from `14696ba9`. Both stamped artifacts were regenerated; 695 hashes match and only privacy.html differs from main. Every other public path and page-content-date record is identical, including dashboard/storage/allowance/distribution output. The privacy artifact itself is byte-identical to the original reviewed after capture. 316 serial Node 22 site tests and two golden tests passed; the publication checker found zero problems. Final CI and independent incremental review remain required. Disclosure wording is approved; publish it before owner worker deployment. No deployment, release, mail or provider action occurred.
+
+## Chrome 0.6.0 strict Worker SSE parsing claim
+
+A separate needs-bruce draft on frozen #426 claims only the extension Gemini parsing/stitching boundary, a new focused test and package evidence. Malformed earlier SSE data must not become a successful answer because a later chunk says STOP. Bound accumulation and preserve valid stream/cancellation behavior. Existing retry and financial policy remain unchanged; post-refactor release qualification is separate. [Package note](P-0.6.0-strict-sse.md).
