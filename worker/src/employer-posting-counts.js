@@ -148,6 +148,63 @@ export function createRequestScopedEmployerPostingCounter({
   return employerPostingCounter(db, (key) => cache.match(key, load), now);
 }
 
+// Dormant alternative: readiness is the current database invariant, not scheduler history.
+// Construct inside the owning request. This path can neither clean rows nor bootstrap caps.
+export function createRetentionCheckedEmployerPostingCounter({
+  db,
+  cache,
+  load,
+  now = () => new Date(),
+}) {
+  return {
+    async countAdmitted(admission) {
+      const value = admissions.get(admission);
+      admissions.delete(admission);
+      if (!value) return false;
+      try {
+        const at = now();
+        if (!instant(at) || at.getTime() < value.at) return false;
+        const day = at.toISOString().slice(0, 10);
+        if (day !== new Date(value.at).toISOString().slice(0, 10)) return false;
+        const isCurrent = await cache.match(value.company, load);
+        const checked = now();
+        if (
+          !isCurrent ||
+          !instant(checked) ||
+          checked.getTime() < at.getTime() ||
+          checked.toISOString().slice(0, 10) !== day ||
+          !isCurrent(checked.getTime())
+        )
+          return false;
+        // Indexed absence checks and both cap updates share one D1 transaction. Database
+        // time rejects an admitted request delayed into another UTC day, even with a stale clock.
+        const results = await db.batch([
+          db
+            .prepare(
+              `INSERT INTO employer_posting_counts(day,company,n)
+            SELECT ?,?,1 WHERE ?=date('now')
+              AND (SELECT n FROM employer_posting_day_caps WHERE day=?)<50000
+              AND NOT EXISTS(SELECT 1 FROM employer_posting_counts WHERE day<date(?,'-90 days'))
+              AND NOT EXISTS(SELECT 1 FROM employer_posting_day_caps WHERE day<?)
+              AND NOT EXISTS(SELECT 1 FROM employer_posting_day_caps WHERE day>?)
+            ON CONFLICT(day,company) DO UPDATE SET n=n+1 WHERE n<1000`,
+            )
+            .bind(day, value.company, day, day, day, day, day),
+          db
+            .prepare("UPDATE employer_posting_day_caps SET n=n+1 WHERE day=? AND changes()=1")
+            .bind(day),
+        ]);
+        return (
+          results.length === 2 &&
+          results.every((result) => result.success && result.meta.changes === 1)
+        );
+      } catch {
+        return false;
+      }
+    },
+  };
+}
+
 // Cleanup has to succeed for the current UTC day before accepting counts.
 function employerPostingCounter(db, match, now, budget = employerMinuteBudget) {
   let readyDay = null;
