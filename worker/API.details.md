@@ -342,6 +342,19 @@ Body:
 ### `POST /demand` (auth)
 Body: `{ "states": ["MA", "NY", "REMOTE"] }`, using USPS codes plus `REMOTE` (max 60). Replaces the user's row. Returns `{ "ok": true }`.
 
+### Optional organic employer posting counts (default off)
+
+The existing `POST /hit` accepts only `{e:"employer_posting_open",c:canonicalKey}` for this optional branch. It requires `EMPLOYER_POSTING_COUNTS_ENABLED` exactly `"1"` and an explicit `EMPLOYER_POSTING_CATALOG` JSON descriptor. The only URL is `https://internscout.org/data/employer-posting-keys.json`. Two exact, mutually exclusive shapes are supported; mixed fields or unknown modes disable the branch:
+
+- Pinned mode keeps the existing `{url,version,sha256}` shape. Version is a 40-character lowercase hexadecimal public release identity; SHA-256 is the 64-character lowercase digest of its exact uncompressed catalog bytes. GET appends `?v=<version>` and verifies the raw-byte digest before parsing. The version query is not immutable Pages history. A changed catalog fails closed until the configured pin matches.
+- Published mode requires exactly `{mode:"published",url}`. It GETs the fixed URL without a version query using `cache:"no-store"`, avoiding an additional Cloudflare fetch cache. It trusts the current first-party publication and refreshes without per-release Worker configuration changes. It does not claim an independently pinned release or keep a second digest state. The catalog remains the same keys-only array, parsed by the existing canonical validator.
+
+Both modes forbid redirects and credentials, require exact response URL/status 200, and bound streamed bytes to 256 KiB. The existing request-owned refresh has a five-second deadline and a five-minute hard cache lifetime measured from load start. Configuration changes and mode switches invalidate the prior generation. During refresh, competing requests fail closed without sharing or cancelling the owner's I/O. Failed, malformed, oversized, late or expired refreshes cannot fall back to stale membership. A valid cached catalog can remain in use until its hard expiry; removed keys are rejected after replacement. No descriptor or enablement is configured here. Publishing annotations and their matching catalog together from the selected export remains a separate release gate.
+
+Legacy hits keep their existing admission and 204 response. Organic abuse admission stays separate and precedes fetch/DB work. The request checks the current UTC retention/cap invariant atomically and cannot bootstrap a day cap or clean rows. The existing maintenance schedule is unchanged. **Do not enable collection until separate maintenance is integrated and verified across UTC rollover and independent requests.** The current daily 07:17 UTC schedule alone leaves the midnight-to-cleanup gap. Physical deletion must continue after disabling collection.
+
+The existing authenticated owner-only `GET /admin/employer-metrics` retains `no-store` and existing paid/funnel fields. With valid enabled configuration it adds the reviewed completed-day organic report and cursor. When the switch is `"1"`, it also adds `organic_posting_readiness: {catalog_configured, retention}`. Retention is `not_checked`, `ready`, `blocked` or `unavailable`. `ready` describes the current database invariant only, not cleanup history, remaining count capacity, or verified/fetched catalog freshness. Health performs no catalog GET, cleanup or bootstrap. Missing/invalid descriptor leaves organic report reads off. With the switch absent the response is unchanged. No public totals or new storage are introduced.
+
 ### `POST /hit` (site only, no auth)
 One page load on internscout.org, sent by `docs/js/count.js` with `sendBeacon` as `text/plain`:
 `{ "p": "/internships/ohio/", "r": "www.google.com", "u": "digest", "m": "email", "c": "weekly-2026w44", "t": "search-card" }` (path, referring

@@ -27,12 +27,12 @@ The router trims trailing slashes before exact matching. Global OPTIONS is handl
 | `GET /invite` | user | none | none | JSON {code, link, rewarded, max, bonus, left} |
 | `POST /invite/claim` | user | none | JSON {code: string} | JSON {ok: true, bonus, inviter_rewarded: boolean} |
 | `POST /demand` | user | none | JSON {states: string[]} | JSON {ok: true} |
-| `POST /hit` | site-origin | none | JSON/text-plain object {p?, r?, u?, m?, c?, t?, e?, s?}; bounded names and tags from visits.js | 204, no body |
+| `POST /hit` | site-origin | none | JSON/text-plain object {p?, r?, u?, m?, c?, t?, e?, s?}; optional gated organic {e: employer_posting_open, c: canonical key}; maximum 2,000 bytes | 204, no body |
 | `POST /employer-interest` | site-origin | none | JSON {name, email, company, title?, hiring_for?, wants?, message?, website?}; maximum 8,000 bytes | JSON {ok: true}; field errors include field |
 | `GET /placements` | public | none | none | JSON {day, placements: [{id, listing_id, apply_url, employer, start, end, page_cap, unpaid_ok}]}; public max-age=300 |
 | `GET /admin/placements` | admin | none | none | JSON {placements: PlacementWithLogAndRuns[]} |
 | `GET /admin/leads` | admin | none | none | JSON {leads: [{id, created, company, wants}]} |
-| `GET /admin/employer-metrics` | admin | none | Query days?: integer 1..90, default 28 | JSON {start, end_exclusive, days, currency, events, page_views, cash_cohort, campaign_reports_all_time, about}; no-store |
+| `GET /admin/employer-metrics` | admin | none | Query days?: integer 1..90, default 28; optional gated organic_after cursor | JSON {start, end_exclusive, days, currency, events, page_views, cash_cohort, campaign_reports_all_time, about}; optional organic_posting_counts and organic_posting_readiness; no-store |
 | `POST /admin/placements/report` | admin | none | JSON {id, month: YYYY-MM} | JSON {report: {placement, employer, listing_id, month, shown, opened, by_page, about}} |
 | `POST /admin/placements` | admin | none | JSON {lead_id?, employer?, listing_id, apply_url, start, end, note?, by} | JSON {placement: Placement} |
 | `POST /admin/placements/update` | admin | none | JSON {id, by, start?, end?, listing_id?, apply_url?, employer?, note?} | JSON {placement: Placement}; manual activation/edit restrictions remain in router |
@@ -417,6 +417,19 @@ Body:
 
 ### `POST /demand` (auth)
 Body: `{ "states": ["MA", "NY", "REMOTE"] }`, using USPS codes plus `REMOTE` (max 60). Replaces the user's row. Returns `{ "ok": true }`.
+
+### Optional organic employer posting counts (default off)
+
+The existing `POST /hit` accepts only `{e:"employer_posting_open",c:canonicalKey}` for this optional branch. It requires `EMPLOYER_POSTING_COUNTS_ENABLED` exactly `"1"` and an explicit `EMPLOYER_POSTING_CATALOG` JSON descriptor. The only URL is `https://internscout.org/data/employer-posting-keys.json`. Two exact, mutually exclusive shapes are supported; mixed fields or unknown modes disable the branch:
+
+- Pinned mode keeps the existing `{url,version,sha256}` shape. Version is a 40-character lowercase hexadecimal public release identity; SHA-256 is the 64-character lowercase digest of its exact uncompressed catalog bytes. GET appends `?v=<version>` and verifies the raw-byte digest before parsing. The version query is not immutable Pages history. A changed catalog fails closed until the configured pin matches.
+- Published mode requires exactly `{mode:"published",url}`. It GETs the fixed URL without a version query using `cache:"no-store"`, avoiding an additional Cloudflare fetch cache. It trusts the current first-party publication and refreshes without per-release Worker configuration changes. It does not claim an independently pinned release or keep a second digest state. The catalog remains the same keys-only array, parsed by the existing canonical validator.
+
+Both modes forbid redirects and credentials, require exact response URL/status 200, and bound streamed bytes to 256 KiB. The existing request-owned refresh has a five-second deadline and a five-minute hard cache lifetime measured from load start. Configuration changes and mode switches invalidate the prior generation. During refresh, competing requests fail closed without sharing or cancelling the owner's I/O. Failed, malformed, oversized, late or expired refreshes cannot fall back to stale membership. A valid cached catalog can remain in use until its hard expiry; removed keys are rejected after replacement. No descriptor or enablement is configured here. Publishing annotations and their matching catalog together from the selected export remains a separate release gate.
+
+Legacy hits keep their existing admission and 204 response. Organic abuse admission stays separate and precedes fetch/DB work. The request checks the current UTC retention/cap invariant atomically and cannot bootstrap a day cap or clean rows. The existing maintenance schedule is unchanged. **Do not enable collection until separate maintenance is integrated and verified across UTC rollover and independent requests.** The current daily 07:17 UTC schedule alone leaves the midnight-to-cleanup gap. Physical deletion must continue after disabling collection.
+
+The existing authenticated owner-only `GET /admin/employer-metrics` retains `no-store` and existing paid/funnel fields. With valid enabled configuration it adds the reviewed completed-day organic report and cursor. When the switch is `"1"`, it also adds `organic_posting_readiness: {catalog_configured, retention}`. Retention is `not_checked`, `ready`, `blocked` or `unavailable`. `ready` describes the current database invariant only, not cleanup history, remaining count capacity, or verified/fetched catalog freshness. Health performs no catalog GET, cleanup or bootstrap. Missing/invalid descriptor leaves organic report reads off. With the switch absent the response is unchanged. No public totals or new storage are introduced.
 
 ### `POST /hit` (site only, no auth)
 One page load on internscout.org, sent by `docs/js/count.js` with `sendBeacon` as `text/plain`:
