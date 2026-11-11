@@ -55,6 +55,10 @@ Updated: 2026-11-11. Owner: product lead. Instructions: [HANDOFF.md](HANDOFF.md)
 
 [Draft #295](https://github.com/bpmcginley/InternshipFinder/pull/295) is based on exact #286 `c4e245dd`. A validated complete window with no matching roles advances the unchanged confirmed scopes atomically. The same full-set generation and watermark check used for enqueue protects the write. Live jobs and unresolved send attempts keep their existing progress. Migration `0014` adds a partial subscriber index for the unresolved-attempt check. A retry after an ambiguous commit can read the already-advanced window. Owner integration and the producer, dispatch and deployment gates remain pending.
 
+## P-2.1m dormant pinned digest preparation
+
+[Draft #298](https://github.com/bpmcginley/InternshipFinder/pull/298) is based on exact #295 `a1f3c19c`. Preparation loads only the queued public snapshot pin, verifies exact bytes and matched role references, and rechecks the live lease after loading. The loader receives no address or link. The actual sender still needs a fresh guarded attempt. The producer, transport, owner integration and deployment remain pending.
+
 ## Package tracker
 
 Queued means not started, not approved for release. A dash means no branch or PR has been created. Split parts of a package get separate rows and PRs when ownership or approval differs.
@@ -208,6 +212,7 @@ Dates are when the item was recorded, not a claim that a separate message was se
 
 | Recorded | Item | Ready artifact / next action | Done |
 |---|---|---|---|
+| 2026-11-10 | P-2.1m pinned digest preparation | [#298](https://github.com/bpmcginley/InternshipFinder/pull/298), stacked on #295. Preparation proves the pinned public snapshot and current lease. The sender still needs fresh consent and an owner-approved deployment. | Draft needs-bruce |
 | 2026-11-10 | P-2.1l empty-window progress | [#295](https://github.com/bpmcginley/InternshipFinder/pull/295), stacked on #286. Complete empty snapshots can advance exact current scopes without a digest job. Review, CI, parent integration and owner merge remain pending. | Draft needs-bruce |
 | 2026-11-10 | P-2.1k dormant finalization worker merge | [Draft #286](https://github.com/bpmcginley/InternshipFinder/pull/286), stacked on #281. Local progress, deletion, rollback, malformed-data and migration tests pass; independent review, fresh CI, parent integration and owner merge remain pending. No sender or deployment enabled. | - |
 | 2026-11-10 | P-2.1f dormant matching merge | [#255](https://github.com/bpmcginley/InternshipFinder/pull/255), stacked on #243. Pure matching only; review/CI and owner merge needed. Draft public snapshot contract is unpublished; production limits/producer, consent/watermark/queue integration and sending/deployment gates remain pending. | - |

@@ -1,5 +1,5 @@
 // Dormant transaction composition. No sender, producer, route, cron or progress finalization.
-import { matchFollowSnapshot } from "./follow-matching.js";
+import { followSnapshotDigest, matchFollowSnapshot } from "./follow-matching.js";
 import { readFollowProgress } from "./follow-progress.js";
 import { payloadOf } from "./follow-outbox.js";
 
@@ -113,9 +113,7 @@ export async function enqueueFollowSnapshot(
   } catch {
     return invalid("pending_bound");
   }
-  const digest = [...new Uint8Array(await crypto.subtle.digest("SHA-256", snapshot))]
-    .map((n) => n.toString(16).padStart(2, "0"))
-    .join("");
+  const digest = await followSnapshotDigest(snapshot);
   const id = crypto.randomUUID(),
     day = at.slice(0, 10);
   const result = await db.batch([

@@ -1,4 +1,5 @@
 import { enqueueFollowSnapshot } from "../src/follow-enqueue.js";
+import { prepareLeasedFollowDigest } from "../src/follow-digest-prepare.js";
 import {
   confirmFollow,
   mintFollowToken,
@@ -74,6 +75,8 @@ async function confirm(db, company) {
 }
 const enqueue = (db, id, data = snapshot(), overrides = {}, at = now) =>
   enqueueFollowSnapshot(db, id, data, { ...options, ...overrides }, at);
+const prepare = (db, id, lease, loadSnapshot, clock = () => now) =>
+  prepareLeasedFollowDigest(db, id, lease, { catalog, limits, loadSnapshot, clock });
 const rows = async (db, table) => (await db.prepare(`SELECT * FROM ${table}`).all()).results;
 const progress = (db) => rows(db, "follow_scope_progress");
 const pending = (db) => rows(db, "follow_pending_progress");
@@ -520,4 +523,117 @@ export async function emptyWindowRollback(db, equal, rejects) {
     (await progress(db)).map((row) => row.watermark),
     [options.upperBound, options.upperBound],
   );
+}
+
+export async function preparePinnedDigest(db, equal) {
+  const a = await confirm(db, "alpha");
+  const job = await enqueue(db, a.subscriberId);
+  const pin = (await pending(db))[0];
+  let loads = 0;
+  const load = async (input) => {
+    loads++;
+    equal(input, {
+      at: options.upperBound,
+      digest: pin.snapshot_digest,
+      maxBytes: limits.maxBytes,
+    });
+    return snapshot();
+  };
+  equal(await prepare(db, job.id, crypto.randomUUID(), load), { status: "unavailable" });
+  equal(loads, 0);
+  const lease = await leaseFollowDigest(db, job.id, now);
+  const previous = await jobs(db);
+  const [alpha] = JSON.parse(new TextDecoder().decode(snapshot())).roles;
+  equal(await prepare(db, job.id, lease, load), {
+    status: "ready",
+    subscriberId: a.subscriberId,
+    roles: [alpha],
+  });
+  equal(loads, 1);
+
+  const changedBytes = new TextEncoder().encode(" " + new TextDecoder().decode(snapshot()));
+  for (const data of [changedBytes, new Uint8Array(limits.maxBytes + 1), "not bytes"]) {
+    equal(await prepare(db, job.id, lease, async () => data), { status: "unavailable" });
+  }
+  equal(await jobs(db), previous);
+  equal(await pending(db), [pin]);
+  equal(await rows(db, "follow_digest_days"), []);
+
+  await db
+    .prepare("UPDATE follow_digest_outbox SET payload=? WHERE id=?")
+    .bind(JSON.stringify([{ scopeKey: a.scopeKey, roles: ["2".repeat(16)] }]), job.id)
+    .run();
+  equal(await prepare(db, job.id, lease, load), { status: "unavailable" });
+}
+
+export async function prepareLeaseFences(db, equal) {
+  const a = await confirm(db, "alpha");
+  await confirm(db, "beta");
+  const job = await enqueue(db, a.subscriberId);
+  const lease = await leaseFollowDigest(db, job.id, now);
+  for (const expiresDuring of [1, 2]) {
+    let time = now,
+      reads = 0,
+      loads = 0;
+    const delayedRead = {
+      prepare(sql) {
+        return {
+          bind: (...args) => ({
+            first: async () => {
+              const row = await db
+                .prepare(sql)
+                .bind(...args)
+                .first();
+              if (++reads === expiresDuring) time = new Date(+now + 5 * 60_000);
+              return row;
+            },
+          }),
+        };
+      },
+    };
+    const load = async () => {
+      loads++;
+      return snapshot();
+    };
+    equal(await prepare(delayedRead, job.id, lease, load, () => time), { status: "unavailable" });
+    equal(loads, expiresDuring - 1);
+  }
+  for (const offset of [-1, 5 * 60_000]) {
+    let time = now;
+    const delayed = async () => {
+      time = new Date(+now + offset);
+      return snapshot();
+    };
+    equal(await prepare(db, job.id, lease, delayed, () => time), { status: "unavailable" });
+  }
+
+  const token = await mintFollowToken(db, a.subscriberId, "manage", {}, now);
+  const cancelled = async () => {
+    await removeManagedFollow(db, token, a.scopeKey, now);
+    return snapshot();
+  };
+  equal(await prepare(db, job.id, lease, cancelled), { status: "unavailable" });
+  equal((await jobs(db))[0].state, "cancelled");
+  equal(await pending(db), []);
+  equal(await rows(db, "follow_digest_days"), []);
+}
+
+export async function prepareUnpinnedJob(db, equal) {
+  const a = await confirm(db, "alpha");
+  const jobId = await queueFollowDigest(
+    db,
+    a.subscriberId,
+    [{ scopeKey: a.scopeKey, roles: ["1".repeat(16)] }],
+    now,
+  );
+  const lease = await leaseFollowDigest(db, jobId, now);
+  let loads = 0;
+  equal(
+    await prepare(db, jobId, lease, async () => {
+      loads++;
+      return snapshot();
+    }),
+    { status: "unavailable" },
+  );
+  equal(loads, 0);
 }
