@@ -22,7 +22,7 @@ import tempfile
 REPO = Path(__file__).resolve().parents[2]
 FIXTURE = Path(__file__).with_name("fixtures") / "golden"
 STAMP = "2026-11-10T12:00:00+00:00"
-TEXT_SUFFIXES = {".py", ".html", ".js", ".css", ".json", ".txt", ".md", ".webmanifest", ".svg"}
+TEXT_SUFFIXES = {".py", ".html", ".js", ".mjs", ".css", ".json", ".txt", ".md", ".webmanifest", ".svg"}
 
 
 def copy_file(source, target):

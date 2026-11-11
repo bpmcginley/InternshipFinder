@@ -50,6 +50,8 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: main             # after an ingest run: the commit that run just pushed
+          fetch-depth: 0
+          filter: blob:none
 
       - uses: ./.github/actions/python
 
@@ -138,7 +140,7 @@ jobs:
 
       - name: Stamp local script and stylesheet content versions
         working-directory: backend
-        run: python -m internscout.asset_versions ../_site
+        run: python -m internscout.asset_versions ../_site --retain-core-git ..
 
       - name: Check public site contents before publishing
         run: |
