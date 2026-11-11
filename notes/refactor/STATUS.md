@@ -637,6 +637,13 @@ For a later measurement, record monotonic elapsed milliseconds and attempt count
 
 - On `fb24a6f5`, no open Product PR claimed the five source modules. Convert only thirteen existing human diagnostics: three digest check/refusal statuses, the local digest preview summary, four social fixed/class-only outcomes, two Instagram skip outcomes, and three metrics write statuses. Default text, streams, and ordering stay exact. The social warnings add exception class metadata in JSON mode.
 - Preserve provider responses and raw errors, previews, account-setting and credential values, GitHub annotations, and output artifacts. Instagram status JSON retains the same branch and ordering. Metrics emits the original pretty JSON snapshot first, and read-only mode emits only that snapshot. The preexisting raw write-error line remains before the hint. Offline tests verify all three write outcomes and read-only byte equivalence. A real local digest fixture produced byte-identical HTML, text and JSON artifacts under the original generator and both log modes. Plain stdout also matched, and JSON omits the subject and output path.
+
+
+### WP-1.4 Q7 operator diagnostic redaction
+
+- Redacted ten standalone provider-error diagnostics across Digest, Instagram, YouTube and Metrics in plain and JSON output. The logger emits fixed action labels and exception classes. Retry numbers and fixed recovery guidance remain. Digest preserves the safe key-permission and duplicate hints. Instagram and YouTube keep their existing fallback and advice order. Metrics prints the original JSON snapshot before its warning and hint.
+- Workflow consumers use exit statuses and the existing artifacts. These diagnostics have no machine consumer. Digest final-send recovery lines with draft references, provider return IDs, previews, annotations, local renderer failures, interactive authorization, and credential-handling diagnostics stay outside this slice.
+- Offline verification: 246 focused tests passed with one existing optional cryptography skip. The real synthetic Reel check ran. Both Golden tests passed with 695 artifact paths. Ruff and diff checks passed.
 - The Instagram and metrics direct CLIs use a temporary checkout import path. Their existing workflow checkouts already contain the shared standard-library logger. No workflow or packaging edit. The diagnostic-only scope is supported by syntax-tree comparisons of the four status modules and actual artifact and stdout comparisons for digest. After integrating main `f98760d2`, the authored sources and tests stayed byte-identical, and the socket-denied focused and golden run passed 233 with two local dependency skips. Ruff passed.
 
 ## WP-1.4 page-build logging
