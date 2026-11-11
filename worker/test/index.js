@@ -52,3 +52,4 @@ import "./topup-first-settlement.test.js";
 import "./topup-checkout-expiry.test.js";
 import "./topup-session-reservation.test.js";
 import "./topup-account-deletion.test.js";
+import "./topup-attempt-recovery.test.js";

@@ -201,6 +201,7 @@ Dates are when the item was recorded, not a claim that a separate message was se
 
 | Recorded | Item | Ready artifact / next action | Done |
 |---|---|---|---|
+| 2026-11-10 | P-2.2n active-checkout recovery Worker merge | [PR #311](https://github.com/bpmcginley/InternshipFinder/pull/311), stacked on frozen #303. Owner merge after independent review/CI. No route/schema/provider writes; request scheduling, existing-purchase reconciliation, approved publication, configuration and deployment remain separate. #294 run lifecycle is outside this package. | - |
 | 2026-11-10 | P-2.2m top-up deletion Worker merge | [PR #303](https://github.com/bpmcginley/InternshipFinder/pull/303), stacked on frozen #299. Owner merge after independent review/CI; migration0015 and legacy hook add no retained fields. #297, future route pending response, migration adoption and deployment remain required; no activation. | - |
 | 2026-11-10 | P-2.2l session-fenced reservation Worker merge | [PR #299](https://github.com/bpmcginley/InternshipFinder/pull/299), stacked on frozen #293. Owner merge after independent review/CI. #297 session-copy fix, atomic deletion, route/client integration, configuration and deployment remain required; no activation. | - |
 | 2026-11-10 | P-2.2j authoritative expiry worker merge | [PR #293](https://github.com/bpmcginley/InternshipFinder/pull/293), stacked on frozen #289. Owner merge after independent review/CI; exact-evidence local expiry only. Production deletion/auth reservation fencing, recovery routes, cleanup and activation remain separate. | - |
