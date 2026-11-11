@@ -127,7 +127,7 @@ test("links held by a live job are left out of the header selection; a failed jo
 test("distinct listings can share an apply link", () => {
   const all = loadAll();
   const byUrl = new Map();
-  for (const x of all) if (x.apply_url) byUrl.set(x.apply_url, (byUrl.get(x.apply_url) || 0) + 1);
+  for (const x of all) if (x.status === "open" && x.apply_url) byUrl.set(x.apply_url, (byUrl.get(x.apply_url) || 0) + 1);
   assert.ok([...byUrl.values()].some((n) => n > 1));
 });
 
@@ -325,7 +325,7 @@ const FILTER_STATES = (all) => {
     { company: [someCo] },
     { where: "onsite" },
     { where: "remote" },
-    { stage: "coop" },
+    { stage: "co_op" },
     { year: "junior" },
     { sector: someSector },
     { paid: "paid" },

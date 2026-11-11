@@ -20,7 +20,7 @@ const roles = [
   { title: "Software Engineer Intern", field_tags: ["swe"], years: ["junior"], salary: "$30/hour" },
   { title: "Software Research Intern", field_tags: ["swe"], status: "closed" },
   { title: "Nursing Intern", field_tags: ["nursing", "health"], years: ["sophomore"] },
-  { title: "Data Analyst Intern", field_tags: ["data"], stage: ["coop"] },
+  { title: "Data Analyst Intern", field_tags: ["data"], stage: ["co_op"] },
   { title: "Software Developer Intern", field_tags: ["swe"], restrictions: ["us_citizen_only"] },
   { title: "Marketing Intern", field_tags: ["business"], restrictions: ["paid"], is_remote: true },
   { title: "Unpaid Marketing Intern", field_tags: ["business"], restrictions: ["unpaid"] },
@@ -35,7 +35,7 @@ function shard(key) {
   return Array.from({ length: 520 }, (_, i) => ({
     id: key + "-" + i,
     // Distinct listings can point at the same application.
-    apply_url: "https://jobs.example/" + key + "/" + (i === 1 ? 0 : i),
+    apply_url: "https://jobs.example/" + key + "/" + (i === 1 || i === 4 ? 0 : i),
     company_name: "Example Employer " + (i % 23),
     sector: i % 2 ? "healthcare" : "technology",
     status: "open",
