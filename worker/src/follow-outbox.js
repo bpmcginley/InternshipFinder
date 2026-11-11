@@ -9,7 +9,7 @@ const invalid = () => {
   throw new Error("Invalid digest outbox input");
 };
 
-function payloadOf(refs) {
+export function payloadOf(refs) {
   if (!Array.isArray(refs) || !refs.length) invalid();
   const seen = new Set();
   for (const ref of refs) {
