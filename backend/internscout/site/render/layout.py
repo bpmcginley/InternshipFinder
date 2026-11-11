@@ -7,7 +7,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from html import escape as esc
 
-from .text import join_words
+from ..text import join_words
 
 
 @dataclass(frozen=True)

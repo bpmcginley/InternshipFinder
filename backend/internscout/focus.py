@@ -170,7 +170,7 @@ def choose(export_dir: str | None, fallback: list[str]) -> list[str]:
         console("[focus] no previous export; using the configured focus queries")
         return fallback
     try:
-        from .seo_pages import load
+        from .site.source import load
 
         # load() reads <site>/data; the export directory is that data folder.
         d = load(os.path.dirname(os.path.abspath(export_dir)))

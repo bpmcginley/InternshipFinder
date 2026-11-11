@@ -39,6 +39,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "backend"))
 sys.path.insert(0, HERE)
 from internscout import seo_pages as sp  # noqa: E402
+from internscout.site import source as site_source  # noqa: E402
+from internscout.site import taxonomy as site_taxonomy  # noqa: E402
+from internscout.site import text as site_text  # noqa: E402
 from internscout.console_log import console  # noqa: E402
 import digest  # noqa: E402
 
@@ -119,32 +122,33 @@ def anchor(heading: str, used: set[str]) -> str:
 
 def summer_role(x: dict) -> bool:
     stages = set(x.get("stage") or [])
-    return x.get("term") == TERM and (not stages or bool(stages & sp.STUDENT_STAGES))
+    return x.get("term") == TERM and (not stages or bool(stages & site_source.STUDENT_STAGES))
 
 
 def collect(site_dir: str, live: dict[str, str] | None = None) -> dict:
     """Everything the list says, from the site's data. live: the sitemap the site serves now
     (seo_pages.live_paths), so the field pages linked are exactly the ones deployed."""
-    pages = sp.build(site_dir, live or {})  # sets sp.EMPLOYERS and sp.BASELINE too
+    snapshot = sp.build_result(site_dir, live or {})
+    pages = snapshot.pages
     by_path = {p["path"]: p for p in pages}
-    d = sp.load(site_dir)
-    now = sp._when(d["generated_at"]) or datetime.now(timezone.utc)
-    roles = sp.newest_first(digest.unique_roles([x for x in d["listings"] if summer_role(x)]))
+    d = site_source.load(site_dir)
+    now = site_source._when(d["generated_at"]) or datetime.now(timezone.utc)
+    roles = site_source.newest_first(digest.unique_roles([x for x in d["listings"] if summer_role(x)]))
     by_field: dict[str, list[dict]] = {}
     for x in roles:
-        for t in sorted(set(x.get("field_tags") or []) - sp.SKIP_FIELDS):
+        for t in sorted(set(x.get("field_tags") or []) - site_taxonomy.SKIP_FIELDS):
             by_field.setdefault(t, []).append(x)
     fields = {t: v for t, v in by_field.items() if len(v) >= MIN_FIELD}
     open_by_field = Counter(
-        t for x in d["listings"] for t in set(x.get("field_tags") or []) - sp.SKIP_FIELDS
+        t for x in d["listings"] for t in set(x.get("field_tags") or []) - site_taxonomy.SKIP_FIELDS
     )
     links = {}
     for t in fields:
-        page = by_path.get(f"/internships/{sp.field_slug(t)}/")
+        page = by_path.get(f"/internships/{site_taxonomy.field_slug(t)}/")
         # Only if that path is the field's own page: a field whose slug is a state's ("georgia") gets
         # none, and the page there is the state's (state is set on state pages, and h1 names the field).
         if page and (
-            page.get("state") is not None or page.get("h1") != f"{sp.field_title(t)} internships"
+            page.get("state") is not None or page.get("h1") != f"{site_taxonomy.field_title(t)} internships"
         ):
             page = None
         # The field's landing page and the count in its title; the dashboard filtered to the field
@@ -154,7 +158,7 @@ def collect(site_dir: str, live: dict[str, str] | None = None) -> dict:
             if page
             else (f"{sp.SITE}/?field={quote(t)}", open_by_field[t])
         )
-    new = [x for x in roles if sp.fresh(x, now, d["baseline"])]
+    new = [x for x in roles if site_source.fresh(x, now, d["baseline"])]
     return {
         "now": now,
         "roles": roles,
@@ -162,14 +166,14 @@ def collect(site_dir: str, live: dict[str, str] | None = None) -> dict:
         "links": links,
         "new": new,
         "total": len(d["listings"]),
-        "employers": dict(sp.EMPLOYERS),
+        "employers": dict(snapshot.employer_registry),
         "new_page": "/internships/new/" in by_path,
         # Only roles that name their employer: a blank name would count as one more employer.
         "employer_count": len(
-            {sp.employer_key(x["company_name"]) for x in roles if x.get("company_name")}
+            {site_source.employer_key(x["company_name"]) for x in roles if x.get("company_name")}
         ),
     }
-    # was: len({sp.employer_key(x.get("company_name") or "") for x in roles})
+    # was: len({site_source.employer_key(x.get("company_name") or "") for x in roles})
 
 
 # ---------------------------------------------------------------- rendering
@@ -177,7 +181,7 @@ def collect(site_dir: str, live: dict[str, str] | None = None) -> dict:
 
 def posted(x: dict, now: datetime) -> str:
     """The day on the posting, or the day InternScout first found it when the posting gives none."""
-    d = sp._when(x.get("posted_at")) or sp._when(x.get("first_seen"))
+    d = site_source._when(x.get("posted_at")) or site_source._when(x.get("first_seen"))
     if not d:
         return ""
     return f"{d:%b} {d.day}" if d.year == now.year else f"{d:%b} {d.day}, {d.year}"
@@ -195,8 +199,8 @@ def row(x: dict, ctx: dict) -> str | None:
     cells = [
         company,
         md(x.get("title"), TITLE_MAX),
-        md(sp.place(x)),
-        md(sp.pay_text(x), PAY_MAX),
+        md(site_source.place(x)),
+        md(site_source.pay_text(x), PAY_MAX),
         posted(x, ctx["now"]),
         f"[Apply]({url})",
     ]
@@ -215,11 +219,11 @@ def updated(ctx: dict) -> str:
 
 def see_all(t: str, ctx: dict) -> str:
     url, n = ctx["links"][t]
-    return f"[See all {n:,} {sp.lower_name(sp.field_title(t))} internships on InternScout]({url})"
+    return f"[See all {n:,} {site_text.lower_name(site_taxonomy.field_title(t))} internships on InternScout]({url})"
 
 
 def field_order(ctx: dict) -> list[str]:
-    return sorted(ctx["fields"], key=lambda t: (sp.field_title(t).lower(), t))
+    return sorted(ctx["fields"], key=lambda t: (site_taxonomy.field_title(t).lower(), t))
 
 
 def footer(ctx: dict, repo: str) -> str:
@@ -249,7 +253,7 @@ def footer(ctx: dict, repo: str) -> str:
 def render(ctx: dict, per_field: int, repo: str = REPO) -> str:
     order = field_order(ctx)
     used: set[str] = {"contents", "new-this-week", "about-this-list"}
-    anchors = {t: anchor(sp.field_title(t), used) for t in order}
+    anchors = {t: anchor(site_taxonomy.field_title(t), used) for t in order}
     out = [
         f"# {TERM} Internships — Every Major\n",
         "<!-- Generated by growth/every_major_list.py in bpmcginley/InternshipFinder. Edits here are "
@@ -272,8 +276,8 @@ def render(ctx: dict, per_field: int, repo: str = REPO) -> str:
         f"| Field | {TERM} roles | Full list |\n|---|---:|---|",
     ]
     out += [
-        f"| [{sp.field_title(t)}](#{anchors[t]}) | {len(ctx['fields'][t]):,} | "
-        f"[fields/{sp.field_slug(t)}.md](fields/{sp.field_slug(t)}.md) |"
+        f"| [{site_taxonomy.field_title(t)}](#{anchors[t]}) | {len(ctx['fields'][t]):,} | "
+        f"[fields/{site_taxonomy.field_slug(t)}.md](fields/{site_taxonomy.field_slug(t)}.md) |"
         for t in order
     ]
     out.append("")
@@ -298,10 +302,10 @@ def render(ctx: dict, per_field: int, repo: str = REPO) -> str:
     for t in order:
         items = ctx["fields"][t]
         n = len(items)
-        slug = sp.field_slug(t)
+        slug = site_taxonomy.field_slug(t)
         whole = "all of them" if n <= FILE_ROWS else f"the newest {FILE_ROWS}"
         shown = "all of them below" if n <= per_field else f"the {per_field} newest below"
-        out.append(f"## {sp.field_title(t)}\n")
+        out.append(f"## {site_taxonomy.field_title(t)}\n")
         out.append(
             f"{n:,} {TERM} {'role' if n == 1 else 'roles'}, {shown}. "
             f"[One page with {whole}](fields/{slug}.md) · {see_all(t, ctx)}\n"
@@ -315,12 +319,12 @@ def render(ctx: dict, per_field: int, repo: str = REPO) -> str:
 def render_field(t: str, ctx: dict, repo: str = REPO) -> str:
     items = ctx["fields"][t]
     n = len(items)
-    title = sp.field_title(t)
+    title = site_taxonomy.field_title(t)
     shown = f"all {n:,}" if n <= FILE_ROWS else f"the {FILE_ROWS} newest of {n:,}"
     return "\n".join(
         [
             f"# {title}: {TERM} Internships\n",
-            f"{n:,} open {TERM} {sp.lower_name(title)} {'role' if n == 1 else 'roles'}, newest first ({shown}). "
+            f"{n:,} open {TERM} {site_text.lower_name(title)} {'role' if n == 1 else 'roles'}, newest first ({shown}). "
             f"**Updated {updated(ctx)}.** [Back to every major](../README.md) · {see_all(t, ctx)}\n",
             table(items, ctx, FILE_ROWS) + "\n",
             f"Every Apply link goes to the employer's own posting; always check it there before applying. "
@@ -345,7 +349,7 @@ def build(site_dir: str, live: dict[str, str] | None = None, repo: str = REPO) -
             break
     files = {"README.md": readme}
     files.update(
-        {f"fields/{sp.field_slug(t)}.md": render_field(t, ctx, repo) for t in ctx["fields"]}
+        {f"fields/{site_taxonomy.field_slug(t)}.md": render_field(t, ctx, repo) for t in ctx["fields"]}
     )
     return files
 

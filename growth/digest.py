@@ -41,6 +41,9 @@ from urllib.parse import quote
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "backend"))
 from internscout import seo_pages as sp  # noqa: E402
+from internscout.site import source as site_source  # noqa: E402
+from internscout.site import taxonomy as site_taxonomy  # noqa: E402
+from internscout.site import text as site_text  # noqa: E402
 from internscout import placements  # noqa: E402
 from internscout.console_log import console  # noqa: E402
 
@@ -71,7 +74,7 @@ SERIF = "font-family:Georgia,'Times New Roman',serif"
 
 esc = html.escape
 # The state slugs are shared with seo_pages.build, which gives a field no page when its slug names a state.
-STATE_SLUGS = {sp.state_slug(k) for k in sp.US_STATES}
+STATE_SLUGS = {site_taxonomy.state_slug(k) for k in site_taxonomy.US_STATES}
 
 
 # ---------------------------------------------------------------- building
@@ -85,54 +88,54 @@ def _text(value) -> str:
 def _link(url) -> str | None:
     """A web link, or None. safe_url keeps only http(s). A link with whitespace inside is not a real
     address, and in the text email it would start a new line."""
-    u = sp.safe_url(url)
+    u = site_text.safe_url(url)
     return u if u and not re.search(r"\s", u) else None
 
 
 # Both moved to seo_pages (2026-10-06), so the landing pages' sign-up forms count new roles with this
 # same code; the names stay here for the growth scripts that call them (social, outreach, metrics,
 # every_major_list). was: def unique_roles(...) and def new_roles(...), the same bodies, here.
-unique_roles = sp.unique_roles
-new_roles = sp.new_roles
+unique_roles = site_source.unique_roles
+new_roles = site_source.new_roles
 
 
 def has_page(tag: str, open_count: int) -> bool:
     """Whether seo_pages.build makes a landing page for this field: it needs MIN_OPEN open roles, and a
     field whose slug names a state gets none (the state's page has that path)."""
-    return open_count >= sp.MIN_OPEN and sp.field_slug(tag) not in STATE_SLUGS
+    return open_count >= sp.MIN_OPEN and site_taxonomy.field_slug(tag) not in STATE_SLUGS
 
 
 def field_url(tag: str, open_count: int) -> str:
     """The field's landing page. When the field has no page, the dashboard filtered to that field
     instead. A page needs MIN_OPEN open roles, and a field whose slug names a state gets none."""
-    # was: slug = sp.field_slug(tag); if open_count >= sp.MIN_OPEN and slug not in STATE_SLUGS:
+    # was: slug = site_taxonomy.field_slug(tag); if open_count >= sp.MIN_OPEN and slug not in STATE_SLUGS:
     # The test moved into has_page so growth/social.py links only to pages that exist by the same rule.
     if has_page(tag, open_count):
-        return f"{sp.SITE}/internships/{sp.field_slug(tag)}/?{UTM}"
+        return f"{sp.SITE}/internships/{site_taxonomy.field_slug(tag)}/?{UTM}"
     return f"{sp.SITE}/?field={quote(tag)}&{UTM}"
 
 
 def role(x: dict) -> dict:
-    pay = _text(x["salary"]) if x.get("salary") else ("Paid" if sp.is_paid(x) else None)
+    pay = _text(x["salary"]) if x.get("salary") else ("Paid" if site_source.is_paid(x) else None)
     return {
         "id": x.get("id"),
         "title": _text(x.get("title")),
         "company": _text(x.get("company_name")),
-        "place": _text(sp.place(x)),
+        "place": _text(site_source.place(x)),
         "pay": pay,
         "url": _link(x.get("apply_url")),
-        "nearby": bool(x["keys"] & sp.HOME_STATES),
+        "nearby": bool(x["keys"] & site_source.HOME_STATES),
     }
 
 
 def section(tag: str, items: list[dict], open_count: int) -> dict:
     return {
         "tag": tag,
-        "title": sp.field_title(tag),
+        "title": site_taxonomy.field_title(tag),
         "new": len(items),
         "open": open_count,
         "url": field_url(tag, open_count),
-        "roles": [role(x) for x in varied(sp.near_home_first(items))],
+        "roles": [role(x) for x in varied(site_source.near_home_first(items))],
     }
 
 
@@ -162,26 +165,26 @@ def build(site_dir: str, now: datetime | None = None, placements_path: str | Non
     """This week's digest, from <site_dir>/data. now defaults to when the data was exported. Paid
     listings are read only when DIGEST_PLACEMENTS is "1" (placements_on), from placements_path or
     <site_dir>/data/placements.json, and they go in their own key: nothing else in the digest reads them."""
-    d = sp.load(site_dir)
-    now = now or sp._when(d["generated_at"]) or datetime.now(timezone.utc)
+    d = site_source.load(site_dir)
+    now = now or site_source._when(d["generated_at"]) or datetime.now(timezone.utc)
     listings = d["listings"]
-    # was: new = unique_roles([x for x in listings if sp.fresh(x, now, d["baseline"])])
+    # was: new = unique_roles([x for x in listings if site_source.fresh(x, now, d["baseline"])])
     new = new_roles(d, now)
     # Open roles per field, counted as the field's landing page counts them, so "See all N" matches it.
     open_by_field = Counter(
-        t for x in listings for t in set(x.get("field_tags") or []) - sp.SKIP_FIELDS
+        t for x in listings for t in set(x.get("field_tags") or []) - site_taxonomy.SKIP_FIELDS
     )
     by_field: dict[str, list[dict]] = {}
     for x in new:
-        for t in set(x.get("field_tags") or []) - sp.SKIP_FIELDS:
+        for t in set(x.get("field_tags") or []) - site_taxonomy.SKIP_FIELDS:
             by_field.setdefault(t, []).append(x)
     ranked = sorted(
         ((t, v) for t, v in by_field.items() if len(v) >= MIN_NEW),
-        key=lambda tv: (-len(tv[1]), sp.field_title(tv[0])),
+        key=lambda tv: (-len(tv[1]), site_taxonomy.field_title(tv[0])),
     )
     sections = [section(t, v, open_by_field[t]) for t, v in ranked]
     return {
-        "subject": f"{sp.plural(len(new), 'new internship')} this week",
+        "subject": f"{site_text.plural(len(new), 'new internship')} this week",
         "preheader": preheader(sections[:MAX_SECTIONS]),
         "week_ending": f"{now:%B} {now.day}, {now.year}",
         "generated_at": now.isoformat(),
@@ -192,7 +195,7 @@ def build(site_dir: str, now: datetime | None = None, placements_path: str | Non
         "totals": {
             "open": len(listings),
             "new": len(new),
-            "nearby": sum(1 for x in new if x["keys"] & sp.HOME_STATES),
+            "nearby": sum(1 for x in new if x["keys"] & site_source.HOME_STATES),
             "fields": len(sections),
         },
         "sections": sections[:MAX_SECTIONS],
@@ -259,7 +262,7 @@ def resolve_placements(raw: list, listings: list[dict], day: str) -> list[dict]:
         x = by_id[p["listing_id"]]
         if _citizen_only(x):
             continue
-        tags = sorted(set(x.get("field_tags") or []) - sp.SKIP_FIELDS)
+        tags = sorted(set(x.get("field_tags") or []) - site_taxonomy.SKIP_FIELDS)
         if tags and _link(x.get("apply_url")):
             kept.append({"id": p["id"], "tags": tags, "role": role(x)})
     return kept
@@ -302,7 +305,7 @@ def pick_sections(digest: dict, fields=None) -> tuple[list[dict], str]:
 
 def intro(digest: dict, sections: list[dict]) -> str:
     t = digest["totals"]
-    line = f"InternScout found {sp.plural(t['new'], 'new student role')} this week"
+    line = f"InternScout found {site_text.plural(t['new'], 'new student role')} this week"
     if t["nearby"]:
         line += f", {t['nearby']:,} of them in the Northeast or remote."
         if sections:
@@ -399,7 +402,7 @@ def _section_html(s: dict, placed: dict | None = None) -> str:
     )
     more = _a(
         s.get("url"),
-        f"See all {s.get('open', 0):,} open {sp.lower_name(title)} roles",
+        f"See all {s.get('open', 0):,} open {site_text.lower_name(title)} roles",
         f"color:{ACCENT};font-weight:bold;text-decoration:underline",
     )
     return (
@@ -541,7 +544,7 @@ def render_text(digest: dict, fields=None, postal_address=None) -> str:
         if _link(s.get("url")):
             out += [
                 "",
-                f"See all {s.get('open', 0):,} open {sp.lower_name(title)} roles: {_link(s.get('url'))}",
+                f"See all {s.get('open', 0):,} open {site_text.lower_name(title)} roles: {_link(s.get('url'))}",
             ]
     address = _address(postal_address)
     out += [

@@ -28,6 +28,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "backend"))
 sys.path.insert(0, HERE)
 from internscout import focus, seo_pages  # noqa: E402
+from internscout.site import source as site_source  # noqa: E402
+from internscout.site import text as site_text  # noqa: E402
 import audience  # noqa: E402
 import social  # noqa: E402
 
@@ -273,7 +275,7 @@ def audience_section(site_dir: str) -> list[str]:
 
 
 def targeting_section(site_dir: str) -> list[str]:
-    d = seo_pages.load(site_dir)
+    d = site_source.load(site_dir)
     picks = focus.thinnest(d["listings"], d["majors"])
     if not picks:
         return ["## Search targeting", "No field is thin enough to need focus searches.", ""]
@@ -331,8 +333,8 @@ def social_section(site_dir: str, now: datetime) -> list[str]:
             likes = sum(p.get("likeCount", 0) for p in week)
             reposts = sum(p.get("repostCount", 0) for p in week)
             out += [
-                f"{seo_pages.plural(len(week), 'post')} on Bluesky ([@{BLUESKY}](https://bsky.app/profile/{BLUESKY})) "
-                f"this week, with {seo_pages.plural(likes, 'like')} and {seo_pages.plural(reposts, 'repost')}. "
+                f"{site_text.plural(len(week), 'post')} on Bluesky ([@{BLUESKY}](https://bsky.app/profile/{BLUESKY})) "
+                f"this week, with {site_text.plural(likes, 'like')} and {site_text.plural(reposts, 'repost')}. "
                 f"[Latest]({link}).",
                 "",
             ]

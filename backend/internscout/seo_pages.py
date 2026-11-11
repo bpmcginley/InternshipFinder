@@ -32,21 +32,32 @@ from statistics import median
 from datetime import datetime, timezone
 from urllib.parse import quote, urlparse
 
-from . import near_metros, page_dates, seo_role_details, widget_data
+from . import feeds, near_metros, page_dates, role_index, seo_role_details, widget_data
 from . import pay as _salary_pay
 from .console_log import console
 from .site import build as _build
 from .site import digest as _digest
 from .site import discovery as _discovery
 from .site import employer as _employer
+from .site import facts as _facts
 from .site import field as _field
-from .site import layout as _layout
+from .site.render import layout as _layout
 from .site import listing as _listing
 from .site import llms as _llms
 from .site import near as _near
 from .site import numbers as _numbers
+from .site import paid as _paid
 from .site import pay as _pay
-from .site.layout import (
+from .site import source as _source
+from .site import taxonomy as _taxonomy
+from .site.render import digest as _render_digest_module
+from .site.render import employer as _render_employer_module
+from .site.render import field as _render_field_module
+from .site.render import listing as _render_listing_module
+from .site.render import near as _render_near_module
+from .site.render import numbers as _render_numbers_module
+from .site.render import pay as _render_pay_module
+from .site.render.layout import (
     faq_ld as faq_ld,
     faq_section as faq_section,
     fits_line as fits_line,
@@ -56,6 +67,9 @@ from .site.layout import (
     table as table,
     tablewrap as tablewrap,
 )
+from .site.assets import CSS as CSS, SITE as SITE
+from .site.digest import DIGEST_PATH as DIGEST_PATH, digest_archive as digest_archive, digest_form_action as digest_form_action
+from .site.facts import boards_line as boards_line, canada_only as canada_only, coverage_line as coverage_line, top as top, word_list as word_list
 from .site.rules import (
     MIN_COMBO as MIN_COMBO,
     MIN_COMBO_PRIORITY as MIN_COMBO_PRIORITY,
@@ -68,6 +82,36 @@ from .site.rules import (
     keep_at as keep_at,
     near_same as near_same,
 )
+from .site.source import (
+    well_formed as well_formed,
+    _when as _when,
+    newest_first as newest_first,
+    place as place,
+    real_company as real_company,
+    FIRST_SEEN_SINCE as FIRST_SEEN_SINCE,
+    CANADA_SINCE as CANADA_SINCE,
+    NEW_DAYS as NEW_DAYS,
+    HOME_STATES as HOME_STATES,
+    PER_PAGE as PER_PAGE,
+    STUDENT_STAGES as STUDENT_STAGES,
+    _SUFFIX as _SUFFIX,
+    EMPLOYER_ALIASES as EMPLOYER_ALIASES,
+)
+from .site.taxonomy import (
+    US_STATES as US_STATES,
+    CA_PROVINCES as CA_PROVINCES,
+    CA_METRO_PAGES as CA_METRO_PAGES,
+    US_METRO_PAGES as US_METRO_PAGES,
+    _US_METRO_TOWNS as _US_METRO_TOWNS,
+    METRO_STATE as METRO_STATE,
+    CANADA_KEYS as CANADA_KEYS,
+    PLACES as PLACES,
+    PLACE_THE as PLACE_THE,
+    FIELD_TITLES as FIELD_TITLES,
+    SKIP_FIELDS as SKIP_FIELDS,
+    FIELD_SHORT as FIELD_SHORT,
+    SLUG_MAX as SLUG_MAX,
+)
 from .site.text import (
     join_words as join_words,
     lower_name as lower_name,
@@ -78,7 +122,6 @@ from .site.text import (
     safe_url as safe_url,
 )
 
-SITE = "https://internscout.org"
 # In all advertising copy, and so in every page's footer and in llms.txt (one copy, added 2026-10-02).
 SLOGAN = "Built by one student, made for all students."
 # The extension's Chrome Web Store listing, the same URL docs/install.html links (2026-10-04).
@@ -268,8 +311,6 @@ def duplicates(
 # still says something worth reading. 270 more employers qualified that day.
 MIN_EMPLOYER = 5  # open roles an employer needs before it gets a page of its own
 MIN_KIND = 25  # ...and a start term, paid, co-op, research or class-year page (see kinds())
-PER_PAGE = 40  # listings shown on one page; the dashboard has the rest
-NEW_DAYS = 7
 RELATED = 12  # related-page links per section
 NEW_FEED = 100  # items in /internships/new/feed.xml (the other feeds carry feeds.ITEMS)
 # was: TAIL = ", from internships to co-ops and research" (the end of the opening sentence). Since
@@ -287,257 +328,17 @@ TITLE_SUFFIX = " | InternScout"
 # was: DESC_MIN, DESC_MAX = 110, 160. Revert: restore DESC_MAX to 160.
 DESC_MIN, DESC_MAX = 110, 155
 
-US_STATES = {
-    "AL": "Alabama",
-    "AK": "Alaska",
-    "AZ": "Arizona",
-    "AR": "Arkansas",
-    "CA": "California",
-    "CO": "Colorado",
-    "CT": "Connecticut",
-    "DE": "Delaware",
-    "DC": "Washington, DC",
-    "FL": "Florida",
-    "GA": "Georgia",
-    "HI": "Hawaii",
-    "ID": "Idaho",
-    "IL": "Illinois",
-    "IN": "Indiana",
-    "IA": "Iowa",
-    "KS": "Kansas",
-    "KY": "Kentucky",
-    "LA": "Louisiana",
-    "ME": "Maine",
-    "MD": "Maryland",
-    "MA": "Massachusetts",
-    "MI": "Michigan",
-    "MN": "Minnesota",
-    "MS": "Mississippi",
-    "MO": "Missouri",
-    "MT": "Montana",
-    "NE": "Nebraska",
-    "NV": "Nevada",
-    "NH": "New Hampshire",
-    "NJ": "New Jersey",
-    "NM": "New Mexico",
-    "NY": "New York",
-    "NC": "North Carolina",
-    "ND": "North Dakota",
-    "OH": "Ohio",
-    "OK": "Oklahoma",
-    "OR": "Oregon",
-    "PA": "Pennsylvania",
-    "RI": "Rhode Island",
-    "SC": "South Carolina",
-    "SD": "South Dakota",
-    "TN": "Tennessee",
-    "TX": "Texas",
-    "UT": "Utah",
-    "VT": "Vermont",
-    "VA": "Virginia",
-    "WA": "Washington",
-    "WV": "West Virginia",
-    "WI": "Wisconsin",
-    "WY": "Wyoming",
-    "PR": "Puerto Rico",
-    "remote": "Remote (US)",
-}
-# Canada since 2026-09-30. A province is filed like a state (none of the codes is a US state's), and
-# three more kinds of page are made from the same listings: all of Canada, and each big metro, since
-# "internships in Toronto" is searched far more than "internships in Ontario". The metros are the
-# ones geo.CA_METROS groups towns under; smaller ones still count toward their province.
-CA_PROVINCES = {
-    "ON": "Ontario",
-    "QC": "Quebec",
-    "BC": "British Columbia",
-    "AB": "Alberta",
-    "MB": "Manitoba",
-    "SK": "Saskatchewan",
-    "NS": "Nova Scotia",
-    "NB": "New Brunswick",
-    "NL": "Newfoundland and Labrador",
-    "PE": "Prince Edward Island",
-    "NT": "Northwest Territories",
-    "NU": "Nunavut",
-    "YT": "Yukon",
-}
-CA_METRO_PAGES = {
-    "Toronto": "ON",
-    "Montreal": "QC",
-    "Vancouver": "BC",
-    "Calgary": "AB",
-    "Ottawa": "ON",
-    "Edmonton": "AB",
-    "Waterloo Region": "ON",
-}
-# US cities since 2026-10-07. Search Console's field queries read "<field> internships in <place>", and
-# students name the city ("software engineering internships nyc") at least as often as the state. The
-# export carries a metro only for Canada (geo.CA_METROS), so a US region is in one of these when it is
-# filed in the metro's state and its location names one of the metro's towns; New York City also needs
-# the region's own nyc_metro kind (region.py: within 50 miles of Midtown), so "Rochester, New York" is
-# not in it. The towns are the ones the listings name (2026-10-07 export) within a short commute of the
-# city. Boston is the inner ring, not eastern Massachusetts: drawn that wide it held 89% of the
-# Massachusetts page's roles, the same list under a second URL (see near_same).
-US_METRO_PAGES = {
-    "New York City": (
-        "NY",
-        "new york|nyc|manhattan|brooklyn|queens|bronx|staten island|long island city",
-    ),
-    "Boston": (
-        "MA",
-        "boston|cambridge|somerville|brookline|newton|watertown|waltham|medford|malden|everett|"
-        "chelsea|revere|quincy|arlington|belmont|needham|dedham|wellesley|lexington|burlington|"
-        "woburn|winchester|milton|braintree|canton|norwood|westwood|bedford|hanscom",
-    ),
-    "San Francisco Bay Area": (
-        "CA",
-        "san francisco|sf|oakland|berkeley|emeryville|alameda|san jose|palo alto|"
-        "mountain view|sunnyvale|santa clara|cupertino|menlo park|redwood city|"
-        "redwood shores|san mateo|foster city|south san francisco|san bruno|burlingame|"
-        "san carlos|belmont|brisbane|millbrae|fremont|newark|milpitas|los gatos|campbell|"
-        "pleasanton|livermore|dublin|san ramon|walnut creek|hayward|union city",
-    ),
-    "Los Angeles": (
-        "CA",
-        "los angeles|santa monica|el segundo|culver city|playa vista|venice|marina del rey|"
-        "long beach|torrance|hawthorne|manhattan beach|redondo beach|carson|inglewood|burbank|"
-        "glendale|pasadena|west hollywood|beverly hills|van nuys|northridge|seal beach|irvine|"
-        "costa mesa|huntington beach|santa ana|anaheim|newport beach",
-    ),
-    "Seattle": (
-        "WA",
-        "seattle|bellevue|redmond|kirkland|bothell|renton|tukwila|kent|everett|mukilteo|issaquah|"
-        "auburn|seatac|tacoma|puyallup|lynnwood",
-    ),
-    "Chicago": (
-        "IL",
-        "chicago|evanston|skokie|niles|glenview|northbrook|northfield|deerfield|lake forest|rosemont|"
-        "des plaines|schaumburg|rolling meadows|hoffman estates|elk grove village|itasca|naperville|"
-        "lisle|downers grove|oak brook|oakbrook terrace|westchester|lombard|warrenville|abbott park|"
-        "north chicago|waukegan|wood dale|bolingbrook|aurora|batavia",
-    ),
-    "Austin": ("TX", "austin|round rock|cedar park|georgetown|pflugerville|taylor|leander"),
-    "Dallas–Fort Worth": (
-        "TX",
-        "dallas|fort worth|ft\\.? worth|plano|irving|richardson|frisco|arlington|addison|"
-        "carrollton|coppell|westlake|grapevine|lewisville|mckinney|allen|garland|grand prairie|"
-        "north richland hills|las colinas|denton|southlake",
-    ),
-    "Houston": (
-        "TX",
-        "houston|the woodlands|spring|sugar land|katy|pasadena|pearland|baytown|deer park|la porte|"
-        "texas city|kingwood|humble|cypress|conroe|galveston",
-    ),
-    "Atlanta": (
-        "GA",
-        "atlanta|atl|alpharetta|duluth|dunwoody|suwanee|johns creek|kennesaw|norcross|marietta|"
-        "sandy springs|buford|peachtree corners|lawrenceville|roswell|smyrna|decatur",
-    ),
-    "Denver": (
-        "CO",
-        "denver|boulder|golden|westminster|lakewood|centennial|broomfield|lone tree|greenwood village|"
-        "littleton|englewood|louisville|lafayette|aurora|arvada|thornton|highlands ranch|longmont|superior",
-    ),
-    "Philadelphia": (
-        "PA",
-        "philadelphia|king of prussia|conshohocken|malvern|wayne|radnor|bala cynwyd|ardmore|exton|"
-        "fort washington|horsham|blue bell|collegeville|spring house|west point|plymouth meeting|"
-        "ridley park|west chester|newtown square|berwyn",
-    ),
-    "Pittsburgh": (
-        "PA",
-        "pittsburgh|canonsburg|cranberry|coraopolis|moon township|warrendale|murrysville|"
-        "bridgeville|wexford",
-    ),
-}
-_US_METRO_TOWNS = {
-    m: re.compile(rf"\b(?:{towns})\b", re.I) for m, (_, towns) in US_METRO_PAGES.items()
-}
-# Every metro page's state or province: the dashboard opens on it, and a page names a town without it.
-METRO_STATE = {**CA_METRO_PAGES, **{m: st for m, (st, _) in US_METRO_PAGES.items()}}
-
-
 def us_metro(g: dict) -> str | None:
     """The US metro (US_METRO_PAGES) a region is in, or None."""
-    for m, (st, _) in US_METRO_PAGES.items():
-        if (
-            g.get("state") == st
-            and (m != "New York City" or g.get("kind") == "nyc_metro")
-            and _US_METRO_TOWNS[m].search(str(g.get("loc") or ""))
-        ):
-            return m
-    return None
-
-
-US_STATES.update(CA_PROVINCES)
-US_STATES.update(
-    {"Canada": "Canada", **{m: m for m in CA_METRO_PAGES}, **{m: m for m in US_METRO_PAGES}}
-)
-CANADA_KEYS = set(CA_PROVINCES) | {"Canada"}
-# was: set(US_STATES) - {"remote"}. "Canada" and the metros are views over the provinces, not places
-# a posting is filed in, so they do not count toward how widely a posting is spread.
-# was: ... - set(CA_METRO_PAGES); the US metros (2026-10-07) are views over their states the same way.
-PLACES = (
-    set(US_STATES) - {"remote", "Canada"} - set(METRO_STATE)
-)  # the states a posting can be filed in
-
-# How a field tag reads in a heading and in a URL. Tags not listed read as their own words.
-FIELD_TITLES = {
-    "swe": ("Software Engineering", "software-engineering"),
-    "ml": ("Machine Learning and AI", "machine-learning-ai"),
-    "data": ("Data Science and Analytics", "data-science"),
-    "pm": ("Product Management", "product-management"),
-    "hr": ("Human Resources", "human-resources"),
-    "quant": ("Quantitative Finance", "quantitative-finance"),
-    "security": ("Cybersecurity", "cybersecurity"),
-    "hardware": ("Hardware Engineering", "hardware-engineering"),
-    "electrical": ("Electrical Engineering", "electrical-engineering"),
-    "mechanical": ("Mechanical Engineering", "mechanical-engineering"),
-    "civil": ("Civil Engineering", "civil-engineering"),
-    "aerospace": ("Aerospace Engineering", "aerospace-engineering"),
-    "chemical": ("Chemical Engineering", "chemical-engineering"),
-    "industrial": ("Industrial Engineering", "industrial-engineering"),
-    "environmental": ("Environmental Science and Engineering", "environmental"),
-    "biomedical": ("Biomedical Engineering", "biomedical-engineering"),
-    "materials": ("Materials Science", "materials-science"),
-    "supply_chain": ("Supply Chain", "supply-chain"),
-    "public_health": ("Public Health", "public-health"),
-    "clinical_research": ("Clinical Research", "clinical-research"),
-    "lab_research": ("Lab Research", "lab-research"),
-    "real_estate": ("Real Estate", "real-estate"),
-    "social_work": ("Social Work", "social-work"),
-    "social_science": ("Social Science", "social-science"),
-    "urban_planning": ("Urban Planning", "urban-planning"),
-    "business": ("Business", "business"),
-    "law": ("Law and Legal", "law"),
-    "government": ("Government and Public Policy", "government"),
-    "sports": ("Sports", "sports"),
-    "arts": ("Arts", "arts"),
-    "museums": ("Museums", "museums"),
-    "library": ("Library Science", "library-science"),
-}
-SKIP_FIELDS = {"other"}
-# The long field titles as a title tag can carry them when the full one won't fit beside a state
-# ("Environmental Science and Engineering Internships in Pennsylvania" is 65 characters on its own).
-# Each is what students search for; fit_title falls back to it only when the full title is too long.
-FIELD_SHORT = {
-    "ml": "Machine Learning",
-    "data": "Data Science",
-    "environmental": "Environmental",
-    "government": "Government",
-    "law": "Law",
-}
+    return _taxonomy.us_metro(g, metro_towns=_US_METRO_TOWNS)
 
 
 def field_title(tag: str) -> str:
-    return FIELD_TITLES.get(tag, (tag.replace("_", " ").title(), None))[0]
+    return _taxonomy.field_title(tag, field_titles=FIELD_TITLES)
 
 
 def field_short(tag: str) -> str:
-    return FIELD_SHORT.get(tag, field_title(tag))
-
-
-SLUG_MAX = 80  # longest slug a URL folder gets (see slugify)
+    return _taxonomy.field_short(tag, field_titles=FIELD_TITLES, short_fields=FIELD_SHORT)
 
 
 def slugify(text: str) -> str:
@@ -545,19 +346,15 @@ def slugify(text: str) -> str:
     name past the filesystem's 255 bytes is an OSError that stopped the whole deploy. A long slug is
     cut to SLUG_MAX and ends in a hash of the whole one, so two long names that share their first 70
     characters still get two folders, and the same name gets the same folder on every build."""
-    slug = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
-    # was: return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
-    if len(slug) <= SLUG_MAX:
-        return slug
-    return slug[: SLUG_MAX - 9].rstrip("-") + "-" + hashlib.sha1(slug.encode()).hexdigest()[:8]
+    return _taxonomy.slugify(text, limit=SLUG_MAX)
 
 
 def field_slug(tag: str) -> str:
-    return FIELD_TITLES.get(tag, (None, None))[1] or slugify(tag)
+    return _taxonomy.field_slug(tag, field_titles=FIELD_TITLES, slug=slugify)
 
 
 def state_slug(key: str) -> str:
-    return slugify(US_STATES.get(key, key))
+    return _taxonomy.state_slug(key, places=US_STATES, slug=slugify)
 
 
 esc = html.escape
@@ -565,154 +362,47 @@ esc = html.escape
 
 # ---------------------------------------------------------------- data
 
-_TEXT = (str, type(None))
-_LIST_FIELDS = ("field_tags", "stage", "years")
-
-
-def well_formed(x) -> bool:
-    """Whether a listing has the shape every page builder reads without checking. pages.yml deploys
-    through this build and nothing else, so one row a job board mangled (a region with no "loc", a
-    company name that is a number, a tag list that is a string) used to stop the whole site from
-    deploying. Such a row is left out and counted instead (load)."""
-    if (
-        not isinstance(x, dict)
-        or isinstance(x.get("id"), bool)
-        or not isinstance(x.get("id"), (str, int))
-    ):
-        return False
-    if not all(
-        isinstance(x.get(k), _TEXT) for k in ("company_name", "title", "first_seen", "posted_at")
-    ):
-        return False
-    if not isinstance(x.get("term"), _TEXT) or not isinstance(
-        x.get("insights"), (dict, type(None))
-    ):
-        return False
-    if not all(
-        isinstance(x.get(k) or [], list) and all(isinstance(v, str) for v in x.get(k) or [])
-        for k in _LIST_FIELDS
-    ):
-        return False
-    regions = x.get("regions") or []
-    return isinstance(regions, list) and all(
-        isinstance(g, dict)
-        and isinstance(g.get("loc"), _TEXT)
-        and isinstance(g.get("state"), _TEXT)
-        and bool(g.get("loc") or g.get("state"))
-        for g in regions
-    )
-
 
 def load(site_dir: str) -> dict:
-    data = os.path.join(site_dir, "data")
-    with open(os.path.join(data, "listings", "index.json"), encoding="utf-8") as f:
-        index = json.load(f)
-    with open(os.path.join(data, "majors.json"), encoding="utf-8") as f:
-        majors = json.load(f)
-    by_id: dict[str, dict] = {}
-    bad = 0
-    for key, meta in index["files"].items():
-        with open(os.path.join(data, meta["file"]), encoding="utf-8") as f:
-            rows = json.load(f)
-        for x in rows if isinstance(rows, list) else []:
-            if not well_formed(x):
-                bad += 1
-                continue
-            if x.get("status") != "open" or not safe_url(x.get("apply_url")):
-                continue
-            keep = by_id.setdefault(str(x["id"]), dict(x, id=str(x["id"]), keys=set()))
-            # was: keep = by_id.setdefault(x["id"], dict(x, keys=set()))
-            keep["keys"].add(key)
-    for x in by_id.values():
-        # The Canada and metro pages' keys (the listing files are by province, with "Canada" for the
-        # ones that name no province): every Canadian role is in "Canada", and in its metro's.
-        regions = x.get("regions") or []
-        if any(g.get("kind") == "canada" for g in regions if isinstance(g, dict)):
-            x["keys"].add("Canada")
-        x["keys"].update(
-            g["metro"] for g in regions if isinstance(g, dict) and g.get("metro") in CA_METRO_PAGES
-        )
-        # A US metro is named on the region the way the export names a Canadian one (2026-10-07), so
-        # place(), places() and city_name read both alike.
-        for g in regions:
-            m = us_metro(g) if isinstance(g, dict) and g.get("kind") != "canada" else None
-            if m:
-                g["metro"] = m
-                x["keys"].add(m)
-    if bad:
-        console(
-            f"[seo] warning: skipped {bad} malformed listing rows (see well_formed)",
-            file=sys.stderr,
-            level=logging.WARNING,
-        )
-    listings = list(by_id.values())
-    return {
-        "generated_at": index.get("generated_at"),
-        "listings": listings,
-        "majors": majors.get("majors", []),
-        "baseline": baseline_day(listings),
-    }
+    return _source.load(
+        site_dir,
+        ca_metros=CA_METRO_PAGES,
+        metro=us_metro,
+        baseline=baseline_day,
+        valid_row=well_formed,
+        valid_url=safe_url,
+        diagnostic=console,
+    )
 
 
 # first_seen has survived from one export to the next only since this day, so everything already
 # open then carries it: 11,146 of 12,792 listings on 2026-09-23. Counted as "found this week", that
 # made half the site new, and a brand post said 110 new data science roles when 31 were.
-FIRST_SEEN_SINCE = "2026-09-18"
 
 
 # Canada was switched on this day, and its first scan found about 800 Canadian roles that had been
 # open for weeks. By first_seen alone 346 of them were "new this week". A Canadian role first seen on
 # or before this day counts as new only if the employer's own posting date is inside the week; one
 # first seen after it is new by the ordinary rule.
-CANADA_SINCE = "2026-09-30"
 
 
 def canada_first_scan(x: dict) -> bool:
     """A role only in Canada that the first Canadian scan found (see CANADA_SINCE)."""
-    regions = [g for g in x.get("regions") or [] if isinstance(g, dict)]
-    return (
-        bool(regions)
-        and all(g.get("kind") == "canada" for g in regions)
-        and str(x.get("first_seen") or "")[:10] <= CANADA_SINCE
+    return _source.canada_first_scan(
+        x,
+        canada_since=CANADA_SINCE,
     )
 
 
 def baseline_day(listings: list[dict]) -> str | None:
     """The day before which "first seen" means only "already open when we started keeping dates"."""
-    return FIRST_SEEN_SINCE
+    return _source.baseline_day(
+        listings,
+        first_seen_since=FIRST_SEEN_SINCE,
+    )
 
 
-def _when(stamp) -> datetime | None:
-    try:
-        d = datetime.fromisoformat(str(stamp).replace("Z", "+00:00"))
-        return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
-    except (TypeError, ValueError):
-        return None
-
-
-def newest_first(items: list[dict]) -> list[dict]:
-    """The dashboard's order (docs/js/app.js, "newer"): dated postings first, newest posting first,
-    then by when a scan found it. first_seen alone would put a 2024 posting found this week on top.
-    Postings that tie on all three stay in id order, not in whatever order they arrived: which 40 a
-    page shows must be the same on every build of the same data (test_two_builds_are_identical)."""
-    return sorted(
-        sorted(items, key=lambda x: str(x.get("id"))),
-        key=lambda x: (
-            bool(x.get("posted_at")),
-            x.get("posted_at") or "",
-            x.get("first_seen") or "",
-        ),
-        reverse=True,
-    )  # sorted() stays stable under reverse=True, so ties keep id order
     # was: return sorted(items, key=lambda x: (...), reverse=True)   (ties in arrival order)
-
-
-def top(counts: Counter, n: int | None = None) -> list:
-    """Counter.most_common, but ties broken by the key itself. most_common breaks them by insertion
-    order, and counting over a set inserts in hash order, which Python changes on every run: one
-    employer page said "mostly in nonprofit, marketing and communications" on one build and
-    "... communications and marketing" on the next."""
-    return [k for k, _ in sorted(counts.items(), key=lambda kv: (-kv[1], str(kv[0])))[:n]]
 
 
 # A board with no pay to show still fills the field: "$0.00 /Yr", "$0.00 - $999.99 Hour" (22 open
@@ -728,62 +418,31 @@ def placeholder_pay(salary) -> bool:
 
 def real_salary(x: dict) -> str | None:
     """The listing's salary text, unless it is a placeholder (placeholder_pay)."""
-    s = x.get("salary")
-    return str(s) if s and not placeholder_pay(s) else None
+    return _source.real_salary(
+        x,
+        invalid_pay=placeholder_pay,
+    )
 
 
 def is_paid(x: dict) -> bool:
-    # A placeholder salary is not pay. export_static used to turn one into insights.pay "paid" as
-    # well, and an export made before that fix still carries it, so a placeholder settles it.
-    if x.get("salary") and placeholder_pay(x["salary"]):
-        return False
-    return bool(x.get("salary")) or ((x.get("insights") or {}).get("pay") == "paid")
+    return _source.is_paid(
+        x,
+        invalid_pay=placeholder_pay,
+    )
     # was: return bool(x.get("salary")) or ((x.get("insights") or {}).get("pay") == "paid")
 
 
 def pay_text(x: dict) -> str:
     """What a listing row says about pay: the real salary, else "Paid" when the posting says so."""
-    return real_salary(x) or ("Paid" if is_paid(x) else "")
-
-
-def place(x: dict, state: str | None = None) -> str:
-    """Where the role is. On a state's page, the location in that state comes first: a Massachusetts
-    page that says "New York, NY +5" reads as a listing filed in the wrong place."""
-    regions = x.get("regions") or []
-    if not regions:
-        return "Remote" if x.get("is_remote") else "United States"
-    if state == "remote":
-        lead = next(
-            (g for g in regions if g.get("kind") == "remote" or g.get("state") == "Remote"),
-            regions[0],
-        )
-    elif state:
-        # was: g.get("state") == state. A metro page leads with the location in that metro, and the
-        # Canada page with the Canadian one.
-        lead = next(
-            (
-                g
-                for g in regions
-                if g.get("state") == state
-                or g.get("metro") == state
-                or (state == "Canada" and g.get("kind") == "canada")
-            ),
-            regions[0],
-        )
-    else:
-        lead = regions[0]
-    shown = (
-        "Remote"
-        if lead.get("state") == "Remote"
-        else (lead.get("loc") or lead.get("state") or "United States")
+    return _source.pay_text(
+        x,
+        salary=real_salary,
+        paid=is_paid,
     )
-    # was: shown = "Remote" if lead.get("state") == "Remote" else lead["loc"]
-    return shown + (f" +{len(regions) - 1}" if len(regions) > 1 else "")
 
 
 # UMass Amherst students are the audience: roles within reach of western Massachusetts, and remote
 # ones, are the ones they can take. Pages that span the country list those first.
-HOME_STATES = {"MA", "CT", "RI", "NH", "VT", "ME", "NY", "NJ", "remote"}
 
 
 def fresh(x: dict, now: datetime, baseline: str | None = None) -> bool:
@@ -796,26 +455,24 @@ def fresh(x: dict, now: datetime, baseline: str | None = None) -> bool:
     found seven days ago later in the day than the run (1,834 here against 1,832 there). One
     difference is left: a listing with no first_seen is not new here and is there, but every
     exported row has one."""
-    seen, posted = _when(x.get("first_seen")), _when(x.get("posted_at"))
-    if baseline and str(x.get("first_seen") or "")[:10] <= baseline:
-        return False
-    today = now.astimezone(timezone.utc).date()
-    if canada_first_scan(x):
-        return bool(posted and (today - posted.date()).days < NEW_DAYS)
-    return bool(
-        seen
-        and (today - seen.date()).days < NEW_DAYS
-        and (posted is None or (today - posted.date()).days < 2 * NEW_DAYS)
+    return _source.fresh(
+        x,
+        now,
+        baseline,
+        new_days=NEW_DAYS,
+        when=_when,
+        canada_first=canada_first_scan,
     )
     # was: seen and now - seen <= timedelta(days=NEW_DAYS)
     #      and (posted is None or now - posted <= timedelta(days=2 * NEW_DAYS))
 
 
 def near_home_first(items: list[dict]) -> list[dict]:
-    ordered = newest_first(items)
-    return [x for x in ordered if x["keys"] & HOME_STATES] + [
-        x for x in ordered if not x["keys"] & HOME_STATES
-    ]
+    return _source.near_home_first(
+        items,
+        home_states=HOME_STATES,
+        sort_newest=newest_first,
+    )
 
 
 # ---------------------------------------------------------------- page pieces
@@ -1194,83 +851,34 @@ EMPLOYERS: dict[
 
 # Trailing words that name the same employer differently: "Magna International" is Magna, "The Boeing
 # Company" is Boeing. Only whole trailing words go, so "Bank of America" keeps its name.
-_SUFFIX = re.compile(
-    r"\s+(inc|incorporated|llc|ltd|co|company|corp|corporation|international|group|holdings|plc|lp)$"
-)
-EMPLOYER_ALIASES = {"booz allen hamilton": "booz allen"}
 # 2026-11-02: Altera Corporation and Altera alternate as the most common display name. Keep the current
 # published URL even when that count changes; the old corporation URL redirects below.
 # Revert: remove this map, restore slugify(name), and remove the alias writer below.
 EMPLOYER_SLUGS = {"altera": "altera"}
-STUDENT_STAGES = {"internship", "co_op", "research", "fellowship"}
 
 
 # A company name a job board filled with something else (2026-10-07): "APPLY NOW" headed a row of the
 # Summer 2027 tracker (a Jobilize listing). Nothing upstream cleans names, so this is conservative: a
 # name with no letters, or one made only of call-to-action or placeholder words, is not an employer.
 # "PGA TOUR", "C3 AI" and "HP IQ" are real; only whole names made of these words are dropped.
-_NOT_A_NAME = frozenset(
-    {
-        "apply",
-        "now",
-        "here",
-        "click",
-        "today",
-        "view",
-        "see",
-        "more",
-        "details",
-        "learn",
-        "hiring",
-        "job",
-        "jobs",
-        "career",
-        "careers",
-        "opening",
-        "openings",
-        "position",
-        "positions",
-        "confidential",
-        "undisclosed",
-        "unknown",
-        "n",
-        "a",
-        "na",
-        "tbd",
-        "company",
-        "name",
-        "employer",
-        "various",
-        "multiple",
-        "not",
-        "specified",
-    }
-)
-
-
-def real_company(name: str) -> bool:
-    words = re.findall(r"[a-z]+", (name or "").lower())
-    return bool(words) and not set(words) <= _NOT_A_NAME
 
 
 def employer_key(name: str) -> str:
-    k = re.sub(r"\s+", " ", re.sub(r"[^a-z0-9& ]+", " ", name.lower())).strip()
-    k = re.sub(r"^the ", "", k)
-    while _SUFFIX.search(k):
-        k = _SUFFIX.sub("", k).strip()
-    return EMPLOYER_ALIASES.get(k, k) or name.lower()
+    return _source.employer_key(
+        name,
+        aliases=EMPLOYER_ALIASES,
+        suffix=_SUFFIX,
+    )
 
 
 def dedupe_roles(items: list[dict]) -> list[dict]:
     """One row per role: a company that posts a requisition on two of its boards (Boeing's
     JR2026520392 and JR2026520392-1) would otherwise count it twice in "N Open Now"."""
-    seen, out = set(), []
-    for x in newest_first(items):
-        key = (re.sub(r"\W+", " ", (x.get("title") or "").lower()).strip(), place(x))
-        if key not in seen:
-            seen.add(key)
-            out.append(x)
-    return out
+    return _source.dedupe_roles(
+        items,
+        sort_newest=newest_first,
+        location=place,
+    )
 
 
 # The weekly email's "new" count (2026-10-06): moved here from growth/digest.py, which still names
@@ -1284,10 +892,11 @@ DIGEST_MIN_NEW = (
 def unique_roles(items: list[dict]) -> list[dict]:
     """One row per role. dedupe_roles matches on title and place, so it runs within each employer:
     two companies that each post a "Software Engineering Intern" in Boston are two roles."""
-    by_employer: dict[str, list[dict]] = {}
-    for x in items:
-        by_employer.setdefault(employer_key(x.get("company_name") or ""), []).append(x)
-    return [x for group in by_employer.values() for x in dedupe_roles(group)]
+    return _source.unique_roles(
+        items,
+        key_for=employer_key,
+        dedupe=dedupe_roles,
+    )
 
 
 def new_roles(d: dict, now: datetime) -> list[dict]:
@@ -1297,7 +906,12 @@ def new_roles(d: dict, now: datetime) -> list[dict]:
     all use this one number. stats.json's "new" (export_static's is_new) counts every listing a scan
     first saw in the last week, before either step, so it runs a little higher; it is the dashboard's
     own badge count."""
-    return unique_roles([x for x in d["listings"] if fresh(x, now, d["baseline"])])
+    return _source.new_roles(
+        d,
+        now,
+        is_fresh=fresh,
+        unique=unique_roles,
+    )
 
 
 def student_share(items: list[dict]) -> float:
@@ -1484,7 +1098,7 @@ def tracker_page(
 
 
 def _render_tracker_page(model: _listing.TrackerPage) -> tuple[str, str, str, str]:
-    return _listing.render_tracker_page(
+    return _render_listing_module.render_tracker_page(
         model,
         count_floor=count_floor,
         fit_head=fit_head,
@@ -1497,7 +1111,13 @@ def _render_tracker_page(model: _listing.TrackerPage) -> tuple[str, str, str, st
 def shown(items: list[dict], state: str | None = None) -> list[dict]:
     """The PER_PAGE listings a page actually shows, in its order: what a reader, and a search engine,
     sees of it. Two pages that show the same ones are the same page to both (see same_list)."""
-    return (newest_first(items) if state else near_home_first(items))[:PER_PAGE]
+    return _source.shown(
+        items,
+        state,
+        per_page=PER_PAGE,
+        sort_home=near_home_first,
+        sort_newest=newest_first,
+    )
 
 
 def shown_ids(items: list[dict]) -> frozenset:
@@ -1529,7 +1149,7 @@ def listing_rows(
 ) -> str:
     """src: where the page sits (seo-employer, seo-state, ...), carried into the install page's ?from=
     by each row's "Auto-Apply this" link, so its store link's utm_source says which pages install."""
-    return _listing.listing_rows(
+    return _render_listing_module.listing_rows(
         items,
         now,
         state,
@@ -1551,7 +1171,7 @@ def listing_rows(
 def row_meta(x: dict, state: str | None = None) -> str:
     """A row's grey line, HTML: place, term, stage and pay. The same for a listing row and a paid
     listing's box (placement_box), so the two can never describe one role differently."""
-    return _listing.row_meta(
+    return _render_listing_module.row_meta(
         x,
         state,
         place=place,
@@ -1579,7 +1199,7 @@ OFFER_MARK = '<a class="go" data-aa '
 
 def go_aa(x: dict) -> str:
     """ ' data-aa' for a posting link whose application Auto-Apply fills (autofills), else ''."""
-    return _listing.go_aa(
+    return _render_listing_module.go_aa(
         x,
         autofills=autofills,
     )
@@ -1591,7 +1211,7 @@ def autoapply_card(items: list[dict], src: str, state: str | None = None) -> str
     them is on a site it fills. Two buttons, one shown: on a computer straight to the store (count.js
     counts it as install_click), on a phone or tablet, which can't add extensions, to the install page,
     which says to send the link to a laptop. The same media query as install.html's, so no script."""
-    return _listing.autoapply_card(
+    return _render_listing_module.autoapply_card(
         items,
         src,
         state,
@@ -1605,7 +1225,7 @@ def autoapply_card(items: list[dict], src: str, state: str | None = None) -> str
 
 def company_link(name: str, here: str | None = None) -> str:
     """The company's name, linked to its employer page when it has one (here: this page's path)."""
-    return _listing.company_link(
+    return _render_listing_module.company_link(
         name,
         here,
         employers=EMPLOYERS,
@@ -1617,7 +1237,6 @@ EMPLOYER_PLACES = 6  # field-in-a-place pages an employer page links (2026-10-07
 
 
 # Places read with "the" after "in" (2026-10-07): "internships in the San Francisco Bay Area".
-PLACE_THE = frozenset({"San Francisco Bay Area", "NT"})
 # ...and the shorter name a title falls back to when the full one won't fit beside a long field, as
 # FIELD_SHORT does for fields: "Software Engineering Internships in the San Francisco Bay Area" is 62.
 PLACE_SHORT = {"San Francisco Bay Area": "in the Bay Area"}
@@ -1625,7 +1244,7 @@ PLACE_SHORT = {"San Francisco Bay Area": "in the Bay Area"}
 
 def in_place(k: str) -> str:
     """ "in Boston", "in the San Francisco Bay Area": a place after "in", as a sentence or title says it."""
-    return f"in {'the ' if k in PLACE_THE else ''}{US_STATES[k]}"
+    return _taxonomy.in_place(k, article_places=PLACE_THE, places=US_STATES)
 
 
 def combo_label(t: str, k: str) -> str:
@@ -1640,115 +1259,6 @@ def combo_label(t: str, k: str) -> str:
 # pages drew in Georgia and Segoe. accent-hover is the call-to-action's hover, a real colour
 # step rather than a fade. nav spacing is a flex gap (was: margin-left on each link, which also pushed
 # the first one off the header's edge when the header wrapped on a phone).
-CSS = """
-@font-face{font-family:"IBM Plex Sans";src:url(/fonts/ibm-plex-sans-latin.woff2) format("woff2");font-weight:100 700;font-style:normal;font-display:swap;unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
-@font-face{font-family:"Source Serif 4";src:url(/fonts/source-serif-4-latin.woff2) format("woff2");font-weight:600;font-style:normal;font-display:swap;unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
-@font-face{font-family:"Plex Fallback";src:local("Arial"),local("ArialMT"),local("Helvetica Neue"),local("Helvetica"),local("Roboto");font-weight:400;size-adjust:100.1%;ascent-override:102.4%;descent-override:27.5%;line-gap-override:0%}
-@font-face{font-family:"Plex Fallback";src:local("Arial"),local("ArialMT"),local("Helvetica Neue"),local("Helvetica"),local("Roboto");font-weight:500;size-adjust:102.1%;ascent-override:100.4%;descent-override:26.9%;line-gap-override:0%}
-@font-face{font-family:"Plex Fallback";src:local("Arial Bold"),local("Arial-BoldMT"),local("Helvetica Neue Bold"),local("Helvetica Bold"),local("Roboto Bold");font-weight:600 700;size-adjust:97.2%;ascent-override:105.5%;descent-override:28.3%;line-gap-override:0%}
-@font-face{font-family:"Serif Fallback";src:local("Georgia Bold"),local("Georgia-Bold");font-weight:600 700;size-adjust:86%;ascent-override:120.5%;descent-override:39%;line-gap-override:0%}
-:root{--paper:#f6f4ef;--panel:#fffefb;--sunk:#efece5;--ink:#17191c;--ink2:#454a52;--ink3:#646a73;--rule:#e2ded4;--rule2:#ece9e1;--field-border:#80858c;--accent:#1d5c46;--accent-ink:#fff;--accent-hover:#164a38;--accent-soft:#e3eee8;--blue:#2b5aa0;--amber:#8c5a0f;--amber-soft:#f6ecd9;--green:#1d7549;--red:#a8362c;
---serif:"Source Serif 4","Serif Fallback",Georgia,"Times New Roman",serif;--sans:"IBM Plex Sans","Plex Fallback",system-ui,-apple-system,"Segoe UI",sans-serif;--fs-1:12px;--fs-2:13px;--fs-3:15px;--fs-4:16px;--fs-5:18px;--fs-6:22px;--fs-7:28px;--fs-8:34px;--lh:1.5;--lh-head:1.2;--s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:24px;--s6:32px;--s7:48px;--r-sm:4px;--r:6px;--r-lg:8px;--r-pill:999px;--shadow-pop:0 10px 30px color-mix(in srgb,var(--ink) 14%,transparent);--ring:0 0 0 1px var(--accent);--h-ctl:36px;--h-ctl-sm:32px;--h-field:40px;--ease-out:cubic-bezier(.2,.7,.3,1);--t-fast:140ms;--t-move:200ms;--i-chevron:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");--i-search:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-4-4'/%3E%3C/svg%3E");--i-check:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7'/%3E%3C/svg%3E");--i-cross:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 6l12 12M18 6L6 18'/%3E%3C/svg%3E");--i-alert:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7.5v5.5M12 16.5v.01'/%3E%3C/svg%3E");--i-external:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5'/%3E%3C/svg%3E");--i-select:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23646a73' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");color-scheme:light}
-@media (prefers-color-scheme:dark){:root{--paper:#131416;--panel:#1a1b1e;--sunk:#232427;--ink:#ecebe6;--ink2:#b8b6af;--ink3:#95948e;--rule:#2c2d31;--rule2:#232427;--field-border:#6e7077;--accent:#7cc3a1;--accent-ink:#0f1a15;--accent-hover:#95d2b3;--accent-soft:#1c2a24;--blue:#8fb2e8;--amber:#e0b25e;--amber-soft:#2e2717;--green:#7cc3a1;--red:#e48a80;
---i-select:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2395948e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");color-scheme:dark}}
-@media (pointer:coarse){:root{--h-ctl:44px;--h-ctl-sm:44px;--h-field:44px}}
-*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);
-font:var(--fs-4)/var(--lh) var(--sans)}
-.wrap{max-width:860px;margin:0 auto;padding:0 20px 64px}a{color:var(--accent)}
-header{display:flex;justify-content:space-between;align-items:baseline;gap:8px 20px;flex-wrap:wrap;
-padding:22px 0 14px;border-bottom:1px solid var(--ink)}
-.mark{font:600 var(--fs-6)/1 var(--serif);color:var(--ink);text-decoration:none}
-nav{display:flex;gap:4px 14px;flex-wrap:wrap}
-nav a{color:var(--ink2);font-size:var(--fs-3);text-decoration:none;transition:color 140ms ease-out}nav a:hover{color:var(--ink)}
-.mobile-digest{display:none}
-@media(max-width:560px){header nav{gap:4px 14px}header nav a{display:inline-flex;align-items:center;min-height:44px}header nav .nav-extra{display:none}.mobile-digest{display:inline}}
-:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.crumbs{font-size:var(--fs-3);color:var(--ink3);margin:22px 0 0}.crumbs a{color:var(--ink3)}
-h1{font:600 var(--fs-8)/1.2 var(--serif);margin:10px 0 8px}
-.lede{color:var(--ink2);font-size:var(--fs-5);margin:0 0 6px}.updated{color:var(--ink3);font-size:var(--fs-3);margin:0}
-.cta{display:inline-flex;align-items:center;justify-content:center;min-height:var(--h-ctl);margin:18px 0 8px;padding:10px 16px;
-border-radius:var(--r);border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink);font-weight:600;text-decoration:none;
-transition:background-color 140ms ease-out,border-color 140ms ease-out}
-.cta:hover{background:var(--accent-hover);border-color:var(--accent-hover)}.cta:active{transform:translateY(1px)}
-.cta.secondary{background:var(--panel);border-color:var(--field-border);color:var(--ink)}
-.cta.secondary:hover{background:var(--panel);border-color:var(--ink3)}
-.cta.quiet{background:transparent;border-color:transparent;color:var(--accent);padding-left:4px;padding-right:4px}
-.cta.quiet:hover{text-decoration:underline;text-underline-offset:3px}
-.cta[disabled],.cta[aria-disabled=true]{background:var(--sunk);border-color:var(--field-border);color:var(--ink3);cursor:default;transform:none}
-ul.jobs{list-style:none;padding:0;margin:24px 0;border-top:1px solid var(--rule)}
-.job{display:grid;grid-template-columns:1fr auto;gap:2px 16px;padding:14px 0;border-bottom:1px solid var(--rule)}
-.co{font-weight:600}.co a{color:var(--ink);text-decoration:none}.co a:hover{text-decoration:underline;text-underline-offset:3px}.role{grid-column:1}.meta{grid-column:1;color:var(--ink3);font-size:var(--fs-3)}
-.pay{color:var(--ink2);font-variant-numeric:tabular-nums}.new{font-size:var(--fs-1);color:var(--accent);font-weight:600;margin-left:6px}
-.acts{grid-column:2;grid-row:1/span 3;align-self:center;display:flex;flex-wrap:wrap;align-items:center;gap:var(--s2) var(--s3)}
-.go{display:inline-flex;align-items:center;min-height:var(--h-ctl);padding:0 14px;border:1px solid var(--field-border);border-radius:var(--r);
-background:var(--panel);color:var(--ink);font-size:var(--fs-3);font-weight:500;text-decoration:none;white-space:nowrap;transition:border-color 140ms ease-out}
-.go:hover{border-color:var(--ink3)}
-.more,.follow{color:var(--ink2)}section.rel h2{font:600 var(--fs-6)/1.3 var(--serif);margin:36px 0 8px}
-section.rel ul{list-style:none;padding:0;margin:0;columns:2;column-gap:28px}
-section.rel li{padding:3px 0;break-inside:avoid}
-.facts{display:grid;grid-template-columns:max-content 1fr;gap:6px 18px;margin:20px 0 24px;padding:16px 18px;
-background:var(--panel);border:1px solid var(--rule);border-radius:var(--r-lg)}.facts dt{color:var(--ink3)}.facts dd{margin:0}
-section.faq h2{font:600 var(--fs-5)/1.3 var(--serif);margin:28px 0 6px}section.faq p{margin:0;color:var(--ink2)}
-@media (max-width:560px){.facts{grid-template-columns:1fr;gap:2px}.facts dd{margin-bottom:8px}}.n{color:var(--ink3);font-size:var(--fs-2)}
-footer{margin-top:48px;padding-top:16px;border-top:1px solid var(--rule);color:var(--ink3);font-size:var(--fs-3)}
-footer a{color:var(--ink2)}
-.distribution-links{gap:8px 24px;margin-bottom:16px}
-.distribution-links a,.widget-follow a{display:inline-flex;align-items:center;min-height:44px;text-decoration:underline;text-underline-offset:3px}
-@media (max-width:560px){h1{font-size:var(--fs-7)}section.rel ul{columns:1}
-.job{grid-template-columns:1fr}.acts{grid-column:1;grid-row:auto;margin-top:var(--s2)}}
-@media (prefers-reduced-motion:reduce){*{transition:none!important}.cta:active{transform:none}}
-.tablewrap{overflow-x:auto;margin:16px 0 8px}table.data{width:100%;border-collapse:collapse;font-size:var(--fs-3)}
-table.data th,table.data td{text-align:left;vertical-align:top;padding:9px 14px 9px 0;border-bottom:1px solid var(--rule)}
-table.data thead th{border-bottom:1px solid var(--ink);font-weight:600}table.data td.num{white-space:nowrap}
-section.prose h2{font:600 var(--fs-6)/1.3 var(--serif);margin:34px 0 6px}.src{color:var(--ink3);font-size:var(--fs-3)}
-table.cmp{min-width:620px}@media (max-width:560px){table.data{font-size:var(--fs-3)}table.data th,table.data td{padding-right:10px}}
-table.tracker tbody th{font-weight:400}.cell-label{display:none}
-@media(max-width:560px){
-table.data,table.data tbody{display:block;min-width:0;width:100%}
-table.data thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
-table.data tbody tr{display:block;padding:12px 0;border-bottom:1px solid var(--rule)}
-table.data tbody th{display:block;padding:0 0 8px;border:0;font-weight:600;overflow-wrap:anywhere}
-table.data tbody td{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;padding:4px 0;border:0;white-space:normal;overflow-wrap:anywhere}
-.cell-label{display:block;color:var(--ink3);font-weight:500}.cell-value{min-width:0}
-}
-.aa-card{margin:18px 0 0;padding:14px 18px 6px;background:var(--panel);border:1px solid var(--rule);border-radius:var(--r-lg)}
-.aa-card p{margin:0;color:var(--ink2)}.aa-card .cta{margin:10px 0 8px}
-figure.chart{margin:8px 0 18px}figure.chart img{display:block;max-width:100%;height:auto}
-figure.chart figcaption{color:var(--ink3);font-size:var(--fs-3);margin-top:4px}
-.ext-touch{display:none}@media (pointer:coarse) and (hover:none){.ext-desk{display:none}.ext-touch{display:inline-block}}
-.aa{display:inline-flex;align-items:center;min-height:var(--h-ctl);font-size:var(--fs-2);font-weight:500;color:var(--accent);text-decoration:none;white-space:nowrap}
-.aa:hover{text-decoration:underline;text-underline-offset:3px}
-@media (max-width:560px){.go,.aa{min-height:44px}}
-main>h1:first-child{margin-top:var(--s6)}.vh{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-.tiers{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:26px 0 6px}
-.tier{position:relative;display:flex;flex-direction:column;padding:20px 18px 16px;background:var(--panel);
-border:1px solid var(--rule);border-radius:var(--r-lg)}.tier.pick{border-color:var(--accent);box-shadow:var(--ring)}
-.tier h2{font:600 var(--fs-6)/1.2 var(--serif);margin:0}
-.tier .price{font:600 var(--fs-7)/1.1 var(--serif);margin:8px 0 2px}
-.tier .price span{font:var(--fs-3)/1 var(--sans);color:var(--ink3)}
-.tier .blurb{color:var(--ink2);margin:0 0 10px;font-size:var(--fs-3)}
-.tier ul{margin:0 0 14px;padding-left:18px;color:var(--ink2);font-size:var(--fs-3);flex:1}.tier li{margin:4px 0}
-.tier .cta{margin:0;text-align:center}
-.badge{position:absolute;top:-11px;left:16px;background:var(--accent);color:var(--accent-ink);font-size:var(--fs-1);
-font-weight:600;padding:3px 9px;border-radius:var(--r-pill)}
-.anchor{font-size:var(--fs-5);margin:20px 0 0}ul.plain{padding-left:18px;color:var(--ink2)}ul.plain li{margin:6px 0}
-@media (max-width:720px){.tiers{grid-template-columns:1fr}}
-form.digest{margin:28px 0 8px;padding:16px 18px;background:var(--panel);border:1px solid var(--rule);border-radius:var(--r-lg)}
-form.digest h2{font:600 var(--fs-6)/1.3 var(--serif);margin:0 0 6px}form.digest p{margin:0 0 8px;color:var(--ink2)}
-.check{display:flex;gap:8px;align-items:baseline;color:var(--ink2);font-size:var(--fs-3);margin:10px 0 0}
-.digest-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0 10px}.digest-row label{font-weight:600}
-.digest-row input{flex:1 1 220px;min-width:0;max-width:340px;height:var(--h-field);padding:0 10px;border:1px solid var(--field-border);
-border-radius:var(--r);background:var(--paper);color:var(--ink);font:inherit}
-.digest-row .cta{margin:0;border:0;font:inherit;font-weight:600;cursor:pointer}form.digest .fine{font-size:var(--fs-3);color:var(--ink3);margin:0}
-.i{display:inline-block;width:1em;height:1em;flex:none;vertical-align:-.125em;background:currentColor;-webkit-mask:var(--i) center/contain no-repeat;mask:var(--i) center/contain no-repeat}
-.i-chevron{--i:var(--i-chevron)}.i-search{--i:var(--i-search)}.i-check{--i:var(--i-check)}.i-cross{--i:var(--i-cross)}.i-alert{--i:var(--i-alert)}.i-external{--i:var(--i-external)}
-input[aria-invalid=true],textarea[aria-invalid=true],select[aria-invalid=true]{border-color:var(--red)}.field-err{color:var(--red);font-size:var(--fs-2);margin:var(--s1) 0 0}
-input:disabled,select:disabled,textarea:disabled{color:var(--ink3);background-color:var(--sunk);cursor:default}
-.paid{display:grid;grid-template-columns:1fr auto;gap:2px 16px;margin:var(--s3) 0;padding:var(--s3) var(--s4);background:var(--panel);border:1px solid var(--rule);border-radius:var(--r-lg)}
-.paid-h{grid-column:1/-1;margin:0 0 var(--s1);font-size:var(--fs-2);font-weight:600;color:var(--ink2)}.paid-h a{margin-left:var(--s2);font-weight:400;color:var(--ink3)}
-.ad{display:inline-block;margin-right:var(--s1);padding:0 6px;border:1px solid var(--ink3);border-radius:var(--r-sm);font-size:var(--fs-1);font-weight:600;line-height:18px;color:var(--ink2);vertical-align:1px}
-.paid .go{grid-column:2;grid-row:2/span 3;align-self:center}@media (max-width:560px){.paid{grid-template-columns:1fr}.paid .go{grid-column:1;grid-row:auto;justify-self:start;margin-top:var(--s2)}}
-"""
 # The last four lines (2026-10-14, B2 plan section 6) are a paid listing's box (placement_box): a panel among the
 # rows, headed "Paid listing", with a bordered "Ad" badge before the company name and "Open posting" where a
 # row has it. The badge and heading use ink2 and ink3 on the panel, 4.5:1 or more in light and dark.
@@ -1799,34 +1309,7 @@ def beacon_from(site_dir: str) -> str:
 # no second copy to forget. While it is empty no page gets a form at all: it is left out of the HTML,
 # not hidden by a script, so it is absent with JavaScript off too.
 # Only a line that starts with "digest:", so a comment that mentions the setting can't be read as it.
-_DIGEST_ACTION = re.compile(r"^\s*digest\s*:\s*\{[^{}\n]*?\bformAction\s*:\s*\"([^\"\n]*)\"", re.M)
 # Buttondown's embed-subscribe address, whose last part is the newsletter's username.
-_BUTTONDOWN_FORM = re.compile(
-    r"^https://buttondown\.(?:com|email)/api/emails/embed-subscribe/([A-Za-z0-9_-]+)/?$"
-)
-DIGEST_PATH = "/digest/"
-
-
-def digest_form_action(site_dir: str) -> str:
-    """CONFIG.digest.formAction from <site_dir>/index.html, or "" while it is empty, missing, or not an
-    https address (the test js/app.js makes before it shows its own form)."""
-    try:
-        with open(os.path.join(site_dir, "index.html"), encoding="utf-8") as f:
-            m = _DIGEST_ACTION.search(f.read())
-    except OSError:
-        return ""
-    action = m.group(1).strip() if m else ""
-    return action if re.match(r"^https://\S+$", action) else ""
-
-
-def digest_archive(action: str) -> str:
-    """The newsletter's public web archive on Buttondown, worked out from the form's address
-    (https://buttondown.com/api/emails/embed-subscribe/USERNAME -> https://buttondown.com/USERNAME/archive/),
-    or "" when the address is not Buttondown's. js/core.js IS.digestArchive does the same for the
-    dashboard. Buttondown's docs (docs.buttondown.com/email-archives) put the archive at
-    buttondown.com/USERNAME; /archive/ is its list of past emails, newest first."""
-    m = _BUTTONDOWN_FORM.match(action or "")
-    return f"https://buttondown.com/{m.group(1)}/archive/" if m else ""
 
 
 def signup_form(
@@ -1870,7 +1353,7 @@ def _select_signup_form(
 
 
 def _render_signup_form(model: _digest.Signup | None) -> str:
-    return _digest.render_signup_form(model)
+    return _render_digest_module.render_signup_form(model)
 
 
 BEACON = ""  # set by build() from the site's own index.html
@@ -1950,11 +1433,7 @@ def page(
 def _dash_state(state: str) -> str:
     """The dashboard has state and province files, not metro or all-Canada ones: a metro opens its state
     or province, and Canada every province and the no-province file."""
-    if state == "Canada":
-        return ",".join(list(CA_PROVINCES) + ["Canada"])
-    return ",".join(
-        METRO_STATE.get(s, s) for s in state.split(",")
-    )  # was: CA_METRO_PAGES.get(s, s)
+    return _taxonomy._dash_state(state, provinces=CA_PROVINCES, metro_state=METRO_STATE)
 
 
 def dash_link(
@@ -2089,7 +1568,7 @@ def listing_body(
     signup: str = "",
     details: dict | None = None,
 ) -> str:
-    return _listing.listing_body(
+    return _render_listing_module.listing_body(
         items,
         what,
         where,
@@ -2125,8 +1604,6 @@ def listing_body(
 # counted from the open roles; when the postings don't say, the page says that rather than guess.
 
 _STATE_NAMES = {name: code for code, name in US_STATES.items() if len(code) == 2}
-_HOURLY = re.compile(r"\b(hour|hr|hourly)\b", re.I)
-_NOT_HOURLY = re.compile(r"\b(year|yr|annual|annually|month|week|stipend|salary)\b", re.I)
 
 
 def long_day(stamp) -> str:
@@ -2138,9 +1615,6 @@ def long_day(stamp) -> str:
 # "$110k" and "$95K – $100K" are yearly salaries written in thousands, and Maven Securities' employer
 # page said "$110 an hour"; "$75 to $100," ends in a comma, so the figure was cut off mid-number; and
 # "$60.500" is $60,500 with a point for the comma.
-_THOUSANDS = re.compile(r"\d\s*k\b", re.I)
-_CUT_OFF = re.compile(r"\d,\s*$")
-_POINT_THOUSANDS = re.compile(r"\d\.\d{3}\b")
 
 
 def hourly_rate(x: dict) -> tuple[float, float] | None:
@@ -2148,24 +1622,12 @@ def hourly_rate(x: dict) -> tuple[float, float] | None:
     amount counts as hourly only under $200 (student pay quoted without a unit is an hourly rate); a
     yearly salary, monthly or weekly pay or a stipend is left out rather than turned into a made-up
     hourly figure, and so is pay text that only looks hourly (_THOUSANDS, _CUT_OFF, _POINT_THOUSANDS)."""
-    s = real_salary(x)
-    if not s or any(r.search(s) for r in (_NOT_HOURLY, _THOUSANDS, _CUT_OFF, _POINT_THOUSANDS)):
-        return None
-    # was: if not s or _NOT_HOURLY.search(s): continue   (inside hourly_range's loop)
-    nums = [float(a.replace(",", "")) for a in _AMOUNT.findall(s)]
-    nums = (
-        [v for v in nums if 7 <= v < 200]
-        if (_HOURLY.search(s) or all(v < 200 for v in nums))
-        else []
-    )
-    return (min(nums), max(nums)) if nums else None
+    return _facts.hourly_rate(x, salary=real_salary)
 
 
 def hourly_range(items: list[dict]) -> tuple[float, float, int] | None:
     """Lowest and highest hourly rate the postings list, and how many list one (see hourly_rate)."""
-    rates = [r for r in (hourly_rate(x) for x in items) if r]
-    # was: the parsing now in hourly_rate, inline in a loop here.
-    return (min(lo for lo, _ in rates), max(hi for _, hi in rates), len(rates)) if rates else None
+    return _facts.hourly_range(items, rate=hourly_rate)
 
 
 def dated_terms(items: list[dict]) -> Counter:
@@ -2791,62 +2253,7 @@ ATS_NAMES = {
 def site_facts(listings: list[dict]) -> dict:
     """What the whole export says about InternScout's coverage: the numbers /about/, /compare/ and
     llms.txt state, so they all agree with each other and with the listing pages."""
-    fields = Counter(t for x in listings for t in set(x.get("field_tags") or []) - SKIP_FIELDS)
-    boards = Counter(ATS_NAMES[x["ats"]] for x in listings if x.get("ats") in ATS_NAMES)
-    keys = {k for x in listings for k in x["keys"]}
-    canada = sum(
-        1
-        for x in listings
-        if any(isinstance(g, dict) and g.get("kind") == "canada" for g in x.get("regions") or [])
-    )
-    return {
-        "open": len(listings),
-        "employers": len(
-            {employer_key(x["company_name"]) for x in listings if x.get("company_name")}
-        ),
-        "fields": fields,
-        "boards": boards,
-        "from_boards": sum(boards.values()),
-        "canada": canada,
-        # The 50 states only: DC and Puerto Rico are counted on their own pages, not here.
-        "states": sorted(
-            k for k in keys if k in PLACES and k not in CA_PROVINCES and k not in ("DC", "PR")
-        ),
-        "provinces": sorted(k for k in keys if k in CA_PROVINCES),
-        "paid": sum(1 for x in listings if is_paid(x)),
-        "hourly": sum(1 for x in listings if hourly_rate(x)),
-    }
-
-
-def coverage_line(f: dict) -> str:
-    """ "14,366 open internships, co-ops and research roles from 1,702 employers in 65 fields" """
-    return (
-        f"{plural(f['open'], 'open internship, co-op and research role', 'open internships, co-ops and research roles')}"
-        f" from {plural(f['employers'], 'employer')} in {plural(len(f['fields']), 'field')}"
-    )
-
-
-def boards_line(f: dict) -> str:
-    """Where the listings come from, counted: "86% of open roles come straight from employers' own
-    applicant tracking systems (Workday, Greenhouse, Oracle, iCIMS, Ashby and Lever are the largest)"."""
-    if not f["from_boards"]:
-        return "every open role links to the posting on the employer's own site"
-    return (
-        f"{pct(f['from_boards'], f['open'])} of open roles come straight from employers' own applicant "
-        f"tracking systems ({join_words(top(f['boards'], 6))} are the largest)"
-    )
-
-
-def word_list(words: list[str]) -> str:
-    """join_words with a comma before the last "and", for names that hold an "and" themselves:
-    "finance, data science and analytics, and operations"."""
-    return join_words(words) if len(words) < 3 else ", ".join(words[:-1]) + ", and " + words[-1]
-
-
-def canada_only(x: dict) -> bool:
-    """A role whose every location is in Canada, so its pay is most likely in Canadian dollars."""
-    regions = [g for g in x.get("regions") or [] if isinstance(g, dict)]
-    return bool(regions) and all(g.get("kind") == "canada" for g in regions)
+    return _facts.site_facts(listings, skip_fields=SKIP_FIELDS, ats_names=ATS_NAMES, places=PLACES, provinces=CA_PROVINCES, employer_key=employer_key, hourly_rate=hourly_rate, is_paid=is_paid)
 
 
 # ---- /internships/highest-paying/
@@ -2929,7 +2336,7 @@ def pay_page(
 
 
 def _render_pay_page(model: _pay.Page) -> tuple[str, str, str]:
-    return _pay.render_pay_page(
+    return _render_pay_module.render_pay_page(
         model,
         company_link=company_link,
         dash_link=dash_link,
@@ -3135,7 +2542,7 @@ def numbers_page(
 
 
 def _render_numbers_page(model: _numbers.Page) -> tuple[list, str, str, list]:
-    return _numbers.render_numbers_page(
+    return _render_numbers_module.render_numbers_page(
         model,
         site=SITE,
         numbers_path=NUMBERS_PATH,
@@ -3369,7 +2776,7 @@ def _select_digest_examples(new: list[dict]) -> _digest.Examples:
 
 
 def _render_digest_examples(model: _digest.Examples | None) -> str:
-    return _digest.render_digest_examples(model)
+    return _render_digest_module.render_digest_examples(model)
 
 
 def digest_page(new: list[dict], by_field: Counter, new_page: bool) -> tuple[str, str, str]:
@@ -3397,11 +2804,11 @@ def digest_page(new: list[dict], by_field: Counter, new_page: bool) -> tuple[str
 
 
 def _render_digest_page(model: _digest.Page) -> tuple[str, str, str]:
-    return _digest.render_digest_page(model)
+    return _render_digest_module.render_digest_page(model)
 
 
 def _render_kind_page(model: _listing.KindPage) -> dict:
-    return _listing.render_kind_page(
+    return _render_listing_module.render_kind_page(
         model,
         count_floor=count_floor,
         dash_link=dash_link,
@@ -3413,7 +2820,7 @@ def _render_kind_page(model: _listing.KindPage) -> dict:
 
 
 def _render_new_page(model: _digest.NewPage) -> dict:
-    return _digest.render_new_page(
+    return _render_digest_module.render_new_page(
         model,
         dash_link=dash_link,
         listing_body=listing_body,
@@ -3629,7 +3036,7 @@ def _select_near_body(
 
 
 def _render_near_body(model: _near.NearBody) -> str:
-    return _near.render_near_body(
+    return _render_near_module.render_near_body(
         model,
         autoapply_card=autoapply_card,
         chart_figure=chart_figure,
@@ -3644,7 +3051,7 @@ def _render_near_body(model: _near.NearBody) -> str:
 
 
 def _near_footer() -> str:
-    return _near.render_footer(NEAR_ROOT)
+    return _render_near_module.render_footer(NEAR_ROOT)
 
 
 def near_pages(
@@ -3674,7 +3081,7 @@ def near_pages(
 
 
 def _render_near_page(model: _near.NearPage) -> dict:
-    return _near.render_near_page(
+    return _render_near_module.render_near_page(
         model,
         near_description=near_description,
         near_title=near_title,
@@ -3689,7 +3096,7 @@ def near_hub(hub: dict) -> tuple[list[str], str, str]:
 
 
 def _render_near_hub(groups: list[_near.LinkGroup]) -> tuple[list[str], str, str]:
-    return _near.render_near_hub(groups)
+    return _render_near_module.render_near_hub(groups)
 
 
 def _select_employer_page(
@@ -3742,7 +3149,7 @@ def _select_employer_page(
 
 
 def _render_employer_page(model: _employer.Page) -> dict:
-    return _employer.render_employer_page(
+    return _render_employer_module.render_employer_page(
         model,
         combo_label=combo_label,
         dash_link=dash_link,
@@ -3759,7 +3166,7 @@ def _render_employer_page(model: _employer.Page) -> dict:
 
 
 def _render_field(model: _field.Field) -> dict:
-    return _field.render_field(
+    return _render_field_module.render_field(
         model,
         dash_link=dash_link,
         field_short=field_short,
@@ -3775,7 +3182,7 @@ def _render_field(model: _field.Field) -> dict:
 
 
 def _render_place(model: _field.Place) -> dict:
-    return _field.render_place(
+    return _render_field_module.render_place(
         model,
         dash_link=dash_link,
         field_slug=field_slug,
@@ -3790,7 +3197,7 @@ def _render_place(model: _field.Place) -> dict:
 
 
 def _render_combo(model: _field.Combo) -> dict:
-    return _field.render_combo(
+    return _render_field_module.render_combo(
         model,
         dash_link=dash_link,
         field_short=field_short,
@@ -3807,7 +3214,7 @@ def _render_combo(model: _field.Combo) -> dict:
 
 
 def _render_major(model: _field.Major) -> dict:
-    return _field.render_major(
+    return _render_field_module.render_major(
         model,
         dash_link=dash_link,
         field_slug=field_slug,
@@ -4422,6 +3829,16 @@ def build(
     (held_paths), live for keep_at though not in the sitemap. earning: the pages people find in
     search (earning_paths, read from SEARCH_PAGES when None), which are never made noindex, but for
     the near pages while NEAR_INDEX is off."""
+    return build_result(site_dir, live, held, earning).pages
+
+
+def build_result(
+    site_dir: str,
+    live: dict[str, str] | set[str] | frozenset[str] = frozenset(),
+    held: set[str] | frozenset[str] = frozenset(),
+    earning: frozenset[str] | None = None,
+) -> _build.Result:
+    """Build pages and return the employer registry from that same build."""
     global BEACON, BASELINE, GENERATED, DIGEST_FORM
     earning = earning_paths() if earning is None else earning
     # Served includes noindex pages for retention. Index decisions still receive raw live.
@@ -4669,9 +4086,9 @@ def add_paid_boxes(pages: list[dict], kept: list[dict], today: str) -> list[dict
     (PLACEMENT_KINDS) whose own items include its listing. kept: placements.resolve's. When two or more
     fit one page, a hash of the path and the day picks one, so two builds on the same day are the same
     and price never matters. Only "html" changes; a page with no box is the same dict."""
-    from .placements import MAX_PER_PAGE
+    max_per_page = _paid.placement_services().MAX_PER_PAGE
 
-    if not kept or MAX_PER_PAGE < 1:
+    if not kept or max_per_page < 1:
         return pages
     out = []
     for p in pages:
@@ -4692,7 +4109,7 @@ def add_paid_boxes(pages: list[dict], kept: list[dict], today: str) -> list[dict
 
 def write_placements(site_dir: str, kept: list[dict], today: str) -> None:
     """<site_dir>/data/placements.json: the placements kept today, public fields only."""
-    from .placements import public
+    public = _paid.placement_services().public
 
     folder = os.path.join(site_dir, "data")
     os.makedirs(folder, exist_ok=True)
@@ -4821,7 +4238,7 @@ def main(argv: list[str]) -> None:
     built = pages  # as build() made them, before any paid box, for the feeds
     today = today_utc()
     if placements_path is not None:
-        from . import placements
+        placements = _paid.placement_services()
 
         kept, dropped = placements.resolve(
             placements.read(placements_path), {str(x["id"]): x for x in LISTINGS}, today
@@ -4843,12 +4260,8 @@ def main(argv: list[str]) -> None:
     write(site_dir, pages)
     # The role index the employer buy page searches and the Worker checks orders against (2026-10-19,
     # role_index). Here and not in build(), which writes nothing: growth/report.py calls build() on docs/.
-    from . import role_index  # role_index imports this module, so not at the top
-
     shards = role_index.write(site_dir, LISTINGS, GENERATED or datetime.now(timezone.utc), today)
     console(f"[seo] role index: {sum(shards.values())} roles in {len(shards)} shards")
-    from . import feeds  # feeds imports this module, so not at the top
-
     # The date is passed, not left to feeds to read from seo_pages.GENERATED: run as
     # `python -m internscout.seo_pages` this module is __main__, and the internscout.seo_pages that
     # feeds imports is a second copy whose build() never ran, so its GENERATED is None.

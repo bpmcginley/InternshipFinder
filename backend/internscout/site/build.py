@@ -54,6 +54,7 @@ class Majors:
 class Employers:
     by_company: Groups
     spellings: dict[str, list[str]]
+    registry: dict[str, str]
 
 
 def digest_summary(
@@ -310,7 +311,7 @@ def register_employers(
             continue
         by_company[name], spellings[name] = items, sorted(names)
         employers.update({n: path for n in names})
-    return Employers(by_company, spellings)
+    return Employers(by_company, spellings, employers)
 
 
 def page_writer(
@@ -439,6 +440,12 @@ def indexable_catalog(pages: list[dict]) -> dict[str, tuple[str, int]]:
 
 
 @dataclass(frozen=True)
+class Result:
+    pages: list[dict]
+    employer_registry: dict[str, str]
+
+
+@dataclass(frozen=True)
 class Stages:
     """Typed phase boundaries supplied by the compatibility caller."""
 
@@ -472,7 +479,7 @@ def assemble(
     employers_in: Callable[[Listings], int],
     fold_at: Callable[[str], float],
     stages: Stages,
-) -> list[dict]:
+) -> Result:
     """Assemble pages in the order their links and membership decisions depend on."""
     listings = data["listings"]
     baseline = data["baseline"]
@@ -529,4 +536,4 @@ def assemble(
     stages.finish(
         pages, live, by_company, cohorts, trackers, new, majors_made, facts, rep, context.updated
     )
-    return pages
+    return Result(pages, employers.registry)
