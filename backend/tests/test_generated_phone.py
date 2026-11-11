@@ -5,8 +5,13 @@ import xml.etree.ElementTree as ET
 from datetime import date, datetime, timezone
 from html import escape
 
-from internscout import seo_pages as sp
+import pytest
+
+from internscout.site import runtime
 from internscout.site.render import layout
+
+
+pytestmark = pytest.mark.without_seo_facade
 
 
 def test_table_preserves_headers_values_and_safe_visible_labels():
@@ -45,7 +50,10 @@ def test_table_preserves_headers_values_and_safe_visible_labels():
 
 
 def test_tracker_uses_shared_headers_and_escapes_employer_data():
-    _, _, _, html = sp.tracker_page(
+    _, _, _, html = runtime.invoke(
+        runtime.BuildState(),
+        runtime.BuildHooks(),
+        runtime.tracker_page,
         "Summer 2027",
         [(date(2026, 9, 17), False, 'Synthetic<Lab> & "Research"', None, 30)],
         30,
@@ -86,9 +94,22 @@ def test_escaped_hostile_column_labels_stay_text_in_headers_and_phone_labels():
     assert table.findall(".//img") == []
 
 
-def test_mobile_footer_keeps_secondary_destinations_and_conditional_email(monkeypatch):
-    monkeypatch.setattr(sp, "DIGEST_FORM", "enabled")
-    html = sp.page("/internships/arts/", "Arts", "Arts", "Arts", [], "", "November 10, 2026")
+def test_mobile_footer_keeps_secondary_destinations_and_conditional_email():
+    def render(digest):
+        return runtime.invoke(
+            runtime.BuildState(digest_form=digest),
+            runtime.BuildHooks(),
+            runtime.page,
+            "/internships/arts/",
+            "Arts",
+            "Arts",
+            "Arts",
+            [],
+            "",
+            "November 10, 2026",
+        )
+
+    html = render("enabled")
     nav = re.search(r'<nav aria-label="Primary">.*?</nav>', html, re.S)[0]
     footer = re.search(r"<footer>.*?</footer>", html, re.S)[0]
     for url in ["/pricing/", "/compare/", "/about/", "/employers/", "/digest/"]:
@@ -99,6 +120,5 @@ def test_mobile_footer_keeps_secondary_destinations_and_conditional_email(monkey
         '<a href="/internships/">',
         '<a href="/install.html">',
     ]
-    monkeypatch.setattr(sp, "DIGEST_FORM", "")
-    disabled = sp.page("/internships/arts/", "Arts", "Arts", "Arts", [], "", "November 10, 2026")
+    disabled = render("")
     assert 'data-digest-placement="footer"' not in disabled
