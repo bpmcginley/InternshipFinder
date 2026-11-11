@@ -67,13 +67,26 @@ export function createEmployerPostingCounter({ db, keys, now = () => new Date() 
       const day = at.toISOString().slice(0, 10);
       const cutoff = new Date(at.getTime() - 90 * DAY).toISOString().slice(0, 10);
       try {
-        const result = await db
-          .prepare("DELETE FROM employer_posting_counts WHERE day < ?")
-          .bind(cutoff)
-          .run();
+        const results = await db.batch([
+          db.prepare("DELETE FROM employer_posting_counts WHERE day < ?").bind(cutoff),
+          db.prepare("DELETE FROM employer_posting_day_caps WHERE day < ?").bind(day),
+          // Never reconstruct an active cap from counts that an owner may have deleted.
+          // Existing history without its cap is ambiguous: stay off until operator recovery
+          // or the next empty UTC day. Existing caps survive cleanup and process restarts.
+          db
+            .prepare(
+              `INSERT INTO employer_posting_day_caps(day, n)
+            SELECT ?, 0 WHERE NOT EXISTS (SELECT 1 FROM employer_posting_counts WHERE day = ?)
+              AND NOT EXISTS (SELECT 1 FROM employer_posting_day_caps WHERE day > ?)
+            ON CONFLICT(day) DO NOTHING`,
+            )
+            .bind(day, day, day),
+          db.prepare("SELECT 1 AS ready FROM employer_posting_day_caps WHERE day = ?").bind(day),
+        ]);
         const finished = now();
         if (
-          !result.success ||
+          !results.every((result) => result.success) ||
+          results[3].results.length !== 1 ||
           version !== cleanupVersion ||
           !instant(finished) ||
           finished.toISOString().slice(0, 10) !== day
@@ -102,22 +115,31 @@ export function createEmployerPostingCounter({ db, keys, now = () => new Date() 
         !known(body.c)
       )
         return false;
-      // One SQLite statement checks both caps and increments one. Concurrent requests
-      // cannot pass a detached SELECT then overshoot. No persisted IP or global rollup.
+      // D1 batch is one transaction. The second write follows only a successful company
+      // increment; failure rolls both back. No full-day scan, IP, or historical rollup.
       try {
-        const result = await db
-          .prepare(
-            `
+        const results = await db.batch([
+          db
+            .prepare(
+              `
           INSERT INTO employer_posting_counts(day, company, n)
           SELECT ?, ?, 1
-          WHERE COALESCE((SELECT SUM(n) FROM employer_posting_counts WHERE day = ?), 0) < 50000
-            AND COALESCE((SELECT n FROM employer_posting_counts WHERE day = ? AND company = ?), 0) < 1000
+          WHERE (SELECT n FROM employer_posting_day_caps WHERE day = ?) < 50000
           ON CONFLICT(day, company) DO UPDATE SET n = n + 1 WHERE n < 1000
         `,
-          )
-          .bind(day, body.c, day, day, body.c)
-          .run();
-        return result.success && result.meta.changes === 1;
+            )
+            .bind(day, body.c, day),
+          db
+            .prepare(
+              "UPDATE employer_posting_day_caps SET n = n + 1 WHERE day = ? AND changes() = 1",
+            )
+            .bind(day),
+        ]);
+        if (!results.every((result) => result.success)) {
+          readyDay = null;
+          return false;
+        }
+        return results.every((result) => result.meta.changes === 1);
       } catch {
         readyDay = null;
         return false;
