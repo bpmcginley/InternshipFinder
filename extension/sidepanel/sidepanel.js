@@ -7,7 +7,7 @@ import { loadReview, shouldShow, cardCopy, STORE_REVIEWS_URL, FEEDBACK_URL, KEY 
 
 const main = document.getElementById("main");
 const live = document.getElementById("live");
-let tab = "queue";
+let tab = "queue", renderVersion = 0;
 const drafts = {}; // keep typed answers across re-renders
 
 const GROUPS = [
@@ -69,7 +69,7 @@ function announce(jobs) {
   seen = now;
 }
 
-async function renderQueue() {
+async function renderQueue(version) {
   const q = (await send({ type: "get_queue" })).queue || { order: [], jobs: {} };
   const jobs = q.order.map((id) => q.jobs[id]).filter(Boolean);
   announce(jobs);
@@ -85,12 +85,11 @@ async function renderQueue() {
   if (!jobs.length) h += `<div class="empty">No applications queued.<br>Pick internships on the dashboard and press <b>Auto-Apply</b>.<br><br><a href="https://internscout.org/" target="_blank" style="color:var(--blue)">Open dashboard ↗</a></div>`;
   // The review card (lib/review.js) goes right under the applications that are ready, which is what it
   // is about, and before anything still waiting. shouldShow() keeps it away while a form is being filled.
-  const rv = await loadReview();
-  const ask = shouldShow(rv, jobs) ? reviewCard(rv.filled) : "";
+  const reviewSlot = "<!--review-ask-->";
   for (const [name, sts] of GROUPS) {
     const list = jobs.filter((j) => sts.includes(j.status));
     if (list.length) h += `<div class="group">${name}<span class="n">${list.length}</span></div>` + list.map((j) => jobCard(j, drafts)).join("");
-    if (name === "Ready to submit") h += ask;
+    if (name === "Ready to submit") h += reviewSlot;
   }
   h += `<div class="group">Apply to any posting</div><form id="addurl" class="row" style="margin-top:0;flex-wrap:nowrap"><input id="url" type="url" required aria-label="Application link" placeholder="https://… application link"><button class="btn small">Queue</button></form><div class="small" id="addmsg"></div>`;
   const sp = await spend(), avg = perApplication(jobs);
@@ -100,6 +99,13 @@ async function renderQueue() {
   h += `<div class="row" style="justify-content:space-between;margin-top:14px">${e.showEdit ? `<button class="btn small quiet" id="dive2">${EDIT_LABEL}</button>` : "<span></span>"}<button class="btn small quiet" id="clear">Clear finished</button></div>`;
   // Asked or not (lib/review.js), once setup is done.
   if (e.showReview) h += `<div class="foot"><button class="btn small quiet" data-review="review">Leave a review</button></div>`;
+  // Revalidate after every asynchronous dependency. A queue/review event invalidates this draw,
+  // even when typing defers the next full render. Never commit a stale review card.
+  const rv = await loadReview();
+  const latest = await send({ type: "get_queue" });
+  if (version !== renderVersion || tab !== "queue") return;
+  const currentJobs = Object.values((latest.queue && latest.queue.jobs) || {});
+  h = h.replace(reviewSlot, latest.queue && shouldShow(rv, currentJobs) ? reviewCard(rv.filled) : "");
   const focused = focusKey(document.activeElement), opened = openLogs();
   main.innerHTML = h;
   for (const id of opened) main.querySelector(`[data-id="${id}"] details`)?.setAttribute("open", "");
@@ -200,11 +206,12 @@ async function renderAccounts() {
 
 let pending = null;
 function render() {
+  const version = ++renderVersion;
   // Don't wipe a half-typed answer while the queue updates.
   if (tab === "queue" && document.activeElement && document.activeElement.matches("textarea[data-ans], #url")) {
     clearTimeout(pending); pending = setTimeout(render, 1500); return;
   }
-  ({ queue: renderQueue, answers: renderAnswers, accounts: renderAccounts })[tab]();
+  ({ queue: renderQueue, answers: renderAnswers, accounts: renderAccounts })[tab](version);
 }
 
 // The queue tab also redraws when the Deep Dive becomes finished or unfinished, which a restore from the
@@ -213,6 +220,19 @@ function render() {
 const doneOf = (v) => !!(v && v.settings && v.settings.onboarded && !resumeReviewPending(v)) && !(v.profile && factCheckNote(v));
 chrome.storage.onChanged.addListener((ch, area) => {
   if (area !== "local") return;
+  if (ch.queue || ch[REVIEW_KEY]) {
+    renderVersion++;
+    const working = ch.queue && Object.values((ch.queue.newValue && ch.queue.newValue.jobs) || {}).some(j => j.status === "working");
+    if (working || ch[REVIEW_KEY]) {
+      // Hiding must not wait for the throttled render or a half-typed answer.
+      const card = main.querySelector(".card.review");
+      if (card) {
+        const focused = card.contains(document.activeElement);
+        card.remove();
+        if (focused) document.querySelector('nav button[data-tab="queue"]').focus({ preventScroll: true });
+      }
+    }
+  }
   const flipped = ch.store && doneOf(ch.store.oldValue) !== doneOf(ch.store.newValue);
   // was: if ((tab === "queue" && (ch.queue || ch.usage || flipped)) || ...
   if ((tab === "queue" && (ch.queue || ch.usage || ch[REVIEW_KEY] || flipped)) || (tab !== "queue" && ch.store)) { clearTimeout(pending); pending = setTimeout(render, 150); }

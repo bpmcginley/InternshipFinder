@@ -23,8 +23,9 @@
 //
 // INTERNSCOUT_API_URL overrides the Worker address (for example http://localhost:8787 with `wrangler dev`).
 import { pathToFileURL } from "node:url";
+import { WORKER_URL } from "../src/public-config.js";
 
-export const DEFAULT_API = "https://internscout-api.bpmcginley.workers.dev";
+export const DEFAULT_API = WORKER_URL;
 
 export const USAGE = `Usage: node scripts/placement.mjs <command> [id] [--flags]
 
