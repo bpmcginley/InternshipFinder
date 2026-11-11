@@ -75,13 +75,23 @@ def build() -> Path:
     return OUT
 
 
+def _landing_font(size: int) -> ImageFont.FreeTypeFont:
+    font = ImageFont.load_default(size)
+    if not isinstance(font, ImageFont.FreeTypeFont):
+        raise RuntimeError("Landing previews require Pillow's FreeType font")
+    # Pillow selects RAQM when present. Keep the same layout engine across build platforms.
+    if font.layout_engine != ImageFont.Layout.BASIC:
+        font = font.font_variant(layout_engine=ImageFont.Layout.BASIC)
+    return font
+
+
 def _fit_landing_title(draw: ImageDraw.ImageDraw, heading: str):
     words = heading.split()
     if not words:
         raise ValueError("Landing card title is empty")
     width = W - 168
     for size in range(90, 43, -2):
-        font = ImageFont.load_default(size)
+        font = _landing_font(size)
         lines = [words[0]]
         for word in words[1:]:
             line = f"{lines[-1]} {word}"
@@ -106,10 +116,10 @@ def landing_card(icon_path: Path, heading: str, *, term: str | None = None) -> b
         icon = source.convert("RGBA").resize((64, 64), Image.Resampling.LANCZOS)
     card.paste(icon, (92, 67), icon)
 
-    draw.text((186, 74), "InternScout", font=ImageFont.load_default(48), fill=PAPER)
+    draw.text((186, 74), "InternScout", font=_landing_font(48), fill=PAPER)
     title, font = _fit_landing_title(draw, heading)
     if term is not None:
-        term_font = ImageFont.load_default(41)
+        term_font = _landing_font(41)
         if (
             not term.strip()
             or term != term.strip()
@@ -119,7 +129,7 @@ def landing_card(icon_path: Path, heading: str, *, term: str | None = None) -> b
             raise ValueError("Landing card term does not fit")
         draw.text((84, 177), term, font=term_font, fill=SOFT)
     draw.multiline_text((84, 235 if term else 210), title, font=font, spacing=8, fill=PAPER)
-    draw.text((84, 533), "internscout.org", font=ImageFont.load_default(37), fill=ACCENT)
+    draw.text((84, 533), "internscout.org", font=_landing_font(37), fill=ACCENT)
 
     output = BytesIO()
     card.save(output, "PNG", optimize=True)

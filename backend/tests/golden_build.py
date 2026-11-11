@@ -219,6 +219,20 @@ def differences(files):
             assert not old or hashlib.sha256(old).hexdigest() == expected[name], (
                 "Baseline archive/manifest mismatch"
             )
+            if name.endswith("/share.png") and old and name in files:
+                from PIL import Image, features
+
+                with (
+                    Image.open(io.BytesIO(old)) as baseline,
+                    Image.open(io.BytesIO(files[name])) as built,
+                ):
+                    pixels = baseline.tobytes() == built.tobytes()
+                lines.append(
+                    f"{name}: bytes changed, pixel match={pixels}; "
+                    f"FreeType={features.version_module('freetype2')}, "
+                    f"zlib-ng={features.version_feature('zlib_ng')}"
+                )
+                continue
             try:
                 before, after = old.decode("utf-8"), files.get(name, b"").decode("utf-8")
             except UnicodeDecodeError:
