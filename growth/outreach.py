@@ -21,7 +21,11 @@ if __package__:
 else:
     import audience  # noqa: E402
     import digest  # noqa: E402
-from internscout import seo_pages as sp  # noqa: E402
+from internscout.site import assets as site_assets  # noqa: E402
+from internscout.site import source as site_source  # noqa: E402
+from internscout.site import taxonomy as site_taxonomy  # noqa: E402
+from internscout.site import text as site_text  # noqa: E402
+from internscout.console_log import console  # noqa: E402
 
 MIN_NEW = 3
 MAX_AGE = timedelta(days=2)
@@ -33,25 +37,25 @@ def one_line(value: object) -> str:
 
 
 def major_url(major: dict, medium: str, now: datetime) -> str:
-    tags = sorted(set(major.get("tags") or []) - sp.SKIP_FIELDS)[:6]
+    tags = sorted(set(major.get("tags") or []) - site_taxonomy.SKIP_FIELDS)[:6]
     query = urlencode(
         {
             "field": ",".join(tags),
             "utm_source": "campus_partner",
             "utm_medium": medium,
             "utm_campaign": f"campus_{now:%Y_%m}",
-            "utm_content": sp.slugify(major["name"]),
+            "utm_content": site_taxonomy.slugify(major["name"]),
         }
     )
-    return f"{sp.SITE}/?{query}"
+    return f"{site_assets.SITE}/?{query}"
 
 
 def pick_roles(items: list[dict], count: int = 3) -> list[dict]:
     """Prefer different employers so one prolific board does not dominate a club note."""
-    ordered = sp.newest_first(items)
+    ordered = site_source.newest_first(items)
     chosen, employers = [], set()
     for x in ordered:
-        employer = sp.employer_key(x.get("company_name") or "")
+        employer = site_source.employer_key(x.get("company_name") or "")
         if employer in employers:
             continue
         chosen.append(x)
@@ -64,12 +68,12 @@ def pick_roles(items: list[dict], count: int = 3) -> list[dict]:
 def place_nearby(x: dict) -> str:
     if "remote" in x["keys"]:
         return "Remote"
-    state = next((k for k in sorted(x["keys"] & sp.HOME_STATES) if k != "remote"), None)
-    return one_line(sp.place(x, state))
+    state = next((k for k in sorted(x["keys"] & site_source.HOME_STATES) if k != "remote"), None)
+    return one_line(site_source.place(x, state))
 
 
 def build(data: dict, now: datetime | None = None, limit: int = 8) -> dict:
-    generated = sp._when(data.get("generated_at"))
+    generated = site_source._when(data.get("generated_at"))
     now = now or datetime.now(timezone.utc)
     if not generated or now - generated > MAX_AGE or generated - now > timedelta(hours=1):
         return {"generated_at": data.get("generated_at"), "status": "stale", "majors": []}
@@ -80,11 +84,11 @@ def build(data: dict, now: datetime | None = None, limit: int = 8) -> dict:
     for major in data["majors"]:
         if major.get("level") not in (None, "undergrad"):
             continue
-        tags = set(major.get("tags") or []) - sp.SKIP_FIELDS
+        tags = set(major.get("tags") or []) - site_taxonomy.SKIP_FIELDS
         if not tags:
             continue
         fits = lambda x: (
-            bool(tags & set(x.get("field_tags") or [])) and bool(x["keys"] & sp.HOME_STATES)
+            bool(tags & set(x.get("field_tags") or [])) and bool(x["keys"] & site_source.HOME_STATES)
         )  # noqa: E731
         open_count = sum(1 for x in listings if fits(x))
         if open_count < audience.PRIMARY:
@@ -97,7 +101,7 @@ def build(data: dict, now: datetime | None = None, limit: int = 8) -> dict:
                 "title": one_line(x.get("title")),
                 "company": one_line(x.get("company_name")),
                 "place": place_nearby(x),
-                "url": sp.safe_url(x.get("apply_url")),
+                "url": site_text.safe_url(x.get("apply_url")),
             }
             for x in pick_roles(new)
         ]
@@ -153,14 +157,18 @@ def main() -> None:
     args = parser.parse_args()
     if args.limit < 1:
         parser.error("--limit must be at least 1")
-    kit = build(sp.load(args.site), limit=args.limit)
+    kit = build(site_source.load(args.site), limit=args.limit)
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     (out / "drafts.txt").write_text(render(kit), encoding="utf-8")
     (out / "drafts.json").write_text(
         json.dumps(kit, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
-    print(f"[outreach] {len(kit['majors'])} drafts; status={kit['status']}; wrote {out}")
+    message = f"[outreach] {len(kit['majors'])} drafts; status={kit['status']}; wrote"
+    if os.environ.get("INTERNSCOUT_LOG_FORMAT") == "json":
+        console(f"{message} drafts")
+    else:
+        console(f"{message} {out}")
 
 
 if __name__ == "__main__":

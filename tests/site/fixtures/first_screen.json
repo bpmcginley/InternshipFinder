@@ -278,5 +278,80 @@
   "i",
   "e",
   "h"
- ]
+ ],
+ "index": {
+  "files": {
+   "MA": {
+    "file": "listings/MA.json"
+   },
+   "NY": {
+    "file": "listings/NY.json"
+   },
+   "CA": {
+    "file": "listings/CA.json"
+   },
+   "remote": {
+    "file": "listings/remote.json"
+   },
+   "NJ": {
+    "file": "listings/NJ.json"
+   },
+   "CT": {
+    "file": "listings/CT.json"
+   },
+   "VT": {
+    "file": "listings/VT.json"
+   },
+   "ME": {
+    "file": "listings/ME.json"
+   },
+   "RI": {
+    "file": "listings/RI.json"
+   }
+  },
+  "first": {
+   "file": "first.json",
+   "keys": [
+    "MA",
+    "NY",
+    "remote",
+    "NJ",
+    "CT",
+    "VT",
+    "ME",
+    "RI"
+   ],
+   "sort": "new",
+   "rows": 5
+  }
+ },
+ "shards": {
+  "listings/MA.json": [
+   "a"
+  ],
+  "listings/NY.json": [
+   "b"
+  ],
+  "listings/CA.json": [
+   "c"
+  ],
+  "listings/remote.json": [
+   "d"
+  ],
+  "listings/NJ.json": [
+   "e"
+  ],
+  "listings/CT.json": [
+   "f"
+  ],
+  "listings/VT.json": [
+   "g"
+  ],
+  "listings/ME.json": [
+   "h"
+  ],
+  "listings/RI.json": [
+   "i"
+  ]
+ }
 }
