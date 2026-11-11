@@ -4,7 +4,7 @@ from copy import deepcopy
 import re
 
 from internscout import seo_pages
-from test_seo_pages import _row, _site
+from tests.seo_fixture_data import _row, _site
 
 
 def test_field_counts_terms_and_locations_use_only_that_employers_matching_roles(tmp_path):

@@ -3,7 +3,8 @@
 import os
 
 from internscout import seo_pages
-from test_seo_pages import _pay_site, _row, _site
+from tests.seo_fixture_data import _row, _site
+from test_seo_pages import _pay_site
 
 
 def test_sitemap_and_robots(tmp_path):

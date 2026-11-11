@@ -8,7 +8,7 @@ from internscout.geo import canada_of
 from internscout.region import classify_location, evaluate_locations, maybe_in_region
 from internscout.sources.lever import parse_lever
 from internscout.sources.workable import parse_workable
-from tests.test_seo_pages import _row, _site
+from tests.seo_fixture_data import _row, _site
 
 
 @pytest.mark.parametrize(

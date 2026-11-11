@@ -309,6 +309,11 @@ Track ingest and Pages through the G3 observation using the public commit, tree 
 - On `e43c1ea4`, open Product claims covered neither employer-entry test file. Four pure employer CTA cases now call the existing site runtime helpers directly, with the same copy, escaping, company-only prefill and disclosure assertions. The generated employer-page case still exercises the legacy build entry and its shared fixtures.
 - The two test files and the Golden build and mutation checks passed all seven cases against the 699-file fixture. Three standalone CTA cases also passed with legacy facade imports and sockets blocked. Runtime, fixtures and publishing entry points have the same bytes.
 
+## WP-6.2 shared listing test fixtures
+
+- After [#380](https://github.com/bpmcginley/InternshipFinder/pull/380) published, Product released the two donor helpers and ten callers. On `a673000f`, `_row` and `_site` moved byte-for-byte into a test-only module. The original donor imports both names for existing callers. The ten released files use the new fixture path, and the campaign test drops its unused facade import. All other test statements, fixtures and monkeypatches are unchanged.
+- All 350 focused and Golden tests passed against the unchanged 794-file Golden. The 64 isolated growth tests also passed with facade imports and sockets blocked. The isolated harness reused the actual CI-event, private-state and Workday safety fixtures and omitted only the legacy near-page fixture. Product's retained advisor, fact-line and launch tests passed through the original aliases.
+
 ## Dashboard ranking test clock
 
 - The first Node coverage attempt in run [42943022453](https://github.com/bpmcginley/InternshipFinder/actions/runs/42943022453/attempts/1) reported an existing assertion failure in `tests/site/dashboard.test.mjs:252` on #259. The same coverage run passed on retry. The failure was in the cached-ranking fixture, which evaluated time-sensitive scores against a changing clock.
@@ -622,6 +627,12 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 - Product released the dashboard, Pages workflow and publication allowlist after [#324](https://github.com/bpmcginley/InternshipFinder/pull/324) merged as `3753530d` and [Pages 43062531153](https://github.com/bpmcginley/InternshipFinder/actions/runs/43062531153) deployed that exact commit successfully. This slice prepares Core generation retention while keeping the classic dashboard and all Golden expected files byte-identical.
 - The Pages build requests full Git ancestry with a blobless filter and passes its checkout to the existing asset stamping step. The graph planner fingerprints reviewed first-parent module files, rejects malformed active graphs, skips invalid historical graph content and still fails on Git read errors. A file-only blobless clone recovered both historical native graphs byte-for-byte after a classic rollback.
 - Offline tests exercised generation changes, unsafe imports, missing historical blobs and rollback. The retention-enabled Stage 4 Golden build matched all 794 artifact paths, still loaded classic Core, staged no native generations and passed the publication allowlist. Activation remains a separate package.
+
+## WP-5.1 native dashboard Core activation
+
+- The separate retention package [#382](https://github.com/bpmcginley/InternshipFinder/pull/382) published at `a673000f` through [Pages 43067767305](https://github.com/bpmcginley/InternshipFinder/actions/runs/43067767305). The exact Pages backend succeeded and all 4,942 published files matched byte-for-byte. The dashboard now loads seven native Core files through a bare generation URL. The ordered 121-key `window.IS` API, deferred startup order, classic Core for cached HTML, and classic App, share, placements and checkout keep their existing behavior.
+- Against Product main `1d6c6486`, the Golden grows from 794 to 808 paths. Seven source files and their seven immutable staged copies are added. The dashboard's Core script tag is the only changed existing artifact, and the other 793 artifacts are byte-identical. The `privacy.html` bytes match the published [#273](https://github.com/bpmcginley/InternshipFinder/pull/273) Golden at `d8fcc791`.
+- Offline Edge booted the classic and two native generations, then revisited cached old HTML. A delayed native graph left the static hero available, and the early index and first-screen fetches each ran once. Both generations' module URLs were each requested once. Synthetic extension replies and pushes passed for every view. Node 22 passed all 325 site and 356 extension tests. Python passed 66 focused and Golden checks with one Windows symlink skip. All six packaging tests passed, both extension ZIPs matched Product main, and the staged 808 files passed the publication allowlist.
 
 ## WP-6.3 ingest timing from existing runs
 

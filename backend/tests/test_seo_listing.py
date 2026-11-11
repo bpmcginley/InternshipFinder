@@ -4,7 +4,8 @@ import re
 import xml.etree.ElementTree as ET
 
 from internscout import seo_pages
-from test_seo_pages import _row, _site, _tracker_site
+from tests.seo_fixture_data import _row, _site
+from test_seo_pages import _tracker_site
 
 
 def test_term_pay_stage_and_class_year_pages_list_only_what_their_title_says(tmp_path):

@@ -1,7 +1,8 @@
 // Paid listings ("placements") on the dashboard (2026-10-14, B2 plan section 5.4; rows S5 and S6). The rule
 // these tests hold the code to: payment never changes any score, order, filter, count or what Auto-Apply
-// does. docs/js/core.js, docs/js/placements.js and docs/js/app.js are loaded the way the page loads them,
-// against a stand-in `window`; T1 uses synthetic listing shards.
+// does. The Core factory and classic placements/app scripts use a stand-in `window`.
+// T1 uses synthetic listing shards.
+import { installCore } from "./core-fixture.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -9,7 +10,6 @@ import vm from "node:vm";
 import { LISTING_CLOCK, MAJORS, listingRows } from "./fixtures/listing_cases.mjs";
 
 const read = p => readFileSync(new URL("../../" + p, import.meta.url), "utf8");
-const CORE_SRC = read("docs/js/core.js");
 const PLACE_SRC = read("docs/js/placements.js");
 const APP_SRC = read("docs/js/app.js");
 
@@ -32,7 +32,7 @@ const freezeClock = ctx => vm.runInContext(`{ const D = Date; Date = class exten
 function loadBoth(extra) {
   const ctx = context(extra);
   freezeClock(ctx);
-  vm.runInContext(CORE_SRC, ctx);
+  installCore(ctx);
   vm.runInContext(PLACE_SRC, ctx);
   return { IS: ctx.IS, P: ctx.ISPlace, ctx };
 }
@@ -105,7 +105,8 @@ test("T1b: the ranking code has no way in", () => {
   // listRows and score take no placements argument and never name them ("paid" is the pay filter, so the
   // code is named "placement" and the guard greps for that).
   const { IS } = loadBoth();
-  assert.doesNotMatch(CORE_SRC, /placement|ISPlace/i);
+  for (const name of ["entry", "index", "profile", "ranking", "listings", "bridge", "account"])
+    assert.doesNotMatch(read(`docs/js/core/${name}.mjs`), /placement|ISPlace/i);
   assert.equal(IS.listRows.length, 3);
   assert.equal(IS.score.length, 2);
   // app.js builds the list from the same six inputs as before, and only after that is the pick made.
@@ -190,7 +191,7 @@ function uiHarness() {
     useEffect(fn, deps) { const i = cursor++, old = slots[i]; if (!old || deps.some((x, j) => x !== old.deps[j])) { slots[i] = { deps }; pending.push(fn); } },
   };
   const ctx = context({ React: react, CONFIG: {} });
-  vm.runInContext(CORE_SRC, ctx);
+  installCore(ctx);
   vm.runInContext(PLACE_SRC, ctx);
   vm.runInContext(APP_SRC.replace('ReactDOM.createRoot(document.getElementById("root")).render(h(App));',
     'window.components = { ListTable, Row, Why, factsLine, matchControl, companyRuns };'), ctx);
@@ -467,7 +468,7 @@ test("index.html loads placements.js between core.js and app.js, deferred", () =
   const html = read("docs/index.html");
   const srcs = [...html.matchAll(/<script\b[^>]*\bsrc="([^"]+)"[^>]*>/g)].map(m => m[0]);
   const at = s => srcs.findIndex(t => t.includes(s));
-  assert.ok(at("js/core.js") < at("js/placements.js") && at("js/placements.js") < at("js/app.js"));
+  assert.ok(at("js/core/entry.mjs") < at("js/placements.js") && at("js/placements.js") < at("js/app.js"));
   assert.match(srcs[at("js/placements.js")], /\sdefer\b/);
 });
 

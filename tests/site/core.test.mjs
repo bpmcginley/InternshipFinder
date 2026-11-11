@@ -1,12 +1,10 @@
-// docs/js/core.js runs in the browser with no build step and no exports, so it is loaded here the way
-// the page loads it: evaluated against a stand-in `window`, after which it hangs its API on window.IS.
+// Import the same Core factory as the browser, with a fresh stand-in window for each test.
 // Kept outside docs/ so the test isn't published with the site.
+import { installCore } from "./core-fixture.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import vm from "node:vm";
 
-const CORE = readFileSync(new URL("../../docs/js/core.js", import.meta.url), "utf8");
 
 // A fresh copy of core.js for each test, with `fetch` answered by the test.
 function loadCore(fetchImpl) {
@@ -35,8 +33,7 @@ function loadCore(fetchImpl) {
     console,
   };
   ctx.window = ctx;
-  vm.createContext(ctx);
-  vm.runInContext(CORE, ctx);
+  installCore(ctx);
   return ctx.IS;
 }
 
