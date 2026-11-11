@@ -221,8 +221,16 @@ def prepare(checkout, primary, state):
 
 
 def ensure_owned_stage(checkout, *, no_replace=False):
+    options = ("--ignore-submodules=none", "--no-ext-diff", "--no-textconv") if no_replace else ()
     staged = git(
-        checkout, "diff", "--cached", "--no-renames", "--name-only", "-z", no_replace=no_replace
+        checkout,
+        "diff",
+        "--cached",
+        "--no-renames",
+        "--name-only",
+        "-z",
+        *options,
+        no_replace=no_replace,
     ).stdout
     if any(not owned(name.decode("utf8")) for name in staged.split(b"\0") if name):
         raise ValueError("Refusing unrelated staged files in the data checkout")

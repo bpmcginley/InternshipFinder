@@ -413,3 +413,30 @@ def test_staged_follow_receipt_ignores_replacement_tree(staged_writer, use_origi
     else:
         with pytest.raises(ValueError, match="staged listing shards"):
             writer.validate_staged_follow_provenance(repo, alternative, proof)
+
+
+def test_staged_proof_refuses_unrelated_gitlink_ignored_by_default_diff(staged_writer):
+    repo, state, proof = staged_writer
+    tree = stage(repo, state)
+    commit = (
+        writer.git(
+            repo,
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "commit-tree",
+            tree,
+            "-m",
+            "Synthetic gitlink",
+        )
+        .stdout.decode("ascii")
+        .strip()
+    )
+    writer.git(repo, "config", "diff.ignoreSubmodules", "all")
+    writer.git(repo, "update-index", "--add", "--cacheinfo", f"160000,{commit},unrelated-module")
+    candidate = writer.git(repo, "write-tree").stdout.decode("ascii").strip()
+    assert candidate != tree
+    writer.ensure_owned_stage(repo)
+    with pytest.raises(ValueError, match="unrelated staged files"):
+        writer.validate_staged_follow_provenance(repo, candidate, proof)
