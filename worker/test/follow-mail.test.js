@@ -12,6 +12,7 @@ const input = {
   origins: [SITE, ACTIONS],
   links: {
     confirmation: `${ACTIONS}/confirm/fixture`,
+    deleteRequest: `${ACTIONS}/delete-request/fixture`,
     management: `${ACTIONS}/manage/fixture`,
     unsubscribe: `${ACTIONS}/unsubscribe/${TOKEN}`,
     matchingPage: `${SITE}/?field=swe`,
@@ -27,8 +28,12 @@ const role = (n, overrides = {}) => ({
   ...overrides,
 });
 const footer = ["InternScout", input.postalAddress];
+const unsubscribeHeaders = {
+  "List-Unsubscribe": `<${input.links.unsubscribe}>`,
+  "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+};
 
-test("confirmation and management keep the approved exact plain-text templates", () => {
+test("confirmation and management send exact plain-text templates and RFC 8058 headers", async () => {
   const { links } = input;
   for (const [kind, subject, lines] of [
     [
@@ -38,7 +43,7 @@ test("confirmation and management keep the approved exact plain-text templates",
         "You asked for new internships matching Fixture Company.",
         `Confirm: ${links.confirmation}`,
         "This link expires in 7 days. If you did not ask for this, ignore this email. We will delete the request after 7 days.",
-        `Delete this request: ${links.unsubscribe}`,
+        `Delete this request: ${links.deleteRequest}`,
       ],
     ],
     [
@@ -51,13 +56,31 @@ test("confirmation and management keep the approved exact plain-text templates",
       ],
     ],
   ]) {
-    assert.deepEqual(renderFollowMail(kind, { ...input, summary: "Fixture\r\nCompany" }), {
+    const env = { EMAIL: { send: async (message) => message } };
+    assert.deepEqual(await sendFollowMail(env, kind, { ...input, summary: "Fixture\r\nCompany" }), {
       from: { name: "InternScout", email: "sender@example.test" },
       to: input.to,
       subject,
       text: [...lines, ...footer].join("\n"),
+      headers: unsubscribeHeaders,
     });
   }
+});
+
+test("confirmation never labels the address-wide unsubscribe link as request-only deletion", () => {
+  const confirmation = (deleteRequest) =>
+    renderFollowMail("confirm", {
+      ...input,
+      summary: "Fixture Company",
+      links: { ...input.links, deleteRequest },
+    });
+  for (const value of [
+    undefined,
+    input.links.unsubscribe,
+    `${ACTIONS}/different-path/${TOKEN.replace(".", "%2E")}`,
+    "https://unapproved.example.test/delete-request/fixture",
+  ])
+    assert.throws(() => confirmation(value), /Invalid follow message input/);
 });
 
 test("digest sends the exact approved copy and both RFC 8058 headers to the mock", async () => {
@@ -84,10 +107,7 @@ test("digest sends the exact approved copy and both RFC 8058 headers to the mock
       from: { name: "InternScout", email: "sender@example.test" },
       to: input.to,
       subject: "New internships for your follows",
-      headers: {
-        "List-Unsubscribe": `<${links.unsubscribe}>`,
-        "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
-      },
+      headers: unsubscribeHeaders,
       text: [
         "New roles matching your follows:",
         "Fixture Company: Intern 1 (Albany, NY)",

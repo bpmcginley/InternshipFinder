@@ -45,6 +45,14 @@ function link(value, httpsOnly = true) {
   return url;
 }
 
+function decodedLink(value) {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    invalid();
+  }
+}
+
 function trustedLinks(origins, links) {
   if (!Array.isArray(origins) || !origins.length || !links) invalid();
   const allowed = new Set(
@@ -57,15 +65,7 @@ function trustedLinks(origins, links) {
   return (name, publicLink = false) => {
     const url = link(links[name]);
     if (!allowed.has(url.origin)) invalid();
-    if (publicLink) {
-      let decoded;
-      try {
-        decoded = decodeURIComponent(url.href);
-      } catch {
-        invalid();
-      }
-      if (FOLLOW_TOKEN.test(decoded)) invalid();
-    } else if (url.hash) invalid();
+    if (publicLink ? FOLLOW_TOKEN.test(decodedLink(url.href)) : url.hash) invalid();
     return url.href;
   };
 }
@@ -104,14 +104,23 @@ export function renderFollowMail(kind, input) {
   const envelope = { from: sender, to: mailAddress(to) };
   const url = trustedLinks(origins, links);
   const unsubscribe = url("unsubscribe");
+  envelope.headers = {
+    "List-Unsubscribe": `<${unsubscribe}>`,
+    "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+  };
   let subject, lines;
   if (kind === "confirm") {
+    const deleteRequest = url("deleteRequest");
+    const target = decodedLink(deleteRequest);
+    const allFollows = decodedLink(unsubscribe);
+    const unsubscribeToken = allFollows.match(FOLLOW_TOKEN)?.[0];
+    if (target === allFollows || (unsubscribeToken && target.includes(unsubscribeToken))) invalid();
     subject = "Confirm your InternScout follows";
     lines = [
       `You asked for new internships matching ${line(input.summary, 500)}.`,
       `Confirm: ${url("confirmation")}`,
       "This link expires in 7 days. If you did not ask for this, ignore this email. We will delete the request after 7 days.",
-      `Delete this request: ${unsubscribe}`,
+      `Delete this request: ${deleteRequest}`,
     ];
   } else if (kind === "manage") {
     subject = "Manage your InternScout follows";
@@ -133,10 +142,6 @@ export function renderFollowMail(kind, input) {
       `Manage my follows: ${url("management")}`,
       `Unsubscribe: ${unsubscribe}`,
     );
-    envelope.headers = {
-      "List-Unsubscribe": `<${unsubscribe}>`,
-      "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
-    };
   }
   lines.push("InternScout", postalLines(postalAddress));
   return { ...envelope, subject, text: lines.join("\n") };
