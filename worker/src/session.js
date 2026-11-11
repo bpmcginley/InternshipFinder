@@ -29,7 +29,7 @@ const expiresFrom = (now) => new Date(now.getTime() + LIFETIME_MS).toISOString()
 // POST /session, after the ID token has been verified. Returns the new token and its expiry. The new row
 // and the trim to MAX_SESSIONS are one batch; the new row is left out of the trim, so a tie on
 // `last_used` (several sign-ins in the same millisecond) can never push out the one just made.
-// `also(id)` adds statements to the same batch (copySession's record of where the session came from).
+// `also(id)` appends optional statements to the same transaction.
 export async function createSession(db, { user, tier, provider }, now, also = () => []) {
   const token = newToken();
   const id = await sha256Hex(token);
@@ -74,21 +74,44 @@ export async function copySession(db, token, deps = {}) {
       .first()
   )
     throw copied();
+  const tokenCopy = newToken();
+  const id = await sha256Hex(tokenCopy);
   const now = new Date(deps.now ?? Date.now());
+  const at = now.toISOString(),
+    expires = expiresFrom(now);
   try {
-    const made = await createSession(db, { user, tier, provider }, now, (id) => [
+    const [created] = await db.batch([
+      // Preflight authentication is not a write fence: deletion, sign-out or expiry can
+      // intervene. Recheck the exact source/account inside this same D1 transaction.
       db
         .prepare(
-          "INSERT INTO session_copies (source, copy, user_hash, created) VALUES (?, ?, ?, ?)",
+          "INSERT INTO sessions (id,user_hash,tier,provider,created,last_used,expires) " +
+            "SELECT ?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM sessions " +
+            "WHERE id=? AND user_hash=? AND tier=? AND provider=? AND expires>?)",
         )
-        .bind(source, id, user, now.toISOString()),
+        .bind(id, user, tier, provider, at, at, expires, source, user, tier, provider, at),
+      db
+        .prepare(
+          "INSERT INTO session_copies (source, copy, user_hash, created) SELECT ?, ?, ?, ? WHERE changes()=1",
+        )
+        .bind(source, id, user, at),
+      // A unique copy-capability conflict rolls the new session back. A failed source
+      // check creates neither row and must not trim unrelated live sessions.
+      db
+        .prepare(
+          "DELETE FROM sessions WHERE user_hash = ? AND id != ? AND id NOT IN " +
+            "(SELECT id FROM sessions WHERE user_hash = ? AND id != ? ORDER BY last_used DESC, created DESC LIMIT ?) " +
+            "AND changes()=1",
+        )
+        .bind(user, id, user, id, MAX_SESSIONS - 1),
     ]);
+    if (created.meta.changes !== 1) throw expired();
     return {
-      session: made.token,
+      session: tokenCopy,
       account: user.slice(0, 16),
       provider: provider || null,
       tier,
-      expires: made.expires,
+      expires,
     };
   } catch (e) {
     if (/UNIQUE|constraint/i.test(String(e && e.message))) throw copied();
