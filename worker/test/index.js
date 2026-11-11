@@ -40,3 +40,4 @@ import "./follows.test.js";
 import "./follow-management.test.js";
 import "./follow-outbox.test.js";
 import "./follow-unsubscribe.test.js";
+import "./follow-mail.test.js";
