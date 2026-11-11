@@ -31,7 +31,7 @@ from collections import Counter
 from statistics import median
 from datetime import datetime, timezone
 from urllib.parse import quote, urlparse
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 
@@ -648,7 +648,7 @@ def count_floor(n: int) -> str:
     return f"{floor:,}+"
 
 
-def fit_head(subjects: list[str], tails: list[str] = ()) -> Head:
+def fit_head(subjects: list[str], tails: Sequence[str] = ()) -> Head:
     """A <title> of at most TITLE_MAX characters. `subjects` are the search phrase, fullest first
     ("Under Armour Internships Summer 2027", then "Under Armour Internships"); `tails` what may follow
     it, fullest first (": 10+ Open Roles", ": 10+ Open"). The first that fits, trying each subject with
@@ -1389,8 +1389,9 @@ def footer_browse() -> str:
     """The footer's links to the employer index and the soonest summer's tracker (2026-10-07): every
     page then links both, so a crawler reaches every employer page in two steps from any page."""
     links = ['<a href="/internships/at/">Employers hiring now</a>']
-    if _state().tracker:
-        links.append(f'<a href="{_state().tracker[1]}">{esc(_state().tracker[0])}: who’s open now</a>')
+    tracker = _state().tracker
+    if tracker:
+        links.append(f'<a href="{tracker[1]}">{esc(tracker[0])}: who’s open now</a>')
     return " · ".join(links) + " · "
 
 
@@ -3352,7 +3353,7 @@ def _emit_near_and_new_pages(
         new_feed=_state().new_feed,
         tracker=_state().tracker,
         fresh=fresh,
-        near_hub=near_hub,
+        near_hub=_hooks().near_hub,
         near_pages=_hooks().near_pages,
         select_signup_form=_select_signup_form,
         render_new_page=_render_new_page,
@@ -3627,7 +3628,7 @@ def build_result(
     _state().listings[:] = listings  # main resolves placements against this existing list object
     now = _when(data["generated_at"]) or datetime.now(timezone.utc)
     _state().generated = now
-    digest_new, digest_by_field, updated = _build.digest_summary(data, now, new_roles, SKIP_FIELDS)
+    digest_new, digest_by_field, updated = _build.digest_summary(data, now, _hooks().new_roles, SKIP_FIELDS)
 
     enough = _build.retention_rule(served, _state().min_open, lambda need: keep_at(need))
 
@@ -3886,6 +3887,8 @@ class BuildHooks:
     fit_title: Callable[..., str] = fit_title
     fit_description: Callable[[str], str] = fit_description
     near_pages: Callable[..., tuple[list[dict], dict]] = near_pages
+    near_hub: Callable[..., tuple[list[str], str, str]] = near_hub
+    new_roles: Callable[[dict, datetime], list[dict]] = new_roles
     listing_body: Callable[..., str] = listing_body
     listing_rows: Callable[..., str] = listing_rows
     signup_form: Callable[..., str] = signup_form

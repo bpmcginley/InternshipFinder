@@ -468,14 +468,15 @@ class _LegacyState:
 _LEGACY_STATE = cast(_runtime.BuildState, _LegacyState())
 
 
-def _legacy_call(call, *args, **kwargs):
-    hooks = _runtime.BuildHooks(
+_LEGACY_HOOKS = _runtime.BuildHooks(
         load=lambda *args, **kwargs: load(*args, **kwargs),
         page=lambda *args, **kwargs: page(*args, **kwargs),
         pricing_page=lambda *args, **kwargs: pricing_page(*args, **kwargs),
         fit_title=lambda *args, **kwargs: fit_title(*args, **kwargs),
         fit_description=lambda *args, **kwargs: fit_description(*args, **kwargs),
         near_pages=lambda *args, **kwargs: near_pages(*args, **kwargs),
+        near_hub=lambda *args, **kwargs: near_hub(*args, **kwargs),
+        new_roles=lambda *args, **kwargs: new_roles(*args, **kwargs),
         listing_body=lambda *args, **kwargs: listing_body(*args, **kwargs),
         listing_rows=lambda *args, **kwargs: listing_rows(*args, **kwargs),
         signup_form=lambda *args, **kwargs: signup_form(*args, **kwargs),
@@ -489,7 +490,10 @@ def _legacy_call(call, *args, **kwargs):
         earning_paths=lambda *args, **kwargs: earning_paths(*args, **kwargs),
         placeholder_pay=lambda *args, **kwargs: placeholder_pay(*args, **kwargs),
     )
-    return _runtime.invoke(_LEGACY_STATE, hooks, call, *args, **kwargs)
+
+
+def _legacy_call(call, *args, **kwargs):
+    return _runtime.invoke(_LEGACY_STATE, _LEGACY_HOOKS, call, *args, **kwargs)
 
 
 earning_paths = _runtime.earning_paths
@@ -520,7 +524,15 @@ def field_slug(tag: str) -> str:
 
 state_slug = _runtime.state_slug
 def load(site_dir: str) -> dict:
-    return _legacy_call(_runtime.load, site_dir)
+    return _source.load(
+        site_dir,
+        ca_metros=CA_METRO_PAGES,
+        metro=us_metro,
+        baseline=baseline_day,
+        valid_row=well_formed,
+        valid_url=safe_url,
+        diagnostic=console,
+    )
 
 
 def canada_first_scan(x: dict) -> bool:
