@@ -386,3 +386,30 @@ def test_archive_attributes_cannot_hide_a_staged_slim_shard(staged_writer):
     writer.validate_tree(repo, candidate)
     with pytest.raises(ValueError, match="paths differ"):
         writer.validate_staged_follow_provenance(repo, candidate, proof)
+
+
+@pytest.mark.parametrize("use_original_stage", [True, False])
+def test_staged_follow_receipt_ignores_replacement_tree(staged_writer, use_original_stage):
+    repo, state, proof = staged_writer
+    original = stage(repo, state)
+    name = "docs/data/listings/MA.json"
+    path = repo / name
+    raw = path.read_bytes()
+    changed = raw + b" "
+    path.write_bytes(changed)
+    alternative = stage(repo, state)
+    assert original != alternative
+    if use_original_stage:
+        path.write_bytes(raw)
+        assert stage(repo, state) == original
+        source, replacement, replaced_bytes = original, alternative, changed
+    else:
+        source, replacement, replaced_bytes = alternative, original, raw
+    writer.git(repo, "replace", source, replacement)
+    assert writer.git(repo, "cat-file", "blob", f"{source}:{name}").stdout == replaced_bytes
+    if use_original_stage:
+        receipt = writer.validate_staged_follow_provenance(repo, original, proof)
+        assert receipt.shards["listings/MA.json"] == raw
+    else:
+        with pytest.raises(ValueError, match="staged listing shards"):
+            writer.validate_staged_follow_provenance(repo, alternative, proof)
