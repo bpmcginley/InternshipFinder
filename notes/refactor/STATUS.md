@@ -118,7 +118,7 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 7 | WP-6.1.5 Ingest writer | Unassigned | - | - | Queued | Write data branch; preserve Pages-following-ingest behavior. |
 | 7 | WP-6.1.6 Remove main data | Unassigned | - | - | Waiting for observation | Requires seven days of clean ingest/Pages after cutover; no history rewrite. |
 | 7 | WP-6.2 Remove shims | Unassigned | - | - | Queued | Only after repository-wide old-import search is clear. |
-| 7 | WP-6.3 Ingest timing | wp21_inventory | `refactor/wp-6.3-ingest-timing` | - | In review | Two successful existing runs measured. Concurrent board phase took 36m 25s scheduled and 27m 11s on push. Per-source timings unavailable. |
+| 7 | WP-6.3 Ingest timing | wp21_inventory | `refactor/wp-6.3-ingest-timing` | [#323](https://github.com/bpmcginley/InternshipFinder/pull/323) | In review | Two successful existing runs measured. Concurrent board phase took 36m 25s scheduled and 27m 11s on push. Per-source timings unavailable. |
 
 ## Verified findings and plan corrections
 
