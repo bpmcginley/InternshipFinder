@@ -12,9 +12,12 @@ const base = "6827576b64790afc2a4a659a316a5a983beb29bb";
     executablePath: "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe",
     headless: true,
   });
-  const report = [];
+  const reportPath = path.join(__dirname, `${process.argv[2] || "all"}-results.json`);
+  const report = process.argv[3]
+    ? JSON.parse(fs.readFileSync(reportPath, "utf8")).filter((row) => row.page !== process.argv[3])
+    : [];
   for (const phase of process.argv[2] ? [process.argv[2]] : ["before", "after"]) {
-    for (const pageName of ["terms", "privacy"])
+    for (const pageName of process.argv[3] ? [process.argv[3]] : ["terms", "privacy"])
       for (const width of [1280, 375])
         for (const colorScheme of ["light", "dark"]) {
           const context = await browser.newContext({
@@ -102,10 +105,7 @@ const base = "6827576b64790afc2a4a659a316a5a983beb29bb";
         }
   }
   await browser.close();
-  fs.writeFileSync(
-    path.join(__dirname, `${process.argv[2] || "all"}-results.json`),
-    JSON.stringify(report, null, 2) + "\n",
-  );
+  fs.writeFileSync(reportPath, JSON.stringify(report, null, 2) + "\n");
 })().catch((e) => {
   console.error(e);
   process.exitCode = 1;
