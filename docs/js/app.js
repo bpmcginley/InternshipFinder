@@ -2465,6 +2465,8 @@
           h("a", { href: C.issuesUrl, target: "_blank", rel: "noopener" }, "GitHub Issues"),
           // was: h("a", { href: C.extensionInstallUrl || "install.html" }, "Install extension"),
           h("a", { href: installUrl("dashboard-footer"), target: "_blank", rel: "noopener" }, "Install extension"),
+          h("a", { href: "https://github.com/bpmcginley/internships-every-major", "data-distribution": "list" }, "Internships for every major on GitHub"),
+          h("a", { href: "widget/builder.html", "data-distribution": "widget" }, "Put live internships on your club or department site"),
           h("a", { href: C.handshakeUrl, target: "_blank", rel: "noopener" }, "Also check Handshake"),
           h("a", { href: C.reuUrl, target: "_blank", rel: "noopener" }, "NSF REU research"),
           C.campusJobsUrl && h("a", { href: C.campusJobsUrl, target: "_blank", rel: "noopener" }, "UMass campus jobs")),
