@@ -248,6 +248,9 @@ def main(argv: list[str], *, card_renderer: share_cards.Renderer | None = None) 
         placements_path = argv[i + 1] if i + 1 < len(argv) else ""
         del argv[i : i + 2]
     site_dir = argv[1] if len(argv) > 1 else "docs"
+    from .employer_capture import require_unmarked
+
+    require_unmarked(Path(site_dir))
     state = runtime.BuildState()
     hooks = runtime.BuildHooks()
     if employer_postings:

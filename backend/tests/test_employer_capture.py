@@ -46,6 +46,7 @@ def test_invalid_export_cannot_reach_capture(tmp_path, monkeypatch):
     [
         "",
         TAG + TAG,
+        TAG.replace("</script>", ""),
         TAG.replace('></script>', '/>'),
         TAG.replace("defer", "async"),
         TAG.replace("defer", 'data-employer-posting-counts="0" defer'),
@@ -76,6 +77,48 @@ def test_parser_ignores_script_examples_and_leaves_unrelated_pages(tmp_path):
     assert {p for p in before if before[p] != after[p]} == {"index.html"}
     assert after["index.html"].count(MARK) == 1
     assert after["index.html"].replace(MARK, b"") == before["index.html"]
+
+
+@pytest.mark.parametrize("prefix", ["\u2028", "\u2029", "\r", "first\nsecond\u2028\r"])
+def test_html_parser_offsets_count_only_lf(prefix):
+    text = prefix + TAG
+    marked = employer_capture._mark(text)
+    assert marked == prefix + TAG.replace(">", employer_capture.ATTRIBUTE + ">", 1)
+
+
+@pytest.mark.parametrize(
+    "src",
+    [
+        "/js/count.js?v=old",
+        "https://internscout.org/js/count.js?v=old",
+        "//internscout.org/js/count.js",
+        "../../js/count.js?x=1",
+        "/js/%63ount.js",
+        "/js/nested/../count.js",
+    ],
+)
+def test_effective_counter_alias_cannot_hide_duplicate(src):
+    with pytest.raises(ValueError, match="counter script"):
+        employer_capture._mark(TAG + f'<script defer src="{src}"></script>', "/internships/field/")
+
+
+@pytest.mark.parametrize("flags", [[], ["--employer-postings"]])
+@pytest.mark.parametrize(
+    "retained", ["index.html", "internships/stale-outside-current-build/index.html"]
+)
+def test_reused_default_and_annotation_targets_fail_before_any_publication(
+    tmp_path, monkeypatch, flags, retained
+):
+    export(tmp_path)  # A fresh valid export does not authorize a retained marked HTML page.
+    (tmp_path / "index.html").write_text(TAG, encoding="utf-8")
+    path = tmp_path / retained
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(employer_capture._mark(TAG), encoding="utf-8")
+    before = tree(tmp_path)
+    monkeypatch.setattr(employer_publication, "prepare", lambda _: pytest.fail("must not stage"))
+    with pytest.raises(ValueError, match="fresh unmarked publication target"):
+        publish.main(["publish", str(tmp_path), *flags])
+    assert tree(tmp_path) == before
 
 
 def build_capture(work, monkeypatch, capture=True):
