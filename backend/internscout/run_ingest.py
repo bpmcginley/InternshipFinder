@@ -16,6 +16,7 @@ import httpx
 from collections import Counter
 from datetime import date
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from .console_log import console, console_exception
 from .sources import (
     fetch_github_lists,
     fetch_google_jobs,
@@ -138,6 +139,7 @@ def _fetch_boards(c, jobs: list, workers: int) -> dict:
                 res[futs[f]] = f.result()
             except Exception as e:
                 res[futs[f]] = e
+                console_exception("[boards] board fetch failed", type(e).__name__)
     finally:
         for ex in pools:
             ex.shutdown()
@@ -236,7 +238,7 @@ def scan_boards(
             per_ats[ats] += len(r)
     if verbose:
         note = f"; closed by robots.txt {dict(closed)}" if closed else ""
-        print(
+        console(
             f"[boards] {len(todo)} boards in {time.monotonic() - t0:.0f}s "
             f"({len(again)} of {len(transient)} transient failures retried); "
             f"intern postings {dict(per_ats)}; failed boards {dict(failed)}{note}"
@@ -245,9 +247,9 @@ def scan_boards(
             a: dict(k.most_common(4))
             for a, k in sorted(causes.items(), key=lambda x: -failed[x[0]])
         }
-        print(f"[boards] failure causes {why}")
+        console(f"[boards] failure causes {why}")
         if systemic:
-            print(
+            console(
                 f"[boards] not aged this run, failing on half their boards or more: {sorted(systemic)}"
             )
     return out
@@ -307,7 +309,7 @@ def main():
         if raw:
             probed = probe_boards(reg, raw)
             found += probed
-            print(f"[probe] +{probed} boards guessed from company names", flush=True)
+            console(f"[probe] +{probed} boards guessed from company names", flush=True)
         if args.ats or do_all:
             raw += scan_boards(
                 reg, args.workers, completed_boards=completed_boards, metrics=metrics
@@ -327,7 +329,7 @@ def main():
         labelled = label_sectors(reg, raw)
         dropped = prune(reg)
         save_registry(reg)
-        print(
+        console(
             f"[registry] +{seeded} seeded, +{found} discovered, -{dropped} dead or closed, "
             f"{refused_count()} recently dropped boards left out, "
             f"+{named} boards labelled by name, "
