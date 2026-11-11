@@ -334,6 +334,11 @@ Track ingest and Pages through the G3 observation using the public commit, tree 
 - Three phone table tests and five synthetic structured-data tests call the canonical table, escape, FAQ and JSON-LD helpers. All four callable identities and the normalized non-import test AST match the legacy references. The tracker and footer calls, generated structured-data build, root fixtures and monkeypatches still exercise the existing integrations.
 - The focused phone, structured-data and distribution tests and both Golden checks passed offline, 33 tests total. All 830 App-era Golden artifacts matched.
 
+## WP-6.2 standalone test fixture
+
+- The three independently facade-free growth modules and the standalone publisher regression opt in to `without_seo_facade`. The root fixture skips loading the legacy module for a marked test in isolation and detects a late import at teardown. If another test already loaded the facade, the existing near-page override applies. Unmarked tests use the original path, including the isolated lazy feed and widget cases. The 500-page exception and the canonical `BuildState` default both passed direct checks.
+- All 65 marked tests passed with the root fixtures active, strict marker checking, and the facade and sockets blocked. The full offline backend and growth suite on `b3b3d049` passed 1,865 tests and 11 subtests with eight local or optional skips. After feed defaults [#411](https://github.com/bpmcginley/InternshipFinder/pull/411), the 65 standalone cases, both lazy cases, and 35 combined feed, widget, near-page and Golden checks passed. The Node 22 Worker suite passed all 726 tests.
+
 ## Dashboard ranking test clock
 
 - The first Node coverage attempt in run [42943022453](https://github.com/bpmcginley/InternshipFinder/actions/runs/42943022453/attempts/1) reported an existing assertion failure in `tests/site/dashboard.test.mjs:252` on #259. The same coverage run passed on retry. The failure was in the cached-ranking fixture, which evaluated time-sensitive scores against a changing clock.
