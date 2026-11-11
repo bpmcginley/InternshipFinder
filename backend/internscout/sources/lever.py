@@ -6,9 +6,11 @@ serves them. Plenty of EU-hosted boards advertise US internships, so they are wo
 """
 
 from __future__ import annotations
+import logging
 from .base import client
 from .common import board_item, counts_of, stamp_board_newest
 from ..classify import is_internship
+from ..console_log import console
 from ..region import board_state, place_bare_cities
 
 URL = "https://api.{region}lever.co/v0/postings/{slug}?mode=json"
@@ -82,5 +84,9 @@ def fetch_lever(companies: list[dict]) -> list[dict]:
             try:
                 out += fetch_lever_board(c, co)
             except Exception as e:
-                print(f"[lever] {co['name']} ({co['ats_token']}) failed: {e}")
+                console(
+                    f"[lever] board fetch failed: {type(e).__name__}",
+                    level=logging.WARNING,
+                    exception_type=type(e).__name__,
+                )
     return out
