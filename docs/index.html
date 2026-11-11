@@ -438,6 +438,9 @@
   .c-mine{width:1%}
   .li-head{color:var(--ink);line-height:1.4}
   .co{font-weight:600}
+  .company-tile{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;margin-right:var(--s2);border-radius:var(--r-sm);vertical-align:middle;font:600 var(--fs-2)/1 var(--sans);background:hsl(var(--company-hue) 32% 90%);color:hsl(var(--company-hue) 40% 24%)}
+  @media(prefers-color-scheme:dark){.company-tile{background:hsl(var(--company-hue) 22% 23%);color:hsl(var(--company-hue) 55% 85%)}}
+  .pay-badge{display:inline-block;padding:1px 6px;border:1px solid var(--rule);border-radius:var(--r-sm);background:var(--panel);font-weight:500}
   .role{color:var(--ink)}
   .dot-sep{color:var(--ink3)}
   .meta{color:var(--ink3);font-size:var(--fs-2);margin-top:3px}
@@ -469,12 +472,12 @@
   .open-link:hover{border-color:var(--ink3)}
   .open-link .i{color:var(--ink3)}
   /* "Auto-Apply" beside it, quiet: accent text. */
-  .rowbtn{margin-left:var(--s2);height:var(--h-ctl-sm);font:500 var(--fs-2) var(--sans);color:var(--accent);background:none;border:0;padding:0 6px;cursor:pointer;white-space:nowrap;border-radius:var(--r)}
+  .rowbtn{margin-left:var(--s2);height:var(--h-ctl-sm);font:500 var(--fs-2) var(--sans);color:var(--accent);background:var(--accent-soft);border:1px solid var(--accent);padding:0 8px;cursor:pointer;white-space:nowrap;border-radius:var(--r)}
   .rowbtn:disabled{color:var(--ink3);cursor:default}
   .rowbtn:hover{text-decoration:underline;text-underline-offset:3px}
   /* The row Auto-Apply shown before the extension is installed (2026-10-04): quieter than the real one,
      and it opens a one-line explainer row instead of queueing anything. */
-  .rowbtn.try{color:var(--ink2);font-weight:400}
+  .rowbtn.try{color:var(--accent);font-weight:500}
   .rowbtn.try:hover,.rowbtn.try[aria-expanded=true]{color:var(--accent)}
   tbody tr.aa-info td,tbody tr.aa-info:hover td{background:var(--sunk);font-size:var(--fs-2);color:var(--ink2);padding:var(--s2) var(--s4)}
   tr.aa-info a{color:var(--accent);font-weight:500}
