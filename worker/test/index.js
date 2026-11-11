@@ -1,3 +1,4 @@
+import "./employer-retention.test.js";
 // Lets `node --test worker/test/` run the whole folder (Node resolves a directory to index.js).
 import "./auth.test.js";
 import "./billing.test.js";
