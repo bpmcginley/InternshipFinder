@@ -61,6 +61,7 @@ from datetime import datetime, timedelta, timezone
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import digest  # noqa: E402
+from internscout.console_log import console  # noqa: E402
 
 API = "https://api.buttondown.com/v1"
 # Pinned, so a different version set on the newsletter or on the key can't change what these calls do.
@@ -307,10 +308,12 @@ def check(key: str, send: bool) -> int:
     """--check: one read with the key (the same-week check's GET /v1/emails) and what it found.
     Nothing is sent and no draft is made, so it is safe to run at any time."""
     if send:
-        print("[digest] --check only reads, so it can't be combined with --send. Nothing was sent.")
+        console(
+            "[digest] --check only reads, so it can't be combined with --send. Nothing was sent."
+        )
         return EXIT_REFUSED
     if not key:
-        print(f"[digest] Check failed: {KEY_ENV} is empty.")
+        console(f"[digest] Check failed: {KEY_ENV} is empty.")
         return EXIT_REFUSED
     try:
         earlier = same_week(key, "")
@@ -423,7 +426,7 @@ def main(argv: list[str]) -> int:
         if not address:
             missing.append(f"{ADDRESS_ENV} (the postal address every email must carry, a PO box)")
         if missing:
-            print("[digest] Not sent. Missing: " + "; ".join(missing))
+            console("[digest] Not sent. Missing: " + "; ".join(missing))
             return EXIT_REFUSED
         why = export_issue(args.site_dir)
         if why:

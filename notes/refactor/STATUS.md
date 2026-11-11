@@ -72,6 +72,7 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 4 | WP-1.4 Growth logging | Unassigned | - | - | Queued | Check external PR overlap and output contracts. |
 | 4 | WP-1.4 Growth asset logging | wp14_logging | `refactor/wp-1.4-logging-growth-assets` | [#234](https://github.com/bpmcginley/InternshipFinder/pull/234) | In review | Human flyer and campaign diagnostics only. Default output and artifacts are preserved. |
 | 4 | WP-1.4 Growth generator summaries | wp14_logging | `refactor/wp-1.4-logging-growth-cli` | [#238](https://github.com/bpmcginley/InternshipFinder/pull/238) | In review | Every Major and title discovery success summaries only. |
+| 4 | WP-1.4 Growth preview status logging | wp14_logging | `refactor/wp-1.4-logging-growth-status` | [#240](https://github.com/bpmcginley/InternshipFinder/pull/240) | In review | Eight preflight or local-render summaries. Provider and payload paths remain separate. |
 | 4 | WP-1.4 Sparse workflow logging | wp42_orders | `refactor/wp-1.4-logging-sparse` | [#242](https://github.com/bpmcginley/InternshipFinder/pull/242) | In review | IndexNow and Keep schedule diagnostics. Four sparse jobs include the shared standard-library logger. |
 | 4 | WP-2.1 Vocabulary inventory | wp21_inventory | `refactor/wp-2.1-vocab-inventory` | [#215](https://github.com/bpmcginley/InternshipFinder/pull/215) | Merged | [Source inventory](vocab-inventory.md) records shared values and consumer-specific projections. Pages 42917833199 and backend verified. Q4 gates DC label normalization. |
 | 4 | WP-2.4 Config: growth and extension | Lead | `refactor/wp-2.4-public-config` | [#218](https://github.com/bpmcginley/InternshipFinder/pull/218) | Merged | Merged as `cb0f5f98`. One public Worker origin. Regenerate with `python scripts/generate_public_config.py`. The growth suite checks both generated copies. |
@@ -285,6 +286,12 @@ Full reads completed: `AGENTS.md`, `CONTRIBUTING.md`, `README.md`, all of `backe
 
 Continue Wave 4 with the vocabulary inventory, logging, public config and orders split. Serialize merges with the product lead and verify Pages after publishing merges.
 
+## WP-1.4 sparse workflow diagnostics
+
+- Move IndexNow human counts and submission summaries plus Keep schedule and guard diagnostics to the shared console. Plain output stays byte-identical. JSON omits a local sitemap path and arbitrary guard names, and exception records contain only the existing class name. IndexNow usage, the raw Actions error annotation and the catch-up output file's bare skip key are preserved.
+- Four existing sparse checkout steps add only `backend/internscout`. Reverse comparison reproduced the exact baseline workflows, including actions, events, schedules, permissions and parameters. Parsed helper functions outside each CLI main match the original, including dispatch and submission request code.
+- Focused offline tests passed 32 cases. Golden matched all 695 files and Ruff passed. A separate Git sparse checkout exercised the notify and guard shape and the Keep schedule shape with Python's site packages disabled and network blocked. The test uses local time-zone data files on Windows for the existing zoneinfo dependency. Keep schedule requests used a local fake transport.
+
 ## WP-0.6 validation and coordination
 
 - Product-session coordination read from PR #170 (`notes/product/HANDOFF.md` section 3 and the new refactor section 4 bullet). Refactor has structural right of way; inspect product draft PR claims before each wave. Before formatting, publish "Formatting PRs next" at the top of this tracker and allow a few hours for product PRs to clear. Do not alter product-owned work.
@@ -432,6 +439,20 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 - IndexNow and Keep schedule keep their 13 prints. Pages notify and the ingest/social guards each sparse-check out only `growth`. Keep schedule also checks out `.github/actions` and installs neither backend dependencies nor the editable project. Adding the `backend/internscout` checkout path at all four call sites plus a direct-script import from `backend` could make the standard-library helper available without changing triggers, permissions, secrets, schedules or package installation. Preserve IndexNow usage and raw error annotations, and keep the guard's `skip=` file output verbatim.
 - Both generator ASTs match main outside the success diagnostics and imports. After normal main integration `add6dc3d`, focused, generator and golden verification passed 69 tests. Ruff passed.
 
+## WP-1.4 growth preview and refusal diagnostics
+
+- At `add6dc3d`, checked open Product paths and separated human diagnostics from payloads, annotations and credentials. This slice converts three digest preflight refusals, two social local-render statuses, and three YouTube pre-upload statuses. Plain console output stays exact. JSON drops the social output directory and carries only fixed messages or setting names. Existing preview payloads remain raw.
+
+| Module | Human diagnostics | Outputs and decisions kept separate |
+|---|---|---|
+| `growth/digest_send.py` | Three fixed preflight refusals migrate. Read-only check success and duplicate-free status could follow with mocks. | Keep the dry-run body, envelope and request plan raw. Leave recipient and postal details, provider IDs and subjects, and the raw errors and unknown-send recovery text in their existing paths. |
+| `growth/social.py` | No selection and local render success migrate. Existing class-only channel failure and aggregate outcome lines could follow with mocks. | Keep raw post/tagged-copy previews, raw renderer errors, dynamic stale-export reasons and provider return values. Preserve status, cleanup and send order. |
+| `growth/instagram.py` | Fixed skip outcomes exist, but token refresh and posting branches stay outside this slice. | Keep the raw Actions warning/error annotations, preview captions, media paths and status artifact protocol. Leave provider IDs and raw fallback/error messages separate. |
+| `growth/youtube.py` | Two fixed no-Reel skips and the missing-setting names migrate. | Keep raw title/description and media-path previews, provider links and values, retry detail and advice. |
+| `growth/youtube_auth.py` | Interactive authorization instructions stay together. | Existing credential output requires a separate secure-channel decision. Authorization URL, channel selection, credential output and raw failures stay outside this logger. |
+
+- All three syntax trees match main after removing the eight diagnostic changes and their imports. Tests exercise default and JSON modes without provider access. Existing provider flow tests use fake requests, and a socket audit hook rejects any accidental network call. After normal main integration `d709af9a`, all 129 focused and golden tests passed with one existing OAuth loopback test deselected because it requires a local socket. Ruff passed.
+
 ## WP-1.4 page-build logging
 
 - On main `fb62c4f0` with the approved logging foundation, audited the six existing SEO print sites. Four diagnostics use the shared console logger. The two GitHub Actions annotation sites remain raw in both modes. The malformed-listing warning keeps stderr, and opt-in JSON omits the output directory from the build summary.
@@ -536,9 +557,3 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 - Compared all 104 declarations from the pre-capacity `orders.js` at `05dd42cf` with their current locations. Every original declaration body matched byte-for-byte. All module references resolve, and the checkout, settlement, review, refund and cron SQL, mail, provider and idempotency order remains in the original function bodies.
 - The original Node test entry point imports four consecutive case files in their old registration order, with the original shared fixtures. All 43 test bodies match after accounting for one relative dynamic import path, which still resolves to the same Worker entry point. The shared Node/D1 settlement race is unchanged.
 - Node 22.23.4 passed 342 Worker tests, local Workers passed 15 tests in six files, checkout passed 40 tests and Golden matched 695 files. JavaScript lint reported zero errors and warnings. Worker type reporting retained 914 existing diagnostics. Normal integration with main `fef33968` preserved the reviewed implementation and tests. The Worker, local Workers, checkout and golden runs passed again. Worker deployment remains with Bruce.
-
-## WP-1.4 sparse workflow diagnostics
-
-- Move IndexNow human counts and submission summaries plus Keep schedule and guard diagnostics to the shared console. Plain output stays byte-identical. JSON omits a local sitemap path and arbitrary guard names, and exception records contain only the existing class name. IndexNow usage, the raw Actions error annotation and the catch-up output file's bare skip key are preserved.
-- Four existing sparse checkout steps add only `backend/internscout`. Reverse comparison reproduced the exact baseline workflows, including actions, events, schedules, permissions and parameters. Parsed helper functions outside each CLI main match the original, including dispatch and submission request code.
-- Focused offline tests passed 32 cases. Golden matched all 695 files and Ruff passed. A separate Git sparse checkout exercised the notify and guard shape and the Keep schedule shape with Python's site packages disabled and network blocked. The test uses local time-zone data files on Windows for the existing zoneinfo dependency. Keep schedule requests used a local fake transport.
