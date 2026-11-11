@@ -1,5 +1,6 @@
 // Dormant reservation boundary. Trusted configuration and an injected verified adapter only.
 // No Stripe request, checkout URL, settlement, recovery or account-deletion caller is wired.
+import { validTopupOfferVersion, validTopupCheckoutId } from "./topup-ledger.js";
 const active = "state IN ('creating','open')";
 const positive = (value) => Number.isSafeInteger(value) && value > 0;
 const row = (db, id) => db.prepare("SELECT * FROM topup_checkout_attempts WHERE id=?").bind(id);
@@ -24,8 +25,7 @@ export async function reserveTopupCheckout(db, userHash, capability = {}, now = 
     units: input.units,
   };
   if (
-    typeof offer.version !== "string" ||
-    !/^[A-Za-z0-9._-]{1,80}$/.test(offer.version) ||
+    !validTopupOfferVersion(offer.version) ||
     !positive(offer.amount) ||
     !positive(offer.units) ||
     typeof offer.currency !== "string" ||
@@ -63,8 +63,7 @@ export async function reserveTopupCheckout(db, userHash, capability = {}, now = 
   if (
     !verified ||
     verified.status !== "open" ||
-    typeof verified.checkoutId !== "string" ||
-    !/^cs_[A-Za-z0-9_]{1,200}$/.test(verified.checkoutId) ||
+    !validTopupCheckoutId(verified.checkoutId) ||
     verified.attemptId !== id ||
     verified.userHash !== userHash ||
     verified.offerVersion !== offer.version ||

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { reserveTopupCheckout } from "../src/topup-checkout.js";
+import { recordVerifiedTopup } from "../src/topup-ledger.js";
 const user = "a".repeat(64),
   other = "b".repeat(64);
 const now = new Date("2026-11-11T00:00:00Z");
@@ -30,7 +31,14 @@ export async function checkoutReservation(db) {
     cap(null),
     { ...cap(create), enabled: false },
     { ...cap(create), offer: { ...offer, verified: false } },
-    ...[{ amount: 0 }, { units: 1.5 }, { currency: "USD" }, { version: "" }].map((p) => ({
+    ...[
+      { amount: 0 },
+      { units: 1.5 },
+      { currency: "USD" },
+      { version: "" },
+      { version: "fixture.v1" },
+      { version: "v".repeat(65) },
+    ].map((p) => ({
       ...cap(create),
       offer: { ...offer, ...p },
     })),
@@ -77,6 +85,35 @@ export async function checkoutReservation(db) {
     "user_hash",
   ]);
   assert.equal(await db.prepare("SELECT COUNT(*) AS n FROM topup_purchases").first("n"), 0);
+  // The full supported reservation boundary can pass the actual verified-settlement API.
+  const boundary = await reserveTopupCheckout(
+    db,
+    "c".repeat(64),
+    {
+      enabled: true,
+      offer: { ...offer, version: "A".repeat(62) + "_-" },
+      create: async (a) => ({ ...reply(a), checkoutId: "cs_" + "x".repeat(250) }),
+    },
+    now,
+  );
+  assert.equal(boundary.status, "open");
+  const a = boundary.attempt;
+  const settled = await recordVerifiedTopup(
+    db,
+    {
+      paymentId: "pi_checkout_boundary",
+      checkoutId: a.checkout_id,
+      userHash: a.user_hash,
+      offerVersion: a.offer_version,
+      amount: a.amount,
+      currency: a.currency,
+      units: a.units,
+      livemode: false,
+    },
+    now,
+  );
+  assert.equal(settled.granted, true);
+  assert.equal(settled.purchase.available, a.units);
 }
 
 export async function checkoutAmbiguity(db) {
@@ -134,6 +171,7 @@ export async function checkoutAssociation(db) {
   for (const patch of [
     { status: "complete" },
     { checkoutId: "invalid" },
+    { checkoutId: "cs_" + "x".repeat(251) },
     { attemptId: "other" },
     { userHash: other },
     { offerVersion: "other" },
