@@ -194,7 +194,8 @@ class FollowCheckpointClient:
         self._max_bytes = max_bytes
         self._timeout = timeout
         self._connection = _connection
-        self._context = ssl.create_default_context()
+        self._context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        self._context.load_default_certs()
 
     def _request(self, method, suffix, statuses, consume, *, body=None, extra=None):
         connection = response = None

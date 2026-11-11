@@ -7,6 +7,7 @@ from http.client import HTTPResponse, RemoteDisconnected
 from io import BytesIO
 
 import json
+import ssl
 
 import pytest
 
@@ -255,3 +256,16 @@ def test_elapsed_deadline_after_read_fails_closed(protocol, monkeypatch):
     with pytest.raises(module.FollowCheckpointClientError, match="transport timeout"):
         open_client(transport).stage(pending)
     assert len(transport.requests) == transport.closed == 1
+
+
+def test_ambient_tls_keylog_is_ignored(protocol, monkeypatch, tmp_path):
+    _, open_client, _, _, _ = protocol
+    log = tmp_path / "tls-keylog.txt"
+    monkeypatch.setenv("SSLKEYLOGFILE", str(log))
+    client = open_client(Transport(frame(b"", b"", state="never_seeded")))
+    assert client._context.protocol == ssl.PROTOCOL_TLS_CLIENT
+    assert client._context.verify_mode == ssl.CERT_REQUIRED
+    assert client._context.check_hostname
+    assert client._context.keylog_filename is None
+    assert client.load().state == "never_seeded"
+    assert not log.exists()
