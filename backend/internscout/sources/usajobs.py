@@ -4,6 +4,7 @@ key was requested with; USAJOBS requires it as the User-Agent). Skipped when eit
 
 from __future__ import annotations
 import os
+import logging
 from .base import client
 from .common import ScanCounts, board_item, html_to_text, report_source, reported_count, rows_of
 from ..classify import is_internship
@@ -156,7 +157,11 @@ def fetch_usajobs(api_key: str | None = None, email: str | None = None, report=N
                     counts.stop("page_cap")
     except Exception as e:
         error = e
-        print(f"[usajobs] failed: {e}")
+        console(
+            f"[usajobs] failed: {type(e).__name__}",
+            level=logging.WARNING,
+            exception_type=type(e).__name__,
+        )
     console(f"[usajobs] {len(out)} student postings")
     # A failure part way through is still a failure, whatever it returned before it.
     report_source(report, "usajobs", items=out, error=error, counts=counts)
