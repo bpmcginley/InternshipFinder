@@ -284,3 +284,49 @@ test("paid placement caps and organic budget are independent", async () => {
   });
   assert.equal(await db.prepare("SELECT n FROM placement_counts").first("n"), 50000);
 });
+
+test("receipt method replacement cannot replay and its constructor cannot mint admission", async () => {
+  const db = dbFixture(),
+    at = new Date("2027-01-05T12:00:00Z");
+  const counter = createEmployerPostingCounter({ db, keys: ["acme"], now: () => at });
+  await counter.cleanup();
+  let receipt;
+  await countHit(db, request("192.0.2.188"), event, at, (value) => {
+    receipt = value;
+    return false;
+  });
+  try {
+    receipt.take = () => ({ company: "acme", at: at.getTime() });
+  } catch {
+    /* Frozen token rejects mutation. */
+  }
+  assert.equal(await counter.countAdmitted(receipt), true);
+  assert.equal(await counter.countAdmitted(receipt), false, "overridden take must not replay");
+  const minted = new receipt.constructor("acme", at.getTime());
+  assert.equal(
+    await counter.countAdmitted(minted),
+    false,
+    "reachable constructor must not mint admission",
+  );
+  assert.equal(Object.isFrozen(receipt), true);
+  assert.deepEqual(Reflect.ownKeys(receipt), []);
+  assert.equal(await db.prepare("SELECT n FROM employer_posting_counts").first("n"), 1);
+});
+
+test("receipt constructor cannot bypass the exhausted organic budget", async () => {
+  const db = dbFixture(),
+    at = new Date("2027-01-06T12:00:00Z");
+  const counter = createEmployerPostingCounter({ db, keys: ["acme"], now: () => at });
+  await counter.cleanup();
+  let receipt;
+  for (let i = 0; i < 30; i++)
+    await countHit(db, request("192.0.2.189"), event, at, (value) => {
+      receipt = value;
+      return false;
+    });
+  assert.deepEqual(await countHit(db, request("192.0.2.189"), event, at, () => true), {
+    counted: false,
+  });
+  assert.equal(await counter.countAdmitted(new receipt.constructor("acme", at.getTime())), false);
+  assert.equal(await db.prepare("SELECT COUNT(*) AS n FROM employer_posting_counts").first("n"), 0);
+});

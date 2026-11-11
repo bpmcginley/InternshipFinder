@@ -74,21 +74,12 @@ const validBody = (body) =>
   isEmployerPostingKey(body.c);
 
 // A server-only, single-use receipt: no IP, request, binding or persistent identifier.
-class Admission {
-  #value;
-  constructor(company, at) {
-    this.#value = { company, at };
-  }
-  take() {
-    const value = this.#value;
-    this.#value = null;
-    return value;
-  }
-}
+const admissions = new WeakMap();
 export function admitEmployerPosting(body, address, at) {
-  return validBody(body) && employerMinuteBudget(address, at)
-    ? new Admission(body.c, at.getTime())
-    : null;
+  if (!validBody(body) || !employerMinuteBudget(address, at)) return null;
+  const receipt = Object.freeze({});
+  admissions.set(receipt, { company: body.c, at: at.getTime() });
+  return receipt;
 }
 
 export function createEmployerPostingCounter({ db, keys, now = () => new Date() }) {
@@ -180,8 +171,9 @@ function employerPostingCounter(db, match, now) {
       return countKnown(body.c, at);
     },
     async countAdmitted(admission) {
-      if (!(admission instanceof Admission)) return false;
-      const value = admission.take();
+      const value = admissions.get(admission);
+      admissions.delete(admission); // Consume before any await or caller-controlled operation.
+      if (!value) return false;
       const fresh = now();
       if (
         !value ||
