@@ -209,7 +209,7 @@ def _held_paths(listing: str) -> frozenset[str]:
 
 def main(argv: list[str], *, card_renderer: share_cards.Renderer | None = None) -> None:
     """python -m internscout.site.publish SITE_DIR [LIVE_SITEMAP [LIVE_NOINDEX_LIST]] [--placements PATH]
-    [--placements-report PATH]
+    [--placements-report PATH] [--employer-postings]
 
     --placements PATH (2026-10-14): the Worker's GET /placements answer, which the pages workflow
     fetches only when the repo variable INTERNSCOUT_PLACEMENTS_URL is set and otherwise writes as
@@ -219,8 +219,17 @@ def main(argv: list[str], *, card_renderer: share_cards.Renderer | None = None) 
 
     --placements-report PATH (2026-10-14), with --placements: also writes PATH, the build's report for
     placements.record_runs (placements.report: the UTC day, the ids kept and the ids dropped with their
-    reasons). The pages workflow writes it outside the site, so it is never published."""
+    reasons). The pages workflow writes it outside the site, so it is never published.
+
+    --employer-postings explicitly stages the already-selected export and its matching catalog
+    before rendering organic annotations from that same captured data. Off by default; it does
+    not enable browser capture or Worker collection. Use a fresh staged export for each build."""
     argv = list(argv)
+    employer_postings = "--employer-postings" in argv
+    if employer_postings:
+        if argv.count("--employer-postings") != 1:
+            raise ValueError("Duplicate employer publication option")
+        argv.remove("--employer-postings")
     placements_path = None
     report_path = None
     if "--placements-report" in argv:
@@ -234,6 +243,11 @@ def main(argv: list[str], *, card_renderer: share_cards.Renderer | None = None) 
     site_dir = argv[1] if len(argv) > 1 else "docs"
     state = runtime.BuildState()
     hooks = runtime.BuildHooks()
+    if employer_postings:
+        from .employer_publication import prepare
+
+        data, state.posting_links = prepare(site_dir)
+        hooks = runtime.BuildHooks(load=lambda _site: data)
     pages = runtime.invoke(
         state,
         hooks,
