@@ -33,6 +33,7 @@ Run from the repo root:  python growth/social.py [docs] [--out=DIR] [--send]
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import sys
@@ -45,6 +46,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "backend"))
 sys.path.insert(0, HERE)
 from internscout import seo_pages as sp  # noqa: E402
+from internscout.console_log import console  # noqa: E402
 import digest  # noqa: E402
 if __package__:
     from .public_config import WORKER_URL
@@ -486,7 +488,7 @@ def main(argv: list[str]) -> int:
         return 0
     pick_ = chosen(site_dir)
     if not pick_:
-        print("[social] no field gained enough new nearby listings this week; nothing to post")
+        console("[social] no field gained enough new nearby listings this week; nothing to post")
         return 0
     text, url = compose(*pick_)
     print(text)
@@ -508,7 +510,10 @@ def main(argv: list[str]) -> int:
         try:
             data = write_out(site_dir, out_dir)
             if data:
-                print(f"[social] card and captions written to {out_dir}")
+                message = "[social] card and captions written"
+                if os.environ.get("INTERNSCOUT_LOG_FORMAT") != "json":
+                    message += f" to {out_dir}"
+                console(message)
         except Exception as e:
             print(f"[social] card failed: {type(e).__name__}: {e}")
             failed.append("card")
@@ -522,9 +527,13 @@ def main(argv: list[str]) -> int:
     if data and os.environ.get("CLOUDFLARE_API_TOKEN"):
         try:
             save_drafts(data, os.environ["CLOUDFLARE_API_TOKEN"], os.path.join(out_dir, "card.jpg"))
-            print("[social] LinkedIn draft saved for the analytics page")
+            console("[social] LinkedIn draft saved for the analytics page")
         except Exception as e:
-            print(f"[social] LinkedIn draft failed: {type(e).__name__}")
+            console(
+                f"[social] LinkedIn draft failed: {type(e).__name__}",
+                level=logging.WARNING,
+                exception_type=type(e).__name__,
+            )
             failed.append("LinkedIn draft")
     for name, needs, send in CHANNELS:
         if not all(os.environ.get(k) for k in needs):
@@ -533,11 +542,15 @@ def main(argv: list[str]) -> int:
             print(f"[social] {name}: {send(texts[name], url)}")
         except Exception as e:  # one account failing must not stop the others
             # Only the type: an HTTPError's text can carry the webhook URL or the instance's answer.
-            print(f"[social] {name} failed: {type(e).__name__}")
+            console(
+                f"[social] {name} failed: {type(e).__name__}",
+                level=logging.WARNING,
+                exception_type=type(e).__name__,
+            )
             failed.append(name)
     # was: return 0, whatever failed, so a revoked app password left the Actions run green for weeks.
     if failed:
-        print(
+        console(
             f"[social] {len(failed)} account(s) failed: {', '.join(failed)}. Check their secrets."
         )
         return 1

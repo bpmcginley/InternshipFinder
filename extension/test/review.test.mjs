@@ -36,129 +36,163 @@ const idle = [
   { id: "b", status: "submitted" },
 ];
 
-test("the first filled application never asks; the second does", () => {
-  const one = fills(1);
-  assert.equal(one.filled, 1);
-  assert.equal(shouldShow(one, idle), false);
-  const two = recordFill(one, "j1");
-  assert.equal(two.filled, 2);
-  assert.equal(shouldShow(two, idle), true);
-  assert.equal(two.asks, 1);
-  // Even a state edited to look open is not shown below two fills.
-  assert.equal(shouldShow({ ...one, open: true }, idle), false);
+test("only the third successful fill opens one lifetime prompt", () => {
+  assert.deepEqual(MILESTONES, [3]);
+  let s = emptyState();
+  for (let i = 1; i <= 20; i++) {
+    s = recordFill(s, "job" + i);
+    assert.equal(shouldShow(s, idle), i >= 3);
+    assert.equal(s.asks, i < 3 ? 0 : 1);
+  }
+  assert.equal(shouldShow({ ...s, filled: 2 }, idle), false);
 });
 
-test("it waits while any application is being filled, and shows once none is", () => {
-  const s = fills(2);
-  assert.equal(shouldShow(s, [...idle, { id: "c", status: "working" }]), false);
-  assert.equal(shouldShow(s, [...idle, { id: "c", status: "queued" }]), true);
+test("Not now consumes the opportunity, including after restart and hundreds more fills", () => {
+  let s = answer(fills(3), "later");
+  for (let i = 3; i < 600; i++) s = recordFill(JSON.parse(JSON.stringify(s)), "j" + i);
+  assert.equal(s.asks, 1);
+  assert.equal(shouldShow(s, idle), false);
+  assert.equal(s.done, null);
+});
+
+test("permanent review and never decisions survive later answers and more fills", () => {
+  for (const [action, done] of [
+    ["review", "reviewed"],
+    ["never", "never"],
+  ]) {
+    let s = answer(fills(3), action);
+    s = fills(25, answer(s, "later"), 3);
+    assert.equal(s.done, done);
+    assert.equal(shouldShow(s, idle), false);
+  }
+  assert.equal(shouldShow(fills(4, answer(emptyState(), "review")), idle), false);
+});
+
+test("all earlier v1 asks, open cards and permanent choices consume the opportunity", () => {
+  for (const extra of [
+    { asks: 1 },
+    { asks: 2 },
+    { open: true },
+    { done: "never" },
+    { done: "reviewed" },
+  ]) {
+    const old = {
+      v: 1,
+      filled: 2,
+      ids: ["a", "b"],
+      next: 1,
+      open: false,
+      asks: 0,
+      done: null,
+      ...extra,
+    };
+    const before = JSON.stringify(old),
+      next = R.migrateReview(old);
+    assert.equal(next.v, 2);
+    assert.deepEqual(next.ids, old.ids);
+    assert.equal(next.filled, 2);
+    assert.equal(next.asks, old.asks);
+    assert.equal(next.done, old.done);
+    assert.equal(next.open, false);
+    assert.equal(shouldShow(fills(20, next), idle), false);
+    assert.equal(JSON.stringify(old), before);
+  }
+});
+
+test("legacy users below three with no ask remain eligible; past milestones are never asked late", () => {
+  const old = (n) => ({
+    v: 1,
+    filled: n,
+    ids: Array.from({ length: n }, (_, i) => "old" + i),
+    next: 1,
+    open: false,
+    asks: 0,
+    done: null,
+  });
+  assert.equal(shouldShow(recordFill(R.migrateReview(old(2)), "new"), idle), true);
+  for (const n of [3, 9, 10, 40])
+    assert.equal(shouldShow(recordFill(R.migrateReview(old(n)), "new"), idle), false);
+  assert.equal(shouldShow(recordFill(emptyState(["a", "b", "c"]), "new"), idle), false);
+});
+
+test("only Ready transitions count new success; manual Submitted and repeated Ready do not", () => {
+  for (const previous of ["working", "needs_you", "queued"])
+    assert.equal(R.fillTransition(previous, "ready_to_submit"), true);
+  for (const [previous, status] of [
+    [null, "ready_to_submit"],
+    ["ready_to_submit", "ready_to_submit"],
+    ["working", "submitted"],
+    ["failed", "submitted"],
+    ["ready_to_submit", "submitted"],
+  ])
+    assert.equal(R.fillTransition(previous, status), false);
+  let s = fills(2);
+  s = recordFill(s, "j1");
+  assert.equal(s.filled, 2);
+  s = recordFill(s, "new");
+  assert.equal(recordFill(s, "new"), s);
+  const source = readFileSync(new URL("../background/index.js", import.meta.url), "utf8");
+  assert.match(
+    source,
+    /if \(fillTransition\(prev, j.status\)\) noteFilled\(j.id, Object.values\(q.jobs\)\)/,
+  );
+  assert.doesNotMatch(source, /FILLED.has\(j.status\)/);
+});
+
+test("an active fill hides the prompt while queued and human-review jobs do not", () => {
+  const s = fills(3);
+  assert.equal(shouldShow(s, [...idle, { id: "busy", status: "working" }]), false);
+  assert.equal(shouldShow(s, [...idle, { id: "next", status: "queued" }]), true);
   assert.equal(shouldShow(s, []), true);
 });
 
-test("the same job counts once, however many times it reaches Ready", () => {
-  let s = fills(1);
-  s = recordFill(s, "j0");
-  s = recordFill(s, "j0");
-  assert.equal(s.filled, 1);
-  assert.equal(shouldShow(s, idle), false);
-  assert.equal(recordFill(s, "j0"), s, "unchanged state is the same object, so nothing is written");
+test("dashboard proactive line stays off; the side panel is the sole proactive surface", () => {
+  for (const s of [null, fills(2), fills(3), fills(20), answer(fills(3), "later")])
+    assert.equal(webLineOk(s), false);
+  const panel = readFileSync(new URL("../sidepanel/sidepanel.js", import.meta.url), "utf8");
+  const popup = readFileSync(new URL("../popup/popup.js", import.meta.url), "utf8");
+  assert.match(panel, /if \(e.showReview\).*Leave a review/);
+  assert.match(popup, /review_ask/);
 });
 
-test("Not now waits for the next milestone, and nothing asks between milestones", () => {
-  let s = answer(fills(2), "later");
-  assert.equal(shouldShow(s, idle), false);
-  for (let n = 3; n < MILESTONES[1]; n++) {
-    s = recordFill(s, "j" + (n - 1));
-    assert.equal(shouldShow(s, idle), false, `no ask at ${n}`);
-  }
-  s = recordFill(s, "later-10");
-  assert.equal(s.filled, MILESTONES[1]);
-  assert.equal(shouldShow(s, idle), true);
-  assert.equal(s.asks, 2);
-});
-
-test("at most two asks ever, even for a student who always says Not now", () => {
-  let s = emptyState(),
-    shown = 0;
-  for (let i = 0; i < 500; i++) {
-    s = recordFill(s, "j" + i);
-    if (shouldShow(s, idle)) {
-      shown++;
-      s = answer(s, "later");
-    }
-  }
-  assert.equal(shown, MILESTONES.length);
-  assert.equal(MILESTONES.length, 2);
-  assert.equal(s.asks, 2);
-  assert.equal(s.filled, 500);
-});
-
-test("Don't ask again is permanent", () => {
-  let s = answer(fills(2), "never");
-  assert.equal(s.done, "never");
-  s = fills(200, s, 2);
-  assert.equal(shouldShow(s, idle), false);
-  assert.equal(s.asks, 1);
-  assert.equal(webLineOk(s), false, "the dashboard's line stays quiet too");
-  assert.equal(answer(s, "later").done, "never", "a later Not now cannot undo it");
-});
-
-test("Leave a review is the last ask too, from the card or from the always-there link", () => {
-  let s = answer(fills(2), "review");
-  s = fills(50, s, 2);
-  assert.equal(shouldShow(s, idle), false);
-  // The passive link, clicked before any card: no card afterwards either.
-  let t = answer(emptyState(), "review");
-  t = fills(20, t);
-  assert.equal(shouldShow(t, idle), false);
-  assert.equal(t.asks, 0);
-});
-
-test("a card left unanswered stays one card when the next milestone passes", () => {
-  const s = fills(MILESTONES[1]);
-  assert.equal(shouldShow(s, idle), true);
-  assert.equal(s.asks, 1);
-  const after = fills(30, answer(s, "later"), MILESTONES[1]);
-  assert.equal(shouldShow(after, idle), false, "both milestones are used");
-});
-
-test("an update with applications already filled counts them but does not ask late", () => {
-  const s = emptyState(["a", "b", "c", "a"]);
-  assert.equal(s.filled, 3);
-  assert.equal(s.open, false);
-  assert.equal(shouldShow(s, idle), false);
-  let t = s;
-  for (let i = 4; i < MILESTONES[1]; i++) t = recordFill(t, "n" + i);
-  assert.equal(shouldShow(t, idle), false);
-  t = recordFill(t, "n10");
-  assert.equal(t.filled, 10);
-  assert.equal(shouldShow(t, idle), true);
-});
-
-test("the dashboard's line is allowed after two fills until the student reviews or opts out", () => {
-  assert.equal(webLineOk(null), false);
-  assert.equal(webLineOk(fills(1)), false);
-  assert.equal(webLineOk(fills(2)), true);
-  assert.equal(webLineOk(answer(fills(2), "later")), true);
-  assert.equal(webLineOk(answer(fills(2), "review")), false);
-});
-
-test("noteFilled seeds from the queue once, then counts each job; answerReview is kept in local storage", async () => {
+test("serialized fills deduplicate concurrent completions and preserve a concurrent dismissal", async () => {
   for (const k of Object.keys(data)) delete data[k];
-  // A fresh install: the first fill is one, and asks nothing.
-  let s = await R.noteFilled("x1", [{ id: "x1", status: "ready_to_submit" }]);
-  assert.equal(s.filled, 1);
-  assert.equal(data[KEY].filled, 1);
-  // Two jobs finishing at once (two tabs): both counted, one card.
-  await Promise.all([R.noteFilled("x2"), R.noteFilled("x3")]);
+  await R.noteFilled("x1", [{ id: "x1", status: "ready_to_submit" }]);
+  await Promise.all([R.noteFilled("x2"), R.noteFilled("x3"), R.noteFilled("x3")]);
   assert.equal(data[KEY].filled, 3);
-  assert.equal(data[KEY].open, true);
   assert.equal(data[KEY].asks, 1);
-  await R.answerReview("never");
-  assert.equal(data[KEY].done, "never");
-  await R.noteFilled("x4");
+  assert.equal(data[KEY].v, 2);
+  await Promise.all([R.answerReview("later"), R.noteFilled("x4")]);
   assert.equal(shouldShow(await R.loadReview(), []), false);
-  assert.deepEqual(Object.keys(data), [KEY], "one key, nothing else written");
+  assert.equal(data[KEY].filled, 4);
+  assert.deepEqual(Object.keys(data), [KEY]);
+});
+
+test("missing history never treats manually Submitted jobs as proof of filling", async () => {
+  delete data[KEY];
+  const jobs = [
+    { id: "manual1", status: "submitted" },
+    { id: "manual2", status: "submitted" },
+    { id: "new", status: "ready_to_submit" },
+  ];
+  let s = await R.noteFilled("new", jobs);
+  assert.equal(s.filled, 1);
+  assert.equal(shouldShow(s, []), false);
+  s = await R.noteFilled("second");
+  assert.equal(s.filled, 2);
+  assert.equal(shouldShow(s, []), false);
+  s = await R.noteFilled("third");
+  assert.equal(s.filled, 3);
+  assert.equal(shouldShow(s, []), true);
+  await R.noteFilled("third");
+  assert.equal(data[KEY].filled, 3);
+  const old = { v: 1, filled: 2, ids: ["a", "b"], next: 1, open: false, asks: 1, done: null };
+  data[KEY] = old;
+  await R.noteFilled("c");
+  assert.equal(data[KEY].v, 2);
+  assert.equal(data[KEY].filled, 3);
+  assert.equal(data[KEY].asks, 1);
+  assert.equal(data[KEY].open, false);
 });
 
 test("the card asks honestly: no incentive, no star count, no suggested text, the same for everyone", () => {
@@ -199,5 +233,5 @@ test("the review card needs no new permission and sends nothing anywhere", () =>
     "nothing about reviews is sent anywhere",
   );
   const panel = readFileSync(new URL("../sidepanel/sidepanel.js", import.meta.url), "utf8");
-  assert.match(panel, /shouldShow\(rv, jobs\)/);
+  assert.match(panel, /shouldShow\(rv, currentJobs\)/);
 });
