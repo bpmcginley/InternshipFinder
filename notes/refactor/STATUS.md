@@ -552,6 +552,11 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 - [#276](https://github.com/bpmcginley/InternshipFinder/pull/276) merged at `c84cea3b`. Pages runs 42949557934 and 42949563654 and the exact deployment succeeded.
 - Move 15 employer-specific test functions and their private fixture into `test_seo_employer.py`, keeping shared helpers at their existing imports. All assertions and decorators match the original source. Cross-family tests remain in `test_seo_pages.py`. Backend collection retained all 1,166 tests, with only the 20 moved case paths changing. All 219 focused tests and Ruff passed.
 
+## WP-6.2 employer links, role details and widget tests
+
+- Employer entry and posting-link tests use the shared fixtures and canonical rendering. The paid box still uses the sponsored link without organic posting annotations. Role-detail builds preserve sitemap and publication order. The widget case runs the canonical publisher with the same fixed date and complete listing input while page and feed writers are stubbed.
+- The offline comparison matched all 109 assertions, 1,106 ordered page records across eight builds, three publication snapshots, 127 ordered writes, all 61 final fixture files, paid markup, console output and widget inputs. All 52 cases passed with root fixtures, strict markers, and the facade, fixture donor and sockets blocked. The 92 focused tests included both Golden checks against all 836 artifacts.
+
 ## WP-3.3 listing test follow-up
 
 - [#300](https://github.com/bpmcginley/InternshipFinder/pull/300) merged as `cc2c0211`. Pages 42959357666 and the exact deployment succeeded.
