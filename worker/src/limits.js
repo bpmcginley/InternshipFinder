@@ -213,7 +213,7 @@ export async function bumpUnder(db, user, bucket, limit) {
 // slip past a limit between a read and a write. `estimate` (cents) is charged up front and corrected
 // by settle() once Gemini says what the call really cost; release() undoes it all if Gemini fails.
 // A Worker that dies in between leaves the unit and the estimate counted, which errs on the safe side.
-export async function admit(db, env, config, user, task, runId, now, tier = "general", plan = "free", estimate = 0) {
+export async function aiPreflight(db, env, config, user, now, plan = "free") {
   const rate = (config.PLANS[plan] || config.PLANS.free).rate || config.RATE;
   const month = monthOf(now);
   const today = dayOf(now);
@@ -264,6 +264,12 @@ export async function admit(db, env, config, user, task, runId, now, tier = "gen
                         { retry_after: untilNextMinute });
   }
 
+}
+
+export async function admit(db, env, config, user, task, runId, now, tier = "general", plan = "free", estimate = 0, boundary = {}) {
+  const month = monthOf(now), today = dayOf(now);
+  const minute = "m:" + now.toISOString().slice(0, 16), dayBucket = "d:" + today;
+  if (!boundary.preflightDone) await aiPreflight(db, env, config, user, now, plan);
   const limit = allowanceFor(config, env, task, tier, plan, now);
   // The client uses `upgrade` to decide whether to mention a paid plan; it never guesses.
   // `upgrade` tells the client whether a bigger plan exists for this student, so it never offers one
@@ -275,7 +281,7 @@ export async function admit(db, env, config, user, task, runId, now, tier = "gen
     offer: upgradeOffer(env, config, tier, plan, now) });
 
   const runKey = [user, month, task, runId];
-  const ins = await db.prepare("INSERT OR IGNORE INTO runs (user_hash, month, task, run_id, calls) VALUES (?, ?, ?, ?, 0)")
+  const ins = boundary.existingLegacyOnly ? { meta: { changes: 0 } } : await db.prepare("INSERT OR IGNORE INTO runs (user_hash, month, task, run_id, calls) VALUES (?, ?, ?, ?, 0)")
     .bind(...runKey).run();
   const isNew = ins.meta.changes > 0;
   let used;
@@ -316,9 +322,13 @@ export async function admit(db, env, config, user, task, runId, now, tier = "gen
     used = row ? row.units : 0;
   }
   const call = await db.prepare(
-    "UPDATE runs SET calls = calls + 1 WHERE user_hash = ? AND month = ? AND task = ? AND run_id = ? AND calls < ?",
-  ).bind(...runKey, config.MAX_CALLS_PER_RUN).run();
-  if (call.meta.changes === 0) throw cap("This run reached its call limit");
+    "UPDATE runs SET calls = calls + 1 WHERE user_hash = ? AND month = ? AND task = ? AND run_id = ? AND calls < ?" +
+      (boundary.existingLegacyOnly ? " AND calls>0 AND date('now')=? AND NOT EXISTS(SELECT 1 FROM funded_runs f WHERE f.user_hash=runs.user_hash AND f.month=runs.month AND f.task=runs.task AND f.run_id=runs.run_id) AND NOT EXISTS(SELECT 1 FROM forget WHERE user_hash=runs.user_hash)" : ""),
+  ).bind(...runKey, config.MAX_CALLS_PER_RUN, ...(boundary.existingLegacyOnly ? [today] : [])).run();
+  if (call.meta.changes === 0) {
+    if (boundary.existingLegacyOnly) throw new HttpError(503, "busy", "AI admission is temporarily unavailable");
+    throw cap("This run reached its call limit");
+  }
 
   // was: const admitted = { month, used, limit, isNew, estimate: estimate > 0 ? estimate : 0, metered: false };
   // was: const admitted = { month, day: today, used, limit, isNew, estimate: estimate > 0 ? estimate : 0, metered: false };
