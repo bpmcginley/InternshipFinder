@@ -7632,6 +7632,18 @@
    "fails": 0,
    "added": "2026-10-16"
   },
+  "williamblair": {
+   "name": "William Blair",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-11"
+  },
+  "wing": {
+   "name": "Wing",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-11"
+  },
   "woolpert": {
    "name": "Woolpert",
    "quant": false,
@@ -12092,9 +12104,8 @@
   "weyerhaeuser|100002": {
    "name": "Weyerhaeuser",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-15",
-   "last_fail": "2026-11-11"
+   "fails": 0,
+   "added": "2026-09-15"
   },
   "zionsbancorp|joinexternalmobile": {
    "name": "Zions Bank",
@@ -13930,8 +13941,9 @@
   "boeing|wd1|EXTERNAL_CAREERS": {
    "name": "Boeing",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-18"
+   "fails": 1,
+   "added": "2026-09-18",
+   "last_fail": "2026-11-11"
   },
   "boeing|wd1|external_subsidiary": {
    "name": "The Boeing Company",
