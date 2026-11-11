@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 
 from ..console_log import console
 from ..pay import placeholder_pay
+from ..public_data import public_data_dir
 from .taxonomy import CA_METRO_PAGES, us_metro
 from .text import safe_url
 
@@ -206,6 +207,7 @@ def canada_first_scan(
 def load(
     site_dir: str,
     *,
+    data_dir: str | None = None,
     ca_metros: Collection[str] = CA_METRO_PAGES,
     metro: Callable[[dict], str | None] = us_metro,
     baseline: Callable[[list[dict]], str | None] = baseline_day,
@@ -213,7 +215,7 @@ def load(
     valid_url: Callable[..., str | None] = safe_url,
     diagnostic: Callable[..., None] = console,
 ) -> dict:
-    data = os.path.join(site_dir, "data")
+    data = public_data_dir(site_dir) if data_dir is None else data_dir
     with open(os.path.join(data, "listings", "index.json"), encoding="utf-8") as f:
         index = json.load(f)
     with open(os.path.join(data, "majors.json"), encoding="utf-8") as f:

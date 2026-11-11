@@ -22,6 +22,7 @@ from .console_log import console
 from .db import SessionLocal, init_db
 from .models import Listing, Application
 from .pay import placeholder_pay
+from .public_data import public_data_dir
 from .site.source import baseline_day, canada_first_scan
 from .config import PROFILE, REGION, BASELINE_STATES, wanted_states
 from .insights import extract, PATTERNS
@@ -909,4 +910,4 @@ def export(out_dir: str, completed_boards=None, observed_urls=None) -> dict:
 if __name__ == "__main__":
     import sys
 
-    export(sys.argv[1] if len(sys.argv) > 1 else "docs/data")
+    export(sys.argv[1] if len(sys.argv) > 1 else public_data_dir())
