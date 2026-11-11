@@ -670,6 +670,11 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 - Standalone feeds snapshot the canonical site URL and configured build date on first use, as the legacy import did. When no date is available, they use the current UTC time. An already-loaded legacy facade still supplies its current URL and last build date, so direct overrides and callers that omit the date after a legacy build still work. If standalone RSS captured the defaults first, a later canonical facade import initializes from that same snapshot. The legacy CLI continues passing its build date explicitly.
 - A fresh subprocess generated a feed with the legacy facade blocked. The offline legacy CLI comparison matched 815 files, including 75 feeds, and console output. All 161 focused tests passed, including the standalone Pages publisher and Golden build. Product's publisher, renderers and Golden fixtures are outside this slice.
 
+## WP-5.1 Buy retention before activation
+
+- Product released the publication allowlist and Golden pair after [#410](https://github.com/bpmcginley/InternshipFinder/pull/410) published as `b3b3d049` through [Pages 43084811385](https://github.com/bpmcginley/InternshipFinder/actions/runs/43084811385). The exact deployment succeeded and all 4,980 public files matched. The retention package starts from `f73efa65` after [#411](https://github.com/bpmcginley/InternshipFinder/pull/411) and reserves only the three Buy module names and their immutable generation paths.
+- Git-pinned staging matched all 830 Golden files and kept the classic checkout and its asset URL. A disposable ordinary activation merge and revert reproduced those 830 files plus all three cached Buy module URLs byte-for-byte. Both outputs passed the allowlist. Eighty-four focused and Golden tests and four allowlist tests passed, with one Windows symlink skip in each suite.
+
 ## WP-6.3 ingest timing from existing runs
 
 Both completed runs succeeded. The ingest and export, coverage, and commit columns are step wall-clock durations from Actions metadata. The board phase is the elapsed-seconds value from the existing `[boards]` summary inside the ingest and export step.
