@@ -5,81 +5,16 @@ from __future__ import annotations
 import hashlib
 import re
 
+from ..vocabulary import CANADIAN_PROVINCES, US_PLACE_LABELS
 
-US_STATES = {
-    "AL": "Alabama",
-    "AK": "Alaska",
-    "AZ": "Arizona",
-    "AR": "Arkansas",
-    "CA": "California",
-    "CO": "Colorado",
-    "CT": "Connecticut",
-    "DE": "Delaware",
-    "DC": "Washington, DC",
-    "FL": "Florida",
-    "GA": "Georgia",
-    "HI": "Hawaii",
-    "ID": "Idaho",
-    "IL": "Illinois",
-    "IN": "Indiana",
-    "IA": "Iowa",
-    "KS": "Kansas",
-    "KY": "Kentucky",
-    "LA": "Louisiana",
-    "ME": "Maine",
-    "MD": "Maryland",
-    "MA": "Massachusetts",
-    "MI": "Michigan",
-    "MN": "Minnesota",
-    "MS": "Mississippi",
-    "MO": "Missouri",
-    "MT": "Montana",
-    "NE": "Nebraska",
-    "NV": "Nevada",
-    "NH": "New Hampshire",
-    "NJ": "New Jersey",
-    "NM": "New Mexico",
-    "NY": "New York",
-    "NC": "North Carolina",
-    "ND": "North Dakota",
-    "OH": "Ohio",
-    "OK": "Oklahoma",
-    "OR": "Oregon",
-    "PA": "Pennsylvania",
-    "RI": "Rhode Island",
-    "SC": "South Carolina",
-    "SD": "South Dakota",
-    "TN": "Tennessee",
-    "TX": "Texas",
-    "UT": "Utah",
-    "VT": "Vermont",
-    "VA": "Virginia",
-    "WA": "Washington",
-    "WV": "West Virginia",
-    "WI": "Wisconsin",
-    "WY": "Wyoming",
-    "PR": "Puerto Rico",
-    "remote": "Remote (US)",
-}
+
+US_STATES = dict(US_PLACE_LABELS)
+US_STATES.update({"DC": "Washington, DC", "remote": "Remote (US)"})
 # Canada since 2026-09-30. A province is filed like a state (none of the codes is a US state's), and
 # three more kinds of page are made from the same listings: all of Canada, and each big metro, since
 # "internships in Toronto" is searched far more than "internships in Ontario". The metros are the
 # ones geo.CA_METROS groups towns under; smaller ones still count toward their province.
-CA_PROVINCES = {
-    "ON": "Ontario",
-    "QC": "Quebec",
-    "BC": "British Columbia",
-    "AB": "Alberta",
-    "MB": "Manitoba",
-    "SK": "Saskatchewan",
-    "NS": "Nova Scotia",
-    "NB": "New Brunswick",
-    "NL": "Newfoundland and Labrador",
-    "PE": "Prince Edward Island",
-    "NT": "Northwest Territories",
-    "NU": "Nunavut",
-    "YT": "Yukon",
-}
+CA_PROVINCES = dict(CANADIAN_PROVINCES)
 CA_METRO_PAGES = {
     "Toronto": "ON",
     "Montreal": "QC",
