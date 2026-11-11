@@ -81,3 +81,8 @@ import "./topup-checkout-http.test.js";
 import "./employer-catalog-cache.test.js";
 import "./employer-posting-counts.test.js";
 import "./employer-request-safe.test.js";
+
+import "./funded-run-admission.test.js";
+import "./funded-run-callbacks.test.js";
+import "./funded-run-sibling.test.js";
+import "./funded-purchase.test.js";

@@ -26,11 +26,13 @@ const migrationNames = [
   "0014_follow_attempt_lookup.sql",
   "0015_topup_account_deletion.sql",
   "0016_follow_send_budget.sql",
+  "0017_funded_run_admission.sql",
+  "0018_purchased_run_generations.sql",
 ];
 const legacySql = [...env.TEST_SCHEMA_SQL, ...env.TEST_EXTRA_SCHEMA_SQL];
 const databases = [env.LEGACY_DB, env.MIGRATION_DB];
 const tableNames = env.TEST_SCHEMA_SQL.flatMap((sql) => {
-  const match = sql.match(/CREATE TABLE IF NOT EXISTS (\w+)\s*\(/);
+  const match = sql.match(/CREATE TABLE IF NOT EXISTS "?(\w+)"?\s*\(/);
   return match ? [match[1]] : [];
 });
 const run = (db, queries) => db.batch(queries.map((sql) => db.prepare(sql)));
@@ -80,8 +82,8 @@ it("migrations create the complete legacy schema, including constraints and trig
   await initialize();
   const expected = await schema(env.LEGACY_DB);
   expect(await schema(env.MIGRATION_DB)).toEqual(expected);
-  expect(expected.objects.filter((row) => row.type === "table")).toHaveLength(59);
-  expect(expected.objects.filter((row) => row.type === "index")).toHaveLength(32);
+  expect(expected.objects.filter((row) => row.type === "table")).toHaveLength(62);
+  expect(expected.objects.filter((row) => row.type === "index")).toHaveLength(34);
   expect(expected.objects.filter((row) => row.type === "trigger")).toHaveLength(11);
   expect(expected.objects.filter((row) => row.type === "view")).toHaveLength(1);
   expect(await ledger()).toEqual(migrationNames.map((name) => ({ name })));
