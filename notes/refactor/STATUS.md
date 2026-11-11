@@ -91,7 +91,7 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 5 | WP-3.2 Sitemap/feeds/llms | wp21_inventory | `refactor/wp-3.2-site-artifacts` | [#264](https://github.com/bpmcginley/InternshipFinder/pull/264) | Merged | `6fa14ba8`. Pages 42946316162 and the exact deployment succeeded. Sitemap, robots, RSS and LLMS retain legacy entry points and exact golden bytes. |
 | 5 | WP-3.3 Near family | wp21_inventory | `refactor/wp-3.3-near` | [#271](https://github.com/bpmcginley/InternshipFinder/pull/271) | Merged | `75c4e013`. Pages 42948316654 and the exact deployment succeeded. All 501 near pages and 695 golden files retained. |
 | 5 | WP-3.3 Employer family | wp21_inventory | `refactor/wp-3.3-employer` | [#276](https://github.com/bpmcginley/InternshipFinder/pull/276) | Merged | `c84cea3b`. Pages 42949557934 and 42949563654 and the exact deployment succeeded. Employer eligibility, recruiter CTA, related links and full page items were preserved. |
-| 5 | WP-3.3 Field family | wp21_inventory | `refactor/wp-3.3-field` | - | In review | Structured cohorts and related links for field, place, combination and major pages. |
+| 5 | WP-3.3 Field family | wp21_inventory | `refactor/wp-3.3-field` | [#277](https://github.com/bpmcginley/InternshipFinder/pull/277) | In review | Structured cohorts and related links for field, place, combination and major pages. |
 | 5 | WP-3.3 Pay family | Unassigned | - | - | Queued | Serial family PR; unchanged golden manifest. |
 | 5 | WP-3.3 Numbers family | Unassigned | - | - | Queued | Serial family PR; unchanged golden manifest. |
 | 5 | WP-3.3 Digest family | Unassigned | - | - | Queued | Serial family PR; unchanged golden manifest. |
