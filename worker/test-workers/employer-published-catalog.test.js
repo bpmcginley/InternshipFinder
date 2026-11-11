@@ -63,11 +63,11 @@ function freshOptions(url, options) {
   ]);
   assert.equal(options.method, "GET");
   assert.equal(options.cache, "no-store");
-  assert.equal(options.redirect, "error");
+  assert.equal(options.redirect, "manual");
   assert.equal(options.credentials, "omit");
   assert.ok(options.signal instanceof AbortSignal);
   // The actual workerd Request implementation accepts this cache mode under existing compatibility.
-  assert.doesNotThrow(() => new Request(url, { cache: options.cache }));
+  assert.doesNotThrow(() => new Request(url, options));
 }
 
 it("requires explicit enabled published mode and rejects mixed or untrusted descriptors", () => {
@@ -262,6 +262,8 @@ it("keeps exact pin mode compatible and invalidates membership across mode switc
   const load = async (url, options) => {
     assert.equal(url, URL + "?v=" + pinned.version);
     assert.deepEqual(Object.keys(options).sort(), ["credentials", "redirect", "signal"]);
+    assert.equal(options.redirect, "manual");
+    assert.doesNotThrow(() => new Request(url, options));
     return reply(url, text);
   };
   assert.equal(await f.count("alpha", load, config(pinned)), true);
