@@ -12,12 +12,16 @@ export function createEmployerCatalogCache({
   now = Date.now,
   schedule = setTimeout,
   cancel = clearTimeout,
+  loadTimeoutMs = TTL,
 }) {
   if (
     typeof load !== "function" ||
     typeof parse !== "function" ||
     !Number.isSafeInteger(maxBytes) ||
-    maxBytes < 1
+    maxBytes < 1 ||
+    !Number.isSafeInteger(loadTimeoutMs) ||
+    loadTimeoutMs < 1 ||
+    loadTimeoutMs > TTL
   )
     throw new TypeError("Invalid catalog cache options");
   let cached = null,
@@ -47,6 +51,7 @@ export function createEmployerCatalogCache({
 
   function start(at) {
     const expires = at + TTL,
+      deadline = at + loadTimeoutMs,
       controller = new AbortController();
     let resolve, timer, reader, response;
     const promise = new Promise((done) => {
@@ -81,10 +86,10 @@ export function createEmployerCatalogCache({
     pending = work;
     const live = () => {
       const current = time();
-      return pending === work && current !== null && current < expires;
+      return pending === work && current !== null && current < deadline;
     };
     try {
-      timer = schedule(() => work.finish(null), TTL);
+      timer = schedule(() => work.finish(null), loadTimeoutMs);
       timer?.unref?.();
     } catch {
       work.finish(null);

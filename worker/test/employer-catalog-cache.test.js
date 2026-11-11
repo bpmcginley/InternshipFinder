@@ -19,6 +19,7 @@ function fixture(options = {}) {
     signals = [];
   const cache = createEmployerCatalogCache({
     maxBytes: 64,
+    loadTimeoutMs: options.loadTimeoutMs,
     now: () => clock,
     schedule: (fn, delay) => {
       const id = ++next;
@@ -153,6 +154,26 @@ test("timeout releases waiters, aborts load and rejects late publication", async
   await Promise.resolve();
   assert.equal(await f.cache.has("acme"), false);
   assert.equal(await f.cache.has("newco"), true);
+});
+
+test("short load deadline releases stalled callers without shortening snapshot validity", async () => {
+  const gate = deferred();
+  const f = fixture({
+    loadTimeoutMs: 5_000,
+    load: () => (f.loads() === 1 ? gate.promise : response()),
+  });
+  const pending = f.cache.has("acme");
+  f.set(5_000);
+  f.fire();
+  assert.equal(await pending, false);
+  assert.equal(f.signals[0].aborted, true);
+  f.set(10_000);
+  assert.equal(await f.cache.has("acme"), true);
+  f.set(309_999);
+  assert.equal(await f.cache.has("acme"), true);
+  assert.equal(f.loads(), 2);
+  gate.resolve(response(["late"]));
+  assert.equal(await f.cache.has("late"), false);
 });
 
 test("delayed body or validation cannot cross the hard deadline even without timer delivery", async () => {

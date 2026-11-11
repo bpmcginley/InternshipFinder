@@ -1,4 +1,5 @@
 import {
+  createCachedEmployerPostingCounter,
   createEmployerMinuteBudget,
   createEmployerPostingCounter,
   EMPLOYER_POSTING_EVENT,
@@ -16,6 +17,75 @@ const eq = (actual, expected, label) => {
   if (JSON.stringify(actual) !== JSON.stringify(expected)) throw new Error(label);
 };
 const event = (c = "acme") => ({ e: EMPLOYER_POSTING_EVENT, c });
+
+export async function employerCachedCounterScenario(db) {
+  await db.prepare(EMPLOYER_COUNT_SCHEMA).run();
+  await db.prepare(EMPLOYER_DAY_CAP_SCHEMA).run();
+  const start = Date.parse("2026-12-15T12:00:00Z");
+  const address = "192.0.2.90";
+  let time = start,
+    loads = 0,
+    finishLoad;
+  const count = createCachedEmployerPostingCounter({
+    db,
+    maxBytes: 64,
+    now: () => new Date(time),
+    load() {
+      loads++;
+      if (loads === 1) return new Response('["acme"]');
+      if (loads === 2) return new Response('["acme","acme"]');
+      if (loads === 3) return new Response('["newco"]');
+      return new Promise((resolve) => {
+        finishLoad = resolve;
+      });
+    },
+  });
+  eq(await count.count(event(), address), false, "retention gate precedes catalog load");
+  eq(await count.cleanup(), true, "day cap initialized");
+  eq(await count.count({ ...event(), n: 8 }, address), false, "malformed body denied");
+  eq(loads, 0, "unready and malformed requests never start a load");
+  eq(await count.count(event(), address), true, "initial key admitted");
+  eq(await count.count(event("newco"), address), false, "unknown key denied");
+  eq(loads, 1, "same snapshot reused");
+
+  time = start + 300_000;
+  eq(await count.count(event(), address), false, "duplicate keys invalidate expired refresh");
+  time += 4_999;
+  eq(await count.count(event(), address), false, "stale key never admits during backoff");
+  eq(loads, 2, "failure backoff coalesces retries");
+  time++;
+  eq(await count.count(event(), address), false, "old key removed after fresh catalog");
+  eq(await count.count(event("newco"), address), true, "new key admitted after refresh");
+
+  time = Date.parse("2026-12-15T23:59:59Z");
+  const previousDay = count.count(event("newco"), address);
+  time += 1_000;
+  eq(await count.cleanup(), true, "UTC rollover reestablishes retention");
+  finishLoad(new Response('["newco"]'));
+  eq(await previousDay, false, "in-flight previous-day count is discarded");
+  eq(await count.count(event("newco"), address), true, "current UTC day accepts a new click");
+
+  time += 300_000;
+  const previousCleanup = count.count(event("newco"), address);
+  eq(await count.cleanup(), true, "a new cleanup generation can succeed on the same day");
+  finishLoad(new Response('["newco"]'));
+  eq(await previousCleanup, false, "same-day obsolete admission is discarded");
+
+  const companies = await db
+    .prepare("SELECT * FROM employer_posting_counts ORDER BY day, company")
+    .all();
+  const caps = await db.prepare("SELECT * FROM employer_posting_day_caps ORDER BY day").all();
+  eq(
+    companies.results,
+    [
+      { day: "2026-12-15", company: "acme", n: 1 },
+      { day: "2026-12-15", company: "newco", n: 1 },
+      { day: "2026-12-16", company: "newco", n: 1 },
+    ],
+    "only three admitted clicks persist",
+  );
+  eq(caps.results, [{ day: "2026-12-16", n: 1 }], "only current-day aggregate survives");
+}
 
 export async function employerCounterScenario(db) {
   await db.prepare(EMPLOYER_COUNT_SCHEMA).run();
