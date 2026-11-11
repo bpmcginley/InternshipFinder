@@ -446,7 +446,7 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 - HouseAI and UHN route their four existing diagnostics through the console logger. The two outer exception handlers preserve the original class-only messages and add class metadata in JSON mode.
 - JSON mode reports source, operation and exception class from 13 previously silent broad catches: 11 ATS detail reads, the HouseAI detail read, and the shared robots lookup. Default mode leaves those catches silent. The shared console_exception helper preserves fallbacks even if the opt-in write raises BrokenPipeError or RuntimeError.
 - Q5 remains open for the five raw-exception adapters: NYC Jobs, Lever, GitHub lists, Greenhouse and USAJOBS. Those five adapters remain byte-identical.
-- The focused mocked source and adapter suites passed 144 tests. Golden snapshot and mutation checks both passed. Ruff is clean, and targeted Pyright exactly matches the nine existing diagnostics. Syntax trees match the previous revision after stripping logging-only changes from all 14 touched source modules.
+- The focused mocked source and adapter suites passed 144 tests. Golden snapshot and mutation checks both passed. Ruff is clean, and targeted Pyright exactly matches the nine existing diagnostics. Syntax trees match the previous revision after stripping logging-only changes from all 14 touched source modules. After merging main `acf2d347`, all 146 focused and golden tests passed, and source, test and shared-helper bytes matched their reviewed versions.
 
 ## WP-1.4 sources logging canary
 
