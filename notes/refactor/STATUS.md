@@ -598,6 +598,11 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 - Seven synthetic before/after builds matched page records and emitted files. Covered held creation, held versus live slack, earning bypass, threshold override, cohort details and the existing recruiter link. The module AST outside the late employer loop and its two helpers is exact.
 - Relevant SEO, discovery, dates, feeds, link, role and growth checks passed 739 tests with two environment skips for cryptography and ffmpeg. Both Golden checks matched 695 unchanged expected files, and the wheel and isolated import check confirmed no SEO facade back-edge. Ruff passed and targeted Pyright retained the same 12 existing diagnostics.
 
+## WP-6.2 advisor and launch tests
+
+- The advisor and launch suites use the shared listing fixtures. The migrated builds set near pages and earning explicitly, and each writer receives the state and hooks from its build. The thin launch case passes that build's date to the existing feed writer. All 95 assertions, test and parameter order, and the existing launch snapshot build settings match the previous suites.
+- The offline legacy and canonical runs matched 1,112 ordered page records over six builds, 67 ordered writes, all fixture files and RSS bytes. All 64 cases passed with the root pytest fixtures active and the facade, donor module and sockets blocked. The focused offline suite passed 109 cases, including both Golden checks against all 836 artifacts.
+
 ## WP-3.3 field page family
 
 - Started reversible local work from `c84cea3b` while the #276 Pages runs were in progress. Both 42949557934 and 42949563654 and the exact deployment succeeded before this PR was opened. Pages continues to gate merges. Exact Product claim checks found no overlap. #266's apparent overlap is inherited from its merge base.
