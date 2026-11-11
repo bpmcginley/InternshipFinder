@@ -58,3 +58,4 @@ import "./topup-purchase-recovery.test.js";
 import "./topup-checkout-bounds.test.js";
 import "./session-copy-fence.test.js";
 import "./topup-session-copy-integration.test.js";
+import "./topup-checkout-service.test.js";
