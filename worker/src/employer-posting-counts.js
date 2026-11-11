@@ -141,13 +141,14 @@ function employerPostingCounter(db, match, now) {
       const isCurrent = await match(company);
       if (!isCurrent) return false;
       const checked = now();
+      const checkedTime = instant(checked) ? checked.getTime() : NaN;
       if (
-        !instant(checked) ||
-        checked.getTime() < at.getTime() ||
+        !isCurrent(checkedTime) ||
+        !Number.isFinite(checkedTime) ||
+        checkedTime < at.getTime() ||
         checked.toISOString().slice(0, 10) !== day ||
         readyDay !== day ||
-        cleanupVersion !== version ||
-        !isCurrent(checked.getTime())
+        cleanupVersion !== version
       )
         return false;
       // D1 batch is one transaction. The second write follows only a successful company

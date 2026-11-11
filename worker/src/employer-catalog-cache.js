@@ -28,17 +28,19 @@ export function createEmployerCatalogCache({
     pending = null,
     last = 0,
     retryAt = 0;
+  const observeTime = (value) => {
+    if (
+      !Number.isSafeInteger(value) ||
+      value < last ||
+      value > Number.MAX_SAFE_INTEGER - TTL - RETRY
+    )
+      return null;
+    last = value;
+    return value;
+  };
   const time = () => {
     try {
-      const value = now();
-      if (
-        !Number.isSafeInteger(value) ||
-        value < last ||
-        value > Number.MAX_SAFE_INTEGER - TTL - RETRY
-      )
-        return null;
-      last = value;
-      return value;
+      return observeTime(now());
     } catch {
       return null;
     }
@@ -175,11 +177,16 @@ export function createEmployerCatalogCache({
       }
       if (!accepted) return null;
       // Recheck this exact snapshot when the caller resumes and admits the click.
-      return (checked) =>
-        Number.isSafeInteger(checked) &&
-        checked >= last &&
-        checked < entry.expires &&
-        entry === cached;
+      return (checked) => {
+        if (entry !== cached) return false;
+        if (observeTime(checked) === null) {
+          drop();
+          return false;
+        }
+        if (checked < entry.expires) return true;
+        cached = null;
+        return false;
+      };
     } catch {
       drop();
       return null;
@@ -190,11 +197,7 @@ export function createEmployerCatalogCache({
     match,
     async has(key) {
       const isCurrent = await match(key);
-      if (!isCurrent) return false;
-      const checked = time();
-      if (checked !== null) return isCurrent(checked);
-      drop();
-      return false;
+      return isCurrent ? isCurrent(time()) : false;
     },
   });
 }

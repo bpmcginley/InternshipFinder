@@ -59,7 +59,9 @@ export async function employerCachedCounterScenario(db) {
     "expiry between cache match and D1 admits nothing",
   );
   crossingExpiry = false;
-  time = start + 300_000;
+  eq(await count.count(event(), address), false, "clock rollback cannot revive an expired catalog");
+  eq(loads, 1, "clock rollback never starts a refresh");
+  time = start + 305_000;
   eq(await count.count(event(), address), false, "duplicate keys invalidate expired refresh");
   time += 4_999;
   eq(await count.count(event(), address), false, "stale key never admits during backoff");
