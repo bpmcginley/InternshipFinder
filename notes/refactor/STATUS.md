@@ -97,7 +97,7 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 5 | WP-3.3 Listing family | Unassigned | - | - | Queued | Serial family PR; unchanged golden manifest. |
 | 5 | WP-3.4 Build orchestration | Unassigned | - | - | Queued | Explicit ordered steps; preserve outputs and eliminate cycles carefully. |
 | 5 | WP-3.5 Import consumers | Unassigned | - | - | Queued | Point consumers to new modules; retain compatibility exports. |
-| 5 | WP-4.3 Route response baseline | wp42_orders | `refactor/wp-4.3-route-baseline` | - | In review | Fixed offline responses for 42 exact routes and 44 transport, guard and special cases. |
+| 5 | WP-4.3 Route response baseline | wp42_orders | `refactor/wp-4.3-route-baseline` | [#253](https://github.com/bpmcginley/InternshipFinder/pull/253) | In review | Fixed offline responses for 42 exact routes and 44 transport, guard and special cases. |
 | 5 | WP-4.3 Route table | Unassigned | - | - | Queued / question | Start after response characterization. Financial wrapper changes remain paused under Q3. |
 | 5 | WP-5.2 Background agent | Unassigned | - | - | Queued | Separate move-only PR; guard and tests untouched; no version bump. |
 | 5 | WP-5.2 Onboarding | Unassigned | - | - | Queued | Separate PR; preserve UI text and reproducible packaging. |
