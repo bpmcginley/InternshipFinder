@@ -248,7 +248,7 @@ TIPS = [
 
 def lint(text: str) -> list[str]:
     """What in text breaks the rules: a BANNED word or phrase, or an emoji. Empty when it's clean."""
-    low = site_text.lower()
+    low = text.lower()
     found = [w for w in BANNED if re.search(r"(?<![a-z])" + re.escape(w) + r"(?![a-z])", low)]
     return found + (["emoji"] if _EMOJI.search(text) else [])
 
