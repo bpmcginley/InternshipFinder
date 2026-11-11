@@ -33,8 +33,11 @@ REQUIRED = {
 }
 
 
-def git(checkout, *args, check=True, env=None):
-    result = subprocess.run(["git", *args], cwd=checkout, capture_output=True, check=False, env=env)
+def git(checkout, *args, check=True, env=None, no_replace=False):
+    command = ["git", "--no-replace-objects"] if no_replace else ["git"]
+    result = subprocess.run(
+        [*command, *args], cwd=checkout, capture_output=True, check=False, env=env
+    )
     if check and result.returncode:
         raise ValueError(f"Git {args[0]} failed in the data checkout")
     return result
@@ -76,10 +79,13 @@ def check_counts(declared, actual):
 
 
 def validate_tree(checkout, tree, *, _listing_bytes=None):
+    no_replace = _listing_bytes is not None
     paths = [PUBLIC]
-    if git(checkout, "ls-tree", tree, "--", "backend/data").stdout:
+    if git(checkout, "ls-tree", tree, "--", "backend/data", no_replace=no_replace).stdout:
         paths.append("backend/data")
-    archive = git(checkout, "archive", "--format=tar", tree, "--", *paths).stdout
+    archive = git(
+        checkout, "archive", "--format=tar", tree, "--", *paths, no_replace=no_replace
+    ).stdout
     files = {}
     names = set()
     with tarfile.open(fileobj=io.BytesIO(archive)) as snapshot:
@@ -100,7 +106,9 @@ def validate_tree(checkout, tree, *, _listing_bytes=None):
             ):
                 # Git archive may apply working-tree conversion to text files.
                 # Validate and retain the exact object bytes for the proof.
-                raw = git(checkout, "cat-file", "blob", f"{tree}:{member.name}").stdout
+                raw = git(
+                    checkout, "cat-file", "blob", f"{tree}:{member.name}", no_replace=True
+                ).stdout
                 _listing_bytes[path] = raw
                 value = parse_json(raw)
             else:
@@ -212,8 +220,10 @@ def prepare(checkout, primary, state):
         copy_state(checkout / path, state / Path(path).name)
 
 
-def ensure_owned_stage(checkout):
-    staged = git(checkout, "diff", "--cached", "--no-renames", "--name-only", "-z").stdout
+def ensure_owned_stage(checkout, *, no_replace=False):
+    staged = git(
+        checkout, "diff", "--cached", "--no-renames", "--name-only", "-z", no_replace=no_replace
+    ).stdout
     if any(not owned(name.decode("utf8")) for name in staged.split(b"\0") if name):
         raise ValueError("Refusing unrelated staged files in the data checkout")
 
@@ -259,10 +269,11 @@ class _StagedFollowProvenance:
 
 def validate_staged_follow_provenance(checkout, candidate_tree, provenance):
     """Verify an opted-in proof against the current, exact writer candidate without publishing."""
-    ensure_owned_stage(checkout)
+    ensure_owned_stage(checkout, no_replace=True)
     if (
         provenance is None
-        or git(checkout, "write-tree").stdout.decode("ascii").strip() != candidate_tree
+        or git(checkout, "write-tree", no_replace=True).stdout.decode("ascii").strip()
+        != candidate_tree
     ):
         raise ValueError("Expected follow proof and exact staged candidate")
 
@@ -278,6 +289,7 @@ def validate_staged_follow_provenance(checkout, candidate_tree, provenance):
             candidate_tree,
             "--",
             f"{PUBLIC}/listings",
+            no_replace=True,
         )
         .stdout.decode("utf-8")
         .split("\0")
@@ -306,7 +318,10 @@ def validate_staged_follow_provenance(checkout, candidate_tree, provenance):
     if digests != identity.shard_sha256:
         raise ValueError("Follow proof does not match the staged listing shards")
 
-    if git(checkout, "write-tree").stdout.decode("ascii").strip() != candidate_tree:
+    if (
+        git(checkout, "write-tree", no_replace=True).stdout.decode("ascii").strip()
+        != candidate_tree
+    ):
         raise ValueError("Staged candidate changed during follow verification")
 
     return _StagedFollowProvenance(
