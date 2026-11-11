@@ -72,6 +72,33 @@ test("only the dedicated active fixed one-time USD exclusive-tax price enables",
     assert.equal((await reserveTopupCheckout(null, "a".repeat(64), cap)).status, "disabled");
   }
 });
+test("manual multi-currency prices pin USD and reject non-USD replies", async () => {
+  const multi = {
+    ...price(),
+    currency_options: { usd: { unit_amount: 300 }, cad: { unit_amount: 450 } },
+  };
+  let returnedCurrency = "usd",
+    posts = 0;
+  const cap = await prepareTopupStripe(env, callbacks, async (url, options) => {
+    if (url.includes("/prices/")) return reply(multi);
+    if (options.method === "POST") {
+      posts++;
+      const form = new URLSearchParams(options.body);
+      assert.equal(form.get("currency"), "usd");
+      assert.equal(form.get("adaptive_pricing[enabled]"), "false");
+    }
+    return reply({ ...session(), currency: returnedCurrency });
+  });
+  assert.equal(cap.enabled, true);
+  assert.equal((await cap.create(attempt())).currency, "usd");
+  returnedCurrency = "cad";
+  await assert.rejects(cap.create(attempt()), unavailable);
+  await assert.rejects(
+    cap.readOpen({ ...attempt(), state: "open", checkout_id: "cs_fixture" }),
+    unavailable,
+  );
+  assert.equal(posts, 2);
+});
 test("Managed Payments uses the existing switch without subscription offers", async () => {
   let form;
   const cap = await prepareTopupStripe(

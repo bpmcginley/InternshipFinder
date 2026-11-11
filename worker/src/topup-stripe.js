@@ -194,6 +194,7 @@ export async function prepareTopupStripe(env, callbacks, fetchImpl) {
         client_reference_id: a.user_hash,
         success_url: success,
         cancel_url: cancel,
+        currency: "usd",
         "adaptive_pricing[enabled]": "false",
         "expand[]": "line_items",
       };

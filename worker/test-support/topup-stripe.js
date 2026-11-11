@@ -86,6 +86,7 @@ export async function stripeReservationRoundTrip(db) {
       assert.equal(form.get("line_items[0][price]"), env.STRIPE_PRICE_TOPUP);
       assert.equal(form.get("mode"), "payment");
       assert.equal(form.get("ui_mode"), "hosted_page");
+      assert.equal(form.get("currency"), "usd");
       assert.equal(form.get("adaptive_pricing[enabled]"), "false");
       const id = form.get("metadata[attempt_id]");
       assert.equal(options.headers["Idempotency-Key"], "topup-checkout:" + id);
