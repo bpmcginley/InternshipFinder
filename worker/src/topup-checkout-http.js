@@ -1,8 +1,12 @@
 // Dormant outer boundary. The future router owns origin/CORS and server-owned dependencies.
-import { authenticateUser, bearerOf } from "./auth.js";
+import { bearerOf } from "./auth.js";
 import { HttpError, json } from "./http.js";
-import { isSessionToken } from "./session.js";
+import { isSessionToken, sessionUser } from "./session.js";
 import { getSessionTopupCheckout } from "./topup-checkout-service.js";
+
+// Checkout must not slide a session beyond the expiry observed by authentication.
+const authenticateSession = (request, env, deps) =>
+  sessionUser(env.DB, bearerOf(request), { ...deps, refresh: false });
 
 const response = (status, code, extra = {}, headers = {}) =>
   json({ status, ...extra }, code, { "Cache-Control": "no-store", ...headers });
@@ -12,7 +16,7 @@ export async function topupCheckoutResponse({
   db,
   adapter = {},
   clock = () => new Date(),
-  authenticate = authenticateUser,
+  authenticate = authenticateSession,
   checkout = getSessionTopupCheckout,
 }) {
   if (request.method !== "POST") return response("unavailable", 405, {}, { Allow: "POST" });

@@ -121,7 +121,8 @@ export async function copySession(db, token, deps = {}) {
 
 // { user, tier } for a session token. A use moves `last_used` and `expires` forward at most once per UTC
 // day, in the background (`later`), so a busy day costs one write rather than one per request.
-export async function sessionUser(db, token, { now = Date.now(), later } = {}) {
+// refresh:false performs only the existing lookup; callers must recheck expiry after awaited I/O.
+export async function sessionUser(db, token, { now = Date.now(), later, refresh = true } = {}) {
   if (!db) throw new HttpError(500, "server", "Server is missing its database");
   if (!TOKEN.test(String(token))) throw expired();
   const id = await sha256Hex(token);
@@ -134,7 +135,7 @@ export async function sessionUser(db, token, { now = Date.now(), later } = {}) {
   const at = new Date(now);
   const today = at.toISOString().slice(0, 10);
   let expires = row.expires;
-  if (String(row.last_used).slice(0, 10) < today) {
+  if (refresh && String(row.last_used).slice(0, 10) < today) {
     expires = expiresFrom(at);
     // The WHERE repeats the day check, so parallel requests on a new day still write once.
     const refresh = db

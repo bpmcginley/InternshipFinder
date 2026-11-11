@@ -190,3 +190,37 @@ export async function errorsAndClock(db) {
   });
   assert.deepEqual(f.calls(), { posts: 0, gets: 0 });
 }
+
+export async function delayedPriorDayAuthentication(db) {
+  const f = await fixture(db);
+  const previous = new Date(+at - 86400000).toISOString();
+  const expires = new Date(+at + 1000).toISOString();
+  await db.prepare("UPDATE sessions SET last_used=?,expires=?").bind(previous, expires).run();
+  let now = +at;
+  const delayed = {
+    batch: (statements) => db.batch(statements),
+    prepare(sql) {
+      const statement = db.prepare(sql);
+      if (sql !== "SELECT user_hash, tier, provider, last_used, expires FROM sessions WHERE id = ?")
+        return statement;
+      return {
+        bind: (...args) => ({
+          async first() {
+            const row = await statement.bind(...args).first();
+            now = Date.parse(expires) + 1;
+            return row;
+          },
+        }),
+      };
+    },
+  };
+  const response = await f.run(undefined, { db: delayed, clock: () => new Date(now) });
+  assert.deepEqual(
+    await db.prepare("SELECT last_used,expires FROM sessions").first(),
+    { last_used: previous, expires },
+    "checkout authentication must not extend the original session",
+  );
+  await expect(response, 401, { status: "auth" });
+  assert.deepEqual(f.calls(), { posts: 0, gets: 0 });
+  assert.equal((await db.prepare("SELECT count(*) n FROM topup_checkout_attempts").first()).n, 0);
+}
