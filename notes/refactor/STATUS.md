@@ -110,7 +110,7 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 6 | WP-5.1 App modules | Unassigned | - | - | Question | After core and Q2; preserve window.IS consumers. |
 | 6 | WP-5.1 Buy modules | Unassigned | - | - | Question | Last, alone; checkout boundary Q3 and unchanged checkout tests. |
 | 6 | WP-5.3 Shared pure code | Unassigned | - | - | Queued | Preserve profile/scoring/id semantics; package-time copies and staleness check. |
-| 6 | WP-6.1.1 DATA_DIR | Unassigned | - | - | Queued | Single setting; default remains docs/data. |
+| 6 | WP-6.1.1 DATA_DIR | wp14_logging | `refactor/wp-6.1.1-public-data` | [#306](https://github.com/bpmcginley/InternshipFinder/pull/306) | In review | Locate public listing exports with `INTERNSCOUT_PUBLIC_DATA`; default remains `docs/data`. |
 | 6 | WP-6.1.2 Test fixtures | Unassigned | - | - | Queued | Replace verified real-data dependencies with fixed fixtures. |
 | 6 | WP-6.1.3 Reader workflows | Unassigned | - | - | Queued | Separate data checkout with main fallback; preserve triggers and permissions. |
 | 7 | WP-3.6 Jinja templates | Unassigned | - | - | Queued / optional | Only identical golden output; keep f-strings when exactness adds risk. |
@@ -558,6 +558,13 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 - The old facade retains public adapters, the invoking CLI and nine compatibility writes with existing `LISTINGS` identity. Direct builds do not import the facade. The standalone feed fallback still consults canonical `GENERATED` at call time. Placement services load only on placement paths, and pipeline, role index and feeds imports leave them unloaded.
 - CSS and SLOGAN source checks now point at their asset owner with the same assertions. Placement source checks remain on the original literals. No golden input, expected file or manifest changed.
 - Independent repeated-build, CLI and consumer probes matched page order, compatibility timing, all 695 artifacts and the placement report. The editable-install backend and growth suite passed 1,655 checks with three environment skips. Node 22.23.4 passed all 316 site checks, and the installed wheel included all 17 audited owner files. Ruff passed. Targeted Pyright retained ten diagnostics, with two reporting text changes at relocated seams.
+
+## WP-6.1.1 public listing data location
+
+- The default public export is still `docs/data` or the selected site's `data` directory. Set `INTERNSCOUT_PUBLIC_DATA` to select an external listing export, using an absolute path or one relative to the current working directory. Existing explicit CLI output paths, the required `run_ingest --export DIR` operand, and private backend state under `INTERNSCOUT_DATA` retain their previous behavior.
+- The locator covers the site loader, its optional listing-detail sidecars, focus selection, the standalone export CLI, audit and coverage, growth snapshot readers and development benchmarks. Browser URLs and Pages-generated artifacts stay under the site staging root. Digest placement reads still use the generated site placement file or the explicit `--placements` argument.
+- Checked open Product file lists and the exact authored commit scope for #266's inherited overlap. Normal integration preserved all 117 incoming data files from `0285349b`. Workflow and data checkout changes remain with later WP-6.1 steps.
+- Full editable Python suite passed 1,658 tests with three environment skips. Both the default build and a Pages build reading shards and posting details from an external directory matched all 695 Golden artifacts. Offline CLI and filesystem probes covered explicit path precedence, ingest argument parsing, byte-identical startup budget output and the Node benchmark reader. Ruff and JavaScript syntax checks passed.
 
 ## WP-1.4 remaining growth diagnostics
 
