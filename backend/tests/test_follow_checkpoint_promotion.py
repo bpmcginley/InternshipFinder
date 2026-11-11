@@ -33,7 +33,8 @@ def recovery(pending):
         staged = writer.validate_staged_follow_provenance(
             repo, exact_pending.candidate_tree, exact_pending.provenance
         )
-        return writer._bind_published_follow(repo, candidate, observation.commit, staged)
+        receipt = writer._bind_published_follow(repo, candidate, observation.commit, staged)
+        return promotion.BoundFollowAcceptance(candidate, receipt) if receipt is not None else None
 
     def run(cas, *, observation=observed, clock=lambda: observed.observed_at, binder=bind):
         return promotion.recover_and_promote_follow_checkpoint(
@@ -118,15 +119,16 @@ class LocalCheckpoint:
             return "promoted" if result.rowcount == 1 else "stale"
 
 
-def test_crash_reopen_and_retry_keep_original_accepted_clock_and_closed_lineage(recovery, tmp_path):
+def test_lost_ack_replay_keeps_original_accepted_clock_and_closed_lineage(recovery, tmp_path):
     run, bind, accepted, previous, observed, raw, bounds = recovery
     store = LocalCheckpoint(tmp_path / "checkpoint.sqlite", previous, sha256(raw).hexdigest())
     staged_receipt = None
 
     def capture(pending, observation):
         nonlocal staged_receipt
-        staged_receipt = bind(pending, observation)
-        return staged_receipt
+        binding = bind(pending, observation)
+        staged_receipt = binding.receipt
+        return binding
 
     def committed_but_ack_lost(change):
         assert store.cas(change, lambda: observed.observed_at) == "promoted"
@@ -134,7 +136,7 @@ def test_crash_reopen_and_retry_keep_original_accepted_clock_and_closed_lineage(
 
     with pytest.raises(OSError, match="acknowledgement lost"):
         run(committed_but_ack_lost, binder=capture)
-    committed = store.read()  # Opens a new SQLite connection after the simulated crash.
+    committed = store.read()  # Reopen SQLite as a cold reader without the cleared pending record.
     assert committed[:2] == (observed.commit, observed.public_tree)
     assert committed[3] == observed.observed_at.isoformat()
     assert committed[5:] == (None, sha256(raw).hexdigest())
@@ -227,8 +229,12 @@ def test_git_identity_and_post_verification_clock_fail_closed(recovery):
         run(forbidden, observation=replace(observed, public_tree="f" * 40))
 
     def wrong_stage(pending, observation):
-        receipt = bind(pending, observation)
-        return replace(receipt, staged=replace(receipt.staged, candidate_tree="f" * 40))
+        binding = bind(pending, observation)
+        receipt = binding.receipt
+        return replace(
+            binding,
+            receipt=replace(receipt, staged=replace(receipt.staged, candidate_tree="f" * 40)),
+        )
 
     with pytest.raises(ValueError, match="differs from pending proof"):
         run(forbidden, binder=wrong_stage)
@@ -253,3 +259,66 @@ def test_simultaneous_sqlite_promotions_install_once(recovery, tmp_path):
         None,
         change.pending_generation,
     )
+
+
+def test_ambiguous_store_results_raise_without_retry(recovery):
+    run, _, _, _, _, _, _ = recovery
+
+    class StringLike(str):
+        pass
+
+    for result in (
+        None,
+        True,
+        {"status": "promoted"},
+        "unknown",
+        "no_publication",
+        StringLike("promoted"),
+    ):
+        calls = []
+
+        def cas(change):
+            calls.append(change)
+            return result
+
+        with pytest.raises(ValueError, match="ambiguous promotion store result"):
+            run(cas)
+        assert len(calls) == 1
+
+
+def test_same_tree_sibling_bound_to_other_candidate_cannot_promote(recovery, pending):
+    run, _, _, previous, observed, _, _ = recovery
+    repo, writer, _, _, _, _, _ = pending
+    from scripts.follow_checkpoint_promotion import BoundFollowAcceptance
+
+    sibling = (
+        writer.git(
+            repo,
+            "commit-tree",
+            writer.revision(repo, "HEAD^{tree}"),
+            "-p",
+            previous.commit,
+            "-m",
+            "Same-tree sibling",
+        )
+        .stdout.decode()
+        .strip()
+    )
+    observation = replace(observed, commit=sibling)
+
+    def forbidden(_):
+        pytest.fail("sibling cannot promote")
+
+    with pytest.raises(ValueError, match="typed accepted receipt"):
+        run(forbidden, observation=observation)
+
+    def wired_to_sibling(exact_pending, accepted):
+        staged = writer.validate_staged_follow_provenance(
+            repo, exact_pending.candidate_tree, exact_pending.provenance
+        )
+        receipt = writer._bind_published_follow(repo, sibling, accepted.commit, staged)
+        assert receipt is not None
+        return BoundFollowAcceptance(sibling, receipt)
+
+    with pytest.raises(ValueError, match="different pending candidate"):
+        run(forbidden, observation=observation, binder=wired_to_sibling)

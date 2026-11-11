@@ -28,7 +28,8 @@ from scripts.follow_pending_checkpoint import (
 )
 from scripts.ingest_data_writer import _PublishedFollowProvenance, _StagedFollowProvenance
 
-PromotionStatus = Literal["promoted", "already_promoted", "stale", "no_publication"]
+StorePromotionStatus = Literal["promoted", "already_promoted", "stale"]
+PromotionStatus = StorePromotionStatus | Literal["no_publication"]
 
 
 @dataclass(frozen=True)
@@ -38,6 +39,14 @@ class AcceptedFollowObservation:
     commit: str
     public_tree: str
     observed_at: datetime
+
+
+@dataclass(frozen=True)
+class BoundFollowAcceptance:
+    """The exact original candidate used by the trusted #348 binder."""
+
+    candidate_commit: str
+    receipt: _PublishedFollowProvenance
 
 
 @dataclass(frozen=True)
@@ -68,9 +77,9 @@ def recover_and_promote_follow_checkpoint(
     clock: Callable[[], datetime],
     bounds: FollowCheckpointBounds,
     bind_accepted: Callable[
-        [PendingFollowCheckpoint, AcceptedFollowObservation], _PublishedFollowProvenance | None
+        [PendingFollowCheckpoint, AcceptedFollowObservation], BoundFollowAcceptance | None
     ],
-    compare_and_set: Callable[[FollowCheckpointPromotion], PromotionStatus],
+    compare_and_set: Callable[[FollowCheckpointPromotion], StorePromotionStatus],
 ) -> PromotionStatus:
     """Reverify a pending generation and submit one atomic promotion.
 
@@ -79,7 +88,8 @@ def recover_and_promote_follow_checkpoint(
     in its transaction. It checks both old accepted identity and pending generation,
     their lifetimes, installs accepted bytes, and clears exactly that pending. It may
     return already_promoted for the same generation and accepted Git identity, using
-    the original stored acceptance time and payload. Ambiguous store errors propagate.
+    the original stored acceptance time and payload. Store errors propagate and ambiguous
+    results raise without retry.
     """
     if observation is None:
         return "no_publication"
@@ -94,7 +104,12 @@ def recover_and_promote_follow_checkpoint(
     if not pending.prepared_at <= observed <= now or observation.public_tree != pending.public_tree:
         raise _reject("accepted observation differs from pending candidate")
 
-    receipt = bind_accepted(pending, observation)
+    binding = bind_accepted(pending, observation)
+    if not isinstance(binding, BoundFollowAcceptance):
+        raise _reject("exact typed accepted receipt required")
+    if binding.candidate_commit != pending.candidate_commit:
+        raise _reject("accepted binding names a different pending candidate")
+    receipt = binding.receipt
     if (
         not isinstance(receipt, _PublishedFollowProvenance)
         or receipt.commit != observation.commit
@@ -127,4 +142,7 @@ def recover_and_promote_follow_checkpoint(
     )
     if not promotion.live_at(after_proof):
         return "stale"
-    return compare_and_set(promotion)
+    result = compare_and_set(promotion)
+    if type(result) is not str or result not in ("promoted", "already_promoted", "stale"):
+        raise _reject("ambiguous promotion store result")
+    return result
