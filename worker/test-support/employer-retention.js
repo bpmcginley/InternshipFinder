@@ -100,6 +100,21 @@ export async function retentionBoundaries(db) {
     assert.equal(await f.count(), false);
     await db.prepare("DELETE FROM employer_posting_day_caps WHERE day=?").bind(capDay).run();
   }
+  const futureDay = day(new Date(+f.at + DAY));
+  const total = await f.total();
+  await db
+    .prepare("INSERT INTO employer_posting_counts VALUES(?, 'future',1)")
+    .bind(futureDay)
+    .run();
+  assert.equal(await f.count(), false, "a future count without a cap blocks intake");
+  assert.equal(await f.total(), total);
+  const currentCount = await db
+    .prepare("SELECT n FROM employer_posting_counts WHERE day=? AND company='acme'")
+    .bind(today)
+    .first();
+  assert.equal(currentCount.n, total);
+  await db.prepare("DELETE FROM employer_posting_counts WHERE day=?").bind(futureDay).run();
+  assert.equal(await f.count(), true);
   await db.prepare("DELETE FROM employer_posting_day_caps WHERE day=?").bind(today).run();
   assert.equal(await f.count(), false);
   assert.equal(await f.scheduler.cleanup(), false, "history without a cap stays ambiguous");
@@ -214,7 +229,7 @@ export async function measureRetentionReads(db) {
   );
   assert.deepEqual(
     measurements[1].samples,
-    Array.from({ length: 5 }, () => ({ reads: 7, writes: 2 })),
+    Array.from({ length: 5 }, () => ({ reads: 8, writes: 2 })),
     "accepted indexed D1 work",
   );
   return measurements;

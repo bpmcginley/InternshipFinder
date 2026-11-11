@@ -115,7 +115,7 @@ export const ROUTES = Object.freeze([
     "POST",
     "/hit",
     "site-origin",
-    "JSON/text-plain object {p?, r?, u?, m?, c?, t?, e?, s?}; bounded names and tags from visits.js",
+    "JSON/text-plain object {p?, r?, u?, m?, c?, t?, e?, s?}; optional gated organic {e: employer_posting_open, c: canonical key}; maximum 2,000 bytes",
     "204, no body",
   ),
   route(
@@ -144,8 +144,8 @@ export const ROUTES = Object.freeze([
     "GET",
     "/admin/employer-metrics",
     "admin",
-    "Query days?: integer 1..90, default 28",
-    "JSON {start, end_exclusive, days, currency, events, page_views, cash_cohort, campaign_reports_all_time, about}; no-store",
+    "Query days?: integer 1..90, default 28; optional gated organic_after cursor",
+    "JSON {start, end_exclusive, days, currency, events, page_views, cash_cohort, campaign_reports_all_time, about}; optional organic_posting_counts and organic_posting_readiness; no-store",
   ),
   route(
     "POST",
