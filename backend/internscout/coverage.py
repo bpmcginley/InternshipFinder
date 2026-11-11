@@ -25,6 +25,7 @@ import os
 from .classify import SECTOR_FIELDS
 from .config import BASELINE_STATES
 from .geo import PROVINCES, STATE_NAMES
+from .public_data import public_data_dir
 
 CLUSTERS = {
     "Health": ("health", "nursing", "public_health", "clinical_research", "biomedical"),
@@ -258,7 +259,7 @@ def load(path: str) -> list[dict]:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("path", nargs="?", default=os.path.join("docs", "data", "listings"))
+    ap.add_argument("path", nargs="?", default=os.path.join(public_data_dir("docs"), "listings"))
     ap.add_argument("--min", type=int, default=15)
     # Worth running both ways when something is thin: thin here but healthy nationally is a New
     # England employer to seed, thin both ways is a classifier rule or a whole source missing.
