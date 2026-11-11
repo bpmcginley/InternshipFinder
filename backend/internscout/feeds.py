@@ -13,10 +13,12 @@ gets removed), and says where the rest of that page's listings are.
 from __future__ import annotations
 
 import re
+import sys
 from datetime import datetime, timezone
 from email.utils import format_datetime
 from html import escape
 
+from .site import assets
 from .site import feeds as _site_rss
 from .site import source
 from .site.text import safe_url
@@ -28,11 +30,9 @@ ITEMS = 25  # newest roles per feed; readers and bots only look at what is new s
 _BAD_XML = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f￾￿]")
 
 
-def _settings():
-    # The standalone API still consults canonical facade settings at the call site.
-    from . import seo_pages
-
-    return seo_pages
+def _legacy_settings():
+    # Preserve direct overrides on the compatibility facade when a caller already loaded it.
+    return sys.modules.get(f"{__package__}.seo_pages")
 
 
 def _x(text) -> str:
@@ -58,7 +58,7 @@ def rss(
         now,
         state,
         limit,
-        site=_settings().SITE,
+        site=getattr(_legacy_settings(), "SITE", assets.SITE),
         place=source.place,
         pay_text=source.pay_text,
         safe_url=safe_url,
@@ -70,7 +70,7 @@ def rss(
 def write_all(site_dir: str, pages: list[dict], now: datetime | None = None) -> int:
     """feed.xml beside every landing page that lists roles (the hubs have none).
 
-    Dated from the data (seo_pages.GENERATED, set by build), not the clock: lastBuildDate is when a
-    feed's content last changed, and a clock date made every feed a new file on every deploy."""
-    now = now or _settings().GENERATED or datetime.now(timezone.utc)  # was: now = datetime.now(timezone.utc)
+    Prefer the supplied snapshot date, then the last legacy build's date. A standalone call
+    with neither uses the current UTC time."""
+    now = now or getattr(_legacy_settings(), "GENERATED", None) or datetime.now(timezone.utc)
     return _site_rss.write_all(site_dir, pages, now, rss, ITEMS)

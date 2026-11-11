@@ -1,8 +1,12 @@
 """The RSS feed beside each landing page: valid XML whatever a job board sends, newest first, and
 linking straight to the employer's posting."""
 
+import json
+import subprocess
+import sys
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
+from pathlib import Path
 
 from internscout import feeds
 
@@ -65,6 +69,7 @@ def test_a_feed_is_dated_by_its_data_not_the_clock(tmp_path, monkeypatch):
     # lastBuildDate came from the clock, so every deploy rewrote every feed even when nothing changed.
     from internscout import seo_pages
 
+    monkeypatch.setattr(seo_pages, "SITE", "https://legacy.example.test")
     monkeypatch.setattr(seo_pages, "GENERATED", datetime(2026, 9, 23, 10, tzinfo=timezone.utc))
     (tmp_path / "internships" / "x").mkdir(parents=True)
     feeds.write_all(
@@ -72,3 +77,46 @@ def test_a_feed_is_dated_by_its_data_not_the_clock(tmp_path, monkeypatch):
     )
     xml = (tmp_path / "internships" / "x" / "feed.xml").read_text(encoding="utf-8")
     assert "<lastBuildDate>Wed, 23 Sep 2026 10:00:00 +0000</lastBuildDate>" in xml
+    assert "<link>https://legacy.example.test/internships/x/</link>" in xml
+
+
+def test_standalone_defaults_work_with_the_legacy_facade_blocked(tmp_path):
+    script = """
+import json
+from datetime import datetime
+from importlib.abc import MetaPathFinder
+from pathlib import Path
+import sys
+
+class BlockLegacy(MetaPathFinder):
+    def find_spec(self, fullname, path=None, target=None):
+        if fullname == "internscout.seo_pages":
+            raise AssertionError("standalone feed imported the legacy facade")
+
+sys.meta_path.insert(0, BlockLegacy())
+from internscout import feeds
+
+class Clock(datetime):
+    @classmethod
+    def now(cls, tz=None):
+        return cls(2026, 9, 23, 11, tzinfo=tz)
+
+feeds.datetime = Clock
+root = Path(sys.argv[1])
+page = root / "internships/x"
+page.mkdir(parents=True)
+pages = [{"path": "/internships/x/", "h1": "X", "items": [json.loads(sys.argv[2])]}]
+assert feeds.write_all(str(root), pages) == 1
+xml = (page / "feed.xml").read_text(encoding="utf-8")
+assert "<link>https://internscout.org/internships/x/</link>" in xml
+assert "<lastBuildDate>Wed, 23 Sep 2026 11:00:00 +0000</lastBuildDate>" in xml
+assert "internscout.seo_pages" not in sys.modules
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", script, str(tmp_path), json.dumps(_row(1))],
+        cwd=Path(__file__).resolve().parents[1],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stderr
