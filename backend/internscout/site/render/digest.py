@@ -5,12 +5,18 @@ from __future__ import annotations
 from collections.abc import Callable
 from html import escape as esc
 
-from ..digest import Signup, Examples, Page, NewPage
+from ..digest import Signup, Examples, Page, NewPage, digest_archive
 from ..text import join_words, safe_url
 
 
-def render_signup_form(model: Signup | None) -> str:
+def render_signup_form(model: Signup | None, *, advisor: bool = False) -> str:
     if model is None:
+        return ""
+    if advisor and (
+        not isinstance(model.action, str)
+        or model.action != model.action.strip()
+        or not digest_archive(model.action)
+    ):
         return ""
     pitch, field, heading = model.pitch, model.field, model.heading
     what, placement, archive = model.what, model.placement, model.archive
@@ -20,7 +26,21 @@ def render_signup_form(model: Signup | None) -> str:
             f'<label class="check"><input type="checkbox" name="tag" value="{esc(field)}"/> '
             f"Save {esc(model.field_name)} with my subscription, so the email can be matched to it later</label>"
         )
-    goes = "Your address and the field you tick go" if field else "Your address goes"
+    if advisor:
+        box += (
+            '<label class="check"><input type="checkbox" name="tag" value="advisor" '
+            'aria-describedby="digest-advisor-help"/> Subscribe as an advisor</label>'
+            '<p class="fine" id="digest-advisor-help">Add an advisor label to my subscription. '
+            "Everyone gets the same Monday email.</p>"
+        )
+        disclosure = (
+            "Buttondown receives your email address and the labels you choose "
+            "when you submit this form."
+        )
+    else:
+        goes = "Your address and the field you tick go" if field else "Your address goes"
+        disclosure = f"{goes} to Buttondown, which sends the email, not to InternScout's servers."
+    placement_attribute = "" if advisor else f' data-digest-placement="{esc(placement)}"'
     about = (
         (
             "One email on Mondays with the fields that gained the most new roles that week, a few postings "
@@ -32,7 +52,7 @@ def render_signup_form(model: Signup | None) -> str:
     lead = " ".join(p for p in (pitch, about) if p)
     return (
         f'<form class="digest" action="{esc(model.action)}" method="post" target="_blank" rel="noopener" '
-        f'aria-labelledby="digest-title" data-digest-placement="{esc(placement)}">'
+        f'aria-labelledby="digest-title"{placement_attribute}>'
         f'<h2 id="digest-title">{esc(heading)}</h2>'
         + (f"<p>{lead}</p>" if lead else "")
         + box
@@ -42,8 +62,8 @@ def render_signup_form(model: Signup | None) -> str:
         # In every one of Buttondown's sample forms; its docs don't say what it does, so it stays.
         '<input type="hidden" name="embed" value="1"/>'
         "<p class=\"fine\">Buttondown opens in a new tab to finish. You'll get a confirmation email first, and "
-        f"nothing else arrives until you click its link. Unsubscribe any time. {goes} to Buttondown, which "
-        "sends the email, not to InternScout's servers. <a href=\"/privacy#digest\">Details</a>"
+        f"nothing else arrives until you click its link. Unsubscribe any time. {disclosure} "
+        '<a href="/privacy#digest">Details</a>'
         + (
             f' · <a href="{esc(archive)}" target="_blank" rel="noopener">Browse past emails</a>'
             if archive

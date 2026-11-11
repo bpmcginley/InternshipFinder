@@ -5,7 +5,7 @@ from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
-from internscout import seo_pages as sp
+from internscout.site import runtime as sp
 
 PAID_PARAGRAPH = (
     '<p>Promote an eligible open role in a clearly labeled paid listing. '
