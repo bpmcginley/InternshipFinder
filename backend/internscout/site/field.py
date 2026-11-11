@@ -19,6 +19,7 @@ class Context:
     root: tuple[str, str]
     now: datetime
     updated: str
+    export_stamp: datetime | None = None
 
 
 @dataclass(frozen=True)
