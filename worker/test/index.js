@@ -35,3 +35,4 @@ import "./employer-revenue-cron.test.js";
 import "./settlement-race.test.js";
 // Route documentation and client completeness are checked without changing runtime routing.
 import "./api-contract.test.js";
+import "./session-copy-fence.test.js";
