@@ -62,7 +62,7 @@ def test_first_screen_uses_current_counts_and_preserves_field_routes(fields, emp
     assert readme.count(USAGE) == 1 and USAGE in opening
     assert len(readme.encode()) < eml.README_BUDGET
     for field in fields:
-        slug = eml.sp.field_slug(field)
+        slug = eml.site_taxonomy.field_slug(field)
         assert contents.count(f"[fields/{slug}.md](fields/{slug}.md)") == 1
         assert f"[One page with all of them](fields/{slug}.md)" in contents
         assert f"](https://internscout.org/?field={field})" in contents
