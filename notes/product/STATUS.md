@@ -73,6 +73,7 @@ Queued means not started, not approved for release. A dash means no branch or PR
 
 | Wave | Package | Owner | Branch | PR | State | Next step / Bruce gate |
 |---|---|---|---|---|---|---|
+| D | P-2.1ac Bounded delivery tick | audit_growth_generated | `codex/product-p2.1ac-delivery-tick` | [#361](https://github.com/bpmcginley/InternshipFinder/pull/361) | Draft; review/CI pending; needs-bruce | Bounded advisory lookup and sequential UTC-fenced delivery; normal npm test 482 / Workers 102 pass. Five candidate reads at 10,000 synthetic jobs. No cleanup/schedule/activation. |
 | D | P-2.1aa Digest delivery attempt | audit_growth_generated | `codex/product-p2.1aa-digest-delivery` | [#357](https://github.com/bpmcginley/InternshipFinder/pull/357) | Draft; review/CI pending; needs-bruce | Dormant composition; local 473 Node / 92 Workers pass. SQLite UTC plus fresh Worker deadlines; trusted presentation and consent and injected transport. No sending activation. |
 | D | P-2.1u Archive-qualified follow enqueue | Product session | `codex/product-p2.1u-qualified-enqueue` | [#341](https://github.com/bpmcginley/InternshipFinder/pull/341) | Draft needs-bruce | Dormant single-subscriber composition on #330. Uses verified archive coverage, fresh Worker time and a D1 write-time cutoff. No scheduler or sender. |
 | D | P-2.1s Worker archive reader | audit_site | `codex/product-p2.1s-archive-reader` | [#330](https://github.com/bpmcginley/InternshipFinder/pull/330) | Implemented; draft needs-bruce | Exact #310 base, #327 canonical archive contract; 17 focused Node / 2 actual local Workers tests and 449 Node suite pass. Independent review and fresh CI pending; no route/scheduler/provider/publication. |
@@ -227,6 +228,7 @@ Dates are when the item was recorded, not a claim that a separate message was se
 
 | Recorded | Item | Ready artifact / next action | Done |
 |---|---|---|---|
+| 2026-11-11 | [P-2.1ac / #361](https://github.com/bpmcginley/InternshipFinder/pull/361) bounded delivery tick | Dormant internal operation; explicit limits, independent review/CI and all owner sender/integration gates remain. No durable cursor or cleanup. | Needs-bruce; no activation |
 | 2026-11-11 | [P-2.1aa / #357](https://github.com/bpmcginley/InternshipFinder/pull/357) digest delivery attempt | One dormant internal helper; independent review/CI and all sender/operator gates remain. Trusted presentation must authorize subscriber links; no live transport. | Needs-bruce; no activation |
 | 2026-11-10 | P-2.1o budgeted digest attempt | [#310](https://github.com/bpmcginley/InternshipFinder/pull/310) composes the dormant strict digest claim and shared budget. Parent integration, owner cap and quota, dispatch wiring and deployment remain pending. | Draft needs-bruce, no sending activation |
 | 2026-11-10 | P-2.1n shared follow send budget | [#302](https://github.com/bpmcginley/InternshipFinder/pull/302) adds a dormant UTC-day attempt budget with no configured default. Owner quota verification, cap and existing order-mail reserve, parent integration and deployment remain pending. | Draft needs-bruce, no sending activation |
