@@ -1,5 +1,6 @@
 // InternScout API Worker: sign-in check and sessions, the Gemini proxy with caps, area demand and the
 // saved Deep Dive. Contract: API.md.
+import { ROUTES } from "./api-contract.js";
 import { CONFIG } from "./config.js";
 import { HttpError, json, sameSecret } from "./http.js";
 import { authenticateUser, bearerOf, providers, userHash, verifyIdToken } from "./auth.js";
@@ -94,6 +95,143 @@ async function readJson(request, maxBytes, optional = false) {
 const allowanceTable = (config, fn) =>
   Object.fromEntries(Object.entries(config.TASKS).map(([task, c]) => [task, fn(task, c)]));
 
+/**
+ * @typedef {object} SafeRouteContext
+ * @property {Request} request
+ * @property {Parameters<typeof route>[1]} env
+ * @property {Parameters<typeof route>[1]["DB"]} db
+ * @property {Date} now
+ * @property {Parameters<typeof route>[2]} ctx
+ * @property {Parameters<typeof route>[3]} d
+ * @property {() => Promise<string>} signIn
+ */
+/** @typedef {(context: SafeRouteContext) => Promise<Response>} SafeRouteHandler */
+
+// These wrappers preserve each selected route's gate, authentication and parsing order.
+/**
+ * @param {(context: SafeRouteContext, user: string) => Promise<Response>} handler
+ * @returns {SafeRouteHandler}
+ */
+const withUser = (handler) => async (context) => handler(context, await context.signIn());
+/**
+ * @param {(context: SafeRouteContext, user: string) => Promise<Response>} handler
+ * @returns {SafeRouteHandler}
+ */
+const withSyncUser = (handler) => async (context) => {
+  requireSync(context.env);
+  return handler(context, await context.signIn());
+};
+/**
+ * @param {SafeRouteHandler} handler
+ * @returns {SafeRouteHandler}
+ */
+const withAdmin = (handler) => async (context) => {
+  await requireAdmin(context.request, context.env);
+  return handler(context);
+};
+
+/** @type {Record<string, SafeRouteHandler>} */
+const safeRouteHandlers = {
+  // Stay signed in: trade a fresh provider ID token for a long-lived session token (session.js).
+  // Only an ID token can start a session, so a stolen session token cannot make more of itself.
+  "POST /session": async ({ request, env, db, now, ctx, d }) => {
+    const token = bearerOf(request);
+    if (!token || isSessionToken(token)) throw new HttpError(401, "auth", "Sign in with Google or Microsoft first");
+    const { provider, claims, tier } = await verifyIdToken(token, env, { fetch: d.fetch, now: now.getTime() });
+    const user = await userHash(provider, claims, env);
+    const { token: session, expires } = await createSession(db, { user, tier, provider }, now);
+    // A sign-in from the extension, the step between the store click and a first Auto-Apply that
+    // nothing counted before (2026-10-04). Counts sign-ins, not accounts; new_account counts those.
+    if (clientOf(request) === "extension") later(ctx, countEvent(db, now.toISOString(), "ext_signin", "extension"));
+    // The email is echoed for the client to show ("Signed in as ..."); it is not stored.
+    const email = claims.email || claims.preferred_username || null;
+    return json({ session, account: user.slice(0, 16), email, provider, tier, expires });
+  },
+
+  // Is this session token live, and whose is it (2026-10-14, U8)? Only a session token: an ID token is
+  // 401, since it already says all this about itself. Used by the extension to check the sign-in the
+  // dashboard offers it. Answers { account, provider, tier, expires, copyable }; no email (not stored).
+  "GET /session": async ({ request, db, now, ctx }) => {
+    const token = bearerOf(request);
+    if (!token || !isSessionToken(token)) throw new HttpError(401, "auth", "Send a session token");
+    return json(await sessionInfo(db, token, { now: now.getTime(), later: (p) => later(ctx, p) }));
+  },
+
+  // A separate session for the same account, from a session token (2026-10-14): the extension takes over
+  // the dashboard's sign-in with it, so signing out of one leaves the other signed in. Once per session,
+  // never from a copy (session.js copySession). Same reply as POST /session, without the email.
+  "POST /session/copy": async ({ request, db, now }) => {
+    const token = bearerOf(request);
+    if (!token || !isSessionToken(token)) throw new HttpError(401, "auth", "Send a session token");
+    return json(await copySession(db, token, { now: now.getTime() }));
+  },
+
+  "DELETE /session": async ({ request, db }) => {
+    await endSession(db, bearerOf(request));
+    return json({ ok: true });
+  },
+
+  // The saved Deep Dive (profile.js). All three answer 503 sync_off until PROFILE_KEY is set.
+  "GET /profile": withSyncUser(async ({ db, env }, user) => {
+    return json(await getProfile(db, env, user));
+  }),
+
+  "PUT /profile": withSyncUser(async ({ request, db, env, now }, user) => {
+    const { body } = await readJson(request, MAX_PROFILE_BYTES);
+    return json(await putProfile(db, env, user, body, now.getTime()));
+  }),
+
+  "DELETE /profile": withSyncUser(async ({ db }, user) => {
+    await deleteProfile(db, user);
+    return json({ ok: true });
+  }),
+
+  "POST /demand": withUser(async ({ request, db, now }, user) => {
+    const { body } = await readJson(request, 10_000);
+    await setDemand(db, user, cleanStates(body), now);
+    return json({ ok: true });
+  }),
+
+  // One page load on the site (docs/js/count.js, sent with sendBeacon): adds one to the day's exact
+  // visit totals (visits.js). No sign-in, nothing about the visitor kept.
+  "POST /hit": async ({ request, db, now }) => {
+    const { body } = await readJson(request, 2_000);
+    await countHit(db, request, body, now);
+    return new Response(null, { status: 204 });
+  },
+
+  // The interest form on /employers/ (leads.js, added 2026-10-13): no sign-in, the site's Origin only,
+  // a honeypot, and a per-address daily limit. Stores the lead for Bruce to read; takes no payment.
+  "POST /employer-interest": async ({ request, db, env, now, ctx }) => {
+    const { body } = await readJson(request, MAX_LEAD_BYTES);
+    return json(await takeLead(db, request, env, body, now, (p) => later(ctx, p)));
+  },
+
+  "GET /admin/leads": withAdmin(async ({ db }) => {
+    return json(await listLeads(db));
+  }),
+
+  // 2026-10-23: aggregate employer funnel for the owner's terminal. Revert: remove this route.
+  "GET /admin/employer-metrics": withAdmin(async ({ request, db, now }) => {
+    return json(await employerMetrics(db, Number(new URL(request.url).searchParams.get("days") || 28), now),
+      200, { "Cache-Control": "no-store" });
+  }),
+
+  "GET /demand": async ({ request, env, db, d, now }) => {
+    const token = (request.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
+    if (!env.DEMAND_TOKEN || !token || !(await sameSecret(token, env.DEMAND_TOKEN))) {
+      throw new HttpError(401, "auth", "CI token required");
+    }
+    return json(await demandCounts(db, d.config, now));
+  },
+};
+
+// The API contract supplies the dispatch keys. Descriptive auth and gate text stays documentation.
+const safeRoutes = new Map(ROUTES.flatMap(({ method, path }) => {
+  const key = `${method} ${path}`;
+  return Object.hasOwn(safeRouteHandlers, key) ? [[key, safeRouteHandlers[key]]] : [];
+}));
+
 async function route(request, env, ctx, d) {
   const url = new URL(request.url);
   const path = url.pathname.replace(/\/+$/, "") || "/";
@@ -108,7 +246,11 @@ async function route(request, env, ctx, d) {
     { fetch: d.fetch, now: now.getTime(), later: (p) => later(ctx, p) })).user;
   const limits = (tier, plan = "free") => allowanceTable(d.config, (task) => allowanceFor(d.config, env, task, tier, plan, now));
 
-  switch (`${request.method} ${path}`) {
+  const key = `${request.method} ${path}`;
+  const safeHandler = safeRoutes.get(key);
+  if (safeHandler) return safeHandler({ request, env, db, now, ctx, d, signIn });
+
+  switch (key) {
     case "GET /config": {
       return json({
         providers: providers(env).map((p) => ({ ...p, scopes: d.config.SCOPES })),
@@ -162,66 +304,6 @@ async function route(request, env, ctx, d) {
           return limit != null && extra[task] ? { ...out, bonus: extra[task] } : out;
         }),
       });
-    }
-
-    // Stay signed in: trade a fresh provider ID token for a long-lived session token (session.js).
-    // Only an ID token can start a session, so a stolen session token cannot make more of itself.
-    case "POST /session": {
-      const token = bearerOf(request);
-      if (!token || isSessionToken(token)) throw new HttpError(401, "auth", "Sign in with Google or Microsoft first");
-      const { provider, claims, tier } = await verifyIdToken(token, env, { fetch: d.fetch, now: now.getTime() });
-      const user = await userHash(provider, claims, env);
-      const { token: session, expires } = await createSession(db, { user, tier, provider }, now);
-      // A sign-in from the extension, the step between the store click and a first Auto-Apply that
-      // nothing counted before (2026-10-04). Counts sign-ins, not accounts; new_account counts those.
-      if (clientOf(request) === "extension") later(ctx, countEvent(db, now.toISOString(), "ext_signin", "extension"));
-      // The email is echoed for the client to show ("Signed in as ..."); it is not stored.
-      const email = claims.email || claims.preferred_username || null;
-      return json({ session, account: user.slice(0, 16), email, provider, tier, expires });
-    }
-
-    // Is this session token live, and whose is it (2026-10-14, U8)? Only a session token: an ID token is
-    // 401, since it already says all this about itself. Used by the extension to check the sign-in the
-    // dashboard offers it. Answers { account, provider, tier, expires, copyable }; no email (not stored).
-    case "GET /session": {
-      const token = bearerOf(request);
-      if (!token || !isSessionToken(token)) throw new HttpError(401, "auth", "Send a session token");
-      return json(await sessionInfo(db, token, { now: now.getTime(), later: (p) => later(ctx, p) }));
-    }
-
-    // A separate session for the same account, from a session token (2026-10-14): the extension takes over
-    // the dashboard's sign-in with it, so signing out of one leaves the other signed in. Once per session,
-    // never from a copy (session.js copySession). Same reply as POST /session, without the email.
-    case "POST /session/copy": {
-      const token = bearerOf(request);
-      if (!token || !isSessionToken(token)) throw new HttpError(401, "auth", "Send a session token");
-      return json(await copySession(db, token, { now: now.getTime() }));
-    }
-
-    case "DELETE /session": {
-      await endSession(db, bearerOf(request));
-      return json({ ok: true });
-    }
-
-    // The saved Deep Dive (profile.js). All three answer 503 sync_off until PROFILE_KEY is set.
-    case "GET /profile": {
-      requireSync(env);
-      const user = await signIn();
-      return json(await getProfile(db, env, user));
-    }
-
-    case "PUT /profile": {
-      requireSync(env);
-      const user = await signIn();
-      const { body } = await readJson(request, MAX_PROFILE_BYTES);
-      return json(await putProfile(db, env, user, body, now.getTime()));
-    }
-
-    case "DELETE /profile": {
-      requireSync(env);
-      const user = await signIn();
-      await deleteProfile(db, user);
-      return json({ ok: true });
     }
 
     case "DELETE /me": {
@@ -325,28 +407,6 @@ async function route(request, env, ctx, d) {
       return json(await claim(db, d.config, user, who.tier, body.code, now));
     }
 
-    case "POST /demand": {
-      const user = await signIn();
-      const { body } = await readJson(request, 10_000);
-      await setDemand(db, user, cleanStates(body), now);
-      return json({ ok: true });
-    }
-
-    // One page load on the site (docs/js/count.js, sent with sendBeacon): adds one to the day's exact
-    // visit totals (visits.js). No sign-in, nothing about the visitor kept.
-    case "POST /hit": {
-      const { body } = await readJson(request, 2_000);
-      await countHit(db, request, body, now);
-      return new Response(null, { status: 204 });
-    }
-
-    // The interest form on /employers/ (leads.js, added 2026-10-13): no sign-in, the site's Origin only,
-    // a honeypot, and a per-address daily limit. Stores the lead for Bruce to read; takes no payment.
-    case "POST /employer-interest": {
-      const { body } = await readJson(request, MAX_LEAD_BYTES);
-      return json(await takeLead(db, request, env, body, now, (p) => later(ctx, p)));
-    }
-
     // Paid listings (placements.js, added 2026-10-14). The public read is for the site build, once per
     // deploy; visitors never call it. Payment never changes a score, order, filter or count.
     case "GET /placements": {
@@ -358,18 +418,6 @@ async function route(request, env, ctx, d) {
     case "GET /admin/placements": {
       await requireAdmin(request, env);
       return json(await listPlacements(db));
-    }
-
-    case "GET /admin/leads": {
-      await requireAdmin(request, env);
-      return json(await listLeads(db));
-    }
-
-    // 2026-10-23: aggregate employer funnel for the owner's terminal. Revert: remove this route.
-    case "GET /admin/employer-metrics": {
-      await requireAdmin(request, env);
-      return json(await employerMetrics(db, Number(new URL(request.url).searchParams.get("days") || 28), now),
-        200, { "Cache-Control": "no-store" });
     }
 
     // The employer report (S9): one placement, one ended month, rounded counts only (placements.js).
@@ -466,13 +514,6 @@ async function route(request, env, ctx, d) {
       return json(await createPilotCode(db, body, now));
     }
 
-    case "GET /demand": {
-      const token = (request.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
-      if (!env.DEMAND_TOKEN || !token || !(await sameSecret(token, env.DEMAND_TOKEN))) {
-        throw new HttpError(401, "auth", "CI token required");
-      }
-      return json(await demandCounts(db, d.config, now));
-    }
   }
   throw new HttpError(404, "not_found", "No such endpoint");
 }
