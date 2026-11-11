@@ -86,7 +86,7 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 4 | WP-4.2 Orders split, admin and pilot | wp42_orders | `refactor/wp-4.2-orders-admin-pilot` | [#219](https://github.com/bpmcginley/InternshipFinder/pull/219) | Merged | Merged as `c2eb44e6`. Pages 42922537506 and backend verified. Worker deployment remains with Bruce. |
 | 4 | WP-4.2 Orders split, field capacity | wp42_orders | `refactor/wp-4.2-orders-capacity` | [#231](https://github.com/bpmcginley/InternshipFinder/pull/231) | Merged | `fef33968`. Pages 42936798140 and backend verified. Field-capacity file move with exact SQL and all 39 facade exports preserved. |
 | 4 | WP-4.2 Orders split, remaining seams and tests | wp42_orders | `refactor/wp-4.2-orders-delivery` | [#239](https://github.com/bpmcginley/InternshipFinder/pull/239) | Merged | `4c78a8a2`. Pages 42937600170 and backend verified. Preserved all 39 facade exports and the registration order and assertions of all 43 order test cases. |
-| 5 | WP-3.1 Constants/helpers | Unassigned | - | - | Queued | One seo_pages owner; unchanged golden manifest. |
+| 5 | WP-3.1 Constants/helpers | wp21_inventory | `refactor/wp-3.1-site-helpers` | [#252](https://github.com/bpmcginley/InternshipFinder/pull/252) | In review | Move exact pure helpers and immutable thresholds into the installed site package with legacy re-exports. |
 | 5 | WP-3.2 Sitemap/feeds/llms | Unassigned | - | - | Queued | After WP-3.1; unchanged golden manifest. |
 | 5 | WP-3.3 Near family | Unassigned | - | - | Queued | Serial family PR; data/render split without output changes. |
 | 5 | WP-3.3 Employer family | Unassigned | - | - | Queued | Serial family PR; unchanged golden manifest. |
@@ -448,6 +448,13 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 - Existing tests patch legacy settings and entry functions; they also derive paths from physical `seo_pages.__file__`, mutate its exact SLOGAN assignment, and extract its literal CSS block. Keep these contracts meaningful and unchanged until deliberately redirected to actual new source locations. Preserve actual module CLI execution and its documented `__main__` versus canonical-module behavior.
 - Deferred-import count is not a cycle count: the measured direct back-edge pairs are seo_pages/feeds and seo_pages/role_index. External static importers measured four backend and eight growth modules; additional mentions include comments. Verify each actual caller rather than relying on the hand-off's broader counts.
 - When introducing site/render subpackages, update PR #199's explicit setuptools declarations and inspect built wheel members; editable imports alone can hide omitted packages. Golden fixtures must remain unchanged for these refactor extractions.
+
+## WP-3.1 site constants and helpers
+
+- Wave 4 checkpoint Pages 42940952578 and the exact backend deployment succeeded for `067a0337`. Rechecked all open Product file claims before starting. The SEO source, relevant tests and packaging metadata were free.
+- Moved the eight audited leaves and the adjacent `near_same` predicate with its immutable threshold block. All nine helper definitions, eight immutable thresholds and the rule block comments match their original source. The remaining `seo_pages.py` bytes and syntax tree match after excluding these ranges and the explicit re-exports. SLOGAN, CSS, runtime module state, path handling, renderer, CLI and orchestrator stay in the facade.
+- Added `internscout.site` to the explicit package list. Built and installed a wheel into an isolated target and imported it from outside the checkout. All three package files were present and all 17 old names resolve to the same objects.
+- 281 focused SEO, feeds, role index, near-page, growth caller and golden tests passed with network denied. Both golden checks passed, with all 695 output hashes and fixture files unchanged. Ruff passed, and targeted Pyright matched the 12 existing SEO diagnostics with none in the new helpers.
 
 ## WP-1.4 growth asset logging
 
