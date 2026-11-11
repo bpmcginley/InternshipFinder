@@ -201,6 +201,7 @@ Dates are when the item was recorded, not a claim that a separate message was se
 
 | Recorded | Item | Ready artifact / next action | Done |
 |---|---|---|---|
+| 2026-11-10 | P-2.2m top-up deletion Worker merge | [PR #303](https://github.com/bpmcginley/InternshipFinder/pull/303), stacked on frozen #299. Owner merge after independent review/CI; migration0015 and legacy hook add no retained fields. #297, future route pending response, migration adoption and deployment remain required; no activation. | - |
 | 2026-11-10 | P-2.2l session-fenced reservation Worker merge | [PR #299](https://github.com/bpmcginley/InternshipFinder/pull/299), stacked on frozen #293. Owner merge after independent review/CI. #297 session-copy fix, atomic deletion, route/client integration, configuration and deployment remain required; no activation. | - |
 | 2026-11-10 | P-2.2j authoritative expiry worker merge | [PR #293](https://github.com/bpmcginley/InternshipFinder/pull/293), stacked on frozen #289. Owner merge after independent review/CI; exact-evidence local expiry only. Production deletion/auth reservation fencing, recovery routes, cleanup and activation remain separate. | - |
 | 2026-11-10 | P-2.2i atomic first-settlement worker merge | [PR #289](https://github.com/bpmcginley/InternshipFinder/pull/289), stacked on frozen #283. Policy approved; owner merge after independent review/CI. Dormant local-D1 settlement only. Production deletion fencing, expiry/recovery/webhook routes, retention cleanup and activation remain separate prerequisites. | - |

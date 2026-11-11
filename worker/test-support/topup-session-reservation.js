@@ -110,7 +110,13 @@ export async function sessionReservationDeletionRace(db) {
         return db.batch(statements);
       },
     };
-    assert.deepEqual(await reserve(guarded, user, source.token, cap, clock), refused);
+    if (hasAttempt) {
+      // P-2.2m now blocks account deletion once reservation has committed. Sign-out
+      // remains independently valid, and must still fence a stale reservation request.
+      await assert.rejects(deleteUser(db, user, now), /topup_payment_pending/);
+      await forgetSessions(db, user).run();
+      assert.deepEqual(await reserve(db, user, source.token, cap, clock), refused);
+    } else assert.deepEqual(await reserve(guarded, user, source.token, cap, clock), refused);
     assert.equal(cap.calls.length, 0);
     assert.equal((await rows(db)).length, Number(hasAttempt));
     const fresh = await start(db);
