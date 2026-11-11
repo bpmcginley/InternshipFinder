@@ -703,6 +703,16 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 - Standalone feeds snapshot the canonical site URL and configured build date on first use, as the legacy import did. When no date is available, they use the current UTC time. An already-loaded legacy facade still supplies its current URL and last build date, so direct overrides and callers that omit the date after a legacy build still work. If standalone RSS captured the defaults first, a later canonical facade import initializes from that same snapshot. The legacy CLI continues passing its build date explicitly.
 - A fresh subprocess generated a feed with the legacy facade blocked. The offline legacy CLI comparison matched 815 files, including 75 feeds, and console output. All 161 focused tests passed, including the standalone Pages publisher and Golden build. Product's publisher, renderers and Golden fixtures are outside this slice.
 
+## WP-6.2 central SEO, employer and listing tests
+
+- After the discovery fixture move merged as `fff8c84d`, the three suites use canonical build state, publisher writes and CLI, with explicit near, indexing and placement clock settings. Test order, parametrization and assertions are preserved. The shared pay fixture and placement and tracker donor exports remain available to their existing callers.
+- Offline comparisons matched the bytes, ordered writes and console output for three legacy and canonical placement cases. The retained placement report and console tests continue to cover the legacy CLI. On the merged discovery baseline, all 148 migrated tests and both 836-artifact Golden checks passed with the facade and sockets blocked. The three retained CLI tests passed with sockets blocked.
+
+## WP-6.2 facade removal rehearsal
+
+- A disposable copy of `ca660a4a` composed the reviewed test and screenshot slices with the feed and root-fixture changes and physically removed `seo_pages.py`. The executable-reference audit found no live import or command. All three synthetic screenshot preparations and both 836-artifact Golden checks passed with external network calls denied.
+- The full backend and growth run passed 1,870 tests and 11 subtests with eight skips. Five editable provenance tests initially resolved a different checkout. A real offline editable install of the disposable copy with pinned setuptools 84.2.1 then passed all nine packaging tests, including those five. Across both runs, 1,875 distinct tests passed. The facade remains in the repository pending the prerequisite migrations.
+
 ## WP-5.1 Buy retention before activation
 
 - Product released the publication allowlist and Golden pair after [#410](https://github.com/bpmcginley/InternshipFinder/pull/410) published as `b3b3d049` through [Pages 43084811385](https://github.com/bpmcginley/InternshipFinder/actions/runs/43084811385). The exact deployment succeeded and all 4,980 public files matched. The retention package starts from `f73efa65` after [#411](https://github.com/bpmcginley/InternshipFinder/pull/411) and reserves only the three Buy module names and their immutable generation paths.
