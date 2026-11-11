@@ -74,6 +74,7 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 4 | WP-1.4 Growth asset logging | wp14_logging | `refactor/wp-1.4-logging-growth-assets` | [#234](https://github.com/bpmcginley/InternshipFinder/pull/234) | In review | Human flyer and campaign diagnostics only. Default output and artifacts are preserved. |
 | 4 | WP-1.4 Growth generator summaries | wp14_logging | `refactor/wp-1.4-logging-growth-cli` | [#238](https://github.com/bpmcginley/InternshipFinder/pull/238) | In review | Every Major and title discovery success summaries only. |
 | 4 | WP-1.4 Growth preview status logging | wp14_logging | `refactor/wp-1.4-logging-growth-status` | [#240](https://github.com/bpmcginley/InternshipFinder/pull/240) | In review | Eight preflight or local-render summaries. Provider and payload paths remain separate. |
+| 4 | WP-1.4 Sparse workflow logging | wp42_orders | `refactor/wp-1.4-logging-sparse` | [#242](https://github.com/bpmcginley/InternshipFinder/pull/242) | In review | IndexNow and Keep schedule diagnostics. Four sparse jobs include the shared standard-library logger. |
 | 4 | WP-2.1 Vocabulary inventory | wp21_inventory | `refactor/wp-2.1-vocab-inventory` | [#215](https://github.com/bpmcginley/InternshipFinder/pull/215) | Merged | [Source inventory](vocab-inventory.md) records shared values and consumer-specific projections. Pages 42917833199 and backend verified. Q4 gates DC label normalization. |
 | 4 | WP-2.4 Config: growth and extension | Lead | `refactor/wp-2.4-public-config` | [#218](https://github.com/bpmcginley/InternshipFinder/pull/218) | Merged | Merged as `cb0f5f98`. One public Worker origin. Regenerate with `python scripts/generate_public_config.py`. The growth suite checks both generated copies. |
 | 4 | WP-2.4 Config: Worker | Lead | `refactor/wp-2.4-worker-config` | [#223](https://github.com/bpmcginley/InternshipFinder/pull/223) | Merged | Merged as `e3822e4f`. Pages 42934103714 and backend verified. The generated Worker module supplies orders and the placement CLI. Both environment overrides remain evaluated at call time. |
@@ -285,6 +286,12 @@ Full reads completed: `AGENTS.md`, `CONTRIBUTING.md`, `README.md`, all of `backe
 ## Next update
 
 Continue Wave 4 with the vocabulary inventory, logging, public config and orders split. Serialize merges with the product lead and verify Pages after publishing merges.
+
+## WP-1.4 sparse workflow diagnostics
+
+- Move IndexNow human counts and submission summaries plus Keep schedule and guard diagnostics to the shared console. Plain output stays byte-identical. JSON omits a local sitemap path and arbitrary guard names, and exception records contain only the existing class name. IndexNow usage, the raw Actions error annotation and the catch-up output file's bare skip key are preserved.
+- Four existing sparse checkout steps add only `backend/internscout`. Reverse comparison reproduced the exact baseline workflows, including actions, events, schedules, permissions and parameters. Parsed helper functions outside each CLI main match the original, including dispatch and submission request code.
+- Focused offline tests passed 32 cases. Golden matched all 695 files and Ruff passed. A separate Git sparse checkout exercised the notify and guard shape and the Keep schedule shape with Python's site packages disabled and network blocked. The test uses local time-zone data files on Windows for the existing zoneinfo dependency. Keep schedule requests used a local fake transport.
 
 ## WP-0.6 validation and coordination
 
