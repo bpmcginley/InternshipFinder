@@ -50,6 +50,8 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: main             # after an ingest run: the commit that run just pushed
+          fetch-depth: 0
+          filter: blob:none
 
       - uses: ./.github/actions/python
 
@@ -85,9 +87,12 @@ jobs:
             echo '{"placements":[]}' > placements.json
           fi
 
+      - name: Install the link preview renderer
+        run: python -m pip install -r scripts/share-card-requirements.txt
+
       - name: Build the site and its landing pages
         id: pages
-        # seo_pages uses only the standard library, so nothing is installed.
+        # The share-card entry point builds pages and their local link previews together.
         # A malformed listing is skipped and counted inside the build, so bad data no longer stops a
         # deploy. Anything else that breaks here fails the run and deploys nothing, which leaves the
         # last good site live, landing pages and all.
@@ -110,7 +115,7 @@ jobs:
           rm -f _site/CNAME        # the custom domain lives in the Pages settings for an Actions deploy
           # --placements-report (2026-10-14): what this build kept and dropped, for the next step. Written
           # outside _site, so it is never published.
-          (cd backend && INTERNSCOUT_PUBLIC_DATA="$GITHUB_WORKSPACE/_site/data" python -m internscout.seo_pages ../_site ../live-sitemap.xml ../live-noindex.txt --placements ../placements.json --placements-report ../placements-report.json)
+          (cd backend && INTERNSCOUT_PUBLIC_DATA="$GITHUB_WORKSPACE/_site/data" PYTHONPATH="..:." python -m scripts.make_og_image --site ../_site ../live-sitemap.xml ../live-noindex.txt --placements ../placements.json --placements-report ../placements-report.json)
           # 2026-10-23: fail before publishing missing links/canonicals or directory redirects.
           (cd backend && python -m internscout.site_links ../_site)
           # For the notify job: what was live before this deploy, and what this deploy publishes.
@@ -135,7 +140,7 @@ jobs:
 
       - name: Stamp local script and stylesheet content versions
         working-directory: backend
-        run: python -m internscout.asset_versions ../_site
+        run: python -m internscout.asset_versions ../_site --retain-core-git ..
 
       - name: Check public site contents before publishing
         run: |

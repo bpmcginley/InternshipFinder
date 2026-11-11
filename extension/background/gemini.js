@@ -215,6 +215,12 @@ export function workerError(status, data = {}) {
             : "bad_request");
   let msg,
     offer = null;
+  // The cap code/reset/offer are shared by monthly, per-run and spend limits. Only this
+  // exact Worker response identifies the allowance (including a disabled zero limit).
+  const allowanceLimited =
+    code === "cap" &&
+    data.task === "autofill" &&
+    data.message === "Monthly autofill allowance is used up";
   if (code === "auth") msg = `${SIGN_IN_HINT} to use AI features, then try again.`;
   else if (code === "cap") {
     const label =
@@ -254,6 +260,13 @@ export function workerError(status, data = {}) {
     msg = data.resets
       ? `You've used this month's free ${label} allowance.${resets}${edu}${more}${OWN_KEY_HINT.replace(/^or /, "")}.`
       : `This run hit its AI call limit${data.message ? ` (${data.message})` : ""}. Finish it by hand, ${OWN_KEY_HINT}.`;
+    if (allowanceLimited)
+      msg =
+        "Auto-Apply cannot start another run with this account's current allowance. Open the dashboard to check your allowance and available options, or finish this application by hand.";
+    else if (data.message === "This run reached its call limit")
+      msg = `This run reached its AI call limit. Finish it by hand, ${OWN_KEY_HINT}.`;
+    else if (data.message === "This account reached its monthly AI ceiling")
+      msg = `This account reached its monthly AI spending limit. Finish this application by hand, ${OWN_KEY_HINT}.`;
   } else if (code === "rate")
     msg = `Too many AI calls in a short time. Wait ${data.retry_after ? `${data.retry_after} seconds` : "a minute"}, then try again.`;
   // Not this student's own limit: everyone's calls together hit the server's per-minute ceiling. Say so,
@@ -268,6 +281,7 @@ export function workerError(status, data = {}) {
   const e = new Error(msg);
   e.code = code;
   e.status = status;
+  e.allowanceLimited = allowanceLimited;
   if (offer) e.offer = offer;
   if (data.retry_after) e.retry_after = +data.retry_after;
   return e;

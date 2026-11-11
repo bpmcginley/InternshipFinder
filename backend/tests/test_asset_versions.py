@@ -5,11 +5,14 @@ from datetime import datetime
 import json
 import os
 from pathlib import Path
+import subprocess
 import tarfile
 
 import pytest
 
 from internscout.asset_versions import AssetVersionError, main, version_assets
+from internscout import core_graph
+from internscout.core_graph import fingerprint as core_fingerprint
 from internscout.page_dates import fingerprint
 
 from golden_build import STAMP
@@ -24,6 +27,185 @@ def _put(root, name, content):
 
 def _hash(content):
     return hashlib.sha256(content).hexdigest()[:12]
+
+
+def _core_site(root, profile, *, extra=False):
+    names = ["account.mjs", "bridge.mjs", "index.mjs", "listings.mjs", "profile.mjs", "ranking.mjs"]
+    if extra:
+        names.append("new-leaf2.mjs")
+    modules = {name: b"const fixture = true;\n" for name in names}
+    modules["entry.mjs"] = b"".join(f'import "./{name}";\n'.encode() for name in names)
+    modules["profile.mjs"] = profile
+    for name, content in modules.items():
+        _put(root, f"js/core/{name}", content)
+    page = _put(root, "index.html", '<script type="module" src="js/core/entry.mjs"></script>')
+    return page, modules
+
+
+def test_core_graph_leaf_change_preserves_prior_bare_urls_across_fresh_sites(tmp_path):
+    previous = None
+    expected = {}
+    for generation in range(3):
+        root = tmp_path / str(generation)
+        page, modules = _core_site(root, f"export const version = {generation};\n".encode(), extra=generation == 2)
+        digest = core_fingerprint(modules)
+        expected[digest] = modules
+        assert version_assets(root, retain_core_from=previous).changed_files == 1
+        assert page.read_text() == f'<script type="module" src="/js/modules/{digest}/entry.mjs"></script>'
+        previous = root / "js/modules"
+        assert {
+            folder.name: {path.name: path.read_bytes() for path in folder.iterdir()}
+            for folder in previous.iterdir()
+        } == expected
+        assert version_assets(root).changed_files == 0
+
+
+def test_corrupt_retained_core_or_invalid_html_leaves_fresh_staging_untouched(tmp_path):
+    previous, current = tmp_path / "previous", tmp_path / "current"
+    _, old = _core_site(previous, b"export const version = 1;\n")
+    page, _ = _core_site(current, b"export const version = 2;\n")
+    version_assets(previous)
+    retained = previous / "js/modules"
+    (retained / core_fingerprint(old) / "profile.mjs").write_bytes(b"corrupt")
+    source = page.read_bytes()
+    with pytest.raises(AssetVersionError, match="does not match its fingerprint"):
+        version_assets(current, retain_core_from=retained)
+    assert page.read_bytes() == source and not (current / "js/modules").exists()
+    page.write_bytes(source + b'<script src="missing.js"></script>')
+    with pytest.raises(AssetVersionError, match="missing or invalid"):
+        version_assets(current)
+    assert not (current / "js/modules").exists()
+
+
+def test_classic_rollback_preserves_every_previously_published_core_url(tmp_path):
+    deployed, rollback = tmp_path / "deployed", tmp_path / "rollback"
+    _, modules = _core_site(deployed, b"export const version = 2;\n")
+    version_assets(deployed)
+    classic = b"window.IS = {};\n"
+    _put(rollback, "js/core.js", classic)
+    page = _put(rollback, "index.html", '<script defer src="js/core.js"></script>')
+    version_assets(rollback, retain_core_from=deployed / "js/modules")
+    assert page.read_text() == f'<script defer src="js/core.js?v={_hash(classic)}"></script>'
+    for name, data in modules.items():
+        assert (rollback / "js/modules" / core_fingerprint(modules) / name).read_bytes() == data
+
+
+def test_git_retention_reads_committed_generations_and_rejects_stale_staging(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+
+    def git(*args):
+        return subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True).stdout
+
+    git("init", "--quiet")
+    git("config", "core.autocrlf", "true")
+    git("config", "user.name", "Fixture")
+    git("config", "user.email", "fixture@example.invalid")
+    attributes = Path(__file__).resolve().parents[2] / ".gitattributes"
+    (repo / ".gitattributes").write_bytes(attributes.read_bytes())
+    first, second = b"export const version = 1;\n", b"export const version = 2;\n"
+    _, initial = _core_site(repo / "docs", first)
+    git("add", ".gitattributes", "docs")
+    git("commit", "--quiet", "-m", "First Core")
+    first_ref = git("rev-parse", "HEAD").decode().strip()
+    _, latest = _core_site(repo / "docs", second, extra=True)
+    git("add", "docs")
+    git("commit", "--quiet", "-m", "Second Core")
+    # Force a fresh checkout while autocrlf is on. Modules retain canonical Git LF bytes.
+    for name in latest:
+        (repo / "docs/js/core" / name).unlink()
+    git("checkout", "--", "docs/js/core")
+    assert {name: (repo / "docs/js/core" / name).read_bytes() for name in latest} == latest
+    git("replace", "HEAD", first_ref)
+    stage = tmp_path / "stage"
+    page, _ = _core_site(stage, first)
+    with pytest.raises(AssetVersionError, match="do not match the pinned Git checkout"):
+        version_assets(stage, retain_core_git=repo)
+    assert "js/core/entry.mjs" in page.read_text() and not (stage / "js/modules").exists()
+    _core_site(stage, second, extra=True)
+    assert main([str(stage), "--retain-core-git", str(repo)]) == 0
+    assert {path.name for path in (stage / "js/modules").iterdir()} == {
+        core_fingerprint(initial), core_fingerprint(latest),
+    }
+
+
+def test_git_retention_recovers_classic_after_unpublishable_main_merge(tmp_path, monkeypatch):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+
+    def git(*args):
+        return subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True).stdout
+
+    git("init", "--quiet", "-b", "main")
+    git("config", "core.autocrlf", "false")
+    git("config", "user.name", "Fixture")
+    git("config", "user.email", "fixture@example.invalid")
+    _, valid = _core_site(repo / "docs", b"export const version = 1;\n")
+    git("add", "docs")
+    git("commit", "--quiet", "-m", "Publishable Core")
+    valid_ref = git("rev-parse", "HEAD").decode().strip()
+    git("switch", "--quiet", "-c", "candidate")
+    invalid_source = b"export { name }\nfrom './missing.mjs';\n"
+    _core_site(repo / "docs", invalid_source)
+    git("add", "docs")
+    git("commit", "--quiet", "-m", "Unpublishable Core")
+    git("switch", "--quiet", "main")
+    git("merge", "--quiet", "--no-ff", "candidate")
+    invalid_stage = tmp_path / "invalid"
+    _core_site(invalid_stage, invalid_source)
+    with pytest.raises(AssetVersionError, match="declaration exports"):
+        version_assets(invalid_stage, retain_core_git=repo)
+    assert not (invalid_stage / "js/modules").exists()
+
+    git("rm", "--quiet", "-r", "docs/js/core")
+    classic_html = '<script defer src="js/core.js"></script>'
+    _put(repo, "docs/index.html", classic_html)
+    git("add", "docs/index.html")
+    git("commit", "--quiet", "-m", "Restore classic Core")
+    rollback = tmp_path / "rollback"
+    _put(rollback, "js/core.js", b"window.IS = {};\n")
+    page = _put(rollback, "index.html", classic_html)
+    git_reader = core_graph._git
+
+    def unavailable_blob(repo, *args):
+        if args == ("show", f"{valid_ref}:docs/js/core/profile.mjs"):
+            raise core_graph.CoreGraphError("Cannot read Core generation from Git")
+        return git_reader(repo, *args)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(core_graph, "_git", unavailable_blob)
+        with pytest.raises(AssetVersionError, match="Cannot read Core generation from Git"):
+            version_assets(rollback, retain_core_git=repo)
+    assert page.read_text() == classic_html and not (rollback / "js/modules").exists()
+    assert version_assets(rollback, retain_core_git=repo).changed_files == 1
+    generation, = (rollback / "js/modules").iterdir()
+    assert generation.name == core_fingerprint(valid)
+    assert {path.name: path.read_bytes() for path in generation.iterdir()} == valid
+
+
+@pytest.mark.parametrize("source", [b'import "../outside.mjs";', b'const later = () => import("./ranking.mjs");'])
+def test_core_graph_rejects_external_and_dynamic_imports_before_writing(tmp_path, source):
+    page, _ = _core_site(tmp_path, source)
+    with pytest.raises(AssetVersionError, match="static sibling imports"):
+        version_assets(tmp_path)
+    assert "js/core/entry.mjs" in page.read_text() and not (tmp_path / "js/modules").exists()
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        b"export { name }\nfrom './missing.mjs';\n",
+        b"export\n/* clause */ { name }\nfrom './missing.mjs';\n",
+        b"export // clause\n* as other\nfrom './missing.mjs';\n",
+        "export\ufeff// clause\u2028{ name } from './missing.mjs';\n".encode(),
+    ],
+)
+def test_core_graph_rejects_multiline_reexports_before_writing(tmp_path, source):
+    page, _ = _core_site(tmp_path, source)
+    original = page.read_bytes()
+    with pytest.raises(AssetVersionError, match="declaration exports"):
+        version_assets(tmp_path)
+    assert page.read_bytes() == original and not (tmp_path / "js/modules").exists()
 
 
 def test_relative_root_relative_stylesheets_and_asset_bytes(tmp_path):

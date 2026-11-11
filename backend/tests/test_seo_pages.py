@@ -1195,7 +1195,7 @@ def test_the_field_pages_opening_sentences_are_short(tmp_path):
         .split("</p>")[0]
     )
     sentences = [s for s in re.split(r"(?<=[.!?])\s+", lede) if s]
-    assert sentences[0] == "41 open student roles in mechanical engineering." and sentences[
+    assert sentences[0] == "As of September 23, 2026, InternScout lists 41 open student roles in mechanical engineering." and sentences[
         1
     ].startswith("They range from")
     assert max(len(s.split()) for s in sentences) <= 25
@@ -2324,12 +2324,16 @@ def test_of_the_small_pages_only_the_employer_page_is_thin(tmp_path):
     assert "/internships/at/small-co/" in built and "/internships/massachusetts/" in built
     # was: no page thin but the near pages (2026-10-18). The employer page, under INDEX_EMPLOYER, is too (2026-10-23).
     assert {p for p, v in built.items() if v["thin"] and v["kind"] != "near"} == {
-        "/internships/at/small-co/"
+        "/internships/at/small-co/",
+        "/internships/for/mechanical-engineering-majors/weekly/",
     }
     assert all(
         v["index"]
         for p, v in built.items()
-        if p not in ("/digest/", "/internships/at/small-co/") and v["kind"] != "near"
+        if p not in (
+            "/digest/", "/internships/at/small-co/",
+            "/internships/for/mechanical-engineering-majors/weekly/",
+        ) and v["kind"] != "near"
     )  # /digest/ waits for its form
 
 
@@ -2482,7 +2486,10 @@ def test_the_deploy_passes_last_deploys_noindex_list_back_in():
         encoding="utf-8",
     ).read()
     assert f"https://internscout.org/{seo_pages.HELD_FILE} -o live-noindex.txt" in wf
-    assert "python -m internscout.seo_pages ../_site ../live-sitemap.xml ../live-noindex.txt" in wf
+    assert (
+        "python -m scripts.make_og_image --site ../_site ../live-sitemap.xml ../live-noindex.txt"
+        in wf
+    )
 
 
 # PR #97 follow-up: a page with no state covers every state, so its dashboard link says so; otherwise

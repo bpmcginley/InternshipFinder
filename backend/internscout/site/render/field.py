@@ -75,10 +75,13 @@ def render_field(
             src="seo-field",
             faq=faq_section(qa),
             signup=signup_form(pitch, t),
+            export_stamp=model.context.export_stamp,
         ),
         "items": items,
         "ld": [faq_ld(qa)],
         "kind": "field",
+        "share_view": (t, "all"),
+        "share_card": (f"{name} internships", None),
     }
 
 
@@ -146,6 +149,7 @@ def render_place(
         "state": k,
         "ld": [faq_ld(qa)],
         "kind": "state",
+        "share_view": ("", k),
         "thin": model.thin,
     }
 
@@ -222,6 +226,7 @@ def render_combo(
         "ld": [faq_ld(qa)],
         "thin": model.thin,
         "kind": "combo",
+        "share_view": (t, k),
     }
 
 
