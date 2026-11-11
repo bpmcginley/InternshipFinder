@@ -7,6 +7,12 @@ const ref = (value) => (typeof value === "string" ? value : value?.id);
 const id = (value, prefix) =>
   typeof value === "string" && new RegExp("^" + prefix + "_[A-Za-z0-9_]{1,250}$").test(value);
 const nonnegative = (value) => Number.isSafeInteger(value) && value >= 0;
+export const PAYMENT_EVIDENCE_BOUNDS = Object.freeze({
+  timeoutMs: 10000,
+  requests: 3,
+  bodyBytes: 262144,
+  totalBytes: 524288,
+});
 
 // attempt and originalOffer come from trusted storage/configuration, never browser claims.
 // A candidate can recover a lost creation response, but its provider association must match.
@@ -16,6 +22,7 @@ export async function readTopupPaymentEvidence(
   originalOffer,
   fetchImpl,
   candidateCheckoutId = attempt?.checkout_id,
+  timeoutMs = PAYMENT_EVIDENCE_BOUNDS.timeoutMs,
 ) {
   const a = { ...attempt },
     offer = { ...originalOffer };
@@ -23,6 +30,9 @@ export async function readTopupPaymentEvidence(
     typeof env?.STRIPE_SECRET_KEY !== "string" ||
     !env.STRIPE_SECRET_KEY ||
     typeof fetchImpl !== "function" ||
+    !Number.isInteger(timeoutMs) ||
+    timeoutMs < 1 ||
+    timeoutMs > PAYMENT_EVIDENCE_BOUNDS.timeoutMs ||
     typeof a.id !== "string" ||
     !/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/.test(a.id || "") ||
     typeof a.user_hash !== "string" ||
@@ -43,20 +53,100 @@ export async function readTopupPaymentEvidence(
   )
     return pending();
   const config = { STRIPE_SECRET_KEY: env.STRIPE_SECRET_KEY };
-  const get = (path) =>
-    stripe(
+  const cap = PAYMENT_EVIDENCE_BOUNDS,
+    controller = new AbortController();
+  const deadline = performance.now() + timeoutMs;
+  let stopped = false,
+    bytes = 0,
+    requests = 0,
+    timer;
+  const fail = () => {
+    throw new Error("unavailable");
+  };
+  const live = () => {
+    if (stopped || performance.now() >= deadline) fail();
+  };
+  const cancelBody = (response) => {
+    try {
+      void response.body?.cancel().catch(() => {});
+    } catch {
+      /* Cancellation is best effort. */
+    }
+  };
+  async function body(response) {
+    if (stopped || performance.now() >= deadline) {
+      cancelBody(response);
+      fail();
+    }
+    const length = response.headers?.get?.("Content-Length");
+    if (
+      length != null &&
+      (!/^\d+$/.test(length) ||
+        Number(length) > cap.bodyBytes ||
+        Number(length) > cap.totalBytes - bytes)
+    ) {
+      cancelBody(response);
+      fail();
+    }
+    const reader = response.body?.getReader();
+    if (!reader) fail();
+    const cancel = () => {
+      try {
+        void reader.cancel().catch(() => {});
+      } catch {
+        /* Best effort. */
+      }
+    };
+    controller.signal.addEventListener("abort", cancel, { once: true });
+    let size = 0,
+      text = "";
+    const decoder = new TextDecoder("utf-8", { fatal: true });
+    try {
+      for (;;) {
+        live();
+        const chunk = await reader.read();
+        live();
+        if (chunk.done) break;
+        if (!(chunk.value instanceof Uint8Array)) fail();
+        size += chunk.value.byteLength;
+        bytes += chunk.value.byteLength;
+        if (size > cap.bodyBytes || bytes > cap.totalBytes) fail();
+        text += decoder.decode(chunk.value, { stream: true });
+      }
+      return text + decoder.decode();
+    } finally {
+      cancel();
+      controller.signal.removeEventListener("abort", cancel);
+      reader.releaseLock();
+    }
+  }
+  const get = async (path) => {
+    live();
+    if (++requests > cap.requests) fail();
+    const result = await stripe(
       config,
       path,
       {},
       async (url, options) => {
         // Throw before billing's logger can include a private object path or provider error body.
-        const response = await fetchImpl(url, { ...options, redirect: "error" });
-        if (!response.ok) throw new Error("unavailable");
-        return response;
+        const response = await fetchImpl(url, {
+          ...options,
+          redirect: "error",
+          signal: controller.signal,
+        });
+        if (stopped || performance.now() >= deadline || response.ok !== true) {
+          cancelBody(response);
+          fail();
+        }
+        // The shared Stripe parser sees only this bounded successful-body adapter.
+        return { ok: true, text: () => body(response) };
       },
       null,
       "GET",
     );
+    live();
+    return result;
+  };
   const expected = {
     kind: "autofill_topup",
     attempt_id: a.id,
@@ -68,18 +158,21 @@ export async function readTopupPaymentEvidence(
     Object.entries(expected).every(([k, v]) => object?.metadata?.[k] === v);
   const sameMode = (object) =>
     object?.livemode === offer.livemode && object.currency === a.currency;
-  const evidence = (status) => ({
-    status,
-    attemptId: a.id,
-    checkoutId: candidateCheckoutId,
-    userHash: a.user_hash,
-    offerVersion: a.offer_version,
-    offerAmount: a.amount,
-    currency: a.currency,
-    units: a.units,
-    livemode: offer.livemode,
-  });
-  try {
+  const evidence = (status) => {
+    live();
+    return {
+      status,
+      attemptId: a.id,
+      checkoutId: candidateCheckoutId,
+      userHash: a.user_hash,
+      offerVersion: a.offer_version,
+      offerAmount: a.amount,
+      currency: a.currency,
+      units: a.units,
+      livemode: offer.livemode,
+    };
+  };
+  async function run() {
     const session = await get(
       "checkout/sessions/" + encodeURIComponent(candidateCheckoutId) + "?expand[]=line_items",
     );
@@ -169,7 +262,21 @@ export async function readTopupPaymentEvidence(
       chargeId,
       capturedAmount: charge.amount_captured,
     };
-  } catch {
-    return pending();
+  }
+  try {
+    return await Promise.race([
+      run().catch(pending),
+      new Promise((resolve) => {
+        timer = setTimeout(() => {
+          stopped = true;
+          controller.abort();
+          resolve(pending());
+        }, timeoutMs);
+      }),
+    ]);
+  } finally {
+    stopped = true;
+    clearTimeout(timer);
+    controller.abort();
   }
 }
