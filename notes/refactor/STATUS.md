@@ -115,7 +115,7 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 6 | WP-6.1.3 Reader workflows | wp14_logging | `refactor/wp-6.1.3-data-readers` | [#317](https://github.com/bpmcginley/InternshipFinder/pull/317) | In review | Pin one public snapshot for eight readers. Primary checkout fallback only when the data branch is absent. Offline Git and staging checks passed, Golden 695. |
 | 7 | WP-3.6 Jinja templates | Unassigned | - | - | Queued / optional | Only identical golden output; keep f-strings when exactness adds risk. |
 | 7 | WP-6.1.4 Data branch | Unassigned | - | - | Queued | Normal push from current data; branch rules remain Bruce's. |
-| 7 | WP-6.1.5 Ingest writer | Unassigned | - | - | Queued | Write data branch; preserve Pages-following-ingest behavior. |
+| 7 | WP-6.1.5 Ingest writer | wp42_orders | `refactor/wp-6.1.5-data-writer` | - | Offline preparation | Claim ingest workflow and isolated writer helper/tests. Wait for valid seed and drained ingest before activation. |
 | 7 | WP-6.1.6 Remove main data | Unassigned | - | - | Waiting for observation | Requires seven days of clean ingest/Pages after cutover; no history rewrite. |
 | 7 | WP-6.2 Remove shims | Unassigned | - | - | Queued | Only after repository-wide old-import search is clear. |
 | 7 | WP-6.3 Ingest timing | Unassigned | - | - | Queued | Report from logs; no production run triggered for measurement. |
