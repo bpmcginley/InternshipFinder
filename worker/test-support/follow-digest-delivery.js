@@ -3,7 +3,7 @@ import { deliverFollowSnapshotDigest } from "../src/follow-digest-delivery.js";
 import { enqueueFollowSnapshot } from "../src/follow-enqueue.js";
 import { requestFollow, mintFollowToken, confirmFollow } from "../src/follows.js";
 import { reserveFollowSendAttempt } from "../src/follow-send-budget.js";
-const at = new Date("2026-11-11T12:00:00.000Z"),
+const at = new Date(),
   confirmed = new Date(+at - 86400000);
 const catalog = {
   companies: new Set(["alpha"]),
@@ -24,23 +24,26 @@ const role = {
   company_key: "alpha",
   field_tags: ["biology"],
   states: ["MA"],
-  first_seen: "2026-11-11T00:00:00.000Z",
+  first_seen: new Date(+at - 3600000).toISOString(),
   status: "open",
   company_name: "Fixture",
   title: "Fixture role",
   location: "Fixture town",
   apply_url: "https://example.test/1",
 };
-const data = new TextEncoder().encode(
-  JSON.stringify({
-    version: 1,
-    complete: true,
-    generated_at: at.toISOString(),
-    covers_after: "2026-11-10T00:00:00.000Z",
-    roles: [role],
-  }),
-);
-async function fixture(db) {
+async function fixture(db, time = at) {
+  const at = time,
+    confirmed = new Date(+at - 86400000);
+  const currentRole = { ...role, first_seen: new Date(+at - 3600000).toISOString() };
+  const data = new TextEncoder().encode(
+    JSON.stringify({
+      version: 1,
+      complete: true,
+      generated_at: at.toISOString(),
+      covers_after: new Date(+confirmed - 3600000).toISOString(),
+      roles: [currentRole],
+    }),
+  );
   const sub = await requestFollow(
     db,
     "fixture@example.test",
@@ -83,7 +86,7 @@ async function fixture(db) {
   const present = async (input) => {
     assert.deepEqual(Object.keys(input).sort(), ["roles", "subscriberId"]);
     assert.equal(input.subscriberId, sub.subscriberId);
-    assert.deepEqual(input.roles, [role]);
+    assert.deepEqual(input.roles, [currentRole]);
     return {
       from: "Fixture <sender@example.test>",
       to: "must-not-use@example.test",
@@ -264,3 +267,44 @@ export async function unsuccessfulFinalResult(db) {
   assert.deepEqual(await f.run({ db: database }), { status: "uncertain" });
   assert.equal(f.calls(), 0);
 }
+
+async function staleDatabaseClock(db, rollover, expiredJob = false) {
+  const sqlNow = await db.prepare("SELECT strftime('%Y-%m-%dT%H:%M:%fZ','now') AS at").first("at");
+  const dbAt = new Date(sqlNow);
+  const workerAt = rollover
+    ? new Date(Date.parse(sqlNow.slice(0, 10) + "T00:00:00.000Z") - 1000)
+    : new Date(+dbAt - 2000);
+  const f = await fixture(db, workerAt);
+  const database = intercept(db, async (statements, run) => {
+    const result = await run();
+    if (!rollover && statements.length === 7)
+      await db
+        .prepare(
+          expiredJob
+            ? "UPDATE follow_digest_outbox SET expires_at=? WHERE id=?"
+            : "UPDATE follow_digest_outbox SET lease_until=? WHERE id=?",
+        )
+        .bind(new Date(+dbAt - 1000).toISOString(), f.job)
+        .run();
+    return result;
+  });
+  const result = await f.run({ db: database });
+  assert.equal(
+    f.calls(),
+    0,
+    "a lagging Worker clock cannot authorize transport after the database deadline",
+  );
+  assert.deepEqual(result, { status: "uncertain" });
+  assert.equal((await f.row()).state, "uncertain");
+  assert.equal(await f.budget(), 1);
+  assert.equal(
+    await f.watermark(),
+    workerAt.toISOString(),
+    "durable claimed uncertainty advances unchanged scopes without acceptance",
+  );
+  assert.equal((await f.row()).accepted_at, null);
+}
+export const databaseLeaseExpired = (db) => staleDatabaseClock(db, false);
+export const databaseUtcRollover = (db) => staleDatabaseClock(db, true);
+
+export const databaseJobExpired = (db) => staleDatabaseClock(db, false, true);

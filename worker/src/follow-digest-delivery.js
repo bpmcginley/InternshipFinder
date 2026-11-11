@@ -10,7 +10,8 @@ import {
 } from "./follow-outbox.js";
 
 // present is trusted server code: links/similar facts must be authorized for subscriberId.
-// transport resolves only on known acceptance and rejects on rejection/uncertainty.
+// transport initiates immediately or rejects busy; it must not queue behind another send.
+// It resolves only on known acceptance and rejects on rejection/uncertainty.
 export async function deliverFollowSnapshotDigest({
   db,
   jobId,

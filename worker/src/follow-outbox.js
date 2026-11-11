@@ -307,6 +307,10 @@ export async function authorizeFollowSnapshotTransport(db, id, lease, subscriber
             "JOIN follow_subscribers u ON u.id=follow_digest_outbox.subscriber_id " +
             "WHERE follow_digest_outbox.id=? AND state='attempting' AND lease_token=? " +
             "AND subscriber_id=? AND u.email=? AND attempted_at<=? AND substr(attempted_at,1,10)=? " +
+            "AND attempted_at<=strftime('%Y-%m-%dT%H:%M:%fZ','now') " +
+            "AND substr(attempted_at,1,10)=date('now') " +
+            "AND lease_until>strftime('%Y-%m-%dT%H:%M:%fZ','now') " +
+            "AND expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now') " +
             `AND ${consent("payload", "follow_digest_outbox.subscriber_id")} AND ${snapshotConsent}`,
         )
         .bind(id, lease, subscriberId, email, at, at.slice(0, 10), at),
