@@ -1,0 +1,7 @@
+# P-3.4b onboarding practice link
+
+The before images use `ac9e9b27`, the integration of frozen resume-first #262 and bundled practice #265 before the link was added. The after images show the same synthetic completed setup through Resume and Review. All 16 captures use full document width at 1,280 or 375 CSS pixels in light and dark mode. The exact added label is “Practice Auto-Apply”.
+
+`capture.cjs` runs the real onboarding and practice page code in a local Chromium context. It supplies a synthetic ready-to-finish local store, an already signed-in mock, and no provider transport. Every browser HTTP request is intercepted and fulfilled from repository files or rejected. The four width/theme pairs exercise both finish controls by keyboard, check for no practice link before finish and no automatic navigation, then activate the focused link once. The practice tab fills fixed sample fields and completes locally. A separate simulated restore revision invalidates a pending save and leaves the practice link absent. No real profile, account, application or provider is used.
+
+Set `CAPTURE_TOOLS` to local tooling with `node_modules/playwright-core`, then run `node notes/product/screenshots/P-3.4b/capture.cjs` from this branch. `PRACTICE_BROWSER` can override the Edge executable. #265 verifies that the practice route is available in the developer and Web Store ZIPs. This package keeps the onboarding tab open and adds no permission, storage or runtime message for the link.

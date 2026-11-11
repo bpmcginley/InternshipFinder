@@ -39,6 +39,7 @@ let queuedResume = null;
 let signingIn = false;
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const $ = (sel) => main.querySelector(sel);
+const practiceLink = `<span class="small" style="display:block;margin:6px 0 0"><a id="practice-link" href="../practice/practice.html" target="_blank" rel="noopener">Practice Auto-Apply</a></span>`;
 
 // ---------- persistence ----------
 // The service worker also writes the store (accounts, answers, learned answers), so merge instead of overwrite.
@@ -556,7 +557,7 @@ function drawResumeReview() {
 // "Turn on Auto-Apply now" on the Files step, once the AI, a resume and the sign-up email are there:
 // the same finish as Review's button (finishOnboarding), so a student can start applying without the
 // optional steps. Redrawn after a resume is read, since reading it can fill in the sign-up email.
-function drawQuick(msg = "") {
+function drawQuick(msg = "", offerPractice = false) {
   const box = $("#quick");
   if (!box) return;
   // A resume that couldn't be read (or wasn't), or details still missing after choosing to enter them:
@@ -583,6 +584,7 @@ function drawQuick(msg = "") {
   box.innerHTML = S.settings.onboarded
     ? `<p class="small" style="margin:0"><span class="ok">${esc(msg || "Auto-Apply is on.")}</span> <a href="https://internscout.org/" target="_blank">Open the internship dashboard ↗</a></p>
        ${digestLink()}
+       ${offerPractice ? practiceLink : ""}
        <div id="held" hidden></div>
        <p class="small muted" style="margin:6px 0 0">Quick facts, Interview and Voice are optional. They make the answers on your applications better, and you can do them any time.</p>`
     : `<h3>Ready to apply</h3>
@@ -596,8 +598,9 @@ function drawQuick(msg = "") {
   }
   if ($("#quickgo")) $("#quickgo").addEventListener("click", async () => {
     $("#quickgo").disabled = true;
-    await finishAndRender();
-    drawQuick("Saved. Auto-Apply is on.");
+    const finished = await finishAndRender();
+    drawQuick("Saved. Auto-Apply is on.", finished);
+    $("#practice-link")?.focus();
   });
   if (S.settings.onboarded) drawHeld();
 }
@@ -630,8 +633,11 @@ async function drawHeld() {
 
 // Both finish buttons (Files' quick start, Review's finish). was: the body of Review's #finishall handler.
 async function finishAndRender() {
+  const currentStore = S, revision = seenRestore;
   await finishOnboarding(S, save);
+  const finished = (await restoredAt()) === revision && S === currentStore;
   render();
+  return finished;
 }
 
 // One read at a time: the automatic one when a resume is chosen and the button can overlap, and two
@@ -930,9 +936,12 @@ function review() {
     } catch (e) { msg.innerHTML = `<span class="err">Not saved: ${esc(e.message)}</span>`; }
   }));
   $("#finishall").addEventListener("click", async () => {
-    await finishAndRender();
+    const finished = await finishAndRender();
     // The weekly email's link under it (2026-10-06), as on the Files step's finish (drawQuick).
-    $("#rstat").innerHTML = `<span class="ok">Saved. Auto-Apply is on.</span> <a href="https://internscout.org/" target="_blank">Open the internship dashboard ↗</a>${digestLink()}`;
+    const status = $("#rstat");
+    if (!status) return;
+    status.innerHTML = `<span class="ok">Saved. Auto-Apply is on.</span> <a href="https://internscout.org/" target="_blank">Open the internship dashboard ↗</a>${digestLink()}${finished ? practiceLink : ""}`;
+    $("#practice-link")?.focus();
     drawHeld();
   });
   if (S.settings.onboarded) drawHeld();
