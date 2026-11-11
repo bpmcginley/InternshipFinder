@@ -423,8 +423,8 @@ export function createDashboard(browser, {
     }
 
     async function billing(kind, plan, fromArrival = false) {
-      if (checkoutLock.current) return;
-      const ticket = {}; checkoutLock.current = ticket;
+      if (checkoutLock.current?.kind === "topup") return;
+      const ticket = { kind: "billing" }; checkoutLock.current = ticket;
       try { return await billingAction({
         authRef, meResult, meStatus, upgrades, billingRequest, countArrival, IS, setBusy,
         bounded, browser, setNote,

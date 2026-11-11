@@ -258,7 +258,7 @@ export function createTopupActions(browser, { context, update, lock, onPurchase 
   }
   async function buy() {
     if (active || lock.current || !verified || !same(verified)) return;
-    const c = verified, seq = ++sequence, controller = new AbortController(), ticket = {};
+    const c = verified, seq = ++sequence, controller = new AbortController(), ticket = { kind: "topup" };
     active = controller; lock.current = ticket; verified = null;
     onPurchase();
     update({ status: "opening", verified: true });

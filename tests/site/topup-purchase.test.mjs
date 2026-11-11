@@ -1,10 +1,70 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { runInNewContext } from "node:vm";
 import {
   createTopupActions,
   topupEligible,
   topupCheckoutUrl,
+  billingAction,
 } from "../../docs/js/app/allowance.mjs";
+
+test("dashboard billing preserves legacy supersession and account changes; only top-up blocks it", async () => {
+  const source = readFileSync(new URL("../../docs/js/app/dashboard.mjs", import.meta.url), "utf8");
+  const start = source.indexOf("async function billing(");
+  const fn = source.slice(start, source.indexOf("\n    // profile sync", start)).trim();
+  const pending = [],
+    visits = [],
+    calls = [];
+  const ctx = {
+    billingAction,
+    checkoutLock: { current: null },
+    authRef: { current: { token: "iss_a" } },
+    meResult: { token: "iss_a" },
+    meStatus: "ready",
+    upgrades: [{ plan: "pro" }],
+    billingRequest: { current: 0 },
+    countArrival() {},
+    setBusy() {},
+    setNote() {},
+    bounded: (p) => p,
+    browser: { location: { assign: (url) => visits.push(url) } },
+    IS: {
+      count() {},
+      billingUrl: (token, kind) => {
+        calls.push({ token, kind });
+        return new Promise((resolve) => pending.push(resolve));
+      },
+    },
+  };
+  const billing = runInNewContext(`(${fn})`, ctx);
+  const first = billing("checkout", "pro"),
+    second = billing("portal");
+  assert.equal(calls.length, 2);
+  assert.equal(ctx.billingRequest.current, 2);
+  pending[0]({ url: "https://old.example.test" });
+  await first;
+  assert.deepEqual(visits, []);
+  assert.equal(ctx.checkoutLock.current.kind, "billing");
+  pending[1]({ url: "https://current.example.test" });
+  await second;
+  assert.deepEqual(visits, ["https://current.example.test"]);
+  assert.equal(ctx.checkoutLock.current, null);
+  const priorAccount = billing("portal");
+  ctx.authRef.current = { token: "iss_b" };
+  ctx.meResult = { token: "iss_b" };
+  const newAccount = billing("portal");
+  assert.equal(calls.length, 4);
+  assert.equal(calls[3].token, "iss_b");
+  pending[3]({ url: "https://new-account.example.test" });
+  await newAccount;
+  pending[2]({ url: "https://old-account.example.test" });
+  await priorAccount;
+  assert.deepEqual(visits, ["https://current.example.test", "https://new-account.example.test"]);
+  ctx.checkoutLock.current = { kind: "topup" };
+  await billing("portal");
+  assert.equal(calls.length, 4);
+});
 const base = "https://worker.test";
 const offer = { enabled: true, offer: { amount: 300, currency: "usd", units: 25 } };
 const checkout = {
