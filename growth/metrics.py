@@ -1281,11 +1281,11 @@ def listings(site_dir: str) -> dict:
         for p in (os.path.join(here, "..", "backend"), here):
             if p not in sys.path:
                 sys.path.insert(0, p)
-        import digest  # imported here: it needs backend/internscout
+        from internscout.site import source as site_source
 
-        d = digest.sp.load(site_dir)
-        now = digest.sp._when(d["generated_at"]) or datetime.now(timezone.utc)
-        out.update(new_7d=len(digest.new_roles(d, now)), new_7d_basis="digest")
+        d = site_source.load(site_dir)
+        now = site_source._when(d["generated_at"]) or datetime.now(timezone.utc)
+        out.update(new_7d=len(site_source.new_roles(d, now)), new_7d_basis="digest")
     except (ImportError, OSError, ValueError, KeyError):
         pass
     return out
