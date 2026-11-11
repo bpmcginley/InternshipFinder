@@ -1,4 +1,4 @@
-// Reproduce the dormant limiter's idle-erasure blocker in local workerd, without real IPs/network.
+// Local workerd multi-request budget regression; synthetic addresses only, no network or timers.
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { Miniflare, convertV4MiniflareOptions } from "miniflare";
@@ -6,7 +6,7 @@ let outbound = 0;
 const source = (name) => readFileSync(new URL(`../src/${name}`, import.meta.url), "utf8");
 const mf = new Miniflare(
   convertV4MiniflareOptions({
-    name: "idle-budget-probe",
+    name: "hmac-budget-probe",
     compatibilityDate: "2026-09-01",
     cf: false,
     outboundService: () => {
@@ -19,18 +19,16 @@ const mf = new Miniflare(
         path: "probe.mjs",
         contents: `
     import {createEmployerMinuteBudget} from './employer-posting-counts.js';
-    let fires=0;
-    const budget=createEmployerMinuteBudget((fn,ms)=>setTimeout(()=>{fires++;fn();},ms));
-    const at=new Date('2027-03-01T00:00:59.980Z');
-    export default {fetch(request) {
+    const budget=createEmployerMinuteBudget();
+    const start=Date.parse('2027-03-01T00:00:59.980Z');let clock=start;
+    globalThis.setTimeout=()=>{throw Error('Limiter must not depend on runtime timers');};
+    globalThis.clearTimeout=()=>{throw Error('Limiter must not cancel runtime timers');};
+    export default {async fetch(request) {
       const path=new URL(request.url).pathname;
-      if(path==='/fill') {
-        let accepted=0;for(let i=0;i<30;i++)if(budget('192.0.2.201',at))accepted++;
-        return Response.json({accepted,extra:budget('192.0.2.201',at),fires});
-      }
-      if(path==='/status')return Response.json({fires});
-      if(path==='/same-synthetic-minute')return Response.json({accepted:budget('192.0.2.201',at),fires});
-      return Response.json({accepted:budget('192.0.2.201',new Date(at.getTime()+20)),fires});
+      if(path==='/advance')clock=start+20;
+      const at=new Date(path==='/old'?start:clock);
+      const address=path==='/other'?'192.0.2.202':'192.0.2.201';
+      return Response.json({accepted:await budget(address,at)});
     }};
   `,
       },
@@ -44,15 +42,19 @@ const mf = new Miniflare(
 );
 try {
   const call = async (path) => (await mf.dispatchFetch(`https://local.test/${path}`)).json();
-  assert.deepEqual(await call("fill"), { accepted: 30, extra: false, fires: 0 });
-  // Wait outside the returned request for much longer than its scheduled 20ms expiry.
+  await mf.ready;
+  const concurrent = await Promise.all(Array.from({ length: 40 }, () => call("same")));
+  assert.equal(concurrent.filter((result) => result.accepted === true).length, 30);
+  assert.deepEqual(await call("other"), { accepted: true });
   await new Promise((resolve) => setTimeout(resolve, 150));
-  assert.deepEqual(await call("status"), { fires: 0 });
-  assert.deepEqual(await call("same-synthetic-minute"), { accepted: false, fires: 0 });
-  assert.deepEqual(await call("next-minute"), { accepted: true, fires: 0 });
+  assert.deepEqual(await call("same"), { accepted: false });
+  assert.deepEqual(await call("advance"), { accepted: true });
+  assert.deepEqual(await call("old"), { accepted: false });
+  for (let i = 1; i < 30; i++) assert.deepEqual(await call("same"), { accepted: true });
+  assert.deepEqual(await call("same"), { accepted: false });
   assert.equal(outbound, 0);
   console.log(
-    "REPRODUCED privacy blocker: owner request ended; 20ms idle timer never fired after 150ms; later synthetic same-minute probe retains exhausted entry; next-minute access clears it. Zero outbound requests.",
+    "PASS local workerd: 40 independent concurrent requests admit exactly 30; separate address remains independent; UTC rollover admits a fresh 30; older minute fails closed; throwing timer stubs never invoked; zero outbound requests. Opaque codes use lazy expiry, not idle erasure.",
   );
 } finally {
   await mf.dispose();

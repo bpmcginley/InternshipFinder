@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { createRequestSafeEmployerCatalogCache } from "../src/employer-catalog-cache.js";
 import {
   createEmployerPostingCounter,
+  createEmployerMinuteBudget,
   EMPLOYER_POSTING_EVENT,
 } from "../src/employer-posting-counts.js";
 import { countHit, DAY_CAP } from "../src/visits.js";
@@ -329,4 +330,98 @@ test("receipt constructor cannot bypass the exhausted organic budget", async () 
   });
   assert.equal(await counter.countAdmitted(new receipt.constructor("acme", at.getTime())), false);
   assert.equal(await db.prepare("SELECT COUNT(*) AS n FROM employer_posting_counts").first("n"), 0);
+});
+
+test("HMAC limiter preserves concurrent exact caps using a non-extractable isolate key", async () => {
+  const usedKeys = new Set(),
+    inputs = [],
+    signatures = [];
+  const budget = createEmployerMinuteBudget({
+    subtle: {
+      generateKey: (...args) => crypto.subtle.generateKey(...args),
+      sign: async (...args) => {
+        usedKeys.add(args[1]);
+        inputs.push(new TextDecoder().decode(args[2]));
+        const out = await crypto.subtle.sign(...args);
+        signatures.push(Buffer.from(out).toString("hex"));
+        return out;
+      },
+    },
+  });
+  const at = new Date("2027-03-01T00:00:00Z");
+  assert.equal(
+    (await Promise.all(Array.from({ length: 40 }, () => budget("192.0.2.210", at)))).filter(Boolean)
+      .length,
+    30,
+  );
+  assert.equal(usedKeys.size, 1);
+  const key = [...usedKeys][0];
+  assert.equal(key.extractable, false);
+  await assert.rejects(crypto.subtle.exportKey("raw", key));
+  assert.equal(new Set(signatures).size, 1);
+  assert.equal(await budget("192.0.2.211", at), true);
+  assert.equal(await budget("192.0.2.210", new Date(at.getTime() + 60000)), true);
+  assert.notEqual(signatures.at(-1), signatures[0]);
+  assert.equal(await budget("192.0.2.212", at), false);
+  assert.match(inputs[0], /^\d+:192\.0\.2\.210$/);
+});
+test("HMAC limiter rejects crypto/clock errors and an older-minute digest finishing late", async () => {
+  let release,
+    entered = false,
+    first = true;
+  const budget = createEmployerMinuteBudget({
+    subtle: {
+      generateKey: (...args) => crypto.subtle.generateKey(...args),
+      sign: async (...args) => {
+        if (first) {
+          first = false;
+          entered = true;
+          await new Promise((r) => {
+            release = r;
+          });
+        }
+        return crypto.subtle.sign(...args);
+      },
+    },
+  });
+  const at = new Date("2027-03-02T00:00:00Z"),
+    old = budget("192.0.2.210", at);
+  for (let i = 0; !entered && i < 1000; i++) await new Promise((r) => setTimeout(r, 1));
+  assert.equal(entered, true);
+  assert.equal(await budget("192.0.2.211", new Date(at.getTime() + 60000)), true);
+  release();
+  assert.equal(await old, false);
+  assert.equal(await budget("192.0.2.210", at), false);
+  assert.equal(await budget("192.0.2.210", new Date(NaN)), false);
+  class BrokenClock extends Date {
+    getTime() {
+      throw Error("clock unavailable");
+    }
+  }
+  assert.equal(await budget("192.0.2.210", new BrokenClock()), false);
+  assert.deepEqual(
+    await countHit(null, request("192.0.2.210"), event, new BrokenClock(), () => {
+      throw Error("service must not run");
+    }),
+    { counted: false },
+  );
+  for (const subtle of [
+    {
+      generateKey: () => {
+        throw Error("key unavailable");
+      },
+    },
+    { generateKey: async () => ({ extractable: true, type: "secret" }) },
+    {
+      generateKey: (...args) => crypto.subtle.generateKey(...args),
+      sign: () => {
+        throw Error("sign unavailable");
+      },
+    },
+    {
+      generateKey: (...args) => crypto.subtle.generateKey(...args),
+      sign: async () => new ArrayBuffer(1),
+    },
+  ])
+    assert.equal(await createEmployerMinuteBudget({ subtle })("192.0.2.210", at), false);
 });

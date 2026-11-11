@@ -256,7 +256,7 @@ export async function countHit(db, request, body, now, organicService = null) {
   // Organic admission never spends the legacy budget or reaches a legacy table.
   if (body?.e === EMPLOYER_POSTING_EVENT) {
     if (typeof organicService !== "function") return { counted: false };
-    const admission = admitEmployerPosting(body, request.headers.get("CF-Connecting-IP"), now);
+    const admission = await admitEmployerPosting(body, request.headers.get("CF-Connecting-IP"), now);
     if (!admission) return { counted: false };
     try { return { counted: (await organicService(admission)) === true }; }
     catch { return { counted: false }; }

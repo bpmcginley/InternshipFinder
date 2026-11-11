@@ -32,31 +32,46 @@ function parseCatalog(text) {
   return catalog(JSON.parse(text));
 }
 
-export function createEmployerMinuteBudget(schedule = setTimeout, cancel = clearTimeout) {
-  let timer;
-  let minute = null;
-  let addresses = new Map();
-  return (address, now) => {
-    if (!instant(now) || typeof address !== "string" || !/^[0-9a-f:.]{1,64}$/i.test(address))
+// Async because Web Crypto stays in the requesting invocation. Shared state contains no
+// raw address, timer or promise. Codes expire lazily on the next valid newer-minute check.
+export function createEmployerMinuteBudget(crypto = globalThis.crypto) {
+  let key = null,
+    minute = null,
+    codes = new Map();
+  return async (address, now) => {
+    try {
+      if (!instant(now) || typeof address !== "string" || !/^[0-9a-f:.]{1,64}$/i.test(address))
+        return false;
+      const current = Math.floor(now.getTime() / 60_000);
+      if (minute !== null && current < minute) return false;
+      if (current !== minute) {
+        minute = current;
+        codes = new Map();
+      }
+      if (!key) {
+        // Concurrent first calls own their own promises; only the first completed key is
+        // retained. All callers then sign with that same non-extractable isolate key.
+        const generated = await crypto.subtle.generateKey(
+          { name: "HMAC", hash: "SHA-256", length: 256 },
+          false,
+          ["sign"],
+        );
+        if (generated?.extractable !== false || generated?.type !== "secret") return false;
+        key ||= generated;
+      }
+      const digest = await crypto.subtle.sign("HMAC", key, encoder.encode(`${current}:${address}`));
+      if (current !== minute || !(digest instanceof ArrayBuffer) || digest.byteLength !== 32)
+        return false;
+      const code = Array.from(new Uint8Array(digest), (value) =>
+        value.toString(16).padStart(2, "0"),
+      ).join("");
+      const n = codes.get(code) || 0;
+      if ((!n && codes.size >= 2_000) || n >= 30) return false;
+      codes.set(code, n + 1);
+      return true;
+    } catch {
       return false;
-    const current = Math.floor(now.getTime() / 60_000);
-    if (current !== minute) {
-      minute = current;
-      addresses = new Map();
-      cancel(timer);
-      timer = schedule(
-        () => {
-          addresses.clear();
-          minute = null;
-        },
-        60_000 - (now.getTime() % 60_000),
-      );
-      timer?.unref?.(); // Node tests must not wait for the otherwise-idle expiry timer.
     }
-    const n = addresses.get(address) || 0;
-    if ((!n && addresses.size >= 2_000) || n >= 30) return false;
-    addresses.set(address, n + 1);
-    return true;
   };
 }
 
@@ -75,20 +90,39 @@ const validBody = (body) =>
 
 // A server-only, single-use receipt: no IP, request, binding or persistent identifier.
 const admissions = new WeakMap();
-export function admitEmployerPosting(body, address, at) {
-  if (!validBody(body) || !employerMinuteBudget(address, at)) return null;
+export async function admitEmployerPosting(body, address, at) {
+  if (!validBody(body)) return null;
+  const company = body.c;
+  let admittedAt;
+  try {
+    admittedAt = instant(at) ? at.getTime() : NaN;
+  } catch {
+    return null;
+  }
+  if (!(await employerMinuteBudget(address, new Date(admittedAt)))) return null;
   const receipt = Object.freeze({});
-  admissions.set(receipt, { company: body.c, at: at.getTime() });
+  admissions.set(receipt, { company, at: admittedAt });
   return receipt;
 }
 
-export function createEmployerPostingCounter({ db, keys, now = () => new Date() }) {
+export function createEmployerPostingCounter({
+  db,
+  keys,
+  now = () => new Date(),
+  budget = employerMinuteBudget,
+}) {
   const known = catalog(keys);
   const match = known && ((key) => (known(key) ? permanentMatch : null));
-  return employerPostingCounter(db, match, now);
+  return employerPostingCounter(db, match, now, budget);
 }
 
-export function createCachedEmployerPostingCounter({ db, load, maxBytes, now = () => new Date() }) {
+export function createCachedEmployerPostingCounter({
+  db,
+  load,
+  maxBytes,
+  now = () => new Date(),
+  budget = employerMinuteBudget,
+}) {
   const cache = createEmployerCatalogCache({
     load,
     parse: parseCatalog,
@@ -96,7 +130,7 @@ export function createCachedEmployerPostingCounter({ db, load, maxBytes, now = (
     now: () => now().getTime(),
     loadTimeoutMs: 5_000,
   });
-  return employerPostingCounter(db, cache.match, now);
+  return employerPostingCounter(db, cache.match, now, budget);
 }
 
 // Only this parsed catalog may be shared across requests. No loader or D1 binding is retained.
@@ -115,7 +149,7 @@ export function createRequestScopedEmployerPostingCounter({
 }
 
 // Cleanup has to succeed for the current UTC day before accepting counts.
-function employerPostingCounter(db, match, now) {
+function employerPostingCounter(db, match, now, budget = employerMinuteBudget) {
   let readyDay = null;
   let cleanupVersion = 0;
   return {
@@ -164,7 +198,7 @@ function employerPostingCounter(db, match, now) {
         !match ||
         !instant(at) ||
         readyDay !== at.toISOString().slice(0, 10) ||
-        !employerMinuteBudget(address, at) ||
+        !(await budget(address, at)) ||
         !validBody(body)
       )
         return false;
