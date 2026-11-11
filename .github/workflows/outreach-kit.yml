@@ -16,7 +16,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/python
+
+      - name: Select public listing data
+        id: public-data
+        uses: ./.github/actions/public-data
       - name: Build drafts from the current listing export
+        env:
+          INTERNSCOUT_PUBLIC_DATA: ${{ steps.public-data.outputs.directory }}
         run: python growth/outreach.py docs --out outreach-kit
       - name: Save drafts for review
         uses: actions/upload-artifact@v4

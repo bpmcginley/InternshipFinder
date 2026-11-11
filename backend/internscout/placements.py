@@ -34,6 +34,9 @@ import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 
+from .console_log import console
+from .site.paid_rules import _deadline_passed as _deadline_passed, unpaid as unpaid
+
 # Paid boxes on one page or in one view. The D1 column page_cap is held at 1 by a CHECK as well.
 MAX_PER_PAGE = 1
 
@@ -69,16 +72,8 @@ def _company(name) -> str:
     return " ".join(str(name or "").lower().split())
 
 
-def unpaid(x: dict) -> bool:
-    """The listing says the role is unpaid, read as the dashboard's IS.payOf reads it: the first of
-    paid, unpaid or stipend in its restrictions, else insights.pay."""
-    r = next((t for t in x.get("restrictions") or [] if t in ("paid", "unpaid", "stipend")), None)
-    return (r or (x.get("insights") or {}).get("pay")) == "unpaid"
 
 
-def _deadline_passed(x: dict, today: str) -> bool:
-    deadline = str((x.get("insights") or {}).get("deadline") or "")[:10]
-    return bool(deadline) and deadline < today
 
 
 def _well_formed(p) -> bool:
@@ -350,7 +345,7 @@ def main(argv: list[str]) -> int:
             + _why(e).replace(token, "[token]").replace("\n", " ")
         )
         return 0
-    print(f"[placements] recorded today's runs for {n} placement(s)")
+    console(f"[placements] recorded today's runs for {n} placement(s)")
     return 0
 
 
