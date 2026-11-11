@@ -45,8 +45,8 @@ test("U1: the bridge's pages come from the manifest, and its match is the host a
   assert.ok(manifest.permissions.includes("scripting") && manifest.permissions.includes("tabs"));
   assert.equal(
     manifest.version,
-    "0.5.9",
-    "audit fixes use a new version after the submitted 0.5.8 package",
+    "0.5.10",
+    "the release candidate advances beyond the published 0.5.9 package",
   );
 });
 
