@@ -13,6 +13,7 @@ Run: python scripts/make_og_image.py
 Writes: docs/og-preview.png
 """
 
+from io import BytesIO
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
@@ -71,6 +72,52 @@ def build() -> Path:
     OUT.parent.mkdir(parents=True, exist_ok=True)
     img.save(OUT, "PNG", optimize=True)
     return OUT
+
+
+def _fit_landing_title(draw: ImageDraw.ImageDraw, heading: str):
+    words = heading.split()
+    if not words:
+        raise ValueError("Landing card title is empty")
+    width = W - 168
+    for size in range(90, 43, -2):
+        font = ImageFont.load_default(size)
+        lines = [words[0]]
+        for word in words[1:]:
+            line = f"{lines[-1]} {word}"
+            if draw.textlength(line, font=font) <= width:
+                lines[-1] = line
+            else:
+                lines.append(word)
+        title = "\n".join(lines)
+        left, top, right, bottom = draw.multiline_textbbox((0, 0), title, font=font, spacing=8)
+        if len(lines) <= 2 and right - left <= width and bottom - top <= 185:
+            return title, font
+    raise ValueError("Landing card title does not fit")
+
+
+def landing_card(icon_path: Path, heading: str, *, term: str | None = None) -> bytes:
+    """Render a 1200 by 630 PNG for one generated landing page."""
+    card = Image.new("RGB", (W, H), ACCENT)
+    draw = ImageDraw.Draw(card)
+    draw.rectangle((0, 492, W, H), fill=PAPER)
+    draw.rounded_rectangle((84, 59, 164, 139), radius=19, fill=PAPER)
+    with Image.open(icon_path) as source:
+        icon = source.convert("RGBA").resize((64, 64), Image.Resampling.LANCZOS)
+    card.paste(icon, (92, 67), icon)
+
+    draw.text((186, 74), "InternScout", font=ImageFont.load_default(48), fill=PAPER)
+    title, font = _fit_landing_title(draw, heading)
+    if term:
+        term_font = ImageFont.load_default(41)
+        if len(term.splitlines()) != 1 or draw.textlength(term, font=term_font) > W - 168:
+            raise ValueError("Landing card term does not fit")
+        draw.text((84, 177), term, font=term_font, fill=SOFT)
+    draw.multiline_text((84, 235 if term else 210), title, font=font, spacing=8, fill=PAPER)
+    draw.text((84, 533), "internscout.org", font=ImageFont.load_default(37), fill=ACCENT)
+
+    output = BytesIO()
+    card.save(output, "PNG", optimize=True)
+    return output.getvalue()
 
 
 if __name__ == "__main__":
