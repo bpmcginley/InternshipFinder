@@ -349,6 +349,8 @@ def validate_staged_follow_provenance(checkout, candidate_tree, provenance):
 
 
 def ancestor(checkout, earlier, later, *, no_replace=False):
+    # Legacy grafts affect merge-base even when replacement objects are disabled.
+    env = {**os.environ, "GIT_GRAFT_FILE": os.devnull} if no_replace else None
     return (
         git(
             checkout,
@@ -358,25 +360,15 @@ def ancestor(checkout, earlier, later, *, no_replace=False):
             later,
             check=False,
             no_replace=no_replace,
+            env=env,
         ).returncode
         == 0
     )
 
 
-def same_snapshot(checkout, earlier, later, *, no_replace=False):
+def same_snapshot(checkout, earlier, later):
     return (
-        git(
-            checkout,
-            "diff",
-            "--quiet",
-            earlier,
-            later,
-            "--",
-            *OWNED,
-            check=False,
-            no_replace=no_replace,
-        ).returncode
-        == 0
+        git(checkout, "diff", "--quiet", earlier, later, "--", *OWNED, check=False).returncode == 0
     )
 
 
@@ -427,9 +419,15 @@ def _bind_published_follow(checkout, candidate, accepted, staged):
     if staged is None:
         return None
     try:
-        if not ancestor(checkout, candidate, accepted, no_replace=True) or not same_snapshot(
-            checkout, staged.candidate_tree, accepted, no_replace=True
-        ):
+        if not ancestor(checkout, candidate, accepted, no_replace=True):
+            return None
+        staged_owned = git(
+            checkout, "ls-tree", "-z", staged.candidate_tree, "--", *OWNED, no_replace=True
+        ).stdout
+        accepted_owned = git(
+            checkout, "ls-tree", "-z", accepted, "--", *OWNED, no_replace=True
+        ).stdout
+        if staged_owned != accepted_owned:
             return None
         public_tree = revision(checkout, f"{accepted}:{PUBLIC}", no_replace=True)
         if public_tree != revision(checkout, f"{staged.candidate_tree}:{PUBLIC}", no_replace=True):

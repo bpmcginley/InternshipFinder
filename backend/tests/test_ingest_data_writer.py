@@ -551,7 +551,14 @@ class IngestWriterTests(unittest.TestCase):
             )
             self.git(checkout, "replace", changed, replacement)
             self.assertTrue(writer.same_snapshot(checkout, candidate, changed))
-            self.assertFalse(writer.same_snapshot(checkout, candidate, changed, no_replace=True))
+            self.assertNotEqual(
+                writer.git(
+                    checkout, "ls-tree", "-z", candidate, "--", *writer.OWNED, no_replace=True
+                ).stdout,
+                writer.git(
+                    checkout, "ls-tree", "-z", changed, "--", *writer.OWNED, no_replace=True
+                ).stdout,
+            )
             return False
 
         with patch.object(writer, "push_existing", side_effect=lost_ack):
@@ -566,6 +573,63 @@ class IngestWriterTests(unittest.TestCase):
             ),
         )
         self.assertIsNone(receipt)
+
+    def test_external_diff_cannot_hide_true_private_state_change_after_lost_ack(self):
+        writer.prepare(self.data, self.primary, self.state)
+        self.update_snapshot()
+        real_push = writer.push_existing
+
+        def lost_ack(checkout, expected):
+            self.assertTrue(real_push(checkout, expected))
+            candidate = writer.revision(checkout, "HEAD")
+            other = self.other()
+            write(other, writer.STATE[0], {"state": "changed on the remote"})
+            changed = self.commit(other, writer.STATE[0])
+            self.git(other, "push", "origin", f"HEAD:{writer.BRANCH}")
+            self.assertEqual(writer.remote_tip(checkout), changed)
+
+            diff = checkout / ".git/trusted-diff"
+            diff.write_bytes(b"#!/bin/sh\nexit 0\n")
+            diff.chmod(0o755)
+            self.git(checkout, "config", "diff.external", diff.as_posix())
+            self.git(checkout, "config", "diff.trustExitCode", "true")
+            self.assertTrue(writer.same_snapshot(checkout, candidate, changed))
+            self.assertEqual(
+                writer.revision(checkout, f"{candidate}:{writer.PUBLIC}"),
+                writer.revision(checkout, f"{changed}:{writer.PUBLIC}"),
+            )
+            return False
+
+        with patch.object(writer, "push_existing", side_effect=lost_ack):
+            result, receipt = writer.publish_with_follow_provenance(
+                self.data, self.state, "Publish", self.follow_proof()
+            )
+        self.assertEqual(
+            result,
+            (
+                "Validated data snapshot already published.",
+                writer.revision(self.remote, writer.BRANCH),
+            ),
+        )
+        self.assertIsNone(receipt)
+
+    def test_legacy_graft_cannot_invent_accepted_ancestry_for_follow_proof(self):
+        writer.prepare(self.data, self.primary, self.state)
+        self.update_snapshot()
+        writer.stage_snapshot(self.data, self.state)
+        tree = self.git(self.data, "write-tree").decode("ascii").strip()
+        staged = writer.validate_staged_follow_provenance(self.data, tree, self.follow_proof())
+        candidate = (
+            self.git(self.data, "commit-tree", tree, "-m", "Original candidate").decode().strip()
+        )
+        unrelated = (
+            self.git(self.data, "commit-tree", tree, "-m", "Unrelated exact tree").decode().strip()
+        )
+        self.assertNotEqual(candidate, unrelated)
+        (self.data / ".git/info/grafts").write_text(f"{unrelated} {candidate}\n", encoding="ascii")
+        self.assertTrue(writer.ancestor(self.data, candidate, unrelated))
+        self.assertFalse(writer.ancestor(self.data, candidate, unrelated, no_replace=True))
+        self.assertIsNone(writer._bind_published_follow(self.data, candidate, unrelated, staged))
 
     def test_unconfirmed_push_never_binds_a_follow_receipt(self):
         writer.prepare(self.data, self.primary, self.state)
