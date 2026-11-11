@@ -21,6 +21,7 @@ from scripts.follow_lineage_checkpoint import (
     AcceptedFollowSource,
     FollowCheckpoint,
     _check_bounds,
+    _source_rows,
     decode_accepted_follow_checkpoint,
 )
 from scripts.follow_pending_checkpoint import _LIFETIME as _PENDING_LIFETIME
@@ -54,6 +55,32 @@ class VerifiedWriterCheckpoint:
     pending: PendingFollowCheckpoint | None
 
 
+def _continuity_check(source, accepted, bounds):
+    if accepted is None or not accepted.lineage:
+        return None
+    _, previous_rows = _source_rows(source, accepted.identity, bounds)
+    by_id = {}
+    by_url = {}
+    # Match previous_export's first row per raw URL in sorted shard order.
+    for role_id, row in previous_rows.items():
+        url = row["apply_url"]
+        if url not in by_url:
+            key = (role_id, row["first_seen"])
+            by_id[role_id] = by_url[url] = key
+
+    def check(rows, lineage):
+        for role_id, row in rows.items():
+            prior = by_id.get(role_id) or by_url.get(row["apply_url"])
+            stamp = row["first_seen"]
+            if prior is None or stamp != prior[1]:
+                continue
+            proof = accepted.lineage.get(prior)
+            if proof is not None and lineage.get((role_id, stamp)) != proof:
+                raise FollowWriterCheckpointError("retained listing lost predecessor lineage")
+
+    return check
+
+
 class FollowCheckpointWriter:
     """One bounded writer attempt using independently attested Git inputs."""
 
@@ -72,6 +99,7 @@ class FollowCheckpointWriter:
         self._clock = clock
         self._monotonic = _monotonic
         self._loaded = None
+        self._utc_high_water = None
 
     def _check_deadline(self):
         remaining = self._deadline - self._monotonic()
@@ -85,7 +113,11 @@ class FollowCheckpointWriter:
         return result
 
     def _now(self):
-        return _utc(self._call(self._clock))
+        now = _utc(self._call(self._clock))
+        if self._utc_high_water is not None and now < self._utc_high_water:
+            raise FollowWriterCheckpointError("checkpoint clock moved backwards")
+        self._utc_high_water = now
+        return now
 
     def load(
         self,
@@ -110,9 +142,11 @@ class FollowCheckpointWriter:
         ):
             raise FollowWriterCheckpointError("inconsistent observed Git identity")
 
+        if observed > self._now():
+            raise FollowWriterCheckpointError("invalid checkpoint observation")
         loaded = self._call(self._client.load)
         now = self._now()
-        if observed > now or not isinstance(loaded, FollowCheckpointLoad):
+        if not isinstance(loaded, FollowCheckpointLoad):
             raise FollowWriterCheckpointError("invalid checkpoint observation")
         accepted = pending = None
         if loaded.state == "active" and isinstance(loaded.accepted, bytes):
@@ -146,6 +180,7 @@ class FollowCheckpointWriter:
         else:
             raise FollowWriterCheckpointError("accepted checkpoint unavailable")
 
+        continuity = self._call(_continuity_check, source, accepted, self._bounds)
         if loaded.pending is not None:
             pending = self._call(
                 read_pending_follow_checkpoint,
@@ -154,6 +189,7 @@ class FollowCheckpointWriter:
                 predecessor=predecessor,
                 now=now,
                 bounds=self._bounds,
+                _continuity=continuity,
             )
             if pending.provenance.covers_after != covers_after:
                 raise FollowWriterCheckpointError(
@@ -165,7 +201,7 @@ class FollowCheckpointWriter:
         verified = VerifiedWriterCheckpoint(predecessor, covers_after, accepted, pending)
         if self._ensure_live(verified) < observed:
             raise FollowWriterCheckpointError("checkpoint clock moved backwards")
-        self._loaded = (verified, loaded.pending, observation)
+        self._loaded = (verified, loaded.pending, observation, continuity)
         return verified
 
     def _ensure_live(self, verified):
@@ -192,7 +228,7 @@ class FollowCheckpointWriter:
 
     def stage(self, verified: VerifiedWriterCheckpoint, *, candidate, staged, provenance) -> str:
         """Stage one exact new pending generation before the writer attempts publication."""
-        self._take(verified)
+        _, _, continuity = self._take(verified)
         if (
             verified.pending is not None
             or not isinstance(provenance, WriterProvenance)
@@ -209,17 +245,23 @@ class FollowCheckpointWriter:
             predecessor=verified.predecessor,
             prepared_at=prepared,
             bounds=self._bounds,
+            _continuity=continuity,
         )
-        if not timedelta(0) <= self._ensure_live(verified) - prepared < _PENDING_LIFETIME:
-            raise FollowWriterCheckpointError("checkpoint stage deadline passed")
+        generation = sha256(raw).hexdigest()
+        self._ensure_stage_live(verified, prepared)
         status = self._call(self._client.stage, raw)
+        self._ensure_stage_live(verified, prepared)
         if type(status) is not str or status not in ("pending", "already_pending"):
             raise FollowWriterCheckpointError("checkpoint stage unconfirmed")
-        return sha256(raw).hexdigest()
+        return generation
+
+    def _ensure_stage_live(self, verified, prepared):
+        if not timedelta(0) <= self._ensure_live(verified) - prepared < _PENDING_LIFETIME:
+            raise FollowWriterCheckpointError("checkpoint stage deadline passed")
 
     def recover(self, verified: VerifiedWriterCheckpoint, *, bind_accepted) -> PromotionStatus:
         """Promote a verified accepted descendant once. Reload before using new lineage."""
-        raw, observation = self._take(verified)
+        raw, observation, _ = self._take(verified)
         if raw is None or observation.commit == verified.predecessor.commit:
             return "no_publication"
 
@@ -228,7 +270,9 @@ class FollowCheckpointWriter:
 
         def compare_and_set(change):
             self._ensure_live(verified)
-            return self._call(self._client.compare_and_set, change)
+            status = self._call(self._client.compare_and_set, change)
+            self._ensure_live(verified)
+            return status
 
         return self._call(
             recover_and_promote_follow_checkpoint,

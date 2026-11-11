@@ -7,8 +7,11 @@ import json
 
 import pytest
 
+from internscout import export_static, pipeline
+from internscout.follow_writer_provenance import FollowWriterCapture
+from test_follow_lineage_checkpoint import accepted, encoded
 from test_follow_pending_checkpoint import pending
-from test_follow_writer_provenance import BASELINE, NOW, database
+from test_follow_writer_provenance import BASELINE, NOW, FrozenDateTime, database, raw
 
 
 class Store:
@@ -228,3 +231,153 @@ def test_deadline_fences_late_read_binder_and_mutation_reply(scenario):
     with pytest.raises(module.FollowWriterCheckpointError, match="reload"):
         writer.recover(verified, bind_accepted=bind)
     assert store.calls.count("cas") == 1
+
+
+@pytest.fixture
+def successor(accepted, monkeypatch):
+    codec, _, _, source, bounds, directory, listing = accepted
+    from scripts import ingest_data_writer as git
+    from scripts.follow_checkpoint_client import FollowCheckpointLoad
+    from scripts.follow_checkpoint_promotion import AcceptedFollowObservation
+    from scripts.follow_checkpoint_writer import FollowCheckpointWriter
+
+    raw_accepted = encoded(accepted)
+    original = codec.decode_accepted_follow_checkpoint(raw_accepted, source, now=NOW, bounds=bounds)
+
+    class Next(FrozenDateTime):
+        @classmethod
+        def now(cls, tz=None):
+            value = NOW + timedelta(hours=1)
+            return value if tz is not None else value.replace(tzinfo=None)
+
+    monkeypatch.setattr(export_static, "datetime", Next)
+    monkeypatch.setattr(pipeline, "datetime", Next)
+    capture = FollowWriterCapture(
+        covers_after=original.covers_after,
+        prior_identity=original.identity,
+        prior_lineage=original.lineage,
+    )
+    pipeline.run(
+        [listing | {"active": False}, raw("Fixture Open", "open"), raw("New Fixture", "new")],
+        verbose=False,
+        follow_capture=capture,
+    )
+    export_static.export(str(directory), follow_capture=capture)
+    repo = directory.parent.parent
+    git.git(repo, "add", "--all")
+    tree = git.git(repo, "write-tree").stdout.decode().strip()
+    staged = git.validate_staged_follow_provenance(repo, tree, capture.result)
+    git.git(repo, "commit", "-m", "Synthetic next candidate")
+    candidate = git.revision(repo, "HEAD")
+    utc = [NOW + timedelta(hours=2)]
+
+    def session(store):
+        return FollowCheckpointWriter(
+            repo, store, bounds=bounds, deadline=10, clock=lambda: utc[0], _monotonic=lambda: 0
+        )
+
+    def observe():
+        return AcceptedFollowObservation(source.commit, source.public_tree, utc[0])
+
+    def store(pending=None):
+        return Store(FollowCheckpointLoad("active", raw_accepted, pending))
+
+    return (
+        repo,
+        codec,
+        source,
+        bounds,
+        original,
+        candidate,
+        staged,
+        capture.result,
+        utc,
+        session,
+        observe,
+        store,
+    )
+
+
+def test_stage_ack_fails_after_utc_expiry_or_rollback_without_retry(successor):
+    from scripts.follow_checkpoint_writer import FollowWriterCheckpointError
+
+    _, _, source, _, _, candidate, staged, provenance, utc, session, observe, new_store = successor
+    cutoff = NOW + timedelta(days=7)
+    for after, expected in (
+        (cutoff, "accepted checkpoint expired"),
+        (cutoff - timedelta(seconds=2), "clock moved backwards"),
+    ):
+        utc[0] = cutoff - timedelta(seconds=1)
+        store = new_store()
+        writer = session(store)
+        verified = writer.load(source, observe())
+        store.after_stage = lambda: utc.__setitem__(0, after)
+        with pytest.raises(FollowWriterCheckpointError, match=expected):
+            writer.stage(verified, candidate=candidate, staged=staged, provenance=provenance)
+        assert store.state.pending is not None
+        with pytest.raises(FollowWriterCheckpointError, match="reload"):
+            writer.stage(verified, candidate=candidate, staged=staged, provenance=provenance)
+        assert store.calls == ["load", "stage"]
+        utc[0] = cutoff - timedelta(seconds=3)
+        with pytest.raises(FollowWriterCheckpointError, match="clock moved backwards"):
+            writer.load(source, observe())
+
+
+def test_missing_retained_closed_evidence_is_refused_on_stage_and_cold_load(successor):
+    from scripts.follow_checkpoint_writer import FollowWriterCheckpointError, _continuity_check
+    from scripts.follow_pending_checkpoint import prepare_pending_follow_checkpoint
+
+    (
+        repo,
+        codec,
+        source,
+        bounds,
+        old,
+        candidate,
+        staged,
+        provenance,
+        utc,
+        session,
+        observe,
+        new_store,
+    ) = successor
+    closed_key = next(key for key in old.lineage if key[0] not in provenance.rows)
+    stripped = replace(
+        provenance,
+        lineage={key: proof for key, proof in provenance.lineage.items() if key != closed_key},
+    )
+    store = new_store()
+    writer = session(store)
+    verified = writer.load(source, observe())
+    with pytest.raises(FollowWriterCheckpointError, match="retained listing"):
+        writer.stage(verified, candidate=candidate, staged=staged, provenance=stripped)
+    assert store.calls == ["load"] and store.state.pending is None
+
+    stripped_raw = prepare_pending_follow_checkpoint(
+        repo,
+        candidate=candidate,
+        staged=staged,
+        provenance=stripped,
+        predecessor=verified.predecessor,
+        prepared_at=utc[0],
+        bounds=bounds,
+    )
+    cold = new_store(stripped_raw)
+    with pytest.raises(FollowWriterCheckpointError, match="retained listing"):
+        session(cold).load(source, observe())
+    assert cold.calls == ["load"]
+
+    good = writer.load(source, observe())
+    writer.stage(good, candidate=candidate, staged=staged, provenance=provenance)
+    loaded = session(store).load(source, observe())
+    assert closed_key in loaded.pending.provenance.lineage
+
+    check = _continuity_check(source, old, bounds)
+    _, rows = codec._source_rows(source, old.identity, bounds)
+    closed_id, raw_time = closed_key
+    alias = "f" * 16
+    aliased = {alias: {**rows[closed_id], "id": alias, "status": "open"}}
+    check({}, {})  # A row that was genuinely removed has no obligation.
+    with pytest.raises(FollowWriterCheckpointError, match="retained listing"):
+        check(aliased, {})
+    check(aliased, {(alias, raw_time): old.lineage[closed_key]})
