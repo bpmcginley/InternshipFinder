@@ -35,6 +35,7 @@ from urllib.parse import quote, urlparse
 from . import near_metros
 from .console_log import console
 from .site import discovery as _discovery
+from .site import employer as _employer
 from .site import llms as _llms
 from .site import near as _near
 from .site.rules import (
@@ -4379,6 +4380,118 @@ def _render_near_hub(groups: list[_near.LinkGroup]) -> tuple[list[str], str, str
     return title, desc, body
 
 
+def _select_employer_page(
+    directory: _employer.Directory,
+    name: str,
+    items: list[dict],
+    path: str,
+    spellings: list[str],
+    root: tuple[str, str],
+    now: datetime,
+    live,
+    earning: frozenset,
+    details: dict[str, tuple[tuple[str, str], ...]] | None,
+) -> _employer.Page:
+    main = directory.company_fields[name]
+    links = _employer.select_links(
+        directory, name, items, main, related_limit=RELATED, place_limit=EMPLOYER_PLACES
+    )
+    where = ",".join(
+        top(Counter(k for x in items for k in x["keys"] if k in PLACES or k == "remote"), 6)
+    )
+    # A place that names only a country says nothing beside a named city.
+    term = main_term(items)
+    named = [p for p, _ in places(items) if p != "Remote" and not _COUNTRY_ONLY.match(p)][:3]
+    pay = hourly_range(items)
+    co_ops = sum(1 for x in items if "co_op" in (x.get("stage") or []))
+    newest = max(
+        (d for d in (_when(x.get("posted_at") or x.get("first_seen")) for x in items) if d),
+        default=None,
+    )
+    return _employer.Page(
+        name=name,
+        path=path,
+        items=items,
+        main=main,
+        links=links,
+        where=where,
+        spellings=spellings,
+        root=root,
+        now=now,
+        term=term,
+        named=named,
+        pay=pay,
+        newest=newest,
+        co_ops=co_ops,
+        own_links=all(own_posting(x) for x in items),
+        thin=not employer_indexed(len(items), path, live, earning),
+        details=details,
+    )
+
+
+def _render_employer_page(model: _employer.Page) -> dict:
+    name, items, path, main = model.name, model.items, model.path, model.main
+    note = (
+        f"<p class=\"more\">InternScout is not affiliated with {esc(name)}. These are roles InternScout "
+        f"found on {esc(name)}'s public job boards; always apply on the employer's own site.</p>"
+    )
+    facts, questions = employer_facts(name, items, main)
+    related = (
+        employer_breakdown(name, items, main)
+        + questions
+        + note
+        + employer_offer(name)
+        + link_list("Similar employers", model.links.similar)
+        + link_list(
+            "Related fields",
+            [
+                (f"/internships/{field_slug(t)}/", field_title(t), count)
+                for t, count in model.links.fields
+            ],
+        )
+        # The field-in-a-place pages this employer's own roles are on, most of its roles first.
+        + link_list(
+            "Related internships by place",
+            [
+                (f"/internships/{field_slug(t)}/{state_slug(k)}/", combo_label(t, k), count)
+                for t, k, count in model.links.places
+            ],
+        )
+    )
+    desc = employer_description(
+        name,
+        len(items),
+        model.term,
+        model.named,
+        model.pay,
+        model.newest,
+        model.co_ops,
+        own_links=model.own_links,
+    )
+    return {
+        "path": path,
+        "title": employer_title(name, len(items), model.term),
+        "desc": desc,
+        "h1": f"Internships at {name}",
+        "crumbs": [model.root, ("/internships/at/", "By employer"), (path, name)],
+        "body": listing_body(
+            items,
+            f"at {name}",
+            "",
+            model.now,
+            related,
+            dash=dash_link(state=model.where, companies=model.spellings),
+            here=path,
+            extra=facts,
+            src="seo-employer",
+            details=model.details,
+        ),
+        "items": items,
+        "kind": "employer",
+        "thin": model.thin,
+    }
+
+
 # ---------------------------------------------------------------- build
 
 
@@ -4972,139 +5085,22 @@ def build(
         ],
     )
 
+    directory = _employer.Directory(by_company, company_fields, EMPLOYERS, fields, combos)
     for name, items in sorted(by_company.items()):
         path = EMPLOYERS[name]
-        main = company_fields[name]
-        # was: top = [t for t, _ in Counter(t for x in items for t in set(...) - SKIP_FIELDS).most_common(3)]
-        covered = sum(1 for x in items if set(x.get("field_tags") or []) & set(main))
-        fields_words = join_words([lower_name(field_title(t)) for t in main])
-        # "Mostly" only when it is true; otherwise the fields are some of what the employer hires for.
-        about = (
-            (
-                f", mostly in {fields_words}"
-                if covered * 2 > len(items)
-                else f", including roles in {fields_words}"
-            )
-            if main
-            else ""
-        )
-        note = (
-            f"<p class=\"more\">InternScout is not affiliated with {esc(name)}. These are roles InternScout "
-            f"found on {esc(name)}'s public job boards; always apply on the employer's own site.</p>"
-        )
-        facts, questions = employer_facts(name, items, main)
-        # Ranked by fields shared, then size; the tie goes to the name, so every build agrees.
-        similar = sorted(
-            (
-                (len(set(main) & set(f)), len(by_company[o]), o)
-                for o, f in company_fields.items()
-                if o != name and set(main) & set(f)
-            ),
-            key=lambda t: (-t[0], -t[1], t[2]),
-        )[:RELATED]
-        # was: related = note + link_list("Related fields", ...)
-        # 2026-10-23: was: questions + note, with no field-by-field facts. Revert: omit this call.
-        related = (
-            employer_breakdown(name, items, main)
-            + questions
-            + note
-            + employer_offer(name)
-            + link_list("Similar employers", [(EMPLOYERS[o], o, k) for _, k, o in similar])
-            + link_list(
-                "Related fields",
-                [
-                    (f"/internships/{field_slug(t)}/", field_title(t), len(fields[t]))
-                    for t in main
-                    if t in fields
-                ],
-            )
-            # The field-in-a-place pages this employer's own roles are on (2026-10-07), most of
-            # its roles first: "Software Engineering in New York City" from a bank hiring there.
-            + link_list(
-                "Related internships by place",
-                [
-                    (
-                        f"/internships/{field_slug(t)}/{state_slug(k)}/",
-                        combo_label(t, k),
-                        len(combos[(t, k)]),
-                    )
-                    for (t, k), _ in sorted(
-                        Counter(
-                            (t, k)
-                            for x in items
-                            for t in main
-                            for k in x["keys"]
-                            if (t, k) in combos and t in (x.get("field_tags") or [])
-                        ).items(),
-                        key=lambda kv: (-kv[1], kv[0]),
-                    )[:EMPLOYER_PLACES]
-                ],
-            )
-        )
-        # was: if k in US_STATES, which now holds the Canada and metro views as well.
-        where = ",".join(
-            top(Counter(k for x in items for k in x["keys"] if k in PLACES or k == "remote"), 6)
-        )
-        # was: ",".join(k for k, _ in Counter(k for x in items for k in x["keys"] if k in US_STATES).most_common(6))
-        # was: f"{name} Internships – {len(items):,} Open Now | InternScout", and a description of
-        # "N open internships and co-ops at X for college students{about}". The start term in the title
-        # matches "blue origin internships summer 2027"; places and pay are what a searcher picks on.
-        term = main_term(items)
-        # A place that names only a country ("Canada", 6 of Lyft's roles) says nothing beside "Toronto, ON".
-        named = [p for p, _ in places(items) if p != "Remote" and not _COUNTRY_ONLY.match(p)][:3]
-        pay = hourly_range(items)
-        co_ops = sum(1 for x in items if "co_op" in (x.get("stage") or []))
-        # Fewer places until the description fits DESC_MAX (2026-10-05): a board's "place" can be a
-        # street address, and three of them made a 330-character description. was: always three.
-        # 2026-10-07: employer pages ranked 8-10 for "<employer> internships" but got under 1% of clicks
-        # (Under Armour 1 of 205, Campbell 0 of 119): the employer's own careers page sits above them, so
-        # the snippet now leads with what that page doesn't show in one place: every open role on one
-        # page, the listed pay, and how recently the newest was posted (a role found this week reads as
-        # still open). was: "... Roles in <fields>. Updated <date>. Free, no sign-up."
-        newest = max(
-            (d for d in (_when(x.get("posted_at") or x.get("first_seen")) for x in items) if d),
-            default=None,
-        )
-        # 2026-10-13 (employer_title, employer_description): still under 1% (Under Armour 1 click in 348
-        # impressions at 9.2). The title starts with the search's own words, "Under Armour Internships
-        # Summer 2027", with a count floor that does not change on every refresh; the description keeps
-        # the exact count, places, pay and newest date, and ends on why click (free, the employer's own
-        # posting) where it fits. was: [f"{name} {term} Internships – {n} Open", f"{name} Internships
-        # ({term}) – {n} Open", f"{name} Internships – {n} Open", f"{name} Internships"], and the
-        # description "{n} open {name} internships for {term} on one page, in {places}. Listed pay
-        # $a–$b/hour. Newest posted {day}. Free, no sign-up." built here.
-        desc = employer_description(
+        model = _select_employer_page(
+            directory,
             name,
-            len(items),
-            term,
-            named,
-            pay,
-            newest,
-            co_ops,
-            own_links=all(own_posting(x) for x in items),
-        )
-        add(
-            path,
-            employer_title(name, len(items), term),
-            desc,
-            f"Internships at {name}",
-            [root, ("/internships/at/", "By employer"), (path, name)],
-            listing_body(
-                items,
-                f"at {name}",
-                "",
-                now,
-                related,
-                dash=dash_link(state=where, companies=spellings[name]),
-                here=path,
-                extra=facts,
-                src="seo-employer",
-                details=cohort_details if path in seo_role_details.COHORT_PATHS else None,
-            ),
             items,
-            kind="employer",
-            thin=not employer_indexed(len(items), path, live, earning),
-        )  # 2026-10-23
+            path,
+            spellings[name],
+            root,
+            now,
+            live,
+            earning,
+            cohort_details if path in seo_role_details.COHORT_PATHS else None,
+        )
+        add(**_render_employer_page(model))
 
     # Start term, paid, co-op, research and class-year pages (kinds()). A slug a field or state page
     # already uses is skipped, like a field slug that names a state.
