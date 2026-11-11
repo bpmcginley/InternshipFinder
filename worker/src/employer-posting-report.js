@@ -1,8 +1,9 @@
 // Dormant owner-report query. The route must authorize the owner and send no-store.
+import { isEmployerPostingKey } from "./employer-posting-counts.js";
+
 const DAY = 86_400_000;
 const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_PAGE = 1000;
-const encoder = new TextEncoder();
 const isDateKey = (day) => {
   if (typeof day !== "string" || !DATE_KEY.test(day)) return false;
   const stamp = new Date(`${day}T00:00:00Z`);
@@ -38,10 +39,7 @@ export async function readEmployerPostingReport(
       !isDateKey(after.day) ||
       after.day < start ||
       after.day >= end ||
-      typeof after.company !== "string" ||
-      !after.company ||
-      after.company.length > 200 ||
-      encoder.encode(after.company).length > 200)
+      !isEmployerPostingKey(after.company))
   )
     throw new RangeError("Invalid employer posting report cursor");
 

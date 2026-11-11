@@ -66,12 +66,17 @@ test("employer response rejects oversized, repeated, malformed and stale cursors
   };
   const repeated = withCursor(JSON.stringify(cursor));
   repeated.append("organic_after", JSON.stringify(cursor));
+  const inWindow = { start: "2026-11-10", end_exclusive: "2026-11-11", day: "2026-11-10" };
+  const invalidKeys = ["\u0000", "\ud800", " key "].map((company) =>
+    withCursor(JSON.stringify({ ...inWindow, company })),
+  );
   for (const query of [
     withCursor(""),
     withCursor("é".repeat(513)),
     withCursor("{}"),
     withCursor(JSON.stringify(cursor)),
     repeated,
+    ...invalidKeys,
   ]) {
     await assert.rejects(read(db, enabled, query), { status: 400, code: "organic_after" });
   }
