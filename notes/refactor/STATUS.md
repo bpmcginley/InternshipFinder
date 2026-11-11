@@ -475,6 +475,11 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 - [#268](https://github.com/bpmcginley/InternshipFinder/pull/268) merged as `7f43306a`. Both Pages runs, 42947403919 and 42947404877, and the exact deployments succeeded.
 - Move four sitemap, robots, feed discovery and LLMS tests into `test_site_discovery.py` and keep their shared site and listing fixtures in `test_seo_pages.py`. The four test bodies and the private robots parser match their original source. Backend collection retained all 1,166 tests, with only the four moved module paths changing. All 164 focused tests and Ruff passed.
 
+## WP-3.3 employer test follow-up
+
+- [#276](https://github.com/bpmcginley/InternshipFinder/pull/276) merged at `c84cea3b`. Pages runs 42949557934 and 42949563654 and the exact deployment succeeded.
+- Move 15 employer-specific test functions and their private fixture into `test_seo_employer.py`, keeping shared helpers at their existing imports. All assertions and decorators match the original source. Cross-family tests remain in `test_seo_pages.py`. Backend collection retained all 1,166 tests, with only the 20 moved case paths changing. All 219 focused tests and Ruff passed.
+
 ## WP-1.4 growth asset logging
 
 - Audited open Product PRs and the growth CLI and workflow call sites at `aa9070c4`. The Flyer, Glass Flyer and campaign prose diagnostics preserve their exact default text and streams. Opt-in JSON omits output paths, Glass Flyer URLs and spot labels, and campaign titles and matched lint text.
