@@ -14,6 +14,8 @@ sys.path.insert(0, os.path.join(ROOT, "backend"))
 import campaign  # noqa: E402
 from tests.seo_fixture_data import _row, _site  # noqa: E402
 
+pytestmark = pytest.mark.without_seo_facade
+
 NOW = datetime(2026, 10, 26, 12, tzinfo=timezone.utc)  # a Monday, ISO week 44
 
 
