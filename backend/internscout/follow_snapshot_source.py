@@ -24,6 +24,24 @@ _MAX_SAFE_INTEGER = 9_007_199_254_740_991
 
 
 @dataclass(frozen=True)
+class FollowFirstSeenEvidence:
+    """Trusted evidence about one exact naive observation."""
+
+    raw_first_seen: str
+    verified_utc: datetime | None = None
+    observed_by: datetime | None = None
+
+
+@dataclass(frozen=True)
+class FollowTimeProvenance:
+    """An attestation over exact source bytes and deduplicated open row IDs."""
+
+    index_sha256: str
+    shard_sha256: Mapping[str, str]
+    rows: Mapping[str, FollowFirstSeenEvidence]
+
+
+@dataclass(frozen=True)
 class FollowExportCapture:
     """Trusted facts supplied separately from the index and its shard bytes."""
 
@@ -33,6 +51,7 @@ class FollowExportCapture:
     shard_sha256: Mapping[str, str]
     complete: bool
     legacy_utc_first_seen: bool = False
+    first_seen_provenance: FollowTimeProvenance | None = None
 
 
 def _invalid(reason: str) -> ValueError:
@@ -48,18 +67,61 @@ def _utc(value: object) -> datetime:
         raise _invalid("UTC timestamp out of range") from error
 
 
-def _time(value: object, *, legacy_utc: bool = False) -> datetime:
+def _parse_time(value: object) -> datetime:
     if not isinstance(value, str) or not _TIMESTAMP.fullmatch(value) or value.endswith("-00:00"):
         raise _invalid("malformed export time")
     try:
-        parsed = datetime.fromisoformat(
+        return datetime.fromisoformat(
             value.removesuffix("Z") + ("+00:00" if value.endswith("Z") else "")
         )
     except ValueError as error:
         raise _invalid("malformed export time") from error
-    if parsed.utcoffset() is None and legacy_utc:
-        parsed = parsed.replace(tzinfo=timezone.utc)
-    return _utc(parsed)
+
+
+def _proven_rows(
+    capture: FollowExportCapture, row_count: int
+) -> dict[str, FollowFirstSeenEvidence]:
+    proof = capture.first_seen_provenance
+    if proof is None:
+        return {}
+    if (
+        not isinstance(proof, FollowTimeProvenance)
+        or capture.legacy_utc_first_seen
+        or proof.index_sha256 != capture.index_sha256
+        or not isinstance(proof.shard_sha256, Mapping)
+        or dict(proof.shard_sha256) != dict(capture.shard_sha256)
+        or not isinstance(proof.rows, Mapping)
+    ):
+        raise _invalid("first-seen evidence does not bind to the capture")
+    if len(proof.rows) > row_count:
+        raise _invalid("first-seen evidence row bound")
+    return dict(proof.rows)
+
+
+def _first_seen(
+    row: dict, lower: datetime, evidence: dict[str, FollowFirstSeenEvidence], legacy: bool
+) -> datetime | None:
+    raw = row.get("first_seen")
+    parsed = _parse_time(raw)
+    if parsed.utcoffset() is not None:
+        return _utc(parsed)
+    if legacy:
+        return parsed.replace(tzinfo=timezone.utc)
+
+    proof = evidence.pop(row["id"], None)
+    if not isinstance(proof, FollowFirstSeenEvidence) or proof.raw_first_seen != raw:
+        raise _invalid("aware first-seen time or exact row evidence required")
+    if (proof.verified_utc is None) == (proof.observed_by is None):
+        raise _invalid("expected exactly one first-seen proof")
+    if proof.observed_by is not None:
+        if _utc(proof.observed_by) > lower:
+            raise _invalid("prior observation does not prove exclusion")
+        return None
+
+    verified = _utc(proof.verified_utc)
+    if verified.replace(tzinfo=None) != parsed:
+        raise _invalid("verified UTC does not match raw first-seen time")
+    return verified
 
 
 def _unique_object(pairs: list[tuple[str, object]]) -> dict:
@@ -229,18 +291,21 @@ def snapshot_from_fixed_export(
     if lower.microsecond % 1000 or lower >= upper:
         raise _invalid("incomplete millisecond coverage")
     index = _read(index_bytes)
-    if not isinstance(index, dict) or _time(index.get("generated_at")) != exact:
+    if not isinstance(index, dict) or _utc(_parse_time(index.get("generated_at"))) != exact:
         raise _invalid("index generation mismatch")
     files = index.get("files")
     if not isinstance(files, dict) or files.keys() != capture.shard_sha256.keys():
         raise _invalid("incomplete shard manifest")
     source_rows = _collect_rows(files, shards, max_source_rows)
 
+    evidence = _proven_rows(capture, len(source_rows))
     roles = []
     for row in source_rows.values():
         if row["status"] == "closed":
             continue
-        first = _time(row.get("first_seen"), legacy_utc=capture.legacy_utc_first_seen)
+        first = _first_seen(row, lower, evidence, capture.legacy_utc_first_seen)
+        if first is None:
+            continue
         if first > exact:
             raise _invalid("first-seen time after source generation")
         if not lower < first <= upper:
@@ -265,6 +330,8 @@ def snapshot_from_fixed_export(
                 "states": states,
             }
         )
+    if evidence:
+        raise _invalid("unused first-seen evidence")
     return build_follow_snapshot(
         roles, generated_at=upper, covers_after=lower, complete=True, catalog=catalog, bounds=bounds
     )

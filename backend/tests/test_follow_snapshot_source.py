@@ -8,7 +8,12 @@ from hashlib import sha256
 import pytest
 
 from internscout.follow_snapshot import FollowSnapshotBounds, FollowSnapshotCatalog
-from internscout.follow_snapshot_source import FollowExportCapture, snapshot_from_fixed_export
+from internscout.follow_snapshot_source import (
+    FollowExportCapture,
+    FollowFirstSeenEvidence,
+    FollowTimeProvenance,
+    snapshot_from_fixed_export,
+)
 
 LOWER = datetime.fromisoformat("2028-02-29T00:00:00.000000+00:00")
 EXACT = datetime.fromisoformat("2028-02-29T00:00:00.002500+00:00")
@@ -280,3 +285,68 @@ def test_exact_input_and_output_bounds_are_independent():
         run(inputs, max_source_rows=1)
     with pytest.raises(ValueError, match="snapshot exceeds byte bound"):
         run(inputs, bounds=replace(BOUNDS, max_bytes=len(raw) - 1))
+
+
+def with_provenance(inputs, evidence):
+    index, shards, capture = inputs
+    provenance = FollowTimeProvenance(capture.index_sha256, capture.shard_sha256, evidence)
+    return index, shards, replace(capture, first_seen_provenance=provenance)
+
+
+NAIVE = BASE_ROW | {"first_seen": "2028-02-29T00:00:00.001001"}
+UTC_EVIDENCE = FollowFirstSeenEvidence(
+    NAIVE["first_seen"], verified_utc=LOWER + timedelta(microseconds=1001)
+)
+
+
+def test_mixed_provenance_matches_aware_capture():
+    old = NAIVE | {"id": "a" * 16, "first_seen": "2028-02-28T23:00:00"}
+    observed = FollowFirstSeenEvidence(old["first_seen"], observed_by=LOWER)
+    mixed = make_capture({"MA": [NAIVE, old], "NY": [NAIVE]})
+    attest = {NAIVE["id"]: UTC_EVIDENCE, old["id"]: observed}
+    assert run(with_provenance(mixed, attest)) == run(make_capture())
+    with pytest.raises(ValueError, match="exact row evidence"):
+        run(with_provenance(mixed, {NAIVE["id"]: UTC_EVIDENCE}))
+
+
+@pytest.mark.parametrize(
+    "proof",
+    [
+        replace(UTC_EVIDENCE, raw_first_seen=NAIVE["first_seen"] + "0"),
+        replace(UTC_EVIDENCE, verified_utc=LOWER),
+        replace(UTC_EVIDENCE, verified_utc=LOWER.replace(tzinfo=None)),
+        replace(UTC_EVIDENCE, observed_by=LOWER),
+        replace(UTC_EVIDENCE, verified_utc=None),
+        FollowFirstSeenEvidence(NAIVE["first_seen"], observed_by=LOWER.replace(tzinfo=None)),
+        FollowFirstSeenEvidence(NAIVE["first_seen"], observed_by=LOWER + timedelta(microseconds=1)),
+    ],
+)
+def test_ambiguous_per_row_proofs_fail_entire_capture(proof):
+    with pytest.raises(ValueError):
+        run(with_provenance(make_capture({"MA": [NAIVE]}), {NAIVE["id"]: proof}))
+
+
+def test_exact_proof_cannot_be_reused_across_index_or_shard_changes():
+    index, shards, attested = with_provenance(
+        make_capture({"MA": [NAIVE]}), {NAIVE["id"]: UTC_EVIDENCE}
+    )
+    changed_shard = make_capture({"MA": [NAIVE | {"title": "New title"}]})
+    later_capture = make_capture({"MA": [NAIVE]}, generated=EXACT + timedelta(milliseconds=1))
+    for changed_index, changed_shards, changed_capture in (changed_shard, later_capture):
+        with pytest.raises(ValueError, match="does not bind"):
+            run(
+                (
+                    changed_index,
+                    changed_shards,
+                    replace(changed_capture, first_seen_provenance=attested.first_seen_provenance),
+                )
+            )
+    with pytest.raises(ValueError, match="does not bind"):
+        run((index, shards, replace(attested, legacy_utc_first_seen=True)))
+
+
+@pytest.mark.parametrize("status", ["open", "closed"])
+def test_proof_for_aware_or_closed_row_is_unused_and_rejected(status):
+    inputs = make_capture({"MA": [BASE_ROW | {"status": status}]})
+    with pytest.raises(ValueError, match="unused"):
+        run(with_provenance(inputs, {NAIVE["id"]: UTC_EVIDENCE}))
