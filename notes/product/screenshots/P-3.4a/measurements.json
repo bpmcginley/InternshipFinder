@@ -1,0 +1,627 @@
+{
+  "baselineCommit": "1712e648bc29202af7ba50f03876c246a292b31c",
+  "packageHashes": {
+    "before": {
+      "manifest.json": "13d1a01e2fae18a2d9f9be863da84afeea85295f5b30ed68e40697e5b9c931d9",
+      "agent/guard.js": "7dbeb6132aa76b98a656d499e503fc3dca4b6deeb2f7bffb70132c3ffb1a67b0",
+      "agent/actions.js": "28137acef942f3910927d9dd868164f128684eb89671e039c9ca737c9574b6d5",
+      "agent/dom.js": "e71528e99248a9b5126a761bd876d52597d8f471d1c85a29565305d69fa763b7"
+    },
+    "after": {
+      "manifest.json": "13d1a01e2fae18a2d9f9be863da84afeea85295f5b30ed68e40697e5b9c931d9",
+      "agent/guard.js": "7dbeb6132aa76b98a656d499e503fc3dca4b6deeb2f7bffb70132c3ffb1a67b0",
+      "agent/actions.js": "28137acef942f3910927d9dd868164f128684eb89671e039c9ca737c9574b6d5",
+      "agent/dom.js": "e71528e99248a9b5126a761bd876d52597d8f471d1c85a29565305d69fa763b7"
+    }
+  },
+  "measures": [
+    {
+      "phase": "before",
+      "width": 1280,
+      "theme": "light",
+      "missing": true,
+      "baseline": "prior setup page"
+    },
+    {
+      "phase": "before",
+      "width": 1280,
+      "theme": "dark",
+      "missing": true,
+      "baseline": "prior setup page"
+    },
+    {
+      "phase": "before",
+      "width": 375,
+      "theme": "light",
+      "missing": true,
+      "baseline": "prior setup page"
+    },
+    {
+      "phase": "before",
+      "width": 375,
+      "theme": "dark",
+      "missing": true,
+      "baseline": "prior setup page"
+    },
+    {
+      "phase": "after",
+      "width": 1280,
+      "theme": "light",
+      "events": [
+        [
+          "first_name",
+          "input"
+        ],
+        [
+          "first_name",
+          "change"
+        ],
+        [
+          "first_name",
+          "blur"
+        ],
+        [
+          "first_name",
+          "focusout"
+        ],
+        [
+          "first_name",
+          "blur"
+        ],
+        [
+          "first_name",
+          "focusout"
+        ],
+        [
+          "last_name",
+          "input"
+        ],
+        [
+          "last_name",
+          "change"
+        ],
+        [
+          "last_name",
+          "blur"
+        ],
+        [
+          "last_name",
+          "focusout"
+        ],
+        [
+          "last_name",
+          "blur"
+        ],
+        [
+          "last_name",
+          "focusout"
+        ],
+        [
+          "email",
+          "input"
+        ],
+        [
+          "email",
+          "change"
+        ],
+        [
+          "email",
+          "blur"
+        ],
+        [
+          "email",
+          "focusout"
+        ],
+        [
+          "email",
+          "blur"
+        ],
+        [
+          "email",
+          "focusout"
+        ],
+        [
+          "phone",
+          "input"
+        ],
+        [
+          "phone",
+          "change"
+        ],
+        [
+          "phone",
+          "blur"
+        ],
+        [
+          "phone",
+          "focusout"
+        ],
+        [
+          "phone",
+          "blur"
+        ],
+        [
+          "phone",
+          "focusout"
+        ],
+        [
+          "first_name",
+          "blur"
+        ],
+        [
+          "first_name",
+          "focusout"
+        ],
+        [
+          "last_name",
+          "blur"
+        ],
+        [
+          "last_name",
+          "focusout"
+        ],
+        [
+          "email",
+          "blur"
+        ],
+        [
+          "email",
+          "focusout"
+        ],
+        [
+          "phone",
+          "blur"
+        ],
+        [
+          "phone",
+          "focusout"
+        ]
+      ],
+      "submits": 0,
+      "violations": [],
+      "scrollWidth": 1280,
+      "readonly": true,
+      "errors": []
+    },
+    {
+      "phase": "after",
+      "width": 1280,
+      "theme": "dark",
+      "events": [
+        [
+          "first_name",
+          "input"
+        ],
+        [
+          "first_name",
+          "change"
+        ],
+        [
+          "first_name",
+          "blur"
+        ],
+        [
+          "first_name",
+          "focusout"
+        ],
+        [
+          "first_name",
+          "blur"
+        ],
+        [
+          "first_name",
+          "focusout"
+        ],
+        [
+          "last_name",
+          "input"
+        ],
+        [
+          "last_name",
+          "change"
+        ],
+        [
+          "last_name",
+          "blur"
+        ],
+        [
+          "last_name",
+          "focusout"
+        ],
+        [
+          "last_name",
+          "blur"
+        ],
+        [
+          "last_name",
+          "focusout"
+        ],
+        [
+          "email",
+          "input"
+        ],
+        [
+          "email",
+          "change"
+        ],
+        [
+          "email",
+          "blur"
+        ],
+        [
+          "email",
+          "focusout"
+        ],
+        [
+          "email",
+          "blur"
+        ],
+        [
+          "email",
+          "focusout"
+        ],
+        [
+          "phone",
+          "input"
+        ],
+        [
+          "phone",
+          "change"
+        ],
+        [
+          "phone",
+          "blur"
+        ],
+        [
+          "phone",
+          "focusout"
+        ],
+        [
+          "phone",
+          "blur"
+        ],
+        [
+          "phone",
+          "focusout"
+        ],
+        [
+          "first_name",
+          "blur"
+        ],
+        [
+          "first_name",
+          "focusout"
+        ],
+        [
+          "last_name",
+          "blur"
+        ],
+        [
+          "last_name",
+          "focusout"
+        ],
+        [
+          "email",
+          "blur"
+        ],
+        [
+          "email",
+          "focusout"
+        ],
+        [
+          "phone",
+          "blur"
+        ],
+        [
+          "phone",
+          "focusout"
+        ]
+      ],
+      "submits": 0,
+      "violations": [],
+      "scrollWidth": 1280,
+      "readonly": true,
+      "errors": []
+    },
+    {
+      "phase": "after",
+      "width": 375,
+      "theme": "light",
+      "events": [
+        [
+          "first_name",
+          "input"
+        ],
+        [
+          "first_name",
+          "change"
+        ],
+        [
+          "first_name",
+          "blur"
+        ],
+        [
+          "first_name",
+          "focusout"
+        ],
+        [
+          "first_name",
+          "blur"
+        ],
+        [
+          "first_name",
+          "focusout"
+        ],
+        [
+          "last_name",
+          "input"
+        ],
+        [
+          "last_name",
+          "change"
+        ],
+        [
+          "last_name",
+          "blur"
+        ],
+        [
+          "last_name",
+          "focusout"
+        ],
+        [
+          "last_name",
+          "blur"
+        ],
+        [
+          "last_name",
+          "focusout"
+        ],
+        [
+          "email",
+          "input"
+        ],
+        [
+          "email",
+          "change"
+        ],
+        [
+          "email",
+          "blur"
+        ],
+        [
+          "email",
+          "focusout"
+        ],
+        [
+          "email",
+          "blur"
+        ],
+        [
+          "email",
+          "focusout"
+        ],
+        [
+          "phone",
+          "input"
+        ],
+        [
+          "phone",
+          "change"
+        ],
+        [
+          "phone",
+          "blur"
+        ],
+        [
+          "phone",
+          "focusout"
+        ],
+        [
+          "phone",
+          "blur"
+        ],
+        [
+          "phone",
+          "focusout"
+        ],
+        [
+          "first_name",
+          "blur"
+        ],
+        [
+          "first_name",
+          "focusout"
+        ],
+        [
+          "last_name",
+          "blur"
+        ],
+        [
+          "last_name",
+          "focusout"
+        ],
+        [
+          "email",
+          "blur"
+        ],
+        [
+          "email",
+          "focusout"
+        ],
+        [
+          "phone",
+          "blur"
+        ],
+        [
+          "phone",
+          "focusout"
+        ]
+      ],
+      "submits": 0,
+      "violations": [],
+      "scrollWidth": 375,
+      "readonly": true,
+      "errors": []
+    },
+    {
+      "phase": "after",
+      "width": 375,
+      "theme": "dark",
+      "events": [
+        [
+          "first_name",
+          "input"
+        ],
+        [
+          "first_name",
+          "change"
+        ],
+        [
+          "first_name",
+          "blur"
+        ],
+        [
+          "first_name",
+          "focusout"
+        ],
+        [
+          "first_name",
+          "blur"
+        ],
+        [
+          "first_name",
+          "focusout"
+        ],
+        [
+          "last_name",
+          "input"
+        ],
+        [
+          "last_name",
+          "change"
+        ],
+        [
+          "last_name",
+          "blur"
+        ],
+        [
+          "last_name",
+          "focusout"
+        ],
+        [
+          "last_name",
+          "blur"
+        ],
+        [
+          "last_name",
+          "focusout"
+        ],
+        [
+          "email",
+          "input"
+        ],
+        [
+          "email",
+          "change"
+        ],
+        [
+          "email",
+          "blur"
+        ],
+        [
+          "email",
+          "focusout"
+        ],
+        [
+          "email",
+          "blur"
+        ],
+        [
+          "email",
+          "focusout"
+        ],
+        [
+          "phone",
+          "input"
+        ],
+        [
+          "phone",
+          "change"
+        ],
+        [
+          "phone",
+          "blur"
+        ],
+        [
+          "phone",
+          "focusout"
+        ],
+        [
+          "phone",
+          "blur"
+        ],
+        [
+          "phone",
+          "focusout"
+        ],
+        [
+          "first_name",
+          "blur"
+        ],
+        [
+          "first_name",
+          "focusout"
+        ],
+        [
+          "last_name",
+          "blur"
+        ],
+        [
+          "last_name",
+          "focusout"
+        ],
+        [
+          "email",
+          "blur"
+        ],
+        [
+          "email",
+          "focusout"
+        ],
+        [
+          "phone",
+          "blur"
+        ],
+        [
+          "phone",
+          "focusout"
+        ]
+      ],
+      "submits": 0,
+      "violations": [],
+      "scrollWidth": 375,
+      "readonly": true,
+      "errors": []
+    }
+  ],
+  "blockedBrowserAttempts": [
+    "edge.microsoft.com:443",
+    "edge.microsoft.com:443",
+    "substrate.office.com:443",
+    "substrate.office.com:443",
+    "edge.microsoft.com:443",
+    "mss.office.com:443",
+    "prod.rewardsplatform.microsoft.com:443",
+    "substrate.office.com:443",
+    "substrate.office.com:443",
+    "edge.microsoft.com:443",
+    "edge.microsoft.com:443",
+    "edge.microsoft.com:443",
+    "mss.office.com:443",
+    "substrate.office.com:443",
+    "prod.rewardsplatform.microsoft.com:443",
+    "substrate.office.com:443",
+    "substrate.office.com:443",
+    "substrate.office.com:443"
+  ]
+}
