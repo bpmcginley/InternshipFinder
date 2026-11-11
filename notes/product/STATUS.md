@@ -53,6 +53,7 @@ Queued means not started, not approved for release. A dash means no branch or PR
 
 | Wave | Package | Owner | Branch | PR | State | Next step / Bruce gate |
 |---|---|---|---|---|---|---|
+| D | P-2.1t Follow timestamp provenance | Product session | `codex/product-p2.1t-follow-time-provenance` | [#334](https://github.com/bpmcginley/InternshipFinder/pull/334) | Draft needs-bruce | Verified UTC origin or prior-observation evidence for each naive open row. Stack parent #327. No writer or archive publication. |
 | D | P-2.1v In-process follow timestamp provenance | Product session | `codex/product-p2.1v-writer-provenance` | [#344](https://github.com/bpmcginley/InternshipFinder/pull/344) | Draft needs-bruce | Opt-in committed origins and exact writer carry evidence. No CLI activation, durable proof, staged-tree integration or archive publication. |
 | D | P-2.1w Staged follow proof | Product session | `codex/product-p2.1w-staged-proof` | [#347](https://github.com/bpmcginley/InternshipFinder/pull/347) | Draft needs-bruce | Opt-in exact staged-tree receipt for #344 evidence. No CLI change, publication or durable state. |
 | D | P-2.1x Accepted follow publication proof | Product session | `codex/product-p2.1x-published-proof` | [#348](https://github.com/bpmcginley/InternshipFinder/pull/348) | Draft needs-bruce | Dormant binding from #347 staged receipt to the writer-accepted commit and public subtree. No CLI or workflow activation. |
