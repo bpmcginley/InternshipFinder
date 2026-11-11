@@ -2,6 +2,7 @@ import { env } from "cloudflare:workers";
 import { expect, it } from "vitest";
 import {
   employerBudgetScenario,
+  employerCachedCounterScenario,
   employerCounterScenario,
   employerDayCapScenario,
   employerDayCapReads,
@@ -14,6 +15,14 @@ it("enforces employer caps concurrently in actual local D1", async () => {
   expect(await employerCounterScenario(env.DB)).toBe(
     "validation, UTC, atomic caps and retention passed",
   );
+});
+it("keeps stale catalogs and expired admissions out of actual local D1", async () => {
+  const db = env.DB;
+  await db.batch([
+    db.prepare("DROP TABLE IF EXISTS employer_posting_counts"),
+    db.prepare("DROP TABLE IF EXISTS employer_posting_day_caps"),
+  ]);
+  await employerCachedCounterScenario(db);
 });
 it("local D1 preserves the day cap across deletion, failure and UTC rollover", async () => {
   expect(await employerDayCapScenario(env.MIGRATION_DB)).toBe(

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { fakeD1, setup } from "./helpers.js";
 import {
   employerBudgetScenario,
+  employerCachedCounterScenario,
   employerCounterScenario,
   employerDayCapScenario,
 } from "../test-support/employer-posting-counts.js";
@@ -28,6 +29,9 @@ function counterDb() {
 test("isolated employer budget is bounded and independent", employerBudgetScenario);
 test("employer aggregate core enforces caps and retention in SQLite", async () => {
   await employerCounterScenario(counterDb());
+});
+test("cached employer counter discards stale catalogs and admissions", async () => {
+  await employerCachedCounterScenario(counterDb());
 });
 test("day cap survives restart/deletion and fails closed on ambiguous state", async () => {
   await employerDayCapScenario(counterDb());

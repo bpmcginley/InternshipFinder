@@ -1,4 +1,6 @@
-// Dormant core: no production caller, catalog fetch, migration or shared limiter.
+// Dormant core: no production caller, URL, migration or shared limiter.
+import { createEmployerCatalogCache } from "./employer-catalog-cache.js";
+
 export const EMPLOYER_POSTING_EVENT = "employer_posting_open";
 const DAY = 86_400_000;
 const encoder = new TextEncoder();
@@ -19,6 +21,10 @@ function catalog(keys) {
     members.add(key);
   }
   return (key) => members.has(key);
+}
+
+function parseCatalog(text) {
+  return catalog(JSON.parse(text));
 }
 
 export function createEmployerMinuteBudget(schedule = setTimeout, cancel = clearTimeout) {
@@ -51,11 +57,27 @@ export function createEmployerMinuteBudget(schedule = setTimeout, cancel = clear
 
 // Shared by counter instances in this isolate, including after snapshot replacement.
 const employerMinuteBudget = createEmployerMinuteBudget();
+const permanentMatch = () => true;
 
-// Time, validated catalog and DB are injected. No cache lifetime is chosen here.
-// A caller must run cleanup successfully for the current UTC day before accepting counts.
 export function createEmployerPostingCounter({ db, keys, now = () => new Date() }) {
   const known = catalog(keys);
+  const match = known && ((key) => (known(key) ? permanentMatch : null));
+  return employerPostingCounter(db, match, now);
+}
+
+export function createCachedEmployerPostingCounter({ db, load, maxBytes, now = () => new Date() }) {
+  const cache = createEmployerCatalogCache({
+    load,
+    parse: parseCatalog,
+    maxBytes,
+    now: () => now().getTime(),
+    loadTimeoutMs: 5_000,
+  });
+  return employerPostingCounter(db, cache.match, now);
+}
+
+// Cleanup has to succeed for the current UTC day before accepting counts.
+function employerPostingCounter(db, match, now) {
   let readyDay = null;
   let cleanupVersion = 0;
   return {
@@ -63,7 +85,7 @@ export function createEmployerPostingCounter({ db, keys, now = () => new Date() 
       const version = ++cleanupVersion;
       readyDay = null;
       const at = now();
-      if (!known || !instant(at)) return false;
+      if (!match || !instant(at)) return false;
       const day = at.toISOString().slice(0, 10);
       const cutoff = new Date(at.getTime() - 90 * DAY).toISOString().slice(0, 10);
       try {
@@ -100,8 +122,9 @@ export function createEmployerPostingCounter({ db, keys, now = () => new Date() 
     },
     async count(body, address) {
       const at = now();
-      if (!known || !instant(at)) return false;
+      if (!match || !instant(at)) return false;
       const day = at.toISOString().slice(0, 10);
+      const version = cleanupVersion;
       if (readyDay !== day || !employerMinuteBudget(address, at)) return false;
       if (
         !body ||
@@ -111,8 +134,21 @@ export function createEmployerPostingCounter({ db, keys, now = () => new Date() 
         !Object.hasOwn(body, "e") ||
         !Object.hasOwn(body, "c") ||
         body.e !== EMPLOYER_POSTING_EVENT ||
-        !validKey(body.c) ||
-        !known(body.c)
+        !validKey(body.c)
+      )
+        return false;
+      const company = body.c;
+      const isCurrent = await match(company);
+      if (!isCurrent) return false;
+      const checked = now();
+      const checkedTime = instant(checked) ? checked.getTime() : NaN;
+      if (
+        !isCurrent(checkedTime) ||
+        !Number.isFinite(checkedTime) ||
+        checkedTime < at.getTime() ||
+        checked.toISOString().slice(0, 10) !== day ||
+        readyDay !== day ||
+        cleanupVersion !== version
       )
         return false;
       // D1 batch is one transaction. The second write follows only a successful company
@@ -128,7 +164,7 @@ export function createEmployerPostingCounter({ db, keys, now = () => new Date() 
           ON CONFLICT(day, company) DO UPDATE SET n = n + 1 WHERE n < 1000
         `,
             )
-            .bind(day, body.c, day),
+            .bind(day, company, day),
           db
             .prepare(
               "UPDATE employer_posting_day_caps SET n = n + 1 WHERE day = ? AND changes() = 1",
