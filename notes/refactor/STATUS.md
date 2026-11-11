@@ -77,6 +77,7 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 4 | WP-4.2 Orders split, field capacity | wp42_orders | `refactor/wp-4.2-orders-capacity` | - | Prepared locally | File move based on Worker config #223. Open after #223 merges. |
 | 4 | WP-4.2 Orders split, mail templates | wp42_orders | `refactor/wp-4.2-orders-templates` | - | Prepared locally | Plain-text file move based on field capacity. Open after the capacity PR merges. |
 | 4 | WP-4.2 Orders split, review HTML and records | wp42_orders | `refactor/wp-4.2-orders-review-records` | - | Prepared locally | Move the review HTML helpers and record readers after the mail-template PR merges. |
+| 4 | WP-4.2 Orders split, paid settlement | wp42_orders | `refactor/wp-4.2-orders-settlement` | - | Prepared locally | Move the paid block after review HTML and record readers merge. |
 | 4 | WP-4.2 Orders split, remaining seams | Unassigned | - | - | Queued | File moves only. Preserve financial behavior, SQL boundaries, mail, and the shared Node/D1 race scenario. |
 | 5 | WP-3.1 Constants/helpers | Unassigned | - | - | Queued | One seo_pages owner; unchanged golden manifest. |
 | 5 | WP-3.2 Sitemap/feeds/llms | Unassigned | - | - | Queued | After WP-3.1; unchanged golden manifest. |
@@ -484,3 +485,9 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 - Move the review stylesheet, lazy hash, escaping, page and message helpers to `orders/review-html.js`, and the order and role readers to `orders/records.js`. The order ID pattern moves verbatim to shared code.
 - Verified both moved blocks and the shared pattern against mail-template head `e09348fe`. Every remaining orders.js byte matches after removing import wiring. The original CSP, lazy hash, SQL, physical terms literals and 39 facade exports are preserved.
 - Node 22.23.4 passed 342 Worker tests, local Workers passed 15 tests in six files, checkout passed 40 tests and Golden matched 695 files. JavaScript lint reported zero errors and warnings. Worker type reporting retained 914 existing diagnostics.
+
+## WP-4.2 paid settlement
+
+- Move the complete paid block to `orders/settlement.js`. Its Stripe helper is read at call time and `billing.js` still calls `listingEvent` through `orders.js`. The legacy module exports the same 39 names and keeps the physical terms literals.
+- Byte comparison against `c23bce4e` matched the entire paid block and all other orders.js bytes outside import and export wiring. Existing SQL, call order, idempotency keys, notifications, cron callbacks and handler behavior are preserved.
+- Node 22.23.4 passed all 342 Worker tests, local Workers passed 15 tests in six files, checkout passed 40 tests and Golden matched 695 files. JavaScript lint reported zero errors and warnings. Worker type reporting retained 914 existing diagnostics.
