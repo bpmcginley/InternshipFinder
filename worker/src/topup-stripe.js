@@ -1,4 +1,4 @@
-// Dormant trusted adapter. Explicit fetch only; never import from a runtime route yet.
+// Trusted checkout adapter with explicit injected fetch.
 import { stripe, siteUrl, paymentsOn, managedPayments } from "./billing.js";
 import { validTopupCheckoutId } from "./topup-ledger.js";
 const OFFER = Object.freeze({
