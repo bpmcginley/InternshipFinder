@@ -1,0 +1,74 @@
+[
+  {
+    "width": 1280,
+    "theme": "light",
+    "bounds": {
+      "x": 312,
+      "y": 62.21875,
+      "width": 678,
+      "height": 876.5
+    },
+    "viewport": 1280,
+    "document": 1280,
+    "date": "Last updated November 10, 2026",
+    "text": "When these features and their counters are enabled, we also count expanding a company's results, choosing a major, saving a role, opening My list, pressing a share link, opening our GitHub list or widget page, seeing the out-of-runs panel, and pressing its invite, top-up or plan controls. This includes opening or sending a company or search email-follow form, reaching its confirmation page, playing the demo, and pressing Print on a flyer. Each of these browser steps is counted at most once per page load, as a daily total by step and kind of page. These stored totals contain no account ID, email address, company, role, chosen major or search terms. They do not prove that an email subscription was confirmed, a purchase completed, or a flyer printed. These aggregate totals have no automatic expiry and cannot identify a person's activity for individual deletion.",
+    "errors": [],
+    "blockedOrigins": [
+      "https://static.cloudflareinsights.com"
+    ]
+  },
+  {
+    "width": 1280,
+    "theme": "dark",
+    "bounds": {
+      "x": 312,
+      "y": 62.21875,
+      "width": 678,
+      "height": 876.5
+    },
+    "viewport": 1280,
+    "document": 1280,
+    "date": "Last updated November 10, 2026",
+    "text": "When these features and their counters are enabled, we also count expanding a company's results, choosing a major, saving a role, opening My list, pressing a share link, opening our GitHub list or widget page, seeing the out-of-runs panel, and pressing its invite, top-up or plan controls. This includes opening or sending a company or search email-follow form, reaching its confirmation page, playing the demo, and pressing Print on a flyer. Each of these browser steps is counted at most once per page load, as a daily total by step and kind of page. These stored totals contain no account ID, email address, company, role, chosen major or search terms. They do not prove that an email subscription was confirmed, a purchase completed, or a flyer printed. These aggregate totals have no automatic expiry and cannot identify a person's activity for individual deletion.",
+    "errors": [],
+    "blockedOrigins": [
+      "https://static.cloudflareinsights.com"
+    ]
+  },
+  {
+    "width": 375,
+    "theme": "light",
+    "bounds": {
+      "x": 42,
+      "y": -439.515625,
+      "width": 313,
+      "height": 1879.34375
+    },
+    "viewport": 375,
+    "document": 375,
+    "date": "Last updated November 10, 2026",
+    "text": "When these features and their counters are enabled, we also count expanding a company's results, choosing a major, saving a role, opening My list, pressing a share link, opening our GitHub list or widget page, seeing the out-of-runs panel, and pressing its invite, top-up or plan controls. This includes opening or sending a company or search email-follow form, reaching its confirmation page, playing the demo, and pressing Print on a flyer. Each of these browser steps is counted at most once per page load, as a daily total by step and kind of page. These stored totals contain no account ID, email address, company, role, chosen major or search terms. They do not prove that an email subscription was confirmed, a purchase completed, or a flyer printed. These aggregate totals have no automatic expiry and cannot identify a person's activity for individual deletion.",
+    "errors": [],
+    "blockedOrigins": [
+      "https://static.cloudflareinsights.com"
+    ]
+  },
+  {
+    "width": 375,
+    "theme": "dark",
+    "bounds": {
+      "x": 42,
+      "y": -439.515625,
+      "width": 313,
+      "height": 1879.34375
+    },
+    "viewport": 375,
+    "document": 375,
+    "date": "Last updated November 10, 2026",
+    "text": "When these features and their counters are enabled, we also count expanding a company's results, choosing a major, saving a role, opening My list, pressing a share link, opening our GitHub list or widget page, seeing the out-of-runs panel, and pressing its invite, top-up or plan controls. This includes opening or sending a company or search email-follow form, reaching its confirmation page, playing the demo, and pressing Print on a flyer. Each of these browser steps is counted at most once per page load, as a daily total by step and kind of page. These stored totals contain no account ID, email address, company, role, chosen major or search terms. They do not prove that an email subscription was confirmed, a purchase completed, or a flyer printed. These aggregate totals have no automatic expiry and cannot identify a person's activity for individual deletion.",
+    "errors": [],
+    "blockedOrigins": [
+      "https://static.cloudflareinsights.com"
+    ]
+  }
+]
