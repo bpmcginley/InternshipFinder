@@ -4,7 +4,9 @@ import json
 
 import pytest
 
-from internscout import focus, placements, seo_pages
+from internscout.site import source
+
+from internscout import focus, placements
 
 
 @pytest.fixture(params=["plain", "json"])
@@ -49,7 +51,7 @@ def test_focus_diagnostics_preserve_selection_and_plain_stdout(
             else [],
         }
 
-    monkeypatch.setattr(seo_pages, "load", load)
+    monkeypatch.setattr(source, "load", load)
     fallback = ["configured query"]
     expected = focus.SEARCHES["psychology"] if scenario == "thin" else fallback
     assert focus.choose(str(export_dir), fallback) == expected
