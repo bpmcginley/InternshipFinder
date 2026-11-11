@@ -20,6 +20,10 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/python
+
+      - name: Select public listing data
+        id: public-data
+        uses: ./.github/actions/public-data
       - name: Fonts, Pillow and ffmpeg
         # Without ffmpeg the pack still has its slides, and no videos.
         run: |
@@ -28,12 +32,16 @@ jobs:
           python -m pip install -q pillow
           sudo apt-get install -y -qq ffmpeg >/dev/null || echo "::warning::no ffmpeg: this week's pack has no videos"
       - name: Write the pack
+        env:
+          INTERNSCOUT_PUBLIC_DATA: ${{ steps.public-data.outputs.directory }}
         run: python growth/campaign.py docs --out=campaign
       # 2026-11-02: give students real role titles to search/share, backed by the current export.
       - name: Write source-backed title discovery sheets
         id: titles
         # A thin/stale supplemental pack must not discard the already-generated main pack.
         continue-on-error: true
+        env:
+          INTERNSCOUT_PUBLIC_DATA: ${{ steps.public-data.outputs.directory }}
         run: python growth/title_discovery.py docs --out=campaign/title-discovery
       - name: Report unavailable title sheets
         if: steps.titles.outcome == 'failure'
