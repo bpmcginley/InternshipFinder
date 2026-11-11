@@ -5,7 +5,7 @@
 // date. Stripe holds the card, the name and the email; they never reach this Worker or D1.
 import { HttpError } from "./http.js";
 import { countEvent } from "./visits.js";
-import { listingEvent } from "./orders.js";
+import { listingEvent } from "./orders/settlement.js";
 import { studentCheckout, completeStudentCheckout } from "./student-checkout.js";
 
 const API = "https://api.stripe.com/v1/";
