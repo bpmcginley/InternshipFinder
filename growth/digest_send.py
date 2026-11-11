@@ -62,6 +62,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import digest  # noqa: E402
 from internscout.console_log import console  # noqa: E402
+from internscout.public_data import public_data_dir  # noqa: E402
 
 API = "https://api.buttondown.com/v1"
 # Pinned, so a different version set on the newsletter or on the key can't change what these calls do.
@@ -103,7 +104,8 @@ def utcnow() -> datetime:
 def export_issue(site_dir: str, now: datetime | None = None) -> str | None:
     """Refuse a real send when its export cannot support a current-week claim. Read-only."""
     try:
-        with open(os.path.join(site_dir, "data", "listings", "index.json"), encoding="utf-8") as f:
+        index_path = os.path.join(public_data_dir(site_dir), "listings", "index.json")
+        with open(index_path, encoding="utf-8") as f:
             index = json.load(f)
         stamp = index.get("generated_at") if isinstance(index, dict) else None
         made = (

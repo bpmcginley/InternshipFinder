@@ -33,4 +33,6 @@ def test_the_workflow_has_both_utc_slots_and_gates_every_effectful_step():
     assert workflow.count('cron: "0 12 * * 1"') == 1
     assert workflow.count('cron: "0 13 * * 1"') == 1
     assert 'id: eastern-slot' in workflow
-    assert workflow.count("steps.eastern-slot.outputs.run == 'true'") == 4
+    gate = "steps.eastern-slot.outputs.run == 'true'"
+    assert workflow.count(gate) == 5
+    assert f"id: public-data\n        if: {gate}\n        uses: ./.github/actions/public-data" in workflow
