@@ -275,9 +275,9 @@ export async function finishFollowDigestAttempt(db, id, lease, outcome, now = ne
   return result[1].meta.changes > 0;
 }
 
-export async function expireFollowOutbox(db, now = new Date()) {
+export function followOutboxExpiryStatements(db, now) {
   const at = iso(now);
-  await db.batch([
+  return [
     db
       .prepare(
         "UPDATE follow_digest_outbox SET state='uncertain',payload=NULL,lease_token=NULL,lease_until=NULL " +
@@ -292,7 +292,11 @@ export async function expireFollowOutbox(db, now = new Date()) {
       .bind(at),
     db.prepare("DELETE FROM follow_digest_outbox WHERE created<=?").bind(plus(now, -7 * DAY)),
     db.prepare("DELETE FROM follow_digest_days WHERE expires_at<=?").bind(at),
-  ]);
+  ];
+}
+
+export async function expireFollowOutbox(db, now = new Date()) {
+  await db.batch(followOutboxExpiryStatements(db, now));
 }
 
 // Dormant final transport fence. No caller may await other work after true before handoff.
