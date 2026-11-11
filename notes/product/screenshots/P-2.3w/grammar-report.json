@@ -1,5 +1,33 @@
 [
   {
+    "name": "unquoted-url-0",
+    "syntheticExecutions": 2,
+    "rejected": true,
+    "actualPublisherEntry": false,
+    "externalRequestsAllowed": 0
+  },
+  {
+    "name": "unquoted-url-1",
+    "syntheticExecutions": 2,
+    "rejected": true,
+    "actualPublisherEntry": false,
+    "externalRequestsAllowed": 0
+  },
+  {
+    "name": "unquoted-url-2",
+    "syntheticExecutions": 2,
+    "rejected": true,
+    "actualPublisherEntry": false,
+    "externalRequestsAllowed": 0
+  },
+  {
+    "name": "unquoted-url-3",
+    "syntheticExecutions": 2,
+    "rejected": true,
+    "actualPublisherEntry": false,
+    "externalRequestsAllowed": 0
+  },
+  {
     "name": "overlapping-quoted-source",
     "syntheticExecutions": 2,
     "rejected": true,

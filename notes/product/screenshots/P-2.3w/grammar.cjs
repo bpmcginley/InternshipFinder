@@ -10,6 +10,11 @@ const root = path.resolve(__dirname, "../../../..");
 const tag = '<script defer src="/js/count.js"></script>';
 const marked = tag.replace(">", ' data-employer-posting-counts="1">');
 const cases = [
+  ...["=", "`", "<", "\u00a0"].map((character, index) => ({
+    name: `unquoted-url-${index}`,
+    html: tag + `<script src=/x${character}y/../js/count.js></script>`,
+    loads: 2,
+  })),
   { name: "overlapping-quoted-source", html: tag + '<!-->src="' + tag + "<!-- -->", loads: 2 },
   { name: "short-comment", html: tag + "<!-->" + tag + "<!-- -->", loads: 2 },
   { name: "dash-comment", html: tag + "<!--->" + tag + "<!-- -->", loads: 2 },

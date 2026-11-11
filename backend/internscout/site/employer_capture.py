@@ -3,26 +3,29 @@
 from html import unescape
 from html.parser import HTMLParser
 from pathlib import Path
-import re
 from urllib.parse import unquote
 
 ATTRIBUTE = ' data-employer-posting-counts="1"'
 MARKER = "data-employer-posting-counts"
-# Look ahead at every offset: a quoted example must not consume and hide an overlapping
-# browser-active src reference. This scan intentionally knows nothing about HTML comments.
-RAW_SOURCE = re.compile(
-    r'''(?=(\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))))''', re.IGNORECASE
-)
+CANONICAL = '<script defer src="/js/count.js">'
+DASHBOARD_COMMENT = '''<!-- Cloudflare Web Analytics: page views only. No cookies, no local storage, no fingerprinting,
+     and nothing that identifies a visitor; see privacy.html. The token is public by design.
+     js/count.js (2026-09-30) is the exact counter, since Cloudflare samples. The landing pages copy
+     both tags from here (backend/internscout/seo_pages.py beacon_from).
+     "spa": false (2026-10-14, U10): the dashboard now keeps its filters in the address with
+     history.replaceState, and the beacon's default single-page-app mode would count every filter change
+     as another page view (and send the search text with it). With it off, a page load is one view. -->'''
+DASHBOARD_REPLACEMENT = DASHBOARD_COMMENT.replace("js/count.js", "The first-party script")
+
+
+def _normalized(value):
+    # Deliberately independent of URL authorities, attributes and HTML comment grammar.
+    value = unquote(unescape(value)).replace("\\", "/")
+    return value.replace("\t", "").replace("\r", "").replace("\n", "").lower()
 
 
 def _potential_counter(value):
-    if not isinstance(value, str):
-        return False
-    # No authority or HTML grammar inference: aliases and references in malformed markup
-    # are rejected conservatively. Percent/character references cannot disguise the filename.
-    value = unquote(unescape(value)).replace("\\", "/")
-    value = value.replace("\t", "").replace("\r", "").replace("\n", "").strip()
-    return "count.js" in value.lower()
+    return isinstance(value, str) and "count.js" in _normalized(value)
 
 
 class _Scripts(HTMLParser):
@@ -41,7 +44,7 @@ class _Scripts(HTMLParser):
         if not any(name == "src" and _potential_counter(value) for name, value in attrs):
             return
         # These are publisher-owned tags, before the ordinary asset-stamping pass.
-        if self.get_starttag_text() != '<script defer src="/js/count.js">':
+        if self.get_starttag_text() != CANONICAL:
             raise ValueError("Unexpected employer counter script")
         line, column = self.getpos()
         self.pending = self.starts[line - 1] + column + len(self.get_starttag_text()) - 1
@@ -55,17 +58,13 @@ class _Scripts(HTMLParser):
 def _mark(text):
     if MARKER in text.lower():
         raise ValueError("Capture requires a fresh unmarked page")
-    raw = [
-        match
-        for match in RAW_SOURCE.finditer(text)
-        if _potential_counter(next(value for value in match.groups()[1:] if value is not None))
-    ]
-    if len(raw) != 1 or raw[0].group(1) != 'src="/js/count.js"':
+    if _normalized(text).count("count.js") != 1 or text.count(CANONICAL) != 1:
         raise ValueError("Capture requires exactly one raw canonical counter script source")
     parser = _Scripts(text)
     parser.feed(text)
     parser.close()
-    if parser.pending is not None or len(parser.matches) != 1 or raw[0].end(1) != parser.matches[0]:
+    expected = text.index(CANONICAL) + len(CANONICAL) - 1
+    if parser.pending is not None or parser.matches != [expected]:
         raise ValueError("Capture requires exactly one canonical counter script")
     at = parser.matches[0]
     return text[:at] + ATTRIBUTE + text[at:]
@@ -115,6 +114,14 @@ def stamp(root: Path, pages: list[dict]) -> None:
         if target.is_symlink() or target.is_junction() or not target.is_file():
             raise ValueError("Capture requires regular published pages")
         text = target.read_bytes().decode("utf-8")
+        if target == root / "index.html":
+            # Exact known non-visible dashboard comment only; normal/annotation-only builds
+            # never run this pass. Do not exempt it from the subsequent whole-document guard.
+            for ending in ("\n", "\r\n"):
+                old = DASHBOARD_COMMENT.replace("\n", ending)
+                if old in text:
+                    text = text.replace(old, DASHBOARD_REPLACEMENT.replace("\n", ending), 1)
+                    break
         prepared.append((target, _mark(text).encode("utf-8")))
     for target, raw in prepared:
         target.write_bytes(raw)

@@ -126,11 +126,34 @@ def test_potential_counter_filename_cannot_hide_duplicate(src):
         TAG.replace("</script>", "</script/>") + TAG,
         TAG + '<!--><script defer src="/js/co&#117;nt.js?v=old"></script><!-- -->',
         TAG + '<!-->src="' + TAG + '<!-- -->',
+        TAG + '<script src=/x=y/../js/count.js></script>',
+        TAG + '<script src=/x`y/../js/count.js></script>',
+        TAG + '<script src=/x<y/../js/count.js></script>',
+        TAG + '<script src=/x\u00a0y/../js/count.js></script>',
     ],
 )
 def test_raw_counter_guard_is_independent_of_html_comment_and_end_tag_parsing(html):
     with pytest.raises(ValueError, match="raw canonical"):
         employer_capture._mark(html)
+
+
+@pytest.mark.parametrize("ending", ["\n", "\r\n"])
+def test_capture_normalizes_only_exact_known_dashboard_comment(tmp_path, ending):
+    comment = employer_capture.DASHBOARD_COMMENT.replace("\n", ending)
+    path = tmp_path / "index.html"
+    path.write_bytes((comment + ending + TAG).encode())
+    employer_capture.stamp(tmp_path, [])
+    expected = employer_capture.DASHBOARD_REPLACEMENT.replace("\n", ending) + ending + TAG
+    assert path.read_bytes() == expected.replace(TAG, employer_capture._mark(TAG)).encode()
+
+
+def test_whole_document_check_does_not_skip_other_counter_mentions(tmp_path):
+    path = tmp_path / "index.html"
+    before = ('<!-- historical count.js mention -->' + TAG).encode()
+    path.write_bytes(before)
+    with pytest.raises(ValueError, match="raw canonical"):
+        employer_capture.stamp(tmp_path, [])
+    assert path.read_bytes() == before
 
 
 @pytest.mark.parametrize("flags", [[], ["--employer-postings"]])
@@ -203,6 +226,13 @@ def test_actual_capture_changes_only_supported_script_attributes(tmp_path, monke
     assert "internships/highest-paying/index.html" in changed
     for path in changed:
         assert after[path].count(MARK) == 1, path
-        assert after[path].replace(MARK, b"") == before[path], path
+        restored = after[path].replace(MARK, b"")
+        if path == "index.html":
+            restored = restored.replace(
+                employer_capture.DASHBOARD_REPLACEMENT.encode(),
+                employer_capture.DASHBOARD_COMMENT.encode(),
+                1,
+            )
+        assert restored == before[path], path
     assert after["data/page-content-dates.json"] == before["data/page-content-dates.json"]
     assert after["data/employer-posting-keys.json"] == before["data/employer-posting-keys.json"]

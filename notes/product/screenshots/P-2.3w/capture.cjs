@@ -88,9 +88,27 @@ let browser;
           await page.clock.install({ time: new Date("2026-11-10T18:00:00Z") });
           const requestStart = requests.length,
             hitStart = hits.length;
+          const shardResponses =
+            name === "dashboard"
+              ? Object.keys(
+                  JSON.parse(
+                    fs.readFileSync(path.join(root, phase, "site/data/listings/index.json")),
+                  ).files,
+                )
+                  .filter((key) => ["MA", "NY", "remote"].includes(key))
+                  .map((key) =>
+                    page.waitForResponse(
+                      (response) =>
+                        new URL(response.url()).pathname === `/data/listings/${key}.json`,
+                    ),
+                  )
+              : [];
           await page.goto("https://internscout.org" + suffix);
           const link = page.locator(selector).first();
           await link.waitFor();
+          await page.clock.runFor(2000);
+          await Promise.all(shardResponses.map(async (response) => (await response).finished()));
+          await page.waitForLoadState("networkidle");
           await page.clock.runFor(2000);
           if (name === "dashboard") await page.locator(".rowbtn.try").first().waitFor();
           await page.waitForTimeout(200);
