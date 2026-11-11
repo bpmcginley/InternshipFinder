@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping
 from datetime import datetime
+from types import MappingProxyType
 
 from internscout.follow_snapshot import FollowSnapshotCatalog
 from internscout.follow_snapshot_archive import (
@@ -17,11 +18,75 @@ from internscout.follow_snapshot_source import (
     FollowExportCapture,
     FollowFirstSeenEvidence,
     FollowTimeProvenance,
+    _DIGEST,
+    _LISTING_ID,
+    _MAX_SAFE_INTEGER,
+    _SHARD,
     snapshot_from_fixed_export,
 )
+from internscout.follow_writer_provenance import FirstSeenLineage
 from scripts.ingest_data_writer import _PublishedFollowProvenance, _StagedFollowProvenance
 
 _GIT_ID = re.compile(r"(?:[a-f0-9]{40}|[a-f0-9]{64})")
+
+
+def _bounded_source(staged: _StagedFollowProvenance, max_bytes: int, max_rows: int) -> bool:
+    # Match the adapter's source limits before materializing a second evidence mapping.
+    if (
+        any(
+            type(limit) is not int or not 0 < limit <= _MAX_SAFE_INTEGER
+            for limit in (max_bytes, max_rows)
+        )
+        or not isinstance(staged.index_bytes, bytes)
+        or not all(
+            isinstance(value, MappingProxyType)
+            for value in (staged.shards, staged.shard_sha256, staged._rows)
+        )
+        or len(staged._rows) > max_rows
+    ):
+        return False
+    total = len(staged.index_bytes)
+    for blob in staged.shards.values():
+        if not isinstance(blob, bytes):
+            return False
+        total += len(blob)
+        if total > max_bytes:
+            return False
+    if total > max_bytes:
+        return False
+
+    if (
+        not staged.shard_sha256
+        or not isinstance(staged.index_sha256, str)
+        or not _DIGEST.fullmatch(staged.index_sha256)
+        or any(
+            not isinstance(key, str)
+            or not _SHARD.fullmatch(key)
+            or not isinstance(digest, str)
+            or not _DIGEST.fullmatch(digest)
+            for key, digest in staged.shard_sha256.items()
+        )
+        or staged.shards.keys() != {f"listings/{key}.json" for key in staged.shard_sha256}
+    ):
+        return False
+
+    proof_bytes = 0
+    for role_id, proof in staged._rows.items():
+        if (
+            not isinstance(role_id, str)
+            or not _LISTING_ID.fullmatch(role_id)
+            or not isinstance(proof, FirstSeenLineage)
+            or not isinstance(proof.raw_first_seen, str)
+            or not proof.raw_first_seen.isascii()
+            or not 19 <= len(proof.raw_first_seen) <= 26
+            or (proof.verified_utc is None) == (proof.observed_by is None)
+            or not isinstance(proof.verified_utc or proof.observed_by, datetime)
+        ):
+            return False
+        proof_bytes += len(role_id) + len(proof.raw_first_seen)
+        if proof_bytes > max_bytes:
+            return False
+    return True
 
 
 def plan_follow_archive_from_publication(
@@ -52,6 +117,7 @@ def plan_follow_archive_from_publication(
             not isinstance(effective_lower, datetime)
             or effective_lower.utcoffset() is None
             or effective_lower.microsecond % 1000
+            or not _bounded_source(staged, max_source_bytes, max_source_rows)
         ):
             return None
         capture = FollowExportCapture(

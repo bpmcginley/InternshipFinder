@@ -4,7 +4,7 @@ import json
 from dataclasses import replace
 from datetime import timedelta
 from hashlib import sha256
-from types import SimpleNamespace
+from types import MappingProxyType, SimpleNamespace
 
 import pytest
 
@@ -150,3 +150,53 @@ def test_same_day_first_pin_must_itself_cover_the_requested_lower(accepted):
     assert plan(builder, receipt, files) is None
     covered = plan(builder, receipt, files, effective_lower=BASELINE + timedelta(minutes=10))
     assert covered is not None and covered.files == files
+
+
+def test_real_receipt_rejects_too_small_source_limits_before_evidence_conversion(
+    accepted, monkeypatch
+):
+    builder, receipt, _ = accepted
+    staged_type = type(receipt.staged)
+    convert = staged_type.for_adapter
+    calls = 0
+
+    def count(staged, *args):
+        nonlocal calls
+        calls += 1
+        return convert(staged, *args)
+
+    monkeypatch.setattr(staged_type, "for_adapter", count)
+    size = len(receipt.staged.index_bytes) + sum(map(len, receipt.staged.shards.values()))
+    assert plan(builder, receipt, {}, max_source_bytes=size - 1) is None
+    assert plan(builder, receipt, {}, max_source_rows=1) is None
+    assert plan(builder, receipt, {}, max_source_rows=True) is None
+    assert calls == 0
+    assert plan(builder, receipt, {}, max_source_bytes=size, max_source_rows=2) is not None
+    assert calls == 1
+
+
+def test_malformed_immutable_proof_is_rejected_before_conversion(accepted, monkeypatch):
+    builder, receipt, _ = accepted
+    staged = receipt.staged
+    key, proof = next(iter(staged._rows.items()))
+    malformed = (
+        replace(staged, _rows=dict(staged._rows)),
+        replace(staged, _rows=MappingProxyType({key: object()})),
+        replace(staged, _rows=MappingProxyType({key: replace(proof, raw_first_seen=object())})),
+        replace(staged, _rows=MappingProxyType({key: replace(proof, raw_first_seen="0" * 27)})),
+        replace(
+            staged, _rows=MappingProxyType({key: replace(proof, verified_utc="not a datetime")})
+        ),
+        replace(staged, shards=MappingProxyType({"listings/MA.json": object()})),
+        replace(staged, shard_sha256=MappingProxyType({"MA": object()})),
+        replace(staged, shards=MappingProxyType({})),
+    )
+
+    def unexpected(*_):
+        raise RuntimeError("unexpected conversion")
+
+    monkeypatch.setattr(type(staged), "for_adapter", unexpected)
+    for wrong in malformed:
+        assert plan(builder, replace(receipt, staged=wrong), {}) is None
+    with pytest.raises(RuntimeError, match="unexpected conversion"):
+        plan(builder, receipt, {})
