@@ -591,10 +591,10 @@ test("reads the Worker's documented shapes: flat prices still work, taken and un
   assert.equal(B.readCredit({ done: "refund", amount: 900 }).choice, "refund");
 });
 
-// The Worker records the box's words and the terms version on every order (worker/src/orders.js TERMS_BOX
+// The Worker records the box's words and the terms version on every order (worker/src/orders/shared.js TERMS_BOX
 // and TERMS_VERSION); both have to be what this page and the terms actually say (legal review round 4,
 // 2026-10-19). Read from the Worker's source so the site tests need nothing from worker/.
-const ORDERS_SRC = read("worker/src/orders.js");
+const ORDERS_SRC = read("worker/src/orders/shared.js");
 const TERMS_BOX = ORDERS_SRC.match(/export const TERMS_BOX = "([^"]+)";/)[1];
 const TERMS_VERSION = ORDERS_SRC.match(/export const TERMS_VERSION = "(\d{4}-\d{2}-\d{2})";/)[1];
 

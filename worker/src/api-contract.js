@@ -25,7 +25,7 @@ export const ROUTES = Object.freeze([
     "/config",
     "public",
     "none",
-    "JSON {providers: Provider[], allowance: PlanAllowances, payments: {enabled, plans}, paused: boolean, invite: {bonus, max}, sessions: true, sync: boolean}",
+    "JSON {providers: Provider[], allowance: PlanAllowances, payments: {enabled, plans}, topups?: true, paused: boolean, invite: {bonus, max}, sessions: true, sync: boolean}",
   ),
   route(
     "GET",
@@ -93,6 +93,14 @@ export const ROUTES = Object.freeze([
     "Optional JSON {plan?: string}",
     "JSON {url: string}",
     "payments",
+  ),
+  route(
+    "GET",
+    "/billing/topup/offer",
+    "session + site-origin",
+    "First-party dashboard Origin and current session bearer. The server verifies the configured Price.",
+    "No-store JSON {enabled: true, offer: {amount, currency, units}} 200, auth 401, disallowed Origin 403, disabled or unavailable 503",
+    "TOPUPS_ENABLED and existing payment configuration",
   ),
   route(
     "POST",
