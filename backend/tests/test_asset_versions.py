@@ -42,6 +42,79 @@ def _core_site(root, profile, *, extra=False):
     return page, modules
 
 
+def _app_site(root, leaf):
+    modules = {"entry.mjs": b'import "./view.mjs";\n', "view.mjs": leaf}
+    for name, content in modules.items():
+        _put(root, f"js/app/{name}", content)
+    return modules
+
+
+def test_app_graph_changes_independently_and_git_rollback_keeps_both_app_generations(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+
+    def git(*args):
+        subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True)
+
+    git("init", "--quiet", "-b", "main")
+    git("config", "core.autocrlf", "false")
+    git("config", "user.name", "Fixture")
+    git("config", "user.email", "fixture@example.invalid")
+    source = repo / "docs"
+    core = b"export const core = 1;\n"
+    classic = b"window.ISApp = {};\n"
+    _, core_files = _core_site(source, core)
+    _put(source, "js/app.js", classic)
+    git("add", "docs")
+    git("commit", "--quiet", "-m", "Core and classic App")
+    expected_app = {}
+    for generation in range(1, 3):
+        leaf = f"export const generation = {generation};\n".encode()
+        app_files = _app_site(source, leaf)
+        git("add", "docs")
+        git("commit", "--quiet", "-m", f"App generation {generation}")
+        stage = tmp_path / f"stage-{generation}"
+        page, _ = _core_site(stage, core)
+        _app_site(stage, leaf)
+        page.write_text(page.read_text() + '<script type="module" src="js/app/entry.mjs"></script>')
+        report = version_assets(stage, retain_core_git=repo)
+        app_digest = core_fingerprint(app_files)
+        assert report.changed_files == 1
+        assert page.read_text() == (
+            f'<script type="module" src="/js/modules/{core_fingerprint(core_files)}/entry.mjs"></script>'
+            f'<script type="module" src="/js/app-modules/{app_digest}/entry.mjs"></script>'
+        )
+        expected_app[app_digest] = app_files
+        assert {folder.name for folder in (stage / "js/app-modules").iterdir()} == expected_app.keys()
+        assert version_assets(stage, retain_core_git=repo).changed_files == 0
+
+    git("rm", "--quiet", "-r", "docs/js/app")
+    git("commit", "--quiet", "-m", "Restore classic App")
+    rollback = tmp_path / "rollback"
+    page, _ = _core_site(rollback, core)
+    _put(rollback, "js/app.js", classic)
+    page.write_text(page.read_text() + '<script defer src="js/app.js"></script>')
+    version_assets(rollback, retain_core_git=repo)
+    assert page.read_text().endswith(f'<script defer src="js/app.js?v={_hash(classic)}"></script>')
+    assert {
+        folder.name: {path.name: path.read_bytes() for path in folder.iterdir()}
+        for folder in (rollback / "js/app-modules").iterdir()
+    } == expected_app
+    assert {
+        path.name: path.read_bytes() for path in (rollback / "js/modules" / core_fingerprint(core_files)).iterdir()
+    } == core_files
+
+
+def test_invalid_app_graph_does_not_stage_core_or_rewrite_html(tmp_path):
+    page, _ = _core_site(tmp_path, b"export const valid = true;\n")
+    _app_site(tmp_path, b'import "./missing.mjs";\n')
+    original = page.read_bytes()
+    with pytest.raises(AssetVersionError, match="App modules must use static sibling imports"):
+        version_assets(tmp_path)
+    assert page.read_bytes() == original
+    assert not (tmp_path / "js/modules").exists() and not (tmp_path / "js/app-modules").exists()
+
+
 def test_core_graph_leaf_change_preserves_prior_bare_urls_across_fresh_sites(tmp_path):
     previous = None
     expected = {}

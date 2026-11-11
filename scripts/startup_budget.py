@@ -65,15 +65,15 @@ def main() -> None:
         name: root / "docs" / name
         for name in (
             "index.html",
-            "js/app.js",
             "data/listings/index.json",
             "fonts/ibm-plex-sans-latin.woff2",
             "fonts/source-serif-4-latin.woff2",
         )
     }
-    core_files = sorted((root / "docs/js/core").glob("*.mjs")) or [root / "docs/js/core.js"]
-    for path in core_files:
-        assets[path.relative_to(root / "docs").as_posix()] = path
+    for script in ("core", "app"):
+        files = sorted((root / f"docs/js/{script}").glob("*.mjs")) or [root / f"docs/js/{script}.js"]
+        for path in files:
+            assets[path.relative_to(root / "docs").as_posix()] = path
     assets["data/listings/index.json"] = index
     print(
         json.dumps(
