@@ -96,7 +96,8 @@ class BlockLegacy(MetaPathFinder):
         if fullname == "internscout.seo_pages":
             raise AssertionError("standalone feed imported the legacy facade")
 
-sys.meta_path.insert(0, BlockLegacy())
+blocker = BlockLegacy()
+sys.meta_path.insert(0, blocker)
 from internscout import feeds
 from internscout.site import runtime
 
@@ -127,6 +128,14 @@ assert "<lastBuildDate>Wed, 23 Sep 2026 12:00:00 +0000</lastBuildDate>" in (
     page / "feed.xml"
 ).read_text(encoding="utf-8")
 assert "internscout.seo_pages" not in sys.modules
+if scenario == "prior-rss":
+    sys.meta_path.remove(blocker)
+    from internscout import seo_pages
+    assert seo_pages.GENERATED == configured
+    assert feeds.write_all(str(root), pages) == 1
+    assert "<lastBuildDate>Wed, 23 Sep 2026 09:00:00 +0000</lastBuildDate>" in (
+        page / "feed.xml"
+    ).read_text(encoding="utf-8")
 """
     result = subprocess.run(
         [sys.executable, "-c", script, str(tmp_path), json.dumps(_row(1)), scenario],

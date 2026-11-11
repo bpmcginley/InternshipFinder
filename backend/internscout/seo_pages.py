@@ -172,6 +172,9 @@ BEACON = _runtime.BEACON
 DIGEST_FORM = _runtime.DIGEST_FORM
 BASELINE = _runtime.BASELINE
 GENERATED = _runtime.GENERATED
+if __name__ == f"{__package__}.seo_pages":
+    # Standalone feeds may have captured these defaults before the facade was imported.
+    SITE, GENERATED = feeds._standalone_settings()
 TEXTS = {}
 TRACKER = _runtime.TRACKER
 HOME = _runtime.HOME
