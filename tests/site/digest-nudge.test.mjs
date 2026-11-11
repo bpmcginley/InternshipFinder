@@ -210,16 +210,20 @@ test("first manual profile save gives an existing invite priority; later edits n
   const start = APP.indexOf("    function saveProfile(d) {");
   const end = APP.indexOf("    // Focus goes back", start);
   assert.ok(start > -1 && end > start);
-  for (const [profile, invite, expected] of [
+  for (const [profile, invite, expected, pending = false] of [
     [null, true, []],
     [null, false, ["profile"]],
     [{ majors: [] }, false, []],
+    [{ majors: ["Nursing"] }, false, ["profile"], true],
+    [{ majors: ["Nursing"] }, true, [], true],
   ]) {
     const offers = [],
       saved = [],
       counted = [];
     const ctx = {
       p: profile,
+      profileRef: { current: profile },
+      quickFirstSave: { current: pending },
       PAGE: 150,
       IS: {
         count: (x) => counted.push(x),
@@ -231,6 +235,7 @@ test("first manual profile save gives an existing invite priority; later edits n
       offerNudge: () => invite,
       offerDigestNudge: (action) => offers.push(action),
       setP() {},
+      setQuickOpen() {},
       setSetupOpen() {},
       setLimit() {},
       setF() {},
@@ -242,6 +247,7 @@ test("first manual profile save gives an existing invite priority; later edits n
     const data = { majors: ["Nursing"], fields: ["nursing"] };
     ctx.saveProfile(data);
     assert.deepEqual(offers, expected);
+    assert.equal(ctx.quickFirstSave.current, false);
     assert.deepEqual(saved, [data], "the profile still saves normally");
     assert.deepEqual(counted, profile ? [] : ["profile"]);
   }
