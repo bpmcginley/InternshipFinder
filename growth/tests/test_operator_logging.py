@@ -56,7 +56,7 @@ def test_audience_report_preserves_whitespace_and_tier_order(
         calls.append(site)
         return data
 
-    monkeypatch.setattr(audience.seo_pages, "load", load)
+    monkeypatch.setattr(audience.site_source, "load", load)
     run_cli(audience, "mock-site")
     assert calls == ["mock-site"]
     expected = [
@@ -88,7 +88,7 @@ def test_outreach_cli_keeps_draft_artifacts_and_redacts_local_path(
     monkeypatch, tmp_path, capsys, run_cli, use_json
 ):
     monkeypatch.setattr(
-        outreach.sp, "load", lambda site: {"generated_at": None, "majors": [], "listings": []}
+        outreach.site_source, "load", lambda site: {"generated_at": None, "majors": [], "listings": []}
     )
     dest = tmp_path / "operator-draft-output"
     run_cli(outreach, "mock-site", "--out", str(dest))

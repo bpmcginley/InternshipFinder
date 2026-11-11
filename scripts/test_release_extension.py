@@ -6,16 +6,112 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
 import zipfile
 
 import package_extension
+import profile_bridge
+import release_extension
 from release_extension import write_record
 
 
+def seed_bridge(root):
+    for path in (
+        profile_bridge.SOURCE,
+        profile_bridge.DASHBOARD,
+        profile_bridge.BACKGROUND,
+        profile_bridge.GENERATOR,
+    ):
+        target = root / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(profile_bridge.ROOT / path, target)
+
+
 class ReleasePackageTests(unittest.TestCase):
+    def test_profile_bridge_copies_are_current(self):
+        profile_bridge.check_copies(profile_bridge.generated_copies(profile_bridge.ROOT))
+
+    def test_package_rejects_stale_bridge_and_uses_regenerated_entry(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            seed_bridge(root)
+            ext = root / "extension"
+            (ext / "manifest.json").write_text('{"version": "0.0.1"}', encoding="utf-8")
+            src = root / profile_bridge.SOURCE
+            data = json.loads(src.read_text(encoding="utf-8"))
+            data[-1]["width"] = 61
+            src.write_text(json.dumps(data), encoding="utf-8")
+            background = root / profile_bridge.BACKGROUND
+            before = background.read_bytes()
+            dashboard = (root / profile_bridge.DASHBOARD).read_bytes()
+            command = [sys.executable, str(root / profile_bridge.GENERATOR)]
+            with (
+                patch.object(package_extension, "ROOT", root),
+                patch.object(package_extension, "EXT", ext),
+                patch.object(package_extension, "DIST", root / "dist"),
+            ):
+                with self.assertRaisesRegex(ValueError, "stale profile bridge declaration"):
+                    package_extension.build()
+                self.assertFalse((root / "dist").exists())
+                self.assertEqual(background.read_bytes(), before)
+
+                subprocess.run(command, check=True)
+                updated = before.replace(b"str(p.work_auth, 60)", b"str(p.work_auth, 61)")
+                self.assertNotEqual(updated, before)
+                self.assertEqual(background.read_bytes(), updated)
+                self.assertEqual((root / profile_bridge.DASHBOARD).read_bytes(), dashboard)
+                with zipfile.ZipFile(package_extension.build()) as archive:
+                    self.assertEqual(
+                        archive.read("background/index.js"), updated.replace(b"\r\n", b"\n")
+                    )
+
+    def test_generator_preflights_both_targets_before_writing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            seed_bridge(root)
+            source = root / profile_bridge.SOURCE
+            fields = json.loads(source.read_text(encoding="utf-8"))
+            fields[-1]["key"] = "work_permission"
+            source.write_text(json.dumps(fields), encoding="utf-8")
+            dashboard = root / profile_bridge.DASHBOARD
+            background = root / profile_bridge.BACKGROUND
+            before_dashboard = dashboard.read_bytes().replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
+            before_background = background.read_bytes()
+            dashboard.write_bytes(before_dashboard)
+            broken = before_background.replace(b"function cleanProfile(p) {", b"function other(p) {")
+            background.write_bytes(broken)
+            command = [sys.executable, str(root / profile_bridge.GENERATOR)]
+
+            failed = subprocess.run(command, capture_output=True)
+            self.assertEqual(failed.returncode, 1)
+            self.assertIn(b"extension/background/index.js", failed.stderr)
+            self.assertEqual(dashboard.read_bytes(), before_dashboard)
+            self.assertEqual(background.read_bytes(), broken)
+
+            background.write_bytes(before_background)
+            subprocess.run(command, check=True)
+            self.assertEqual(
+                dashboard.read_bytes(),
+                before_dashboard.replace(b'work_auth: p.work_auth || ""', b'work_permission: p.work_permission || ""'),
+            )
+            self.assertEqual(
+                background.read_bytes(),
+                before_background.replace(b"work_auth: str(p.work_auth,", b"work_permission: str(p.work_permission,"),
+            )
+            subprocess.run([*command, "--check"], check=True)
+
+    def test_release_record_rejects_untracked_bridge_source(self):
+        with (
+            patch.object(release_extension.subprocess, "check_output", side_effect=[b"", ""]),
+            patch.object(package_extension, "build") as build,
+        ):
+            with self.assertRaisesRegex(SystemExit, "untracked package input: shared/profile_bridge"):
+                release_extension.main()
+            build.assert_not_called()
+
     def test_rebuild_ignores_checkout_timestamps_and_separates_identities(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

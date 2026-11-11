@@ -61,46 +61,7 @@ FIELDS = tuple(json.loads((_HERE / "top_degree_fields.json").read_text(encoding=
 #   Visual and Performing Arts: arts, design (visual, UX and graphic design), theater, music, film. Thin.
 #   Education: one tag, education (teaching, tutoring, curriculum, instructional design). Thin.
 #   Communication and Journalism: communications, journalism, media, publishing.
-FIELD_TAGS = {
-    "business": (
-        "business",
-        "finance",
-        "accounting",
-        "consulting",
-        "marketing",
-        "sales",
-        "hr",
-        "operations",
-        "supply_chain",
-        "entrepreneurship",
-        "pm",
-        "real_estate",
-        "insurance",
-        "retail",
-        "hospitality",
-    ),
-    "health-professions": ("health", "nursing", "public_health", "clinical_research"),
-    "social-sciences-and-history": ("social_science", "economics", "government", "museums"),
-    "biological-and-biomedical-sciences": ("biology", "biomedical"),
-    "psychology": ("psychology",),
-    "engineering": (
-        "engineering",
-        "mechanical",
-        "electrical",
-        "civil",
-        "chemical",
-        "industrial",
-        "aerospace",
-        "hardware",
-        "materials",
-        "environmental",
-        "biomedical",
-    ),
-    "computer-and-information-sciences": ("swe", "data", "ml", "security"),
-    "visual-and-performing-arts": ("arts", "design", "theater", "music", "film"),
-    "education": ("education",),
-    "communication-and-journalism": ("communications", "journalism", "media", "publishing"),
-}
+FIELD_TAGS = {field["slug"]: tuple(field["tags"]) for field in FIELDS}
 # The shorter name a title falls back to when the full one will not fit (seo_pages.fit_head).
 FIELD_SHORT = {
     "health-professions": "Health",

@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { AUTH, ROUTES, SPECIAL_ROUTES } from "../src/api-contract.js";
 import { generateApi } from "../scripts/generate-api.mjs";
 import { handle } from "../src/index.js";
+import { captureRouteResponses, exactCases } from "../test-support/route-baseline.js";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const read = (path) => readFileSync(join(root, path), "utf8").replaceAll("\r\n", "\n");
@@ -14,12 +15,25 @@ const publicWorkerOrigin = JSON.parse(read("config/public.json")).workerOrigin;
 const key = (method, path) => `${method} ${path.split("?")[0].replace(/\/+$/, "") || "/"}`;
 const declared = new Set(ROUTES.map((r) => key(r.method, r.path)));
 
-test("the contract contains every exact router case, with auth and descriptive shapes", () => {
+test("the contract contains every exact table or switch route, with auth and descriptive shapes", () => {
   const served = [],
     prefixes = new Set();
+  let tables = 0;
   walk(
     parse(read("worker/src/index.js"), { ecmaVersion: "latest", sourceType: "module" }),
     (node) => {
+      if (node.type === "VariableDeclarator" && name(node.id) === "safeRouteHandlers") {
+        tables += 1;
+        assert.equal(node.init.type, "ObjectExpression");
+        for (const handler of node.init.properties) {
+          assert.equal(handler.type, "Property");
+          assert.equal(handler.computed, false);
+          const route = name(handler.key);
+          const match = /^([A-Z]+) (\/.*)$/.exec(route);
+          assert.ok(match, `Invalid table route: ${route}`);
+          served.push(key(match[1], match[2]));
+        }
+      }
       if (node.type === "SwitchCase" && node.test?.type === "Literal") {
         const match = /^([A-Z]+) (\/.*)$/.exec(String(node.test.value));
         if (match) served.push(key(match[1], match[2]));
@@ -32,7 +46,9 @@ test("the contract contains every exact router case, with auth and descriptive s
         prefixes.add(node.arguments[0].value);
     },
   );
+  assert.equal(tables, 1, "one exact-route handler table");
   assert.equal(declared.size, ROUTES.length, "duplicate contract route");
+  assert.equal(new Set(served).size, served.length, "duplicate exact dispatch route");
   assert.deepEqual([...declared].sort(), served.sort());
   assert.deepEqual(
     [...prefixes].sort(),
@@ -89,6 +105,20 @@ test("global preflight, media delegation and fallback are explicit, without chan
   );
   assert.equal(head.status, 200);
   assert.equal(await head.text(), "");
+});
+
+test("the original router's offline response bytes and headers stay fixed", async () => {
+  const fixture = JSON.parse(
+    readFileSync(new URL("./fixtures/route-baseline.json", import.meta.url), "utf8"),
+  );
+  assert.equal(fixture.capturedFrom, "067a033785214ec63d0d67b26b6ed1d54b940e16");
+  assert.equal(exactCases.length, ROUTES.length);
+  assert.deepEqual(new Set(exactCases.map(({ method, path }) => key(method, path))), declared);
+  const actual = await captureRouteResponses();
+  assert.deepEqual(Object.keys(actual), Object.keys(fixture.responses));
+  for (const [label, expected] of Object.entries(fixture.responses)) {
+    assert.deepEqual(actual[label], expected, label);
+  }
 });
 
 test("generated API markdown is current", () => {
