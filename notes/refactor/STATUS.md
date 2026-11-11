@@ -97,7 +97,8 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 5 | WP-3.3 Listing family | Unassigned | - | - | Queued | Serial family PR; unchanged golden manifest. |
 | 5 | WP-3.4 Build orchestration | Unassigned | - | - | Queued | Explicit ordered steps; preserve outputs and eliminate cycles carefully. |
 | 5 | WP-3.5 Import consumers | Unassigned | - | - | Queued | Point consumers to new modules; retain compatibility exports. |
-| 5 | WP-4.3 Route table | Unassigned | - | - | Queued / question | Characterize responses first; financial wrapper changes paused under Q3. |
+| 5 | WP-4.3 Route response baseline | wp42_orders | `refactor/wp-4.3-route-baseline` | - | In review | Fixed offline responses for 42 exact routes and 44 transport, guard and special cases. |
+| 5 | WP-4.3 Route table | Unassigned | - | - | Queued / question | Start after response characterization. Financial wrapper changes remain paused under Q3. |
 | 5 | WP-5.2 Background agent | Unassigned | - | - | Queued | Separate move-only PR; guard and tests untouched; no version bump. |
 | 5 | WP-5.2 Onboarding | Unassigned | - | - | Queued | Separate PR; preserve UI text and reproducible packaging. |
 | 6 | WP-2.1 Vocabulary code | Unassigned | - | - | Queued | After inventory and resolution of meaningful differences. |
@@ -485,6 +486,13 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 - Audit at main `7728e02b` verified 39 exports. Keep literal TERMS_VERSION/TERMS_BOX assignments in legacy orders.js: unchanged buy tests read them directly. Preserve the billing/orders live-binding cycle and listing settlement before student handling; introduce no eager imported-value reads or configuration snapshots.
 - The only top-level mutable local is the review styleHash cache; keep it with the renderer. Exported PRICES/WEBMAIL/CLOSE_REASONS objects retain shared identity. readShard has no module cache; preserve injected-fetch edge-cache options rather than adding memoization.
 - Safest first file-move boundary is shardOf/cleanRole/readShard plus necessary shared regex/error helpers. Existing durable outbox stays in order-mail.js. Preserve every db.batch boundary/statement order, cron job order and names, SQL/email/style literals, default fetch expressions, and all facade exports. The shared settlement-race scenario remains unchanged across both adapters. This is preparation only, not later-wave implementation or financial-behavior approval.
+
+## WP-4.3 offline route response baseline
+
+- Captured 86 responses from unchanged router main `067a0337`. The checked-in fixture records status, observable header values and exact body bytes as UTF-8 or hex. The test reads this fixture and compares live responses. The contract is used only to check that every exact route is represented.
+- Cases cover all 42 exact routes, global OPTIONS, media GET and HEAD, unmatched routes, method/path normalization, allowed and denied CORS, representative auth and gate order, and media success, range and error paths. Each request uses an independent local D1 adapter and fixed time. Media alone uses a narrow fake fetch, and any other fetch or mail attempt fails the test.
+- The test runs through the existing API contract entry, preserving Product ownership of the Worker test index and helpers. No runtime code, route gates, financial behavior, production commands or golden fixtures changed.
+- Node 22.23.4 passed 343 Worker tests. Local Workers passed 15 tests in six files. JavaScript lint reported zero errors and warnings. Worker type reporting retained 914 existing diagnostics. Golden matched all 695 files.
 
 ## WP-2.3 Worker API contract validation
 
