@@ -295,6 +295,38 @@ export const NEEDS_YOU_CODES = new Set(["auth", "cap", "rate", "paused", "busy"]
 // Puts a streamed Gemini reply back together as one generateContent reply, so fromResponse reads it
 // like any other. Each chunk carries a few parts; text that was split across chunks is joined again.
 // A part with a thoughtSignature closes the text before it, because the signature belongs to that part.
+const TERMINAL_REASONS = new Set([
+  "STOP",
+  "MAX_TOKENS",
+  "SAFETY",
+  "RECITATION",
+  "LANGUAGE",
+  "OTHER",
+  "BLOCKLIST",
+  "PROHIBITED_CONTENT",
+  "SPII",
+  "MALFORMED_FUNCTION_CALL",
+  "IMAGE_SAFETY",
+  "IMAGE_PROHIBITED_CONTENT",
+  "IMAGE_OTHER",
+  "NO_IMAGE",
+  "IMAGE_RECITATION",
+  "UNEXPECTED_TOOL_CALL",
+  "TOO_MANY_TOOL_CALLS",
+  "MISSING_THOUGHT_SIGNATURE",
+  "MALFORMED_RESPONSE",
+  "ESCALATION",
+  "PUP_LIMITED_DISABLED",
+]);
+const BLOCK_REASONS = new Set([
+  "SAFETY",
+  "OTHER",
+  "BLOCKLIST",
+  "PROHIBITED_CONTENT",
+  "IMAGE_SAFETY",
+]);
+const object = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+
 export function stitchChunks(chunks) {
   const parts = [];
   let finishReason,
@@ -315,7 +347,12 @@ export function stitchChunks(chunks) {
       !cand ||
       typeof cand !== "object" ||
       Array.isArray(cand) ||
-      (cand.finishReason !== undefined && typeof cand.finishReason !== "string")
+      (cand.finishReason !== undefined &&
+        (typeof cand.finishReason !== "string" ||
+          (cand.finishReason !== "" &&
+            cand.finishReason !== "CONTINUATION" &&
+            cand.finishReason !== "FINISH_REASON_UNSPECIFIED" &&
+            !TERMINAL_REASONS.has(cand.finishReason))))
     )
       throw new Error("Invalid Gemini candidate");
     if (
@@ -337,6 +374,16 @@ export function stitchChunks(chunks) {
         (p.text != null && typeof p.text !== "string")
       )
         throw new Error("Invalid Gemini part");
+      if (p.functionCall !== undefined) {
+        const call = p.functionCall;
+        if (
+          !object(call) ||
+          typeof call.name !== "string" ||
+          !call.name.trim() ||
+          (call.args !== undefined && !object(call.args))
+        )
+          throw new Error("Invalid Gemini function call");
+      }
       if (p.thought) continue;
       const last = parts[parts.length - 1];
       const plain = (x) => x && x.text != null && !x.functionCall;
@@ -352,7 +399,7 @@ export function stitchChunks(chunks) {
       : [],
     ...(usageMetadata ? { usageMetadata } : {}),
     ...(promptFeedback ? { promptFeedback } : {}),
-    complete: !!finishReason,
+    complete: TERMINAL_REASONS.has(finishReason),
   };
 }
 
@@ -376,10 +423,12 @@ export async function readSSE(
     throw new Error("Invalid SSE limits");
   if (!res.body?.getReader) throw new Error("Missing SSE reader");
   const reader = res.body.getReader(),
-    decoder = new TextDecoder("utf-8", { fatal: true }),
-    encoder = new TextEncoder();
+    decoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
   const chunks = [];
-  let buffer = "",
+  let lineParts = [],
+    lineBytes = 0,
+    pendingCR = false,
+    firstLine = true,
     lines = [],
     eventBytes = 0,
     total = 0,
@@ -399,31 +448,63 @@ export async function readSSE(
       throw new Error("Invalid SSE data");
     chunks.push(value);
   };
-  const scan = (piece, final = false) => {
-    buffer += piece;
-    let end;
-    while ((end = buffer.search(/[\r\n]/)) !== -1) {
-      if (buffer[end] === "\r" && end + 1 === buffer.length && !final) break;
-      const width = buffer[end] === "\r" && buffer[end + 1] === "\n" ? 2 : 1;
-      const line = buffer.slice(0, end);
-      buffer = buffer.slice(end + width);
-      eventBytes += encoder.encode(line).byteLength + width;
-      if (eventBytes > maxEventBytes) throw new Error("SSE event too large");
-      if (!line) {
-        dispatch();
-        continue;
+  const append = (part) => {
+    if (part.length) {
+      lineParts.push(part);
+      lineBytes += part.length;
+    }
+  };
+  const finishLine = (terminated = true) => {
+    const bytes = new Uint8Array(lineBytes);
+    let offset = 0;
+    for (const part of lineParts) {
+      bytes.set(part, offset);
+      offset += part.length;
+    }
+    let line = decoder.decode(bytes);
+    if (firstLine && line[0] === "\ufeff") line = line.slice(1);
+    firstLine = false;
+    lineParts = [];
+    lineBytes = 0;
+    if (!line && terminated) dispatch();
+    else if (line === "data" || line.startsWith("data:"))
+      lines.push(line.slice(5).replace(/^ /, ""));
+  };
+  const countByte = () => {
+    if (++eventBytes > maxEventBytes) throw new Error("SSE event too large");
+  };
+  // Each raw byte is visited once. Decode each complete line once, rather than rescanning or
+  // re-encoding its growing prefix on every transport read. CR/LF cannot be UTF-8 continuation bytes.
+  const scan = (bytes) => {
+    let start = 0;
+    for (let i = 0; i < bytes.length; i++) {
+      const byte = bytes[i];
+      if (pendingCR) {
+        pendingCR = false;
+        if (byte === 10) {
+          countByte();
+          finishLine();
+          start = i + 1;
+          continue;
+        }
+        finishLine();
       }
-      if (line === "data" || line.startsWith("data:")) lines.push(line.slice(5).replace(/^ /, ""));
+      countByte();
+      if (byte === 13 || byte === 10) {
+        append(bytes.subarray(start, i));
+        start = i + 1;
+        if (byte === 13) pendingCR = true;
+        else finishLine();
+      }
     }
-    if (eventBytes + encoder.encode(buffer).byteLength > maxEventBytes)
-      throw new Error("SSE event too large");
-    if (final) {
-      if (buffer === "data" || buffer.startsWith("data:"))
-        lines.push(buffer.slice(5).replace(/^ /, ""));
-      // Preserve a harmless final DONE trailer; it never supplies Gemini's finish reason.
-      if (lines.length && lines.join("\n").trim() !== "[DONE]")
-        throw new Error("Incomplete SSE event");
-    }
+    append(bytes.subarray(start));
+  };
+  const finish = () => {
+    if (pendingCR) finishLine();
+    else if (lineBytes) finishLine(false);
+    // Preserve a harmless final DONE trailer; it never supplies Gemini's finish reason.
+    if (lines.length && lines.join("\n").trim() !== "[DONE]")
+      throw new Error("Incomplete SSE event");
   };
   let rejectAbort;
   const aborted = new Promise((_, reject) => {
@@ -450,9 +531,9 @@ export async function readSSE(
         if (!(value instanceof Uint8Array)) throw new Error("Invalid SSE bytes");
         total += value.byteLength;
         if (total > maxBytes) throw new Error("SSE body too large");
-        scan(decoder.decode(value, { stream: true }));
+        scan(value);
       }
-      scan(decoder.decode(), true);
+      finish();
       throwIfAborted(signal);
       return chunks;
     };
@@ -522,7 +603,11 @@ export async function callWorker({
       throwIfAborted(signal);
       // A stream that stopped before Gemini said it was finished is a dropped connection, not an
       // answer: half a tool call or half a resume must not be acted on. Try again like any 502.
-      if (!whole || (!whole.complete && (whole.candidates.length || !whole.promptFeedback))) {
+      if (
+        !whole ||
+        (!whole.complete &&
+          (whole.candidates.length || !BLOCK_REASONS.has(whole.promptFeedback?.blockReason)))
+      ) {
         lastErr = workerError(502, { error: "upstream" });
         if (hasNextAttempt) await sleepImpl(1500 * 2 ** attempt, signal);
         continue;

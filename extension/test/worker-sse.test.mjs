@@ -301,3 +301,187 @@ test("ignored reader cancellation cannot hold the caller or consume a late respo
   assert.equal(reads, 1);
   assert.ok(cancellations >= 1);
 });
+
+test("large fragmented events require only linear decoding, encoding and delimiter search work", async () => {
+  const bytes = encoder.encode(
+    event({ text: "x".repeat(524307 - encoder.encode(event({ text: "" })).length) }),
+  );
+  assert.equal(bytes.length, 524307);
+  for (const step of [32, 128, 16384]) {
+    const res = response(bytes, { step });
+    const Decoder = globalThis.TextDecoder,
+      Encoder = globalThis.TextEncoder;
+    const search = String.prototype.search;
+    let decoded = 0,
+      encoded = 0,
+      searched = 0;
+    globalThis.TextDecoder = class extends Decoder {
+      decode(input, options) {
+        decoded += input?.byteLength || 0;
+        return super.decode(input, options);
+      }
+    };
+    globalThis.TextEncoder = class extends Encoder {
+      encode(input = "") {
+        encoded += input.length;
+        return super.encode(input);
+      }
+    };
+    String.prototype.search = function (...args) {
+      searched += this.length;
+      return search.apply(this, args);
+    };
+    try {
+      const result = await readSSE(res);
+      assert.equal(result[0].text.length, 524288);
+      assert.ok(decoded <= bytes.length, `decoded ${decoded} at ${step}`);
+      assert.ok(
+        encoded + searched <= bytes.length * 2,
+        `revisited ${encoded + searched} at ${step}`,
+      );
+    } finally {
+      globalThis.TextDecoder = Decoder;
+      globalThis.TextEncoder = Encoder;
+      String.prototype.search = search;
+    }
+  }
+});
+
+test("raw event bounds count BOM, split CRLF and UTF-8 exactly", async () => {
+  for (const newline of ["\r\n", "\r", "\n"]) {
+    const text = "\ufeffdata: " + JSON.stringify({ text: "é😀" }) + newline + newline;
+    const size = encoder.encode(text).length;
+    for (const step of [1, 2, 3, size]) {
+      assert.deepEqual(
+        await readSSE(response(text, { step }), { maxBytes: size, maxEventBytes: size }),
+        [{ text: "é😀" }],
+      );
+      await assert.rejects(
+        readSSE(response(text, { step }), { maxBytes: size, maxEventBytes: size - 1 }),
+        /event too large/,
+      );
+    }
+  }
+});
+
+test("nonterminal, unspecified and unrecognized finish reasons retry without returning partial content", async () => {
+  for (const reason of [
+    "CONTINUATION",
+    "FINISH_REASON_UNSPECIFIED",
+    "UNKNOWN",
+    " STOP",
+    "",
+    null,
+    false,
+    4,
+  ]) {
+    const partial = chunk("partial");
+    partial.candidates[0].finishReason = reason;
+    let calls = 0;
+    const out = await callWorker({
+      ...opts,
+      fetchImpl: async () => response(event(++calls === 1 ? partial : chunk("whole", "STOP"))),
+    });
+    assert.equal(calls, 2, String(reason));
+    assert.deepEqual(out.content, [{ type: "text", text: "whole" }]);
+  }
+});
+
+test("only a recognized prompt block ends without retry and malformed function args never reach tools", async () => {
+  const bad = [
+    ...[
+      {},
+      { blockReason: "BLOCK_REASON_UNSPECIFIED" },
+      { blockReason: "UNKNOWN" },
+      { blockReason: false },
+      "SAFETY",
+      null,
+    ].map((promptFeedback) => ({ promptFeedback })),
+    ...["false", false, null, [], 3].map((args) => ({
+      candidates: [
+        { content: { parts: [{ functionCall: { name: "check", args } }] }, finishReason: "STOP" },
+      ],
+    })),
+  ];
+  for (const first of bad) {
+    let calls = 0;
+    const out = await callWorker({
+      ...opts,
+      fetchImpl: async () => response(event(++calls === 1 ? first : chunk("whole", "STOP"))),
+    });
+    assert.equal(calls, 2);
+    assert.deepEqual(out.content, [{ type: "text", text: "whole" }]);
+  }
+  for (const blockReason of [
+    "SAFETY",
+    "OTHER",
+    "BLOCKLIST",
+    "PROHIBITED_CONTENT",
+    "IMAGE_SAFETY",
+  ]) {
+    let calls = 0;
+    await assert.rejects(
+      callWorker({
+        ...opts,
+        fetchImpl: async () => {
+          calls++;
+          return response(event({ promptFeedback: { blockReason } }));
+        },
+      }),
+      /blocked:/,
+    );
+    assert.equal(calls, 1);
+  }
+  const out = await callWorker({
+    ...opts,
+    fetchImpl: async () =>
+      response(
+        event({
+          candidates: [
+            { content: { parts: [{ functionCall: { name: "read_page" } }] }, finishReason: "STOP" },
+          ],
+        }),
+      ),
+  });
+  assert.equal(out.stop_reason, "tool_use");
+  assert.deepEqual(out.content[0].input, {});
+});
+
+test("documented terminal reasons are recognized and malformed earlier markers cannot be hidden", () => {
+  for (const reason of [
+    "STOP",
+    "MAX_TOKENS",
+    "SAFETY",
+    "RECITATION",
+    "LANGUAGE",
+    "OTHER",
+    "BLOCKLIST",
+    "PROHIBITED_CONTENT",
+    "SPII",
+    "MALFORMED_FUNCTION_CALL",
+    "IMAGE_SAFETY",
+    "IMAGE_PROHIBITED_CONTENT",
+    "IMAGE_OTHER",
+    "NO_IMAGE",
+    "IMAGE_RECITATION",
+    "UNEXPECTED_TOOL_CALL",
+    "TOO_MANY_TOOL_CALLS",
+    "MISSING_THOUGHT_SIGNATURE",
+    "MALFORMED_RESPONSE",
+    "ESCALATION",
+    "PUP_LIMITED_DISABLED",
+  ])
+    assert.equal(stitchChunks([chunk("text", reason)]).complete, true, reason);
+  assert.throws(
+    () => stitchChunks([chunk("partial", "UNKNOWN"), chunk("later", "STOP")]),
+    /candidate/,
+  );
+  for (const functionCall of [null, [], "bad", {}, { name: "" }, { name: false }])
+    assert.throws(
+      () =>
+        stitchChunks([
+          { candidates: [{ content: { parts: [{ functionCall }] }, finishReason: "STOP" }] },
+        ]),
+      /function call/,
+    );
+});
