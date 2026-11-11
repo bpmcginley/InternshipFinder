@@ -1,11 +1,13 @@
-// The design tokens (A2 design spec section 1, 2026-10-14). There is no build step, so the same :root block is
-// copied into four places: the dashboard (docs/index.html, the source), the landing pages (CSS in
-// backend/internscout/site/assets.py), /employers/ (docs/employers/index.html) and the extension
-// (extension/lib/theme.css, and the colours in extension/agent/overlay.js). These tests fail when a copy
-// drifts, when a colour pair falls under WCAG AA, or when a size, face or focus rule slips back.
+// tokens.css owns the shared light, dark and touch rules. The generated copies stay inline.
+// The existing design checks cover WCAG AA, type and controls, plus the local overlay subset.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, existsSync } from "node:fs";
+import { updateTokenCopies } from "../../scripts/generate_tokens.mjs";
+
+test("the generated token blocks are current with tokens.css", () => {
+  assert.deepEqual(updateTokenCopies(), [], "run node scripts/generate_tokens.mjs");
+});
 
 const read = (p) => readFileSync(new URL("../../" + p, import.meta.url), "utf8");
 const bytes = (p) => readFileSync(new URL("../../" + p, import.meta.url));
