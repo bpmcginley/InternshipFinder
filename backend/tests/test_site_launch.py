@@ -4,8 +4,10 @@ import re
 
 import pytest
 
-from internscout.site import launch, runtime
-from test_seo_pages import _row, _site
+from internscout.site import launch, publish, runtime
+from tests.seo_fixture_data import _row, _site
+
+pytestmark = pytest.mark.without_seo_facade
 
 
 def rows(n, **over):
@@ -161,19 +163,21 @@ def fixture_rows():
 
 
 def test_thin_pilot_keeps_canonical_and_feed_but_not_sitemap(tmp_path):
-    from internscout import feeds, seo_pages, site_links
+    from internscout import feeds, site_links
 
     items = [
         _row(i, tags=("swe",), term="Summer 2027" if i < 10 else "Spring 2027") for i in range(30)
     ]
     site = _site(tmp_path, {"MA": items})
-    pages = seo_pages.build(site, earning=frozenset())
+    state = runtime.BuildState(near_on=False)
+    hooks = runtime.BuildHooks()
+    pages = runtime.invoke(state, hooks, runtime.build, site, earning=frozenset())
     path = "/internships/summer-2027/software-engineering/"
     page = next(p for p in pages if p["path"] == path)
     assert page["thin"] and not page["index"]
     assert '<meta name="robots" content="noindex, follow"' in page["html"]
-    seo_pages.write(site, pages)
-    feeds.write_all(site, pages, seo_pages.GENERATED)
+    publish._write_site(site, pages, state, hooks)
+    feeds.write_all(site, pages, state.generated)
     assert (tmp_path / path.strip("/") / "feed.xml").is_file()
     assert f"https://internscout.org{path}</loc>" not in (tmp_path / "sitemap.xml").read_text()
     # The minimal fixture has no handwritten assets; audit the new feed/canonical targets specifically.

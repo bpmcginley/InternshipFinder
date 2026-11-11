@@ -29,6 +29,7 @@ const migrationNames = [
   "0017_funded_run_admission.sql",
   "0018_purchased_run_generations.sql",
   "0019_topup_retention_evidence.sql",
+  "0020_topup_retirement_provenance.sql",
 ];
 const legacySql = [...env.TEST_SCHEMA_SQL, ...env.TEST_EXTRA_SCHEMA_SQL];
 const databases = [env.LEGACY_DB, env.MIGRATION_DB];
@@ -46,7 +47,11 @@ beforeEach(async () => {
   for (const db of databases) {
     await run(
       db,
-      [...tableNames.toReversed(), "d1_migrations"].map((name) => `DROP TABLE IF EXISTS "${name}"`),
+      // Wrangler can group late CREATE statements with a trigger. Explicitly reset the
+      // altered table too, so migration0020 is replayed against its actual old shape.
+      ["topup_retention", ...tableNames.toReversed(), "d1_migrations"].map(
+        (name) => `DROP TABLE IF EXISTS "${name}"`,
+      ),
     );
   }
 });
@@ -281,4 +286,37 @@ it("migration bookkeeping skips an applied baseline and rolls back a failed migr
     ),
   ).toEqual([]);
   expect(await ledger()).toEqual(migrationNames.map((name) => ({ name })));
+});
+
+it("0020 preserves old retention timestamps but cannot infer historical eligibility", async () => {
+  await applyD1Migrations(env.MIGRATION_DB, env.TEST_MIGRATIONS.slice(0, -1));
+  const hash = "a".repeat(64),
+    checkout = "b".repeat(64),
+    user = "c".repeat(64);
+  await env.MIGRATION_DB.batch([
+    env.MIGRATION_DB.prepare("INSERT INTO topup_claims VALUES(?,?,'granted')").bind(hash, checkout),
+    env.MIGRATION_DB.prepare(
+      "INSERT INTO topup_purchases VALUES(?,'pi_synthetic','cs_synthetic',?,'fixture',300,'usd',25,0,0,25,0,'2020-01-01T00:00:00.000Z')",
+    ).bind(hash, user),
+    env.MIGRATION_DB.prepare(
+      "INSERT INTO topup_retention VALUES(?,'2020-01-01T00:00:00.000Z','2020-01-01T00:00:00.000Z')",
+    ).bind(hash),
+  ]);
+  await apply();
+  expect(
+    await env.MIGRATION_DB.prepare("SELECT * FROM topup_retention WHERE payment_hash=?")
+      .bind(hash)
+      .first(),
+  ).toEqual({
+    payment_hash: hash,
+    resolved_at: "2020-01-01T00:00:00.000Z",
+    resolved_zero_since: "2020-01-01T00:00:00.000Z",
+    history_proven: 0,
+    evidence_digest: null,
+  });
+  expect(
+    await env.MIGRATION_DB.prepare("SELECT consumed FROM topup_purchases WHERE payment_hash=?")
+      .bind(hash)
+      .first("consumed"),
+  ).toBe(25);
 });
