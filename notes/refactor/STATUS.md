@@ -112,7 +112,7 @@ The documentation-only status PR also verified the complete backend suite in Lin
 | 6 | WP-5.3 Shared pure code | Unassigned | - | - | Queued | Preserve profile/scoring/id semantics; package-time copies and staleness check. |
 | 6 | WP-6.1.1 DATA_DIR | wp14_logging | `refactor/wp-6.1.1-public-data` | [#306](https://github.com/bpmcginley/InternshipFinder/pull/306) | Merged | Locate public listing exports with `INTERNSCOUT_PUBLIC_DATA`; default remains `docs/data`. Merge `bcedd37c`, Pages 42961911238 and exact deployment succeeded. |
 | 6 | WP-6.1.2 Test fixtures | wp42_orders | `refactor/wp-6.1.2-data-test-fixtures` | [#313](https://github.com/bpmcginley/InternshipFinder/pull/313) | In review | Fixed dashboard and placement shards, first-screen preview and registry seed checks. With public data and five ingest state files absent, Node 22 site 319, editable Python 1,661 with three skips, and Golden 695. |
-| 6 | WP-6.1.3 Reader workflows | Unassigned | - | - | Queued | Separate data checkout with main fallback; preserve triggers and permissions. |
+| 6 | WP-6.1.3 Reader workflows | wp14_logging | `refactor/wp-6.1.3-data-readers` | - | In progress | Select a pinned public data checkout for eight readers. Primary checkout fallback only when the data branch is absent. |
 | 7 | WP-3.6 Jinja templates | Unassigned | - | - | Queued / optional | Only identical golden output; keep f-strings when exactness adds risk. |
 | 7 | WP-6.1.4 Data branch | Unassigned | - | - | Queued | Normal push from current data; branch rules remain Bruce's. |
 | 7 | WP-6.1.5 Ingest writer | Unassigned | - | - | Queued | Write data branch; preserve Pages-following-ingest behavior. |

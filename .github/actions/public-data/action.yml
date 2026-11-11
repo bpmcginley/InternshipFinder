@@ -1,0 +1,29 @@
+name: Select public listing data
+description: Check out the data branch snapshot or use the primary checkout when it is absent
+outputs:
+  directory:
+    description: Absolute path to the selected public listing export
+    value: ${{ steps.select.outputs.directory }}
+runs:
+  using: composite
+  steps:
+    - name: Resolve the data branch
+      id: resolve
+      shell: bash
+      run: python "$GITHUB_ACTION_PATH/select.py" resolve
+
+    - name: Check out the public listing snapshot
+      if: steps.resolve.outputs.sha != ''
+      uses: actions/checkout@v7
+      with:
+        ref: ${{ steps.resolve.outputs.sha }}
+        path: .listing-data
+        sparse-checkout: docs/data
+        persist-credentials: false
+
+    - name: Select the public listing export
+      id: select
+      shell: bash
+      env:
+        DATA_SHA: ${{ steps.resolve.outputs.sha }}
+      run: python "$GITHUB_ACTION_PATH/select.py" select
