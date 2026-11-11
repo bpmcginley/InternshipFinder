@@ -496,4 +496,4 @@ Normally integrated published dashboard main `2a8176db`, preserving reviewed pri
 
 ## P-2.2af verified display offer
 
-Draft source claim for an authenticated, default-off Worker offer that verifies the dedicated Stripe Price before projecting public terms. No provider call or activation.
+Draft #430 adds an authenticated, default-off Worker offer with exact Stripe Price verification and a public configuration hint. The session, allowed dashboard Origin and current Auto-Apply service are fenced before the provider read and checked again before presenting the offer. Checkout reuses the service check before reservation. The projected display terms contain no provider references. Local 744 Node and 322 actual Workers/D1 tests passed. Independent review, hosted checks, settlement, dashboard integration and activation remain pending.

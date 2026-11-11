@@ -7,14 +7,14 @@ import { authenticateUser, bearerOf, providers, userHash, verifyIdToken } from "
 import { copySession, createSession, dropExpiredSessions, endSession, isSessionToken, sessionInfo } from "./session.js";
 import { MAX_PROFILE_BYTES, deleteProfile, getProfile, putProfile, requireSync, syncOn } from "./profile.js";
 import { callGemini, costCents, estimateCents, readUsageFromSSE, sanitizeRequest } from "./gemini.js";
-import { allowanceFor, cleanup, upgradeOffer, deleteUser, isPaused, monthOf, release, remainingOf, settle, shownLimit, usageFor } from "./limits.js";
+import { allowanceFor, cleanup, upgradeOffer, deleteUser, globalRpm, isPaused, monthOf, release, remainingOf, settle, shownLimit, usageFor } from "./limits.js";
 import { admitAiLifecycle, respondFundedAi } from "./ai-lifecycle.js";
 import { bonusFor, claim, inviteInfo, noteAccount } from "./referral.js";
 import { cleanStates, demandCounts, dropStale, setDemand, touchSeen } from "./demand.js";
 import { countEvent, countHit } from "./visits.js";
 import { followUnsubscribeEndpoint } from "./follow-unsubscribe-endpoint.js";
-import { topupCheckoutResponse } from "./topup-checkout-http.js";
-import { prepareTopupStripe } from "./topup-stripe.js";
+import { topupCheckoutResponse, topupOfferResponse } from "./topup-checkout-http.js";
+import { prepareTopupStripe, topupConfigured } from "./topup-stripe.js";
 import { createEmployerPostingRuntime, employerPostingReport } from "./employer-posting-runtime.js";
 const employerPostingRuntime = createEmployerPostingRuntime();
 import { CAMPAIGN_REPORT_CRON, expireCampaignReportMail, processCampaignReports } from "./campaign-reports.js";
@@ -65,6 +65,33 @@ function corsHeaders(request, env) {
     "Access-Control-Expose-Headers": "X-InternScout-Model, X-InternScout-Remaining",
     "Access-Control-Max-Age": "86400",
     Vary: "Origin",
+  };
+}
+
+const topupOriginAllowed = (request, env) =>
+  DASHBOARD_ORIGINS.includes(request.headers.get("Origin")) &&
+  !!corsHeaders(request, env)["Access-Control-Allow-Origin"];
+
+const dashboardTopupConfigured = (env) =>
+  topupConfigured(env) && DASHBOARD_ORIGINS.includes(siteUrl(env));
+
+function prepareDashboardTopup({ db, env, d }) {
+  return async (identity, fresh) => {
+    if (!dashboardTopupConfigured(env) || !(globalRpm(env, d.config) > 0))
+      return { enabled: false };
+    const canUseAutoApply = async () => {
+      const { plan } = await planOf(db, identity.user);
+      const at = fresh();
+      return (
+        allowanceFor(d.config, env, "autofill", identity.tier, plan, at) > 0 &&
+        !(await isPaused(db, env, d.config, at, plan))
+      );
+    };
+    if (!(await canUseAutoApply()) || !(Date.parse(identity.expires) > +fresh()))
+      return { enabled: false };
+    const root = siteUrl(env) + "/";
+    const adapter = await prepareTopupStripe(env, { success: root, cancel: root }, d.fetch);
+    return adapter.enabled && (await canUseAutoApply()) ? adapter : { enabled: false };
   };
 }
 
@@ -247,6 +274,7 @@ const safeRouteHandlers = {
         ...Object.fromEntries(d.config.PAID_PLANS.map((plan) => [plan, limits("edu", plan)])),
       },
       payments: paymentsInfo(env, d.config),
+      ...(dashboardTopupConfigured(env) ? { topups: true } : {}),
       paused: await isPaused(db, env, d.config, now),
       // What an invite is worth (REFERRAL in config.js), so the dashboard can offer it before sign-in.
       invite: { bonus: d.config.REFERRAL.bonus, max: d.config.REFERRAL.maxRewards },
@@ -310,26 +338,30 @@ const safeRouteHandlers = {
     return json(await checkout(db, env, d.config, user, body.plan, now, d.fetch));
   },
 
+  "GET /billing/topup/offer": async ({ request, db, env, d }) => {
+    const noStore = { "Cache-Control": "no-store" };
+    if (!dashboardTopupConfigured(env)) return json({ status: "disabled" }, 503, noStore);
+    if (!topupOriginAllowed(request, env))
+      return json({ status: "unavailable" }, 403, noStore);
+    return topupOfferResponse({
+      request,
+      db,
+      clock: d.now,
+      prepareAdapter: prepareDashboardTopup({ db, env, d }),
+    });
+  },
+
   "POST /billing/topup/checkout": async ({ request, db, env, d }) => {
     const noStore = { "Cache-Control": "no-store" };
     if (env.TOPUPS_ENABLED !== "1" || !paymentsOn(env))
       return json({ status: "disabled" }, 503, noStore);
-    const origin = request.headers.get("Origin");
-    if (
-      !DASHBOARD_ORIGINS.includes(origin) ||
-      !corsHeaders(request, env)["Access-Control-Allow-Origin"]
-    )
+    if (!topupOriginAllowed(request, env))
       return json({ status: "unavailable" }, 403, noStore);
     return topupCheckoutResponse({
       request,
       db,
       clock: d.now,
-      prepareAdapter() {
-        const site = siteUrl(env);
-        if (!DASHBOARD_ORIGINS.includes(site)) return { enabled: false };
-        const root = site + "/";
-        return prepareTopupStripe(env, { success: root, cancel: root }, d.fetch);
-      },
+      prepareAdapter: prepareDashboardTopup({ db, env, d }),
     });
   },
 
