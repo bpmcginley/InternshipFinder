@@ -7,7 +7,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[4]
 sys.path[:0] = [str(ROOT / 'backend'), str(ROOT / 'backend/tests')]
 from test_employer_posting_links import fixture_rows, stage, run
-from test_seo_pages import _site
+from tests.seo_fixture_data import _site
 from internscout.site import runtime
 from internscout.site.employer_posting_links import PostingLinks
 
