@@ -43,7 +43,7 @@ export function updateTokenCopies({ write = false } = {}) {
     TOUCH + compactBody(touch) + "}}",
   ].join("\n");
 
-  const stale = [];
+  const updates = [];
   for (const path of TARGETS) {
     const file = new URL("../" + path, import.meta.url);
     const text = readFileSync(file, "utf8");
@@ -51,12 +51,14 @@ export function updateTokenCopies({ write = false } = {}) {
     const output = path === "docs/index.html" ? dashboard : compact;
     const replacement = block[0].includes("\r\n") ? output.replaceAll("\n", "\r\n") : output;
     if (block[0] === replacement) continue;
-    stale.push(path);
-    if (write) {
-      writeFileSync(file, text.slice(0, block.index) + replacement + text.slice(block.index + block[0].length));
-    }
+    const content = text.slice(0, block.index) + replacement + text.slice(block.index + block[0].length);
+    updates.push({ path, file, content });
   }
-  return stale;
+  // Validate every target before applying any replacements.
+  if (write) {
+    for (const { file, content } of updates) writeFileSync(file, content);
+  }
+  return updates.map(({ path }) => path);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

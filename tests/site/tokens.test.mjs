@@ -2,11 +2,54 @@
 // The existing design checks cover WCAG AA, type and controls, plus the local overlay subset.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, existsSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import { updateTokenCopies } from "../../scripts/generate_tokens.mjs";
 
 test("the generated token blocks are current with tokens.css", () => {
   assert.deepEqual(updateTokenCopies(), [], "run node scripts/generate_tokens.mjs");
+});
+
+test("the generator validates the last target before writing any files", () => {
+  const dir = mkdtempSync(join(tmpdir(), "internscout-tokens-"));
+  const script = "scripts/generate_tokens.mjs";
+  const targets = [
+    "docs/index.html",
+    "docs/employers/index.html",
+    "docs/employers/buy/index.html",
+    "backend/internscout/site/assets.py",
+    "extension/lib/theme.css",
+  ];
+  try {
+    for (const path of [script, "tokens.css", ...targets]) {
+      const file = join(dir, path);
+      mkdirSync(dirname(file), { recursive: true });
+      copyFileSync(new URL("../../" + path, import.meta.url), file);
+    }
+    const source = join(dir, "tokens.css");
+    const original = readFileSync(source, "utf8");
+    const edited = original.replace(/--paper:[^;]+;/, "--paper:#010203;");
+    assert.notEqual(edited, original);
+    writeFileSync(source, edited);
+
+    const last = join(dir, targets.at(-1));
+    const theme = readFileSync(last, "utf8");
+    const invalid = theme.replace("@media (pointer:coarse){:root{", "@media (pointer:coarse){body{");
+    assert.notEqual(invalid, theme);
+    writeFileSync(last, invalid);
+
+    const before = targets.map((path) => readFileSync(join(dir, path)));
+    const result = spawnSync(process.execPath, [join(dir, script)], { encoding: "utf8" });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /Expected one design token block in extension\/lib\/theme\.css/);
+    for (const [index, path] of targets.entries()) {
+      assert.deepEqual(readFileSync(join(dir, path)), before[index], path);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 const read = (p) => readFileSync(new URL("../../" + p, import.meta.url), "utf8");
