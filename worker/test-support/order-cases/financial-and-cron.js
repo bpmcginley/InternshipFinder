@@ -349,7 +349,7 @@ test("the Worker's daily cron runs the orders cron too", async () => {
     "email, email_domain, terms_version, terms_at, price) VALUES ('o-0000000000000def', '2020-01-01T00:00:00Z', '2020-01-01T00:00:00Z', " +
     "'unverified', 'one', '2020-01-02', 'acme', 'Acme', 'Acme', 'N', 'n@acme.example', 'acme.example', ?, '2020-01-01T00:00:00Z', 2900)")
     .bind(TERMS_VERSION).run();
-  const worker = (await import("../src/index.js")).default;
+  const worker = (await import("../../src/index.js")).default;
   const waits = [];
   worker.scheduled({ cron: "17 7 * * *" }, env, { waitUntil: (p) => waits.push(p) });
   await Promise.all(waits);
