@@ -23,15 +23,15 @@ def render(model: Edition, *, listing_rows: Callable[..., str], limit: int = 40)
     body = f'<p class="lede">{esc(lead)}</p>'
     body += f"<p>Forward this page's link to students interested in {name}. "
     body += (
-        "The list follows the major's direct fields, not a check of each student's eligibility. "
+        "InternScout groups these roles by the major's fields. "
+        "Check each posting for eligibility and current availability.</p>"
     )
-    body += "Availability can change. Read the employer's full requirements before applying.</p>"
     if model.items and model.stamp is not None:
         body += '<ul class="jobs">' + listing_rows(model.items[:limit], model.stamp) + '</ul>'
         if len(model.items) > limit:
             body += f'<p class="more">Showing {limit} of {len(model.items):,} roles in this edition.</p>'
     elif model.state == "ready":
-        body += "<p>No matching new roles were found in this export's seven-day window. Older open roles may still be available.</p>"
+        body += "<p>Older open roles may still be available.</p>"
     label = (
         "Browse majors"
         if model.parent == "/internships/for/"

@@ -100,6 +100,41 @@ def test_only_available_well_formed_safe_public_roles(change):
     assert not advisor.select(data([dict(row(1), **change)]))[0].items
 
 
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://:password@jobs.example/",
+        "https://@jobs.example/",
+        "https://user:@jobs.example/",
+        "https://jobs.example/\x00role",
+        "https://jobs.example/\x1frole",
+        "https://jobs.example/\x7frole",
+        "https://jobs.example/\x80role",
+        "https://jobs.example/\\role",
+        "https://jobs.example\\@other.example/",
+        "https://jobs.example:bad/",
+        "https://jobs.example:65536/",
+        "https://jobs.example:-1/",
+        "https://jobs.example:/",
+    ],
+)
+def test_posting_rejects_all_userinfo_controls_backslashes_and_malformed_ports(url):
+    assert not advisor.select(data([dict(row(1), apply_url=url)]))[0].items
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://jobs.example:443/role?team=engineering#details",
+        "http://jobs.example:8080/role",
+        "https://[2001:db8::1]:443/role",
+        "https://jobs.example/role",
+    ],
+)
+def test_ordinary_http_postings_and_valid_ports_remain_available(url):
+    assert len(advisor.select(data([dict(row(1), apply_url=url)]))[0].items) == 1
+
+
 def test_undergraduate_empty_unmapped_and_missing_date_are_distinct():
     majors = [
         {"name": "Empty", "tags": ["finance"]},
@@ -148,6 +183,10 @@ def test_render_full_count_bounded_rows_and_escaped_copy_without_form():
     assert "52 open student roles" in page["body"] and "Showing 40 of 52" in page["body"]
     assert '<Bad' not in page["body"] and '&lt;Bad &amp;' in page["body"]
     assert '<form' not in page["body"] and 'subscribe' not in page["body"]
+    assert (
+        "InternScout groups these roles by the major's fields. Check each posting for eligibility and current availability."
+        in page["body"]
+    )
     assert page["thin"] and page["items"] == edition.items
 
 
@@ -158,6 +197,8 @@ def test_render_empty_unmapped_and_undated_never_invents_weekly_count():
         "0 open student roles" in empty["body"]
         and "Older open roles may still be available" in empty["body"]
     )
+    assert empty["body"].count("0 open student roles") == 1
+    assert "No matching new roles" not in empty["body"]
     undated = render(advisor.select(data([], stamp=None))[0], listing_rows=rows)
     assert "cannot be verified" in undated["body"] and "0 open" not in undated["body"]
     unmapped = render(

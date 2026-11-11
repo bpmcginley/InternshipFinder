@@ -26,11 +26,21 @@ def _stamp(value) -> datetime | None:
 
 
 def _safe_posting(value) -> bool:
-    if not isinstance(value, str) or any(c.isspace() for c in value):
+    if not isinstance(value, str) or any(
+        c.isspace() or c == "\\" or ord(c) < 32 or 127 <= ord(c) <= 159 for c in value
+    ):
         return False
     try:
         parsed = urlsplit(value)
-        return parsed.scheme in {"http", "https"} and bool(parsed.hostname) and not parsed.username
+        # Accessing port validates malformed/out-of-range values; urlsplit alone does not.
+        _ = parsed.port
+        return (
+            parsed.scheme in {"http", "https"}
+            and bool(parsed.hostname)
+            and parsed.username is None
+            and parsed.password is None
+            and not parsed.netloc.endswith(":")
+        )
     except ValueError:
         return False
 
