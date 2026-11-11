@@ -49,7 +49,7 @@ def render(model: Edition, *, listing_rows: Callable[..., str], limit: int = 40)
             (model.path, f"{model.name} weekly"),
         ],
         "body": body,
-        "items": model.items,
-        # Discovery policy is decided at integration; utility/empty editions start non-indexed.
+        # Collection metadata without an RSS feed; these are forwardable utility pages.
+        "dated": model.items,
         "thin": True,
     }

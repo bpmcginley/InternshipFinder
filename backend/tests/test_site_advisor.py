@@ -2,12 +2,15 @@
 
 from datetime import datetime, timezone
 from html import escape
+import json
+from pathlib import Path
 
 import pytest
 
 from internscout.site import advisor
+from internscout import page_dates, seo_pages
 from internscout.site.render.advisor import render
-from test_seo_pages import _row
+from test_seo_pages import _row, _site
 
 
 END = "2026-11-11T12:00:00Z"
@@ -187,7 +190,7 @@ def test_render_full_count_bounded_rows_and_escaped_copy_without_form():
         "InternScout groups these roles by the major's fields. Check each posting for eligibility and current availability."
         in page["body"]
     )
-    assert page["thin"] and page["items"] == edition.items
+    assert page["thin"] and page["dated"] == edition.items and "items" not in page
 
 
 def test_render_empty_unmapped_and_undated_never_invents_weekly_count():
@@ -205,3 +208,94 @@ def test_render_empty_unmapped_and_undated_never_invents_weekly_count():
         advisor.select(data([], [{"name": "Undeclared", "tags": []}]))[0], listing_rows=rows
     )
     assert "no direct field mapping" in unmapped["body"] and "0 open" not in unmapped["body"]
+
+
+def set_export_stamp(site, value):
+    path = Path(site) / "data/listings/index.json"
+    index = json.loads(path.read_text(encoding="utf-8"))
+    index["generated_at"] = value
+    path.write_text(json.dumps(index), encoding="utf-8")
+
+
+def build(site):
+    return {p["path"]: p for p in seo_pages.build(str(site), earning=frozenset())}
+
+
+def exported(i):
+    return {k: v for k, v in row(i).items() if k != "keys"}
+
+
+def test_integrated_pages_preserve_existing_catalog_and_have_no_feeds(tmp_path, monkeypatch):
+    majors = [
+        {"name": "Computer Science", "tags": ["swe"]},
+        {"name": "Same Fields", "tags": ["swe"]},
+        {"name": "Empty", "tags": ["finance"]},
+        {"name": "Undeclared", "tags": []},
+    ]
+    site = _site(tmp_path, {"MA": [exported(i) for i in range(52)]}, majors)
+    set_export_stamp(site, END)
+    select = advisor.select
+    monkeypatch.setattr(advisor, "select", lambda *_: [])
+    before = build(site)
+    monkeypatch.setattr(advisor, "select", select)
+    after = build(site)
+    additions = {p.path for p in select(data([], majors))}
+    assert after.keys() - before.keys() == additions
+    for path, page in before.items():
+        assert after[path]["items"] == page["items"]
+        assert after[path]["index"] == page["index"]
+        if path != "/internships/for/":
+            assert after[path]["html"] == page["html"], path
+    seo_pages.write(site, list(after.values()))
+    sitemap = (Path(site) / "sitemap.xml").read_text(encoding="utf-8")
+    hub = after["/internships/for/"]["html"]
+    for path in additions:
+        page = after[path]
+        assert not page["index"] and page["thin"] and page["items"] is None
+        assert f'href="{path}"' in hub
+        assert f'<link rel="canonical" href="https://internscout.org{path}"' in page["html"]
+        assert 'content="noindex, follow"' in page["html"]
+        assert 'href="feed.xml"' not in page["html"]
+        assert not (Path(site) / path.strip("/") / "feed.xml").exists()
+        assert f'https://internscout.org{path}</loc>' not in sitemap
+    weekly = after["/internships/for/computer-science-majors/weekly/"]["html"]
+    assert 'href="/internships/software-engineering/"' in weekly
+    assert "52 open student roles" in weekly and "Showing 40 of 52" in weekly
+
+
+def test_selected_data_directory_supplies_weekly_roles_mapping_and_date(tmp_path, monkeypatch):
+    served = _site(tmp_path / "served", {"MA": []}, [{"name": "Old Major", "tags": ["finance"]}])
+    staged = _site(
+        tmp_path / "staged", {"MA": [exported(1)]}, [{"name": "Computer Science", "tags": ["swe"]}]
+    )
+    set_export_stamp(staged, END)
+    monkeypatch.setenv("INTERNSCOUT_PUBLIC_DATA", str(Path(staged) / "data"))
+    pages = build(served)
+    assert "/internships/for/old-major-majors/weekly/" not in pages
+    page = pages["/internships/for/computer-science-majors/weekly/"]
+    assert "1 open student role first seen" in page["html"]
+    assert "November 11, 2026 at 12:00 UTC" in page["html"]
+
+
+def test_weekly_timestamp_rollover_is_routine_but_facts_and_source_citations_are_not():
+    path = "/internships/for/computer-science-majors/weekly/"
+    first = datetime(2026, 11, 11, 12, tzinfo=timezone.utc)
+    second = datetime(2026, 11, 12, 13, tzinfo=timezone.utc)
+    sentence = (
+        "4 open student roles first seen in the seven days ending November 11, 2026 at 12:00 UTC."
+    )
+    html = f'<head><meta name="description" content="{sentence}"></head><body><p class="lede">{sentence}</p><p>Source November 11, 2026.</p></body>'
+    later = html.replace("November 11, 2026 at 12:00 UTC", "November 12, 2026 at 13:00 UTC")
+    digest = page_dates.fingerprint(path, html, first)
+    assert digest == page_dates.fingerprint(path, later, second)
+    assert digest != page_dates.fingerprint(path, later.replace("4 open", "3 open"), second)
+    assert digest != page_dates.fingerprint(
+        path, later.replace("Source November 11", "Source November 12"), second
+    )
+    citation = html.replace('class="lede"', 'class="source"')
+    assert page_dates.fingerprint(path, citation, first) != page_dates.fingerprint(
+        path, citation.replace("November 11", "November 12"), second
+    )
+    assert page_dates.fingerprint("/about/", html, first) != page_dates.fingerprint(
+        "/about/", later, second
+    )

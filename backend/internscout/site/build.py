@@ -472,6 +472,7 @@ class Stages:
     information: Callable[..., None]
     finish: Callable[..., None]
     launch_pages: Callable[..., list] | None = None
+    advisor_pages: Callable[..., list] | None = None
 
 
 def assemble(
@@ -518,6 +519,7 @@ def assemble(
         stages.launch_pages(add, pages, context, listings, live, earning, employers_in, fold_at)
         if stages.launch_pages else []
     )
+    advisor_links = stages.advisor_pages(add, data, majors_made) if stages.advisor_pages else []
     stages.hubs(
         add,
         context,
@@ -532,6 +534,7 @@ def assemble(
         rep,
         numbers,
         launch_links=launch_links,
+        advisor_links=advisor_links,
     )
     stages.information(
         add,

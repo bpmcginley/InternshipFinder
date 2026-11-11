@@ -374,6 +374,7 @@ def emit_hubs(
     tracker_path: Callable[..., str],
     top_employers: Callable[..., list],
     launch_links: list = (),
+    advisor_links: list = (),
 ) -> None:
     root, updated = context.root, context.updated
     fields, states = cohorts.fields, cohorts.states
@@ -411,7 +412,14 @@ def emit_hubs(
         "Internships by major",
         [root, ("/internships/for/", "By major")],
         "<p class=\"lede\">Pick your major to see open roles that fit it. Each page counts only what is "
-        "open today.</p>" + link_list("Majors", sorted(majors_made, key=lambda p: (p[1], p[0]))),
+        "open today.</p>" + link_list("Majors", sorted(majors_made, key=lambda p: (p[1], p[0])))
+        + (
+            '<section class="rel distribution-links"><h2>Weekly pages to forward</h2>'
+            '<p>Share a weekly page with students interested in a major. Each page uses the export date shown.</p><ul>'
+            + ''.join(f'<li><a href="{esc(path)}">{esc(name)}</a></li>' for path, name in advisor_links)
+            + '</ul></section>'
+            if advisor_links else ""
+        ),
     )
     hub = (
         f"<p class=\"lede\">{listing_count:,} open internships, co-ops, research positions and "

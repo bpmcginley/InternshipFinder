@@ -2324,12 +2324,16 @@ def test_of_the_small_pages_only_the_employer_page_is_thin(tmp_path):
     assert "/internships/at/small-co/" in built and "/internships/massachusetts/" in built
     # was: no page thin but the near pages (2026-10-18). The employer page, under INDEX_EMPLOYER, is too (2026-10-23).
     assert {p for p, v in built.items() if v["thin"] and v["kind"] != "near"} == {
-        "/internships/at/small-co/"
+        "/internships/at/small-co/",
+        "/internships/for/mechanical-engineering-majors/weekly/",
     }
     assert all(
         v["index"]
         for p, v in built.items()
-        if p not in ("/digest/", "/internships/at/small-co/") and v["kind"] != "near"
+        if p not in (
+            "/digest/", "/internships/at/small-co/",
+            "/internships/for/mechanical-engineering-majors/weekly/",
+        ) and v["kind"] != "near"
     )  # /digest/ waits for its form
 
 

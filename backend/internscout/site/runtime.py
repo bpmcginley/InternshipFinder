@@ -48,6 +48,8 @@ from . import field as _field
 from .render import layout as _layout
 from . import listing as _listing
 from . import launch as _launch
+from . import advisor as _advisor
+from .render import advisor as _render_advisor_module
 from . import llms as _llms
 from . import near as _near
 from . import numbers as _numbers
@@ -3412,6 +3414,17 @@ def _emit_launch_pages(add, pages, context, listings, live, earning, employers_i
     return links
 
 
+def _emit_advisor_pages(add, data, majors_made):
+    models = _advisor.select(data, {name: path for path, name, _ in majors_made})
+    links = []
+    for model in models:
+        add(**_render_advisor_module.render(
+            model, listing_rows=_hooks().listing_rows, limit=_state().per_page,
+        ))
+        links.append((model.path, model.name))
+    return links
+
+
 def _emit_hubs(
     add: _build.AddPage,
     context: _field.Context,
@@ -3426,6 +3439,7 @@ def _emit_hubs(
     rep: dict | None,
     numbers: bool,
     launch_links=(),
+    advisor_links=(),
 ) -> None:
     return _catalog.emit_hubs(
         add,
@@ -3441,6 +3455,7 @@ def _emit_hubs(
         rep,
         numbers,
         launch_links=launch_links,
+        advisor_links=advisor_links,
         canada_keys=CANADA_KEYS,
         ca_metro_pages=CA_METRO_PAGES,
         ca_provinces=CA_PROVINCES,
@@ -3686,6 +3701,7 @@ def build_result(
         information=_emit_information_pages,
         finish=_finish_build,
         launch_pages=_emit_launch_pages,
+        advisor_pages=_emit_advisor_pages,
     )
     return _build.assemble(
         site_dir,
