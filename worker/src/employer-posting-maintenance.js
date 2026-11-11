@@ -26,21 +26,27 @@ export async function maintainEmployerPostings(
       db
         .prepare(
           `DELETE FROM employer_posting_counts
-           WHERE ?=date('now') AND (day,company) IN (
+           WHERE ?=date('now')
+             AND NOT EXISTS(SELECT 1 FROM employer_posting_counts WHERE day>?)
+             AND NOT EXISTS(SELECT 1 FROM employer_posting_day_caps WHERE day>?)
+             AND (day,company) IN (
              SELECT day,company FROM employer_posting_counts
              WHERE day<date(?,'-90 days') ORDER BY day,company LIMIT ?
            )`,
         )
-        .bind(day, day, maxRows),
+        .bind(day, day, day, day, maxRows),
       db
         .prepare(
           `DELETE FROM employer_posting_day_caps
-           WHERE ?=date('now') AND day IN (
+           WHERE ?=date('now')
+             AND NOT EXISTS(SELECT 1 FROM employer_posting_counts WHERE day>?)
+             AND NOT EXISTS(SELECT 1 FROM employer_posting_day_caps WHERE day>?)
+             AND day IN (
              SELECT day FROM employer_posting_day_caps
              WHERE day<? ORDER BY day LIMIT ?
            )`,
         )
-        .bind(day, day, maxRows),
+        .bind(day, day, day, day, maxRows),
       db
         .prepare(
           `INSERT INTO employer_posting_day_caps(day,n)
@@ -49,18 +55,20 @@ export async function maintainEmployerPostings(
              AND NOT EXISTS(SELECT 1 FROM employer_posting_counts WHERE day<date(?,'-90 days'))
              AND NOT EXISTS(SELECT 1 FROM employer_posting_day_caps WHERE day<?)
              AND NOT EXISTS(SELECT 1 FROM employer_posting_day_caps WHERE day>?)
+             AND NOT EXISTS(SELECT 1 FROM employer_posting_counts WHERE day>?)
            ON CONFLICT(day) DO NOTHING`,
         )
-        .bind(day, day, day, day, day, day),
+        .bind(day, day, day, day, day, day, day),
       db
         .prepare(
           `SELECT date('now') AS day,
            EXISTS(SELECT 1 FROM employer_posting_counts WHERE day<date(?,'-90 days')) AS expired,
            EXISTS(SELECT 1 FROM employer_posting_day_caps WHERE day<?) AS old_caps,
            EXISTS(SELECT 1 FROM employer_posting_day_caps WHERE day>?) AS future_caps,
+           EXISTS(SELECT 1 FROM employer_posting_counts WHERE day>?) AS future_counts,
            EXISTS(SELECT 1 FROM employer_posting_day_caps WHERE day=?) AS current_cap`,
         )
-        .bind(day, day, day, day),
+        .bind(day, day, day, day, day),
     ]);
     if (
       results.length !== 4 ||
@@ -81,12 +89,16 @@ export async function maintainEmployerPostings(
     if (health.day !== day || dayOf(finished) !== day || finished.getTime() < startedAt)
       return state("blocked");
     if (
-      ![health.expired, health.old_caps, health.future_caps, health.current_cap].every(
-        (value) => value === 0 || value === 1,
-      )
+      ![
+        health.expired,
+        health.old_caps,
+        health.future_caps,
+        health.future_counts,
+        health.current_cap,
+      ].every((value) => value === 0 || value === 1)
     )
       return state("unavailable");
-    if (health.future_caps) return state("blocked");
+    if (health.future_caps || health.future_counts) return state("blocked");
     if (health.expired || health.old_caps) return state("progress");
     return state(health.current_cap ? "ready" : "blocked");
   } catch {

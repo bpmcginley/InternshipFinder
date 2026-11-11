@@ -105,6 +105,38 @@ it("catches up in bounded batches and initializes only after the backlog is clea
   assert.deepEqual((await rows("employer_posting_day_caps")).results, [{ day: today, n: 0 }]);
 });
 
+it("future company rows block all maintenance writes with or without a current cap", async () => {
+  await count(offset(-91), "expired");
+  await count(offset(1), "future");
+  await cap(offset(-1), 6);
+  const before = (await rows("employer_posting_counts")).results;
+  assert.deepEqual(await run(), { status: "blocked" });
+  assert.deepEqual((await rows("employer_posting_counts")).results, before);
+  assert.deepEqual((await rows("employer_posting_day_caps")).results, [{ day: offset(-1), n: 6 }]);
+  await cap(today, 41);
+  assert.deepEqual(await run(), { status: "blocked" });
+  assert.deepEqual((await rows("employer_posting_counts")).results, before);
+  assert.deepEqual((await rows("employer_posting_day_caps")).results, [
+    { day: offset(-1), n: 6 },
+    { day: today, n: 41 },
+  ]);
+});
+
+it("future state arriving after the clock read prevents cleanup and initialization", async () => {
+  await count(offset(-91), "expired");
+  await cap(offset(-1), 7);
+  const database = {
+    prepare: (sql) => db.prepare(sql),
+    batch: async (statements) => {
+      await count(offset(1), "future");
+      return db.batch(statements);
+    },
+  };
+  assert.deepEqual(await run({}, database), { status: "blocked" });
+  assert.equal((await rows("employer_posting_counts")).results.length, 2);
+  assert.deepEqual((await rows("employer_posting_day_caps")).results, [{ day: offset(-1), n: 7 }]);
+});
+
 it("rolls back both cleanups if cap initialization fails, then recovers", async () => {
   await count(offset(-91));
   await cap(offset(-1), 5);
@@ -233,9 +265,17 @@ it("uses bounded indexed range scans with a synthetic retained-history backlog",
       plan.results.some((r) => /SEARCH .* USING COVERING INDEX .*\(day<\?\)/.test(r.detail)),
     );
   for (const sql of observed.slice(1, 3)) {
-    const plan = await db.prepare(`EXPLAIN QUERY PLAN ${sql}`).bind(today, today, 1000).all();
+    const plan = await db
+      .prepare(`EXPLAIN QUERY PLAN ${sql}`)
+      .bind(today, today, today, today, 1000)
+      .all();
     assert.ok(plan.results.filter((r) => /SEARCH employer_posting_/.test(r.detail)).length >= 2);
     assert.ok(!plan.results.some((r) => /SCAN employer_posting_/.test(r.detail)));
+    assert.equal(
+      plan.results.filter((r) => /SEARCH .* USING COVERING INDEX .*\(day>\?\)/.test(r.detail))
+        .length,
+      2,
+    );
   }
   assert.equal(observed.length, 5, "one clock read and one four-statement batch");
 });
