@@ -1,12 +1,10 @@
 // Dashboard selection, queueing and list order (the PR #94 review's dashboard P2s). core.js is loaded the
 // way the page loads it, against a stand-in `window`; the order tests use synthetic listing shards.
+import { installCore } from "./core-fixture.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import vm from "node:vm";
 import { LISTING_CLOCK, MAJORS, listingRows } from "./fixtures/listing_cases.mjs";
 
-const CORE = readFileSync(new URL("../../docs/js/core.js", import.meta.url), "utf8");
 function loadCore(now) {
   const store = () => {
     const m = new Map();
@@ -42,8 +40,7 @@ function loadCore(now) {
     };
   }
   ctx.window = ctx;
-  vm.createContext(ctx);
-  vm.runInContext(CORE, ctx);
+  installCore(ctx);
   return ctx.IS;
 }
 const IS = loadCore(LISTING_CLOCK);
