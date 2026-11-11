@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path, PurePosixPath
 import re
+import stat
 import subprocess
 import sys
 
@@ -17,6 +18,7 @@ def resolve(workspace: Path) -> str:
     result = subprocess.run(
         ["git", "ls-remote", "--exit-code", "--refs", "origin", DATA_REF],
         cwd=workspace,
+        env={**os.environ, "GIT_TERMINAL_PROMPT": "0"},
         capture_output=True,
         text=True,
     )
@@ -30,9 +32,25 @@ def resolve(workspace: Path) -> str:
     return fields[0]
 
 
+def check_tree(directory: Path) -> None:
+    # Reject filesystem links and special files before reading or staging the export.
+    for path in (directory.parent, directory):
+        if not path.is_dir() or path.is_symlink() or path.resolve() != path:
+            raise ValueError
+    pending = [directory]
+    while pending:
+        for child in pending.pop().iterdir():
+            mode = child.lstat().st_mode
+            if stat.S_ISDIR(mode) and child.resolve() == child:
+                pending.append(child)
+            elif not stat.S_ISREG(mode):
+                raise ValueError
+
+
 def check_snapshot(directory: Path) -> None:
     index = directory / "listings" / "index.json"
     try:
+        check_tree(directory)
         if not all((directory / name).is_file() for name in ROOT_FILES):
             raise ValueError
         manifest = json.loads(index.read_text(encoding="utf-8"))
@@ -59,10 +77,21 @@ def select(workspace: Path, sha: str) -> Path:
             raise SystemExit("The public data branch is absent and the primary export is missing.")
         return directory
     checkout = workspace / CHECKOUT
+    if not checkout.is_dir() or checkout.is_symlink() or checkout.resolve() != checkout:
+        raise SystemExit("The resolved public data snapshot was not checked out.")
     result = subprocess.run(
-        ["git", "rev-parse", "HEAD"], cwd=checkout, capture_output=True, text=True
+        ["git", "rev-parse", "--show-toplevel", "HEAD"],
+        cwd=checkout,
+        capture_output=True,
+        text=True,
     )
-    if result.returncode or result.stdout.strip() != sha:
+    lines = result.stdout.splitlines()
+    if (
+        result.returncode
+        or len(lines) != 2
+        or Path(lines[0]).resolve() != checkout
+        or lines[1] != sha
+    ):
         raise SystemExit("The public data checkout does not match the resolved snapshot.")
     directory = checkout / EXPORT
     check_snapshot(directory)
@@ -70,7 +99,7 @@ def select(workspace: Path, sha: str) -> Path:
 
 
 def main() -> None:
-    workspace = Path(os.environ["GITHUB_WORKSPACE"])
+    workspace = Path(os.environ["GITHUB_WORKSPACE"]).resolve()
     if sys.argv[1] == "resolve":
         output = f"sha={resolve(workspace)}"
     else:

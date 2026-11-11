@@ -10,7 +10,7 @@ runs:
     - name: Resolve the data branch
       id: resolve
       shell: bash
-      run: python "$GITHUB_ACTION_PATH/select.py" resolve
+      run: python "$GITHUB_ACTION_PATH/listing_data.py" resolve
 
     - name: Check out the public listing snapshot
       if: steps.resolve.outputs.sha != ''
@@ -18,7 +18,8 @@ runs:
       with:
         ref: ${{ steps.resolve.outputs.sha }}
         path: .listing-data
-        sparse-checkout: docs/data
+        sparse-checkout: /docs/data/
+        sparse-checkout-cone-mode: false
         persist-credentials: false
 
     - name: Select the public listing export
@@ -26,4 +27,4 @@ runs:
       shell: bash
       env:
         DATA_SHA: ${{ steps.resolve.outputs.sha }}
-      run: python "$GITHUB_ACTION_PATH/select.py" select
+      run: python "$GITHUB_ACTION_PATH/listing_data.py" select
