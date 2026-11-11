@@ -5,11 +5,29 @@ import html as html_mod
 import json
 import os
 import re
+from datetime import datetime, timezone
+from functools import partial
 
 import pytest
 
-from internscout import seo_pages
-from tests.seo_fixture_data import _row, _site
+from internscout.site import publish, runtime
+from internscout.site.digest import _DIGEST_ACTION
+from tests.seo_fixture_data import _pay_site, _row, _site
+
+pytestmark = pytest.mark.without_seo_facade
+
+
+def _build_with_state(
+    site, live=frozenset(), held=frozenset(), earning=None, *, near_on=False, **settings
+):
+    state = runtime.BuildState(near_on=near_on, **settings)
+    hooks = runtime.BuildHooks()
+    pages = runtime.invoke(state, hooks, runtime.build, site, live, held, earning)
+    return pages, state, hooks
+
+
+def _build_pages(site, live=frozenset(), held=frozenset(), earning=None, **settings):
+    return _build_with_state(site, live, held, earning, **settings)[0]
 
 
 def _paths(pages):
@@ -21,7 +39,7 @@ def test_pages_only_where_there_are_enough_open_listings(tmp_path):
     ny = [_row(20 + i, state="NY") for i in range(6)]  # 6 in NY
     ct = [_row(40 + i, state="CT") for i in range(3)]  # only 3 in CT
     site = _site(tmp_path, {"MA": ma, "NY": ny, "CT": ct})
-    paths = _paths(seo_pages.build(site))
+    paths = _paths(_build_pages(site))
     assert "/internships/mechanical-engineering/" in paths
     assert "/internships/massachusetts/" in paths
     assert "/internships/mechanical-engineering/massachusetts/" in paths
@@ -34,10 +52,7 @@ def test_pages_only_where_there_are_enough_open_listings(tmp_path):
     assert "/internships/" in paths
 
 
-def test_closed_and_non_web_links_are_left_out(tmp_path, monkeypatch):
-    monkeypatch.setattr(
-        seo_pages, "NEAR_ON", True
-    )  # this test checks the near pages are always built (conftest)
+def test_closed_and_non_web_links_are_left_out(tmp_path):
     rows = [_row(i) for i in range(4)]
     rows.append(_row(4, status="closed"))
     rows.append(_row(5, apply_url="javascript:alert(1)"))
@@ -45,8 +60,8 @@ def test_closed_and_non_web_links_are_left_out(tmp_path, monkeypatch):
     # Only 4 usable listings, so nothing but the hubs, and /about/, /compare/ (2026-10-02), /pricing/
     # (2026-10-05) and /digest/ (2026-10-06), is built.
     # The 500 near pages and their hub (2026-10-18) are built whatever is open, so a link to one never breaks.
-    paths = _paths(seo_pages.build(site))
-    near = {p for p in paths if p.startswith(seo_pages.NEAR_ROOT)}
+    paths = _paths(_build_pages(site, near_on=True))
+    near = {p for p in paths if p.startswith(runtime.NEAR_ROOT)}
     assert len(near) == 501
     assert paths - near == {
         "/internships/",
@@ -66,10 +81,10 @@ def test_job_board_text_is_escaped(tmp_path):
     rows[0]["title"] = '<script>alert("x")</script>Intern'
     rows[1]["company_name"] = 'Evil & Co "</title>'
     site = _site(tmp_path, {"MA": rows})
-    for p in seo_pages.build(site):
+    for p in _build_pages(site):
         assert "<script>alert" not in p["html"]
         assert '"</title>' not in p["html"]
-    page = next(p for p in seo_pages.build(site) if p["path"] == "/internships/massachusetts/")
+    page = next(p for p in _build_pages(site) if p["path"] == "/internships/massachusetts/")
     assert "&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;Intern" in page["html"]
 
 
@@ -80,7 +95,7 @@ def test_state_page_shows_the_location_in_that_state(tmp_path):
         {"loc": "Boston, MA", "kind": "x", "state": "MA"},
     ]
     site = _site(tmp_path, {"MA": rows, "NY": [rows[0]]})
-    page = next(p for p in seo_pages.build(site) if p["path"] == "/internships/massachusetts/")
+    page = next(p for p in _build_pages(site) if p["path"] == "/internships/massachusetts/")
     assert "Boston, MA +1" in page["html"]
     assert "New York, NY +1" not in page["html"]
 
@@ -103,7 +118,7 @@ def test_major_pages_put_the_northeast_first(tmp_path):
         ],
     )
     page = next(
-        p for p in seo_pages.build(site) if p["path"] == "/internships/for/sport-management-majors/"
+        p for p in _build_pages(site) if p["path"] == "/internships/for/sport-management-majors/"
     )
     # The Massachusetts role is the oldest, and still listed before every Texas one. (Only the list
     # itself is compared: the opening paragraph names top employers in its own order.)
@@ -116,9 +131,9 @@ def test_analytics_snippet_comes_from_the_dashboard(tmp_path):
     site = _site(tmp_path, {"MA": [_row(i) for i in range(5)]})
     snippet = "<script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{}'></script>"
     (tmp_path / "index.html").write_text(f"<html><body>{snippet}</body></html>", encoding="utf-8")
-    assert all(snippet in p["html"] for p in seo_pages.build(site))
+    assert all(snippet in p["html"] for p in _build_pages(site))
     (tmp_path / "index.html").write_text("<html></html>", encoding="utf-8")
-    assert all("cloudflareinsights" not in p["html"] for p in seo_pages.build(site))
+    assert all("cloudflareinsights" not in p["html"] for p in _build_pages(site))
 
 
 def test_visit_counter_comes_from_the_dashboard_too(tmp_path):
@@ -128,13 +143,13 @@ def test_visit_counter_comes_from_the_dashboard_too(tmp_path):
     (tmp_path / "index.html").write_text(
         f"<html><body>{counter}\n{beacon}</body></html>", encoding="utf-8"
     )
-    pages = seo_pages.build(site)
+    pages = _build_pages(site)
     assert pages and all(counter in p["html"] and beacon in p["html"] for p in pages)
 
 
 def test_field_and_state_slugs_never_collide():
-    states = {seo_pages.state_slug(k) for k in seo_pages.US_STATES}
-    assert not states & {seo_pages.field_slug(t) for t in seo_pages.FIELD_TITLES}
+    states = {runtime.state_slug(k) for k in runtime.US_STATES}
+    assert not states & {runtime.field_slug(t) for t in runtime.FIELD_TITLES}
     assert "for" not in states
 
 
@@ -155,7 +170,7 @@ def test_dashboard_links_open_on_the_page_topic(tmp_path):
             }
         ],
     )
-    pages = {p["path"]: p["html"] for p in seo_pages.build(site)}
+    pages = {p["path"]: p["html"] for p in _build_pages(site)}
     assert (
         'href="/?field=mechanical&amp;state=all"' in pages["/internships/mechanical-engineering/"]
     )
@@ -179,12 +194,12 @@ def test_dashboard_links_open_on_the_page_topic(tmp_path):
         in pages["/internships/mechanical-engineering/"]
     )
     # docs/js/app.js takes only values shaped like these; anything else would open an empty list.
-    assert all(re.fullmatch(r"[a-z_]{2,32}", t) for t in seo_pages.FIELD_TITLES)
+    assert all(re.fullmatch(r"[a-z_]{2,32}", t) for t in runtime.FIELD_TITLES)
     # was: every key of US_STATES itself. The Canada and metro pages send the dashboard their provinces.
     assert all(
         re.fullmatch(r"[A-Z]{2}|remote|Canada", v)
-        for k in seo_pages.US_STATES
-        for v in seo_pages._dash_state(k).split(",")
+        for k in runtime.US_STATES
+        for v in runtime._dash_state(k).split(",")
     )
 
 
@@ -201,7 +216,7 @@ def test_a_major_with_the_same_listings_as_another_page_is_folded_into_it(tmp_pa
             },
         ],
     )
-    pages = {p["path"]: p["html"] for p in seo_pages.build(site)}
+    pages = {p["path"]: p["html"] for p in _build_pages(site)}
     assert not any(p.startswith("/internships/for/") and p.endswith("-majors/") for p in pages)
     assert (
         "The page for Engineering Mechanics and Mechanical Engineering majors."
@@ -212,14 +227,14 @@ def test_a_major_with_the_same_listings_as_another_page_is_folded_into_it(tmp_pa
 
 
 def test_every_combo_page_is_linked_from_its_field_and_state(tmp_path):
-    rows = [_row(i, tags=(f"f{i % 14}", "mechanical")) for i in range(14 * seo_pages.MIN_COMBO)]
+    rows = [_row(i, tags=(f"f{i % 14}", "mechanical")) for i in range(14 * runtime.MIN_COMBO)]
     site = _site(tmp_path, {"MA": rows})
-    pages = {p["path"]: p["html"] for p in seo_pages.build(site)}
+    pages = {p["path"]: p["html"] for p in _build_pages(site)}
     # was: ... and "/for/" not in p   (a summer's "who's open now" page is /internships/<term>/open/)
     combos = [
         p for p in pages if p.count("/") == 4 and "/for/" not in p and not p.endswith("/open/")
     ]
-    assert len(combos) > seo_pages.RELATED
+    assert len(combos) > runtime.RELATED
     for p in combos:
         field, state = p.split("/")[2:4]
         assert f'href="{p}"' in pages[f"/internships/{field}/"]
@@ -229,16 +244,16 @@ def test_every_combo_page_is_linked_from_its_field_and_state(tmp_path):
 def test_a_live_page_stays_until_it_falls_well_below_the_bar(tmp_path):
     page = "/internships/massachusetts/"
     four = _site(tmp_path / "four", {"MA": [_row(i) for i in range(4)]})
-    assert page not in _paths(seo_pages.build(four))  # new pages need MIN_OPEN
-    assert page in _paths(seo_pages.build(four, {page}))  # a live one keeps going
+    assert page not in _paths(_build_pages(four))  # new pages need MIN_OPEN
+    assert page in _paths(_build_pages(four, {page}))  # a live one keeps going
     two = _site(tmp_path / "two", {"MA": [_row(i) for i in range(2)]})
-    assert page not in _paths(seo_pages.build(two, {page}))  # until it drops below keep_at
+    assert page not in _paths(_build_pages(two, {page}))  # until it drops below keep_at
 
 
 def test_lastmod_follows_the_listings_and_hubs_carry_no_one_item_breadcrumb(tmp_path):
     site = _site(tmp_path, {"MA": [_row(i) for i in range(5)]})
-    pages = seo_pages.build(site)
-    seo_pages.write(site, pages)
+    pages, state, hooks = _build_with_state(site)
+    publish._write_site(site, pages, state, hooks)
     sitemap = open(os.path.join(site, "sitemap.xml"), encoding="utf-8").read()
     # The newest listing on the page was first seen 2026-09-22, whatever day the build runs.
     assert (
@@ -261,7 +276,7 @@ def test_page_text_keeps_acronyms_and_skips_yearless_terms(tmp_path):
     rows = [_row(i, tags=("ml",), term="Summer 2027" if i < 4 else "Summer") for i in range(7)]
     site = _site(tmp_path, {"MA": rows})
     html = next(
-        p["html"] for p in seo_pages.build(site) if p["path"] == "/internships/machine-learning-ai/"
+        p["html"] for p in _build_pages(site) if p["path"] == "/internships/machine-learning-ai/"
     )
     # was: "open student roles in machine learning and AI," (one sentence with the range; split 2026-10-05)
     assert (
@@ -275,7 +290,7 @@ def test_newest_means_newest_posting_not_newest_scan():
     old_post = _row(1, posted_at="2024-09-23T00:00:00", first_seen="2026-09-22T00:00:00")
     fresh = _row(2, posted_at="2026-09-21T00:00:00", first_seen="2026-09-21T00:00:00")
     undated = _row(3, posted_at=None, first_seen="2026-09-23T00:00:00")
-    assert [x["id"] for x in seo_pages.newest_first([old_post, undated, fresh])] == [
+    assert [x["id"] for x in runtime.newest_first([old_post, undated, fresh])] == [
         "id2",
         "id1",
         "id3",
@@ -283,7 +298,7 @@ def test_newest_means_newest_posting_not_newest_scan():
 
 
 def test_postings_filed_everywhere_do_not_make_combo_pages(tmp_path):
-    rows = [_row(i) for i in range(seo_pages.MIN_COMBO)]
+    rows = [_row(i) for i in range(runtime.MIN_COMBO)]
     states = [
         "MA",
         "NY",
@@ -299,24 +314,25 @@ def test_postings_filed_everywhere_do_not_make_combo_pages(tmp_path):
         "CA",
     ]  # 12 states each
     site = _site(tmp_path, {k: rows for k in states})
-    paths = _paths(seo_pages.build(site))
+    paths = _paths(_build_pages(site))
     assert "/internships/massachusetts/" in paths
     assert "/internships/mechanical-engineering/massachusetts/" not in paths
 
 
 def test_missing_pages_get_a_way_back(tmp_path):
     site = _site(tmp_path, {"MA": [_row(i) for i in range(5)]})
-    seo_pages.write(site, seo_pages.build(site))
+    pages, state, hooks = _build_with_state(site)
+    publish._write_site(site, pages, state, hooks)
     html = open(os.path.join(site, "404.html"), encoding="utf-8").read()
     assert '<meta name="robots" content="noindex"/>' in html and "canonical" not in html
     assert 'href="/internships/"' in html
 
 
 def test_employers_with_enough_roles_get_a_page_and_their_name_links_to_it(tmp_path):
-    big = [_row(i, company_name="Big Co") for i in range(seo_pages.MIN_EMPLOYER)]
-    small = [_row(50 + i, company_name="Small Co") for i in range(seo_pages.MIN_EMPLOYER - 1)]
+    big = [_row(i, company_name="Big Co") for i in range(runtime.MIN_EMPLOYER)]
+    small = [_row(50 + i, company_name="Small Co") for i in range(runtime.MIN_EMPLOYER - 1)]
     site = _site(tmp_path, {"MA": big + small})
-    pages = {p["path"]: p["html"] for p in seo_pages.build(site)}
+    pages = {p["path"]: p["html"] for p in _build_pages(site)}
     assert "/internships/at/big-co/" in pages and "/internships/at/small-co/" not in pages
     own = pages["/internships/at/big-co/"]
     assert "InternScout is not affiliated with Big Co." in own
@@ -333,7 +349,7 @@ def test_new_this_week_has_only_fresh_roles(tmp_path):
     rows.append(_row(7, company_name="Old Post", posted_at="2024-01-01T00:00:00"))
     rows.append(_row(8, company_name="Long Ago", first_seen="2026-08-01T00:00:00"))
     site = _site(tmp_path, {"MA": rows})
-    page = next(p for p in seo_pages.build(site) if p["path"] == "/internships/new/")
+    page = next(p for p in _build_pages(site) if p["path"] == "/internships/new/")
     assert {x["id"] for x in page["items"]} == {f"id{i}" for i in range(6)}
     assert "Old Post" not in page["html"] and "Long Ago" not in page["html"]
 
@@ -343,7 +359,7 @@ def test_the_day_first_seen_began_is_not_this_weeks_news(tmp_path):
     start = [_row(i, first_seen="2026-09-18T00:00:00") for i in range(10)]
     later = [_row(20 + i, first_seen="2026-09-22T00:00:00") for i in range(5)]
     site = _site(tmp_path, {"MA": start + later})
-    pages = {p["path"]: p for p in seo_pages.build(site)}
+    pages = {p["path"]: p for p in _build_pages(site)}
     assert {x["id"] for x in pages["/internships/new/"]["items"]} == {
         f"id{20 + i}" for i in range(5)
     }
@@ -354,22 +370,22 @@ def test_new_page_links_to_new_only_and_feeds_every_new_role(tmp_path):
     rows = [_row(i, first_seen="2026-09-22T00:00:00") for i in range(40)]
     rows += [_row(100 + i, first_seen="2026-09-18T00:00:00") for i in range(41)]  # the baseline day
     site = _site(tmp_path, {"MA": rows})
-    pages = seo_pages.build(site)
+    pages, state, hooks = _build_with_state(site)
     new = next(p for p in pages if p["path"] == "/internships/new/")
     assert (
-        'href="/?state=all&amp;new=1"' in new["html"] and new["feed_limit"] == seo_pages.NEW_FEED
+        'href="/?state=all&amp;new=1"' in new["html"] and new["feed_limit"] == runtime.NEW_FEED
     )  # was: is None
     from internscout import feeds
 
-    seo_pages.write(site, pages)
-    feeds.write_all(site, pages)
+    publish._write_site(site, pages, state, hooks)
+    feeds.write_all(site, pages, state.generated)
     xml = open(os.path.join(site, "internships", "new", "feed.xml"), encoding="utf-8").read()
     assert xml.count("<item>") == 40
 
 
 def test_lastmod_never_goes_back(tmp_path):
     site = _site(tmp_path, {"MA": [_row(i) for i in range(5)]})
-    pages = seo_pages.build(site, {"/internships/massachusetts/": "2026-09-30"})
+    pages = _build_pages(site, {"/internships/massachusetts/": "2026-09-30"})
     assert (
         next(p for p in pages if p["path"] == "/internships/massachusetts/")["lastmod"]
         == "2026-09-30"
@@ -381,9 +397,9 @@ def _build_in_new_python(site: str, seed: int) -> dict[str, bytes]:
     import subprocess
     import sys
 
-    backend = os.path.dirname(os.path.dirname(os.path.abspath(seo_pages.__file__)))
+    backend = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     subprocess.run(
-        [sys.executable, "-m", "internscout.seo_pages", site],
+        [sys.executable, "-m", "internscout.site.publish", site],
         cwd=backend,
         check=True,
         capture_output=True,
@@ -464,7 +480,7 @@ def test_a_major_showing_what_a_field_page_shows_is_folded_into_it(tmp_path):
             {"name": "Sport", "tags": ["health", "sport_x"], "level": "undergrad"},
         ],
     )  # 35 of 40
-    pages = seo_pages.build(site)
+    pages, state, hooks = _build_with_state(site)
     by_path = {p["path"]: p["html"] for p in pages}
     assert "/internships/for/nutrition-majors/" not in by_path
     assert "/internships/for/classics-majors/" not in by_path
@@ -476,7 +492,7 @@ def test_a_major_showing_what_a_field_page_shows_is_folded_into_it(tmp_path):
         hub.count('href="/internships/health/"') == 2
         and 'href="/internships/for/sport-majors/"' in hub
     )
-    seo_pages.write(site, pages)
+    publish._write_site(site, pages, state, hooks)
     sitemap = open(os.path.join(site, "sitemap.xml"), encoding="utf-8").read()
     assert (
         "nutrition-majors" not in sitemap
@@ -484,8 +500,8 @@ def test_a_major_showing_what_a_field_page_shows_is_folded_into_it(tmp_path):
         and "sport-majors" in sitemap
     )
     # A page is never folded into a smaller one: the sport_x field page shows 5 of Sport's 40.
-    assert seo_pages.same_list(frozenset("abcde"), frozenset("abcdefghij")) is False
-    assert seo_pages.same_list(frozenset("abcdefghij"), frozenset("abcdefghi")) is True
+    assert runtime.same_list(frozenset("abcde"), frozenset("abcdefghij")) is False
+    assert runtime.same_list(frozenset("abcdefghij"), frozenset("abcdefghi")) is True
 
 
 def test_json_ld_cannot_be_broken_out_of(tmp_path):
@@ -493,7 +509,7 @@ def test_json_ld_cannot_be_broken_out_of(tmp_path):
     # where the real </script> no longer closes the block.
     evil = 'Evil <!--<script>alert(1)</script> & "Co"'
     rows = [_row(i, company_name=evil) for i in range(12)]
-    pages = {p["path"]: p["html"] for p in seo_pages.build(_site(tmp_path, {"MA": rows}))}
+    pages = {p["path"]: p["html"] for p in _build_pages(_site(tmp_path, {"MA": rows}))}
     html = next(
         h for p, h in pages.items() if p.startswith("/internships/at/") and p != "/internships/at/"
     )
@@ -509,17 +525,17 @@ def test_a_placeholder_salary_is_not_pay(tmp_path):
     # 22 open listings said "$0.00 - $999.99 Hour" or "$0.00 /Yr" and were counted, and shown, as paid.
     for salary in ("$0.00 /Yr", "$0.00 - $999.99 Hour", "0", "$0 - $0"):
         x = {"salary": salary, "insights": {"pay": "paid"}}
-        assert not seo_pages.is_paid(x) and seo_pages.pay_text(x) == "", salary
+        assert not runtime.is_paid(x) and runtime.pay_text(x) == "", salary
     for salary in ("$25/hr", "$20.00 - $30.00 Hour", "$85,000 /Yr"):
         assert (
-            seo_pages.is_paid({"salary": salary})
-            and seo_pages.pay_text({"salary": salary}) == salary
+            runtime.is_paid({"salary": salary})
+            and runtime.pay_text({"salary": salary}) == salary
         )
-    assert seo_pages.pay_text({"salary": None, "insights": {"pay": "paid"}}) == "Paid"
+    assert runtime.pay_text({"salary": None, "insights": {"pay": "paid"}}) == "Paid"
     rows = [_row(i, salary="$0.00 - $999.99 Hour") for i in range(5)]
     page = next(
         p
-        for p in seo_pages.build(_site(tmp_path, {"MA": rows}))
+        for p in _build_pages(_site(tmp_path, {"MA": rows}))
         if p["path"] == "/internships/massachusetts/"
     )
     assert "999.99" not in page["html"] and "list pay" not in page["html"]
@@ -544,7 +560,7 @@ def test_a_malformed_listing_is_skipped_not_fatal(tmp_path, capsys):
         + [_row(40 + i, company_name=long_b) for i in range(10)]
     )
     site = _site(tmp_path, {"MA": rows})
-    pages = seo_pages.build(site)
+    pages, state, hooks = _build_with_state(site)
     assert "skipped 4 malformed" in capsys.readouterr().err
     ma = next(p for p in pages if p["path"] == "/internships/massachusetts/")
     assert len(ma["items"]) == 26 and "Town 5" not in ma["html"]
@@ -553,10 +569,10 @@ def test_a_malformed_listing_is_skipped_not_fatal(tmp_path, capsys):
         for p in pages
         if p["path"].startswith("/internships/at/") and p["path"] != "/internships/at/"
     )
-    assert len(employer) == 2 and all(len(p.split("/")[3]) <= seo_pages.SLUG_MAX for p in employer)
-    seo_pages.write(site, pages)  # no OSError from a 300-character folder name
+    assert len(employer) == 2 and all(len(p.split("/")[3]) <= runtime.SLUG_MAX for p in employer)
+    publish._write_site(site, pages, state, hooks)  # no OSError from a 300-character folder name
     assert (
-        seo_pages.slugify("x" * 200) == seo_pages.slugify("x" * 200) != seo_pages.slugify("x" * 201)
+        runtime.slugify("x" * 200) == runtime.slugify("x" * 200) != runtime.slugify("x" * 201)
     )
 
 
@@ -565,10 +581,10 @@ def test_new_means_the_same_calendar_week_the_dashboard_counts():
     from datetime import datetime, timezone
 
     now = datetime(2026, 9, 28, 11, tzinfo=timezone.utc)
-    assert not seo_pages.fresh(
+    assert not runtime.fresh(
         {"first_seen": "2026-09-21T20:00:00+00:00"}, now, "2026-09-18"
     )  # 7 days back
-    assert seo_pages.fresh(
+    assert runtime.fresh(
         {"first_seen": "2026-09-22T01:00:00+00:00"}, now, "2026-09-18"
     )  # 6 days back
 
@@ -578,7 +594,7 @@ def test_employer_pages_link_similar_employers_and_field_pages_link_employers(tm
     b = [_row(20 + i, company_name="Orbit Co", tags=("aerospace",)) for i in range(12)]
     c = [_row(40 + i, company_name="Bank Co", tags=("finance",)) for i in range(10)]
     site = _site(tmp_path, {"MA": a + b + c})
-    pages = {p["path"]: p["html"] for p in seo_pages.build(site)}
+    pages = {p["path"]: p["html"] for p in _build_pages(site)}
     rocket = pages["/internships/at/rocket-co/"]
     assert (
         '<h2>Similar employers</h2><ul><li><a href="/internships/at/orbit-co/">Orbit Co</a>'
@@ -592,32 +608,15 @@ def test_employer_pages_link_similar_employers_and_field_pages_link_employers(tm
 
 
 def test_place_names_read_the_way_people_write_them():
-    name = lambda loc: seo_pages.place_name({"loc": loc})
+    name = lambda loc: runtime.place_name({"loc": loc})
     assert name("New York, New York, United States") == "New York, NY"
     assert name("Austin, Texas, USA") == "Austin, TX"
     assert name("West Des Moines, Iowa") == "West Des Moines, IA"
     assert name("Denver, CO") == "Denver, CO"
-    assert seo_pages.place_name({"kind": "remote", "state": "Remote"}) == "Remote"
+    assert runtime.place_name({"kind": "remote", "state": "Remote"}) == "Remote"
 
 
 # ---- for AI assistants and answer engines (added 2026-10-02)
-
-
-def _pay_site(tmp_path):
-    """30 roles at $20-$49 an hour across six employers, and pay that must never be ranked as hourly:
-    yearly salaries, salaries in thousands, and a role only in Canada (Canadian dollars)."""
-    rows = [_row(i, company_name=f"Pay Co {i % 6}", salary=f"${20 + i}/hr") for i in range(30)]
-    rows += [_row(100 + i, company_name="Salary Co", salary="$150,000 a year") for i in range(5)]
-    rows += [_row(200 + i, company_name="Thousands Co", salary="$120k") for i in range(5)]
-    canada = [
-        _row(
-            300,
-            company_name="Maple Co",
-            salary="$95/hr",
-            regions=[{"loc": "Toronto, ON", "kind": "canada", "state": "ON"}],
-        )
-    ]
-    return _site(tmp_path, {"MA": rows, "ON": canada})
 
 
 def _ld_blocks(html):
@@ -628,7 +627,7 @@ def _ld_blocks(html):
 
 
 def test_hourly_rate_skips_amounts_that_only_look_hourly():
-    rate = lambda s: seo_pages.hourly_rate({"salary": s})  # noqa: E731
+    rate = lambda s: runtime.hourly_rate({"salary": s})  # noqa: E731
     # Maven Securities' employer page said "$110 an hour" for a $110k salary.
     for salary in (
         "$110k",
@@ -645,12 +644,12 @@ def test_hourly_rate_skips_amounts_that_only_look_hourly():
         assert rate(salary) is None, salary
     assert rate("$25/hr") == (25, 25) and rate("$22.50 - $31.50") == (22.5, 31.5)
     assert rate("$63.53-$68.41/ hr") == (63.53, 68.41)
-    assert seo_pages.hourly_range([{"salary": "$110k"}, {"salary": "$30/hr"}]) == (30, 30, 1)
+    assert runtime.hourly_range([{"salary": "$110k"}, {"salary": "$30/hr"}]) == (30, 30, 1)
 
 
 def test_highest_paying_ranks_clear_hourly_rates_and_leaves_yearly_pay_out(tmp_path):
     site = _pay_site(tmp_path)
-    pages = seo_pages.build(site)
+    pages, state, hooks = _build_with_state(site)
     by_path = {p["path"]: p["html"] for p in pages}
     h = by_path["/internships/highest-paying/"]
     # was: "... Up to $49 an Hour Listed | InternScout" (67 characters; fit_title drops "Listed", 2026-10-05)
@@ -662,7 +661,7 @@ def test_highest_paying_ranks_clear_hourly_rates_and_leaves_yearly_pay_out(tmp_p
     assert "Roles only in Canada (1 with a rate) are left out" in h
     # At most PAY_PER_EMPLOYER roles from one employer: six employers, so 18 in the list.
     jobs = h.split('<ul class="jobs">')[1].split("</ul>")[0]
-    assert jobs.count('<li class="job">') == 6 * seo_pages.PAY_PER_EMPLOYER
+    assert jobs.count('<li class="job">') == 6 * runtime.PAY_PER_EMPLOYER
     # The field table counts the roles that list a rate out of the field's open roles, median of $20-$49.
     assert "30 of 41" in h and "$34.50" in h
     # Employers link to their own pages, and the hub links this one.
@@ -670,15 +669,15 @@ def test_highest_paying_ranks_clear_hourly_rates_and_leaves_yearly_pay_out(tmp_p
     assert 'href="/internships/highest-paying/"' in by_path["/internships/"]
     # was: == ["BreadcrumbList"]; every page carries the Organization since 2026-10-05.
     assert [b["@type"] for b in _ld_blocks(h)] == ["BreadcrumbList", "Organization"]
-    seo_pages.write(site, pages)
+    publish._write_site(site, pages, state, hooks)
     sitemap = open(os.path.join(site, "sitemap.xml"), encoding="utf-8").read()
     assert "<loc>https://internscout.org/internships/highest-paying/</loc>" in sitemap
 
 
 def test_no_highest_paying_page_without_enough_listed_rates(tmp_path):
-    rows = [_row(i, salary="$25/hr") for i in range(seo_pages.MIN_PAY_ROLES - 1)]
+    rows = [_row(i, salary="$25/hr") for i in range(runtime.MIN_PAY_ROLES - 1)]
     rows += [_row(100 + i, salary="$85,000 /Yr") for i in range(20)]
-    pages = {p["path"]: p["html"] for p in seo_pages.build(_site(tmp_path, {"MA": rows}))}
+    pages = {p["path"]: p["html"] for p in _build_pages(_site(tmp_path, {"MA": rows}))}
     assert "/internships/highest-paying/" not in pages
     assert (
         "highest-paying" not in pages["/internships/"] and "highest-paying" not in pages["/about/"]
@@ -687,7 +686,7 @@ def test_no_highest_paying_page_without_enough_listed_rates(tmp_path):
 
 def test_about_and_compare_answer_first_with_valid_json_ld(tmp_path):
     site = _pay_site(tmp_path)
-    pages = seo_pages.build(site)
+    pages, state, hooks = _build_with_state(site)
     by_path = {p["path"]: p["html"] for p in pages}
     about = by_path["/about/"]
     blocks = _ld_blocks(about)
@@ -714,10 +713,10 @@ def test_about_and_compare_answer_first_with_valid_json_ld(tmp_path):
     pay = faq["How much do internships on InternScout pay?"]
     assert "only in Canada" in pay and "the highest is $49 an hour" in pay
     assert "$4 or $8 a month" in faq["How is InternScout different from Simplify or Jobright?"]
-    assert seo_pages.COMPARE_AS_OF in faq["How is InternScout different from Simplify or Jobright?"]
+    assert runtime.COMPARE_AS_OF in faq["How is InternScout different from Simplify or Jobright?"]
     # The page shows the same answers, each under its own heading.
     assert "<h2>Does Auto-Apply submit applications for me?</h2><p>No." in about
-    assert seo_pages.SLOGAN in about and blocks[1]["slogan"] == seo_pages.SLOGAN
+    assert runtime.SLOGAN in about and blocks[1]["slogan"] == runtime.SLOGAN
     compare = by_path["/compare/"]
     assert _ld_blocks(compare)[0]["@type"] == "BreadcrumbList"
     # was: "Turbo $39.99/month ($17.99/week)"; the 3-month price is from the same source (2026-10-04).
@@ -732,7 +731,7 @@ def test_about_and_compare_answer_first_with_valid_json_ld(tmp_path):
         "Job seekers at every level",
     ):
         assert fact in compare, fact
-    seo_pages.write(site, pages)
+    publish._write_site(site, pages, state, hooks)
     sitemap = open(os.path.join(site, "sitemap.xml"), encoding="utf-8").read()
     assert (
         "<loc>https://internscout.org/about/</loc>" in sitemap
@@ -797,8 +796,8 @@ def test_nothing_built_names_the_founder(tmp_path):
 
     # The brand stays one student's, unnamed, on the site and in what answer engines read.
     site = _pay_site(tmp_path)
-    pages = seo_pages.build(site)
-    seo_pages.write(site, pages)
+    pages, state, hooks = _build_with_state(site)
+    publish._write_site(site, pages, state, hooks)
     texts = [p["html"] for p in pages] + [
         open(os.path.join(site, n), encoding="utf-8").read()
         for n in ("llms.txt", "llms-full.txt", "robots.txt", "404.html")
@@ -808,7 +807,7 @@ def test_nothing_built_names_the_founder(tmp_path):
 
 def test_the_dashboard_carries_the_same_organization_as_the_landing_pages():
     # docs/index.html is hand-written; its JSON-LD must say what seo_pages.ORGANIZATION and WEBSITE say.
-    backend = os.path.dirname(os.path.dirname(os.path.abspath(seo_pages.__file__)))
+    backend = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     html = open(os.path.join(backend, "..", "docs", "index.html"), encoding="utf-8").read()
     blocks = _ld_blocks(html.replace("\n", ""))
     assert len(blocks) == 1
@@ -819,7 +818,7 @@ def test_the_dashboard_carries_the_same_organization_as_the_landing_pages():
     # 2026-10-23: only /pricing/ shows exact allowances; a Product without offers or ratings
     # also fails Google snippet requirements. was: PRODUCT in the homepage graph too.
     # Revert: restore the full homepage Product and append strip(seo_pages.PRODUCT) here.
-    assert graph == [strip(seo_pages.ORGANIZATION), strip(seo_pages.WEBSITE)]
+    assert graph == [strip(runtime.ORGANIZATION), strip(runtime.WEBSITE)]
 
 
 # ---- /pricing/ (2026-10-05)
@@ -828,15 +827,15 @@ def test_the_dashboard_carries_the_same_organization_as_the_landing_pages():
 def test_pricing_page_states_every_tier_in_numbers_with_a_product_schema(tmp_path):
     pages = {
         p["path"]: p["html"]
-        for p in seo_pages.build(_site(tmp_path, {"MA": [_row(i) for i in range(6)]}))
+        for p in _build_pages(_site(tmp_path, {"MA": [_row(i) for i in range(6)]}))
     }
     pricing = pages["/pricing/"]
     # The allowances are the Worker's own arithmetic: .edu = round(free x multiplier), other = floor(half).
-    assert seo_pages.plan_allowance("Supporter") == (
+    assert runtime.plan_allowance("Supporter") == (
         {"autofill": 50, "resume_tailor": 20},
         {"autofill": 25, "resume_tailor": 10},
     )
-    assert seo_pages.plan_allowance("Pro") == (
+    assert runtime.plan_allowance("Pro") == (
         {"autofill": 100, "resume_tailor": 40},
         {"autofill": 50, "resume_tailor": 20},
     )
@@ -860,7 +859,7 @@ def test_pricing_page_states_every_tier_in_numbers_with_a_product_schema(tmp_pat
         "Cancel any time.",
         'href="/?upgrade=supporter"',
         'href="/?upgrade=pro"',
-        seo_pages.COMPARE_AS_OF,
+        runtime.COMPARE_AS_OF,
         "not for experienced job seekers",
     ):
         assert text in pricing, text
@@ -903,7 +902,7 @@ def _head(html, tag):
 
 
 def test_fit_title_keeps_the_subject_and_drops_the_count_then_the_suffix():
-    fit = seo_pages.fit_title
+    fit = runtime.fit_title
     assert fit("Sports Internships – 12 Open") == "Sports Internships – 12 Open | InternScout"
     # The count goes before the suffix does, and nothing is cut mid-word.
     long = "Machine Learning and AI Internships in Vermont"
@@ -927,19 +926,19 @@ def test_fit_title_keeps_the_subject_and_drops_the_count_then_the_suffix():
     cut = fit(
         "Executive Office for U.S. Attorneys and the Office of the U.S. Attorneys Internships"
     )
-    assert len(cut) <= seo_pages.TITLE_MAX and cut.endswith("the Office of the")
+    assert len(cut) <= runtime.TITLE_MAX and cut.endswith("the Office of the")
     assert (
         fit("", "Arts Internships") == "Arts Internships | InternScout"
     )  # an empty form is skipped
 
 
 def test_fit_description_cuts_at_a_sentence_and_pads_a_short_one():
-    fit = seo_pages.fit_description
+    fit = runtime.fit_description
     long = (
         "12 open Acxiom internships in Conway, AR and New York. Roles in operations, consulting and data "
         "science and analytics. Updated October 5, 2026. Free, no sign-up."
     )
-    assert len(long) > seo_pages.DESC_MAX
+    assert len(long) > runtime.DESC_MAX
     out = fit(long)
     assert out.endswith("Updated October 5, 2026.") and 110 <= len(out) <= 160
     # "St." is not the end of a sentence; a first sentence that is itself too long ends at a word.
@@ -961,14 +960,14 @@ def test_fit_description_cuts_at_a_sentence_and_pads_a_short_one():
     )
     assert fit(long)[:40] == fit("   " + long.replace(". ", ".  "))[:40]  # whitespace is normalised
     # 2026-10-23: the final ellipsis counts towards the limit, including unbroken upstream names.
-    assert len(fit("x" * 400)) == seo_pages.DESC_MAX == 155
+    assert len(fit("x" * 400)) == runtime.DESC_MAX == 155
 
 
 def test_every_generated_title_and_description_is_within_a_search_results_limits(tmp_path):
     # A long field name in a long state, long employer names, a Canadian metro and province, and
     # every browse page: all built, and every title 30-60 characters, every description 110-155.
     # 2026-10-23: was 110-160; the shared limit now also covers the final ellipsis.
-    rows = [_row(i, state="PA", tags=("environmental", "ml")) for i in range(seo_pages.MIN_COMBO)]
+    rows = [_row(i, state="PA", tags=("environmental", "ml")) for i in range(runtime.MIN_COMBO)]
     rows += [
         _row(
             100 + i,
@@ -1016,7 +1015,7 @@ def test_every_generated_title_and_description_is_within_a_search_results_limits
             {"name": "Operations and Information Management", "tags": ["ml"], "level": "undergrad"}
         ],
     )
-    pages = seo_pages.build(site)
+    pages = _build_pages(site)
     by_path = {p["path"]: p["html"] for p in pages}
     for path in (
         "/internships/environmental/pennsylvania/",
@@ -1039,9 +1038,9 @@ def test_every_generated_title_and_description_is_within_a_search_results_limits
             _head(h, r"<title>(.*?)</title>"),
             _head(h, r'<meta name="description" content="(.*?)"/>'),
         )
-        assert 30 <= len(title) <= seo_pages.TITLE_MAX, (path, title)
-        assert seo_pages.DESC_MIN <= len(desc) <= seo_pages.DESC_MAX, (path, desc)
-        assert title.count(seo_pages.TITLE_SUFFIX) <= 1, (path, title)
+        assert 30 <= len(title) <= runtime.TITLE_MAX, (path, title)
+        assert runtime.DESC_MIN <= len(desc) <= runtime.DESC_MAX, (path, desc)
+        assert title.count(runtime.TITLE_SUFFIX) <= 1, (path, title)
     # 2026-10-13: the count (a floor, under 10 none) outranks the brand. was: "Environmental Internships in
     # Pennsylvania | InternScout", "Internships in Toronto – 6 Open | InternScout" and "Research Internships
     # for Undergraduates | InternScout".
@@ -1113,7 +1112,7 @@ def test_indexed_metadata_is_unique_and_major_descriptions_use_their_own_roles(t
             },
         ],
     )
-    pages = seo_pages.build(site)
+    pages = _build_pages(site)
     for pattern in (r"<title>(.*?)</title>", r'<meta name="description" content="(.*?)"/>'):
         seen = {}
         for p in pages:
@@ -1130,31 +1129,31 @@ def test_indexed_metadata_is_unique_and_major_descriptions_use_their_own_roles(t
 
 
 def test_every_page_carries_the_organization_once_with_the_brands_profiles(tmp_path):
-    pages = seo_pages.build(_pay_site(tmp_path))
+    pages = _build_pages(_pay_site(tmp_path))
     for p in pages:
         blocks = _ld_blocks(p["html"])
         orgs = [b for b in blocks if b["@type"] == "Organization"]
-        assert len(orgs) == 1 and orgs[0] == seo_pages.ORGANIZATION, p["path"]
+        assert len(orgs) == 1 and orgs[0] == runtime.ORGANIZATION, p["path"]
         if p["items"] is not None:  # a listing page is a CollectionPage of the site
             col = next(b for b in blocks if b["@type"] == "CollectionPage")
             assert col["url"] == "https://internscout.org" + p["path"] and col["name"] == p["h1"]
             assert (
-                col["isPartOf"] == {"@id": seo_pages.SITE_ID}
+                col["isPartOf"] == {"@id": runtime.SITE_ID}
                 and col["dateModified"] == p["lastmod"]
             )
-    assert len(seo_pages.ORGANIZATION["sameAs"]) == 7
+    assert len(runtime.ORGANIZATION["sameAs"]) == 7
     assert {
         "https://mastodon.social/@internscout",
         "https://x.com/useinternscout",
         "https://www.reddit.com/user/InternScout/",
-    } <= set(seo_pages.ORGANIZATION["sameAs"])
+    } <= set(runtime.ORGANIZATION["sameAs"])
 
 
 def test_the_field_pages_opening_sentences_are_short(tmp_path):
     # The audit measured the field pages' opening sentence at over 25 words: the count and the range
     # are two sentences now, and the compare lede's "cover every level; InternScout lists..." is two.
     site = _pay_site(tmp_path)
-    by_path = {p["path"]: p["html"] for p in seo_pages.build(site)}
+    by_path = {p["path"]: p["html"] for p in _build_pages(site)}
     lede = (
         by_path["/internships/mechanical-engineering/"]
         .split('<p class="lede">')[1]
@@ -1173,7 +1172,7 @@ def test_the_field_pages_opening_sentences_are_short(tmp_path):
 def test_the_install_page_answers_first_and_is_dated():
     # docs/install.html is hand-written: the audit asked for the answer in the first paragraph, a
     # published and an updated date on the page, and a dated HowTo block; no author, as everywhere.
-    backend = os.path.dirname(os.path.dirname(os.path.abspath(seo_pages.__file__)))
+    backend = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     html = open(os.path.join(backend, "..", "docs", "install.html"), encoding="utf-8").read()
     html = re.sub(r"<!--.*?-->", "", html, flags=re.S)  # the "was:" comments hold old copies
     main = html.split("<main>")[1]
@@ -1196,9 +1195,9 @@ def test_the_install_page_answers_first_and_is_dated():
     assert dates == [howto["datePublished"], howto["dateModified"]]
     assert howto["datePublished"] == "2026-09-15" and dates[1] >= dates[0]
     assert [s["position"] for s in howto["step"]] == [1, 2, 3] and "author" not in howto
-    assert howto["publisher"]["@id"] == seo_pages.ORG_ID
+    assert howto["publisher"]["@id"] == runtime.ORG_ID
     desc = _head(html, r'<meta name="description" content="(.*?)"/>')
-    assert seo_pages.DESC_MIN <= len(desc) <= seo_pages.DESC_MAX
+    assert runtime.DESC_MIN <= len(desc) <= runtime.DESC_MAX
 
 
 # ---- Auto-Apply on the listing pages (2026-10-04)
@@ -1218,49 +1217,49 @@ def test_an_employer_domain_is_not_counted_even_on_a_supported_ats():
     # A SuccessFactors or Greenhouse board an employer serves from its own domain needs the student to
     # allow that site first, so the page doesn't count it (extension/lib/hosts.js isAtsHost).
     own = [_ats(i, "successfactors", host="careers.qorvo.com") for i in range(5)]
-    assert not any(seo_pages.autofills(x) for x in own)
-    assert seo_pages.autoapply_card(own, "seo-employer") == ""
-    assert seo_pages.autofills(_ats(0, "successfactors"))
+    assert not any(runtime.autofills(x) for x in own)
+    assert runtime.autoapply_card(own, "seo-employer") == ""
+    assert runtime.autofills(_ats(0, "successfactors"))
     # A lookalike host is not the system's: notmyworkdayjobs.com, or myworkdayjobs.com.evil.example.
     for h in ("notmyworkdayjobs.com", "myworkdayjobs.com.evil.example"):
-        assert not seo_pages.autofills(_ats(0, "workday", host=h)), h
+        assert not runtime.autofills(_ats(0, "workday", host=h)), h
     mixed = own + [_ats(10 + i, "workday") for i in range(3)]
-    assert "3 of these 8 applications are on Workday, a site" in seo_pages.autoapply_card(
+    assert "3 of these 8 applications are on Workday, a site" in runtime.autoapply_card(
         mixed, "seo-employer"
     )
-    html = seo_pages.listing_rows(
-        mixed, seo_pages.datetime(2026, 9, 23, tzinfo=seo_pages.timezone.utc)
+    html = runtime.listing_rows(
+        mixed, datetime(2026, 9, 23, tzinfo=timezone.utc)
     )
     assert html.count('class="aa"') == 3
 
 
 def test_autofill_hosts_are_the_extensions():
     # The same list as extension/lib/hosts.js ATS_HOSTS, the hosts Auto-Apply needs no permission for.
-    backend = os.path.dirname(os.path.dirname(os.path.abspath(seo_pages.__file__)))
+    backend = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     with open(os.path.join(backend, "..", "extension", "lib", "hosts.js"), encoding="utf-8") as f:
         src = f.read()
     block = re.search(r"export const ATS_HOSTS = \[(.*?)\];", src, re.S).group(1)
-    assert set(re.findall(r'"([a-z0-9.-]+)"', block)) == set(seo_pages.AUTOFILL_HOSTS)
+    assert set(re.findall(r'"([a-z0-9.-]+)"', block)) == set(runtime.AUTOFILL_HOSTS)
     # Every supported system's host is one of them.
     assert all(
-        h.split("*.")[1].split("/")[0] in seo_pages.AUTOFILL_HOSTS for h in ATS_HOSTS.values()
+        h.split("*.")[1].split("/")[0] in runtime.AUTOFILL_HOSTS for h in ATS_HOSTS.values()
     )
 
 
 def test_autoapply_card_counts_only_what_the_extension_fills():
-    assert seo_pages.autoapply_card([_ats(i, "other") for i in range(6)], "seo-field") == ""
-    assert seo_pages.autoapply_card([_ats(i, "icims_site") for i in range(6)], "seo-field") == ""
+    assert runtime.autoapply_card([_ats(i, "other") for i in range(6)], "seo-field") == ""
+    assert runtime.autoapply_card([_ats(i, "icims_site") for i in range(6)], "seo-field") == ""
     rows = (
         [_ats(i, "greenhouse") for i in range(3)]
         + [_ats(10 + i, "workday") for i in range(2)]
         + [_ats(20 + i, "other") for i in range(4)]
         + [_ats(30, "lever")]
     )
-    card = seo_pages.autoapply_card(rows, "seo-employer")
+    card = runtime.autoapply_card(rows, "seo-employer")
     # Workday is named first when the page has it, then by count; a third kind is "another site".
     assert "6 of these 10 applications are on Workday, Greenhouse or another site" in card
     assert "stops at Submit" in card
-    assert f'href="{seo_pages.STORE_URL}?utm_source=seo-employer"' in card
+    assert f'href="{runtime.STORE_URL}?utm_source=seo-employer"' in card
     assert 'href="/install.html?from=seo-employer"' in card
     # Secondary buttons (2026-10-14, D22): "Rank these for your major and year" is the page's one solid button.
     assert (
@@ -1268,19 +1267,19 @@ def test_autoapply_card_counts_only_what_the_extension_fills():
         and card.count('class="cta secondary ext-touch"') == 1
     )
     # One kind, and no Workday: the most common one, by name.
-    one = seo_pages.autoapply_card([_ats(i, "greenhouse") for i in range(5)], "seo-hub")
+    one = runtime.autoapply_card([_ats(i, "greenhouse") for i in range(5)], "seo-hub")
     assert "All 5 of these applications are on Greenhouse, a site the free" in one
     # Counted over the rows the page shows (PER_PAGE), not every listing it has.
-    many = [_ats(i, "ashby") for i in range(seo_pages.PER_PAGE + 10)]
-    assert f"All {seo_pages.PER_PAGE} of these" in seo_pages.autoapply_card(many, "seo-field")
+    many = [_ats(i, "ashby") for i in range(runtime.PER_PAGE + 10)]
+    assert f"All {runtime.PER_PAGE} of these" in runtime.autoapply_card(many, "seo-field")
     for word in ("hurry", "only ", "left", "today", "limited", "now"):
         assert word not in card.lower(), word
 
 
 def test_rows_link_auto_apply_only_on_supported_sites():
     rows = [_ats(0, "workday"), _ats(1, "other"), _ats(2, "icims_site"), _ats(3)]
-    html = seo_pages.listing_rows(
-        rows, seo_pages.datetime(2026, 9, 23, tzinfo=seo_pages.timezone.utc), src="seo-state"
+    html = runtime.listing_rows(
+        rows, datetime(2026, 9, 23, tzinfo=timezone.utc), src="seo-state"
     )
     jobs = html.split("</li>")
     assert sum('class="aa"' in j for j in jobs) == 1
@@ -1295,9 +1294,9 @@ def test_rows_link_auto_apply_only_on_supported_sites():
         'class="go"'
     ) < workday.index('class="aa"')
     # An id is escaped into the link, never able to break out of it.
-    odd = seo_pages.listing_rows(
+    odd = runtime.listing_rows(
         [{**_ats(9, "workday"), "id": 'a&b"c/d'}],
-        seo_pages.datetime(2026, 9, 23, tzinfo=seo_pages.timezone.utc),
+        datetime(2026, 9, 23, tzinfo=timezone.utc),
         src="seo-state",
     )
     assert "listing=a%26b%22c%2Fd\"" in odd
@@ -1315,13 +1314,13 @@ def test_posting_links_mark_only_applications_auto_apply_fills():
         _ats(2, "successfactors", host="careers.qorvo.com"),
         _ats(3),
     ]
-    now = seo_pages.datetime(2026, 9, 23, tzinfo=seo_pages.timezone.utc)
-    jobs = seo_pages.listing_rows(rows, now).split("</li>")
+    now = datetime(2026, 9, 23, tzinfo=timezone.utc)
+    jobs = runtime.listing_rows(rows, now).split("</li>")
     marked = [j for j in jobs if 'class="go" data-aa ' in j]
     assert len(marked) == 1 and "Mechanical Intern 0" in marked[0]
     # Every row still opens its posting the same way: same link, same new tab, nothing in between.
     assert sum('rel="nofollow noopener" target="_blank">Open posting</a>' in j for j in jobs) == 4
-    pay = seo_pages.pay_rows(
+    pay = runtime.pay_rows(
         [(_ats(0, "greenhouse"), 20.0, 25.0), (_ats(1, "other"), 20.0, 25.0)], now
     )
     assert pay.count('class="go" data-aa ') == 1
@@ -1335,35 +1334,35 @@ def test_offer_script_only_on_pages_with_a_posting_it_can_fill(tmp_path):
             ats="workday",
             apply_url=f"https://bigco.wd1.myworkdayjobs.com/job/{i}",
         )
-        for i in range(seo_pages.MIN_EMPLOYER)
+        for i in range(runtime.MIN_EMPLOYER)
     ]
     other = [
         _row(100 + i, company_name="Small Co", title=f"Lab Intern {i}")
-        for i in range(seo_pages.MIN_EMPLOYER)
+        for i in range(runtime.MIN_EMPLOYER)
     ]
-    pages = {p["path"]: p["html"] for p in seo_pages.build(_site(tmp_path, {"MA": fills + other}))}
+    pages = {p["path"]: p["html"] for p in _build_pages(_site(tmp_path, {"MA": fills + other}))}
     big, small = pages["/internships/at/big-co/"], pages["/internships/at/small-co/"]
-    assert big.count(seo_pages.OFFER_TAG) == 1 and seo_pages.OFFER_TAG in big.split("</footer>")[1]
-    assert seo_pages.OFFER_TAG not in small and "data-aa" not in small
+    assert big.count(runtime.OFFER_TAG) == 1 and runtime.OFFER_TAG in big.split("</footer>")[1]
+    assert runtime.OFFER_TAG not in small and "data-aa" not in small
     assert "/js/offer.js" not in pages["/pricing/"]
 
 
 def test_offer_script_points_at_the_file_the_site_serves():
-    backend = os.path.dirname(os.path.dirname(os.path.abspath(seo_pages.__file__)))
+    backend = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     docs = os.path.join(backend, "..", "docs")
-    src = re.search(r'src="(/js/[a-z]+\.js)"', seo_pages.OFFER_TAG).group(1)
+    src = re.search(r'src="(/js/[a-z]+\.js)"', runtime.OFFER_TAG).group(1)
     assert os.path.isfile(os.path.join(docs, src.lstrip("/")))
     with open(os.path.join(docs, "js", "offer.js"), encoding="utf-8") as f:
         js = f.read()
     # The same store listing, and the same posting links count.js counts as posting_click.
-    assert f'var STORE = "{seo_pages.STORE_URL}";' in js
+    assert f'var STORE = "{runtime.STORE_URL}";' in js
     assert 'var POSTING = "a.go[href], a.open-link[href]";' in js
 
 
 def test_no_auto_apply_card_where_no_listing_is_on_a_supported_site(tmp_path):
     pages = {
         p["path"]: p["html"]
-        for p in seo_pages.build(_site(tmp_path, {"MA": [_row(i) for i in range(6)]}))
+        for p in _build_pages(_site(tmp_path, {"MA": [_row(i) for i in range(6)]}))
     }
     ma = pages["/internships/massachusetts/"]
     assert "aa-card\"" not in ma and "chromewebstore" not in ma and 'class="aa"' not in ma
@@ -1373,10 +1372,10 @@ def test_no_auto_apply_card_where_no_listing_is_on_a_supported_site(tmp_path):
 def test_compare_and_about_state_the_free_allowance_in_numbers(tmp_path):
     pages = {
         p["path"]: p["html"]
-        for p in seo_pages.build(_site(tmp_path, {"MA": [_row(i) for i in range(6)]}))
+        for p in _build_pages(_site(tmp_path, {"MA": [_row(i) for i in range(6)]}))
     }
     words = "25 Auto-Apply runs and 10 tailored resumes a month with a school .edu email (12 and 5 otherwise)"
-    assert seo_pages.FREE_WORDS == words
+    assert runtime.FREE_WORDS == words
     for path in ("/compare/", "/about/"):
         assert words in pages[path], path
         assert "doubl" not in pages[path].split("<main>")[1], path
@@ -1408,12 +1407,12 @@ ATS_HOSTS = {
 
 def test_supported_ats_are_the_extensions_own_hosts():
     # A page must not offer Auto-Apply on a site the extension needs an optional permission for.
-    backend = os.path.dirname(os.path.dirname(os.path.abspath(seo_pages.__file__)))
+    backend = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     with open(os.path.join(backend, "..", "extension", "manifest.json"), encoding="utf-8") as f:
         hosts = set(json.load(f)["host_permissions"])
-    assert set(ATS_HOSTS) == seo_pages.SUPPORTED_ATS
+    assert set(ATS_HOSTS) == runtime.SUPPORTED_ATS
     assert not [k for k, h in ATS_HOSTS.items() if h not in hosts]
-    assert not {"other", "icims_site"} & seo_pages.SUPPORTED_ATS
+    assert not {"other", "icims_site"} & runtime.SUPPORTED_ATS
 
 
 # ---- the page's own data as a chart (2026-10-05, the SEO audit's g_multimodal)
@@ -1421,7 +1420,7 @@ def test_supported_ats_are_the_extensions_own_hosts():
 
 def test_listing_pages_carry_a_chart_of_their_own_numbers(tmp_path):
     rows = {"MA": [_row(i) for i in range(8)], "CA": [_row(100 + i) for i in range(5)]}
-    pages = {p["path"]: p["html"] for p in seo_pages.build(_site(tmp_path, rows))}
+    pages = {p["path"]: p["html"] for p in _build_pages(_site(tmp_path, rows))}
     field = pages["/internships/mechanical-engineering/"]
     # An <img> with alt text that states the same numbers the bars show.
     m = re.search(r'<figure class="chart"><img src="data:image/svg\+xml[^"]*" alt="([^"]+)"', field)
@@ -1438,18 +1437,18 @@ def test_listing_pages_carry_a_chart_of_their_own_numbers(tmp_path):
 
 def test_no_chart_when_there_is_nothing_to_compare():
     one_place = [{**_row(i), "keys": {"MA"}} for i in range(5)]
-    assert seo_pages.chart_figure(one_place) == ""  # one state: no bars to compare
+    assert runtime.chart_figure(one_place) == ""  # one state: no bars to compare
     two = one_place + [{**_row(9), "keys": {"CA"}}]
-    fig = seo_pages.chart_figure(two)
+    fig = runtime.chart_figure(two)
     assert (
         'alt="Bar chart of the 6 open roles on this page by state: Massachusetts 5, California 1."'
         in fig
     )
     # Eight employers in one state: six bars, and the other two said in the alt and caption.
     many = [{**_row(i, company_name=f"Co {i}"), "keys": {"MA"}} for i in range(8)]
-    dim, pairs = seo_pages.chart_counts(many, "MA")
+    dim, pairs = runtime.chart_counts(many, "MA")
     assert dim == "employer" and len(pairs) == 8
-    fig = seo_pages.chart_figure(many, "MA")
+    fig = runtime.chart_figure(many, "MA")
     assert (
         fig.count("%3Crect") == 6
         and "; 2 more at 2 other employers." in fig
@@ -1462,9 +1461,9 @@ def test_no_chart_when_there_is_nothing_to_compare():
 
 def test_by_the_numbers_states_the_headline_figures_dated_with_a_dataset_block(tmp_path):
     site = _pay_site(tmp_path)
-    pages = seo_pages.build(site)
+    pages, state, hooks = _build_with_state(site)
     by_path = {p["path"]: p["html"] for p in pages}
-    h = by_path[seo_pages.NUMBERS_PATH]
+    h = by_path[runtime.NUMBERS_PATH]
     # Counted from this data (41 open, 9 employers, 1 field) and dated from the export, not the clock.
     assert (
         "As of September 23, 2026, InternScout lists 41 open internships, co-ops and research roles from 9 employers in 1 field."
@@ -1489,7 +1488,7 @@ def test_by_the_numbers_states_the_headline_figures_dated_with_a_dataset_block(t
     blocks = _ld_blocks(h)
     assert [b["@type"] for b in blocks] == ["BreadcrumbList", "Dataset", "Organization"]
     data = blocks[1]
-    assert data["dateModified"] == "2026-09-23" and data["creator"] == {"@id": seo_pages.ORG_ID}
+    assert data["dateModified"] == "2026-09-23" and data["creator"] == {"@id": runtime.ORG_ID}
     measured = {v["name"]: v["value"] for v in data["variableMeasured"]}
     assert (
         measured["Open roles"] == 41
@@ -1504,7 +1503,7 @@ def test_by_the_numbers_states_the_headline_figures_dated_with_a_dataset_block(t
         "As of September 23, 2026, 41 open internships"
     )
     assert '<a href="/internships/by-the-numbers/">InternScout by the numbers</a>' in about
-    seo_pages.write(site, pages)
+    publish._write_site(site, pages, state, hooks)
     short = open(os.path.join(site, "llms.txt"), encoding="utf-8").read()
     assert (
         "- [InternScout by the numbers](https://internscout.org/internships/by-the-numbers/)"
@@ -1515,9 +1514,9 @@ def test_by_the_numbers_states_the_headline_figures_dated_with_a_dataset_block(t
 def test_no_by_the_numbers_page_on_a_handful_of_listings(tmp_path):
     pages = {
         p["path"]: p["html"]
-        for p in seo_pages.build(_site(tmp_path, {"MA": [_row(i) for i in range(6)]}))
+        for p in _build_pages(_site(tmp_path, {"MA": [_row(i) for i in range(6)]}))
     }
-    assert seo_pages.NUMBERS_PATH not in pages
+    assert runtime.NUMBERS_PATH not in pages
     assert (
         "by-the-numbers" not in pages["/internships/"] and "by-the-numbers" not in pages["/about/"]
     )
@@ -1539,11 +1538,11 @@ def _faq(html):
 
 def test_field_state_and_combo_pages_answer_their_questions_in_text_and_json_ld(tmp_path):
     site = _pay_site(tmp_path)
-    by_path = {p["path"]: p for p in seo_pages.build(site)}
+    by_path = {p["path"]: p for p in _build_pages(site)}
     field = by_path["/internships/mechanical-engineering/"]
     ld, shown = _faq(field["html"])
     assert ld == shown and 3 <= len(ld) <= 4
-    assert all(0 < len(a) <= seo_pages.FAQ_ANSWER_MAX for _, a in ld)
+    assert all(0 < len(a) <= runtime.FAQ_ANSWER_MAX for _, a in ld)
     answers = dict(ld)
     n = len(field["items"])
     assert (
@@ -1568,7 +1567,7 @@ def test_field_state_and_combo_pages_answer_their_questions_in_text_and_json_ld(
         {**_row(i, state=st), "keys": {st}}
         for i, st in enumerate(["MA", "NY", "CT", "RI", "NH", "VT", "ME"])
     ]
-    assert dict(seo_pages.listing_faq(many, "mechanical", None, "x"))[
+    assert dict(runtime.listing_faq(many, "mechanical", None, "x"))[
         "Where are mechanical engineering internships?"
     ].endswith("and 2 more states.")
     # After the chart, before the follow lines.
@@ -1600,7 +1599,7 @@ def test_canadian_pages_say_their_rates_are_canadian_dollars(tmp_path):
         )
         for i in range(6)
     ]
-    by_path = {p["path"]: p["html"] for p in seo_pages.build(_site(tmp_path, {"ON": rows}))}
+    by_path = {p["path"]: p["html"] for p in _build_pages(_site(tmp_path, {"ON": rows}))}
     ld, shown = _faq(by_path["/internships/toronto/"])
     assert ld == shown
     answers = dict(ld)
@@ -1616,8 +1615,8 @@ def test_canadian_pages_say_their_rates_are_canadian_dollars(tmp_path):
 
 
 def test_employer_pages_carry_no_faq_page_block(tmp_path):
-    rows = [_row(i, company_name="Big Co") for i in range(seo_pages.MIN_EMPLOYER)]
-    by_path = {p["path"]: p["html"] for p in seo_pages.build(_site(tmp_path, {"MA": rows}))}
+    rows = [_row(i, company_name="Big Co") for i in range(runtime.MIN_EMPLOYER)]
+    by_path = {p["path"]: p["html"] for p in _build_pages(_site(tmp_path, {"MA": rows}))}
     own = by_path["/internships/at/big-co/"]
     assert "<h2>Does Big Co pay interns?</h2>" in own  # its own questions, as before
     assert "FAQPage" not in own
@@ -1627,14 +1626,14 @@ def test_employer_pages_carry_no_faq_page_block(tmp_path):
 def test_no_question_without_an_answer():
     # One employer and no places: no list of employers to name, and nowhere to say.
     items = [{**_row(i, company_name="Solo Co", regions=[]), "keys": {"remote"}} for i in range(5)]
-    qa = dict(seo_pages.listing_faq(items, None, "remote", "September 23, 2026"))
+    qa = dict(runtime.listing_faq(items, None, "remote", "September 23, 2026"))
     assert qa["Which employers are hiring remote interns?"] == "All 5 open roles are at Solo Co."
     assert (
         qa["Do remote internships pay?"]
         == "None of the 5 open postings lists pay or says it is paid."
     )
     assert not any(q.startswith("Where") for q in qa)
-    assert seo_pages.listing_faq([], "swe", None, "September 23, 2026") == []
+    assert runtime.listing_faq([], "swe", None, "September 23, 2026") == []
 
 
 # ---- the weekly email's sign-up forms and /digest/ (2026-10-06)
@@ -1679,7 +1678,7 @@ def _email_site(tmp_path, action):
 
 
 def test_the_form_address_is_read_from_the_dashboards_config_line_only(tmp_path):
-    assert seo_pages.digest_form_action(str(tmp_path)) == ""  # no index.html at all
+    assert runtime.digest_form_action(str(tmp_path)) == ""  # no index.html at all
     for action, want in (
         ("", ""),
         ("  ", ""),
@@ -1688,22 +1687,22 @@ def test_the_form_address_is_read_from_the_dashboards_config_line_only(tmp_path)
         (FORM, FORM),
     ):
         _config(tmp_path, action)
-        assert seo_pages.digest_form_action(str(tmp_path)) == want, action
+        assert runtime.digest_form_action(str(tmp_path)) == want, action
     # The real docs/index.html still has the line where this reads it, so editing the dashboard's config
     # can't silently switch every landing page's form off.
     docs = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(seo_pages.__file__))), "..", "docs"
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "..", "docs"
     )
-    assert seo_pages._DIGEST_ACTION.search(
+    assert _DIGEST_ACTION.search(
         open(os.path.join(docs, "index.html"), encoding="utf-8").read()
     )
 
 
 def test_the_archive_is_worked_out_from_the_form_address():
     # The same cases as tests/site/core.test.mjs checks for IS.digestArchive.
-    assert seo_pages.digest_archive(FORM) == "https://buttondown.com/internscout-test/archive/"
+    assert runtime.digest_archive(FORM) == "https://buttondown.com/internscout-test/archive/"
     assert (
-        seo_pages.digest_archive(
+        runtime.digest_archive(
             "https://buttondown.email/api/emails/embed-subscribe/intern_scout-2/"
         )
         == "https://buttondown.com/intern_scout-2/archive/"
@@ -1715,12 +1714,12 @@ def test_the_archive_is_worked_out_from_the_form_address():
         "https://buttondown.com/api/emails/embed-subscribe/x/../y",
         'https://buttondown.com/api/emails/embed-subscribe/a"onmouseover=x',
     ):
-        assert seo_pages.digest_archive(no) == "", no
+        assert runtime.digest_archive(no) == "", no
 
 
 def test_no_page_has_a_form_while_the_address_is_empty(tmp_path):
     site = _email_site(tmp_path, "")
-    pages = seo_pages.build(site)
+    pages, state, hooks = _build_with_state(site)
     assert not [p["path"] for p in pages if "<form" in p["html"] or "Last Monday" in p["html"]]
     digest = next(p for p in pages if p["path"] == "/digest/")
     assert (
@@ -1731,20 +1730,20 @@ def test_no_page_has_a_form_while_the_address_is_empty(tmp_path):
         "Sign-ups for the email aren't open yet" in digest["html"]
         and 'href="/internships/new/"' in digest["html"]
     )
-    seo_pages.write(site, pages)
+    publish._write_site(site, pages, state, hooks)
     assert "/digest/" not in open(os.path.join(site, "sitemap.xml"), encoding="utf-8").read()
 
 
 def test_landing_digest_navigation_is_absent_when_signup_is_disabled(tmp_path):
     site = _email_site(tmp_path, "")
-    pages = seo_pages.build(site)
+    pages = _build_pages(site)
     assert any(p["path"].startswith("/internships/") for p in pages)
     assert all('data-digest-placement="nav"' not in p["html"] for p in pages)
 
 
 def test_landing_digest_link_precedes_listings_without_duplicating_the_form(tmp_path):
     site = _email_site(tmp_path, FORM)
-    pages = {p["path"]: p["html"] for p in seo_pages.build(site)}
+    pages = {p["path"]: p["html"] for p in _build_pages(site)}
     link = '<a class="nav-extra" href="/digest/" data-digest-placement="nav">Free Monday email</a>'
     landing_pages = {path: html for path, html in pages.items() if path.startswith("/internships/")}
     assert landing_pages
@@ -1762,7 +1761,7 @@ def test_landing_digest_link_precedes_listings_without_duplicating_the_form(tmp_
 
 def test_with_an_address_the_field_pages_new_page_and_digest_page_have_the_form(tmp_path):
     site = _email_site(tmp_path, FORM)
-    pages = {p["path"]: p["html"] for p in seo_pages.build(site)}
+    pages = {p["path"]: p["html"] for p in _build_pages(site)}
     with_form = {path for path, html in pages.items() if "<form" in html}
     assert with_form == {
         "/internships/mechanical-engineering/",
@@ -1791,7 +1790,8 @@ def test_with_an_address_the_field_pages_new_page_and_digest_page_have_the_form(
     assert '<h2 id="digest-title">Get the free weekly email</h2>' in pages["/digest/"]
     assert 'data-digest-placement="digest-page"' in pages["/digest/"]
     assert 'data-digest-placement="landing"' in pages["/internships/new/"]
-    seo_pages.write(site, list(seo_pages.build(site)))
+    pages_to_write, state, hooks = _build_with_state(site)
+    publish._write_site(site, list(pages_to_write), state, hooks)
     assert (
         "<loc>https://internscout.org/digest/</loc>"
         in open(os.path.join(site, "sitemap.xml"), encoding="utf-8").read()
@@ -1800,10 +1800,10 @@ def test_with_an_address_the_field_pages_new_page_and_digest_page_have_the_form(
 
 def test_the_pitch_quotes_the_emails_own_count_and_never_a_small_one(tmp_path):
     site = _email_site(tmp_path, FORM)
-    pages = {p["path"]: p["html"] for p in seo_pages.build(site)}
-    d = seo_pages.load(site)
-    now = seo_pages._when(d["generated_at"])
-    new = seo_pages.new_roles(d, now)
+    pages = {p["path"]: p["html"] for p in _build_pages(site)}
+    d = runtime.load(site)
+    now = runtime._when(d["generated_at"])
+    new = runtime.new_roles(d, now)
     assert len(new) == 8 and sum("mechanical" in x["field_tags"] for x in new) == 6
     assert (
         "6 new mechanical engineering internships in the last week."
@@ -1826,7 +1826,7 @@ def test_the_new_page_says_why_its_count_differs_from_the_list(tmp_path):
     )  # second board
     site = _site(tmp_path, {"MA": rows})
     _config(tmp_path, FORM)
-    html = next(p["html"] for p in seo_pages.build(site) if p["path"] == "/internships/new/")
+    html = next(p["html"] for p in _build_pages(site) if p["path"] == "/internships/new/")
     assert (
         "6 new internships in the last week, each role counted once even when an employer posted it twice."
         in html
@@ -1839,7 +1839,7 @@ def test_the_digest_page_has_no_number_in_a_quiet_week(tmp_path):
     ] + [_row(9)]
     site = _site(tmp_path, {"MA": rows})
     _config(tmp_path, FORM)
-    pages = {p["path"]: p["html"] for p in seo_pages.build(site)}
+    pages = {p["path"]: p["html"] for p in _build_pages(site)}
     assert "/internships/new/" not in pages
     lede = re.search(r'<p class="lede">(.*?)</p>', pages["/digest/"]).group(1)
     assert lede.startswith("One free email every Monday") and "new internships" not in lede
@@ -1847,14 +1847,15 @@ def test_the_digest_page_has_no_number_in_a_quiet_week(tmp_path):
 
 def test_digest_examples_are_real_dated_new_roles_and_favor_breadth(tmp_path):
     site = _email_site(tmp_path, FORM)
-    html = next(p["html"] for p in seo_pages.build(site) if p["path"] == "/digest/")
+    pages, state, _ = _build_with_state(site)
+    html = next(p["html"] for p in pages if p["path"] == "/digest/")
     sample = re.search(r'<section class="prose digest-examples".*?</section>', html, re.S).group(0)
     assert sample.count('<li>') == 3
     assert 'Snapshot: September 23, 2026.' in sample and 'Availability can change' in sample
     assert 'Mechanical Intern' in sample and 'Nursing Extern' in sample
     for url in re.findall(r'href="([^"]+)"', sample):
         assert url in {
-            x["apply_url"] for x in seo_pages.new_roles(seo_pages.load(site), seo_pages.GENERATED)
+            x["apply_url"] for x in runtime.new_roles(runtime.load(site), state.generated)
         }
     assert '<h1>New internships in your inbox every Monday. Free.</h1>' in html
     assert 'For now everyone gets the same email.' in html
@@ -1866,19 +1867,19 @@ def test_digest_examples_omit_closed_or_unsafe_rows_and_escape_board_text():
         _row(2, status='closed'),
         _row(3, apply_url='javascript:alert(1)'),
     ]
-    sample = seo_pages.digest_examples(rows)
+    sample = runtime.digest_examples(rows)
     assert sample.count('<li>') == 1
     assert '&lt;script&gt;bad&lt;/script&gt;' in sample and '&lt;b&gt;Real role&lt;/b&gt;' in sample
     assert '<script>' not in sample and 'javascript:' not in sample
-    assert seo_pages.digest_examples([]) == ''
+    assert runtime.digest_examples([]) == ''
 
 
 def test_workday_country_state_city_places_read_as_city_and_state():
     # 2026-10-07: "USA-Illinois-Chicago" filled Mars's description; "USA-IL Oak Brook" is Winland Foods'.
-    assert seo_pages.place_name({"loc": "USA-Illinois-Chicago"}) == "Chicago, IL"
-    assert seo_pages.place_name({"loc": "USA-Arkansas-Ft. Smith"}) == "Ft. Smith, AR"
-    assert seo_pages.place_name({"loc": "USA-IL Oak Brook"}) == "Oak Brook, IL"
-    assert seo_pages.place_name({"loc": "Denver, Colorado"}) == "Denver, CO"
+    assert runtime.place_name({"loc": "USA-Illinois-Chicago"}) == "Chicago, IL"
+    assert runtime.place_name({"loc": "USA-Arkansas-Ft. Smith"}) == "Ft. Smith, AR"
+    assert runtime.place_name({"loc": "USA-IL Oak Brook"}) == "Oak Brook, IL"
+    assert runtime.place_name({"loc": "Denver, Colorado"}) == "Denver, CO"
 
 
 # ---- 2026-10-07: US cities, the widened field-in-a-place rules, the Summer tracker and the Browse section
@@ -1911,7 +1912,7 @@ def test_us_cities_get_pages_only_when_they_are_their_own_list(tmp_path):
         tmp_path,
         {"MA": boston + worcester, "WA": seattle, "IL": chicago + peoria, "NY": nyc + rochester},
     )
-    pages = {p["path"]: p["html"] for p in seo_pages.build(site)}
+    pages = {p["path"]: p["html"] for p in _build_pages(site)}
     assert "/internships/boston/" in pages and "/internships/software-engineering/boston/" in pages
     assert "/internships/new-york-city/" in pages
     assert "16 open student roles" in pages["/internships/new-york-city/"]  # Rochester is not in it
@@ -1925,22 +1926,22 @@ def test_us_cities_get_pages_only_when_they_are_their_own_list(tmp_path):
     assert "Software Engineering internships by city" in field
     assert 'href="/internships/software-engineering/boston/"' in field
     # Cities are views over their states: they never count toward how widely a role is spread.
-    assert "Boston" not in seo_pages.PLACES and "New York City" not in seo_pages.PLACES
+    assert "Boston" not in runtime.PLACES and "New York City" not in runtime.PLACES
     # The dashboard opens a city's page on its state.
     assert 'href="/?field=swe&amp;state=MA"' in pages["/internships/software-engineering/boston/"]
 
 
 def test_a_city_page_names_new_york_city_as_new_york():
     g = {"loc": "New York, NY", "kind": "nyc_metro", "state": "NY", "metro": "New York City"}
-    assert seo_pages.city_name(g, "NY") == "New York"  # was: "" (the state's name went too)
-    assert seo_pages.city_name(g, "New York City") == "New York"
-    assert seo_pages.city_name({"loc": "Boston, MA", "state": "MA"}, "Boston") == "Boston"
-    assert seo_pages.city_name({"loc": "Massachusetts", "state": "MA"}, "MA") == ""
+    assert runtime.city_name(g, "NY") == "New York"  # was: "" (the state's name went too)
+    assert runtime.city_name(g, "New York City") == "New York"
+    assert runtime.city_name({"loc": "Boston, MA", "state": "MA"}, "Boston") == "Boston"
+    assert runtime.city_name({"loc": "Massachusetts", "state": "MA"}, "MA") == ""
 
 
 def test_marketed_fields_get_northeast_pages_at_the_lower_bar_and_others_do_not(tmp_path):
-    n = seo_pages.MIN_COMBO_PRIORITY
-    assert n < seo_pages.MIN_COMBO
+    n = runtime.MIN_COMBO_PRIORITY
+    assert n < runtime.MIN_COMBO
     ct = [_at(i, f"Hartford {i}, CT", "CT", tags=("data",)) for i in range(n)] + [
         _at(100 + i, f"Hartford {i}, CT", "CT", tags=("mechanical",)) for i in range(n)
     ]
@@ -1950,7 +1951,7 @@ def test_marketed_fields_get_northeast_pages_at_the_lower_bar_and_others_do_not(
         + [_at(400 + i, f"Akron {i}, OH", "OH", tags=("mechanical",)) for i in range(n)]
     )
     site = _site(tmp_path, {"CT": ct, "OH": oh})
-    paths = _paths(seo_pages.build(site))
+    paths = _paths(_build_pages(site))
     assert "/internships/data-science/connecticut/" in paths  # marketed field, Northeast
     assert (
         "/internships/mechanical-engineering/connecticut/" not in paths
@@ -1960,14 +1961,14 @@ def test_marketed_fields_get_northeast_pages_at_the_lower_bar_and_others_do_not(
 
 def test_a_widened_page_that_is_nearly_another_page_is_not_made(tmp_path):
     # Every finance role is in Connecticut, so finance in Connecticut is the finance page again.
-    n = seo_pages.MIN_COMBO_PRIORITY
+    n = runtime.MIN_COMBO_PRIORITY
     rows = [_at(i, f"Stamford {i}, CT", "CT", tags=("finance",)) for i in range(n)]
     rows += [_at(100 + i, f"Stamford {i}, CT", "CT", tags=("civil",)) for i in range(n)]
-    paths = _paths(seo_pages.build(_site(tmp_path, {"CT": rows})))
+    paths = _paths(_build_pages(_site(tmp_path, {"CT": rows})))
     assert "/internships/finance/" in paths and "/internships/connecticut/" in paths
     assert "/internships/finance/connecticut/" not in paths
-    assert seo_pages.near_same(frozenset("abcde"), frozenset("abcd"))  # 4 of 5
-    assert not seo_pages.near_same(frozenset("abcde"), frozenset("abc"))  # 3 of 5
+    assert runtime.near_same(frozenset("abcde"), frozenset("abcd"))  # 4 of 5
+    assert not runtime.near_same(frozenset("abcde"), frozenset("abc"))  # 3 of 5
 
 
 def test_employer_pages_link_the_field_in_a_place_pages_their_roles_are_on(tmp_path):
@@ -1976,7 +1977,7 @@ def test_employer_pages_link_the_field_in_a_place_pages_their_roles_are_on(tmp_p
         for i in range(20)
     ]
     rows += [_at(100 + i, "Worcester, MA", "MA", "new_england") for i in range(20)]
-    pages = {p["path"]: p["html"] for p in seo_pages.build(_site(tmp_path, {"MA": rows}))}
+    pages = {p["path"]: p["html"] for p in _build_pages(_site(tmp_path, {"MA": rows}))}
     emp = pages["/internships/at/big-bank/"]
     assert "Related internships by place" in emp
     assert (
@@ -2008,14 +2009,14 @@ def _tracker_site(tmp_path, index_html=None):
 def test_the_dashboard_gets_a_crawlable_browse_section_between_its_markers(tmp_path):
     shell = (
         "<html><body><div id=\"root\"></div>"
-        + seo_pages.HOME_START
+        + runtime.HOME_START
         + "<p>fallback</p>"
-        + seo_pages.HOME_END
+        + runtime.HOME_END
         + "</body></html>"
     )
     site = _tracker_site(tmp_path, shell)
-    pages = seo_pages.build(site)
-    seo_pages.write(site, pages)
+    pages, state, hooks = _build_with_state(site)
+    publish._write_site(site, pages, state, hooks)
     home = open(os.path.join(site, "index.html"), encoding="utf-8").read()
     assert "fallback" not in home and home.startswith("<html><body><div id=\"root\"></div>")
     made = {p["path"] for p in pages}
@@ -2029,7 +2030,7 @@ def test_the_dashboard_gets_a_crawlable_browse_section_between_its_markers(tmp_p
         "/internships/massachusetts/",
     } <= links
     assert '<a href="/internships/at/alpha/">Alpha</a><span class="n">6</span>' in home
-    seo_pages.write(site, pages)  # writing again changes nothing
+    publish._write_site(site, pages, state, hooks)  # writing again changes nothing
     assert open(os.path.join(site, "index.html"), encoding="utf-8").read() == home
     hub = next(p["html"] for p in pages if p["path"] == "/internships/at/")
     assert "Hiring the most right now" in hub and hub.index("Alpha") < hub.index(
@@ -2040,24 +2041,24 @@ def test_the_dashboard_gets_a_crawlable_browse_section_between_its_markers(tmp_p
 def test_the_real_dashboard_has_the_browse_markers_outside_the_react_root():
     path = os.path.join(os.path.dirname(__file__), "..", "..", "docs", "index.html")
     text = open(path, encoding="utf-8").read()
-    start, end = text.find(seo_pages.HOME_START), text.find(seo_pages.HOME_END)
+    start, end = text.find(runtime.HOME_START), text.find(runtime.HOME_END)
     assert 0 < start < end
     assert text.find('<div id="root">') < start and text.find("</noscript>") < start
 
 
 def test_a_name_that_is_not_a_company_gets_no_tracker_row_or_page(tmp_path):
-    assert not seo_pages.real_company("APPLY NOW") and not seo_pages.real_company("Confidential")
-    assert not seo_pages.real_company("1234") and not seo_pages.real_company(
+    assert not runtime.real_company("APPLY NOW") and not runtime.real_company("Confidential")
+    assert not runtime.real_company("1234") and not runtime.real_company(
         "Hiring Now - Apply Here"
     )
     assert all(
-        seo_pages.real_company(n) for n in ("PGA TOUR", "C3 AI", "HP IQ", "AMERICAN SYSTEMS", "3M")
+        runtime.real_company(n) for n in ("PGA TOUR", "C3 AI", "HP IQ", "AMERICAN SYSTEMS", "3M")
     )
     rows = [_row(i, company_name=f"Co {'ABCDE'[i % 5]}", title=f"Intern {i}") for i in range(25)]
     rows += [
         _row(100 + i, company_name="APPLY NOW", title=f"Editorial Intern {i}") for i in range(6)
     ]
-    pages = {p["path"]: p["html"] for p in seo_pages.build(_site(tmp_path, {"MA": rows}))}
+    pages = {p["path"]: p["html"] for p in _build_pages(_site(tmp_path, {"MA": rows}))}
     tracker = pages["/internships/summer-2027/open/"]
     assert "APPLY NOW" not in tracker and ">Co A</a>" in tracker
     assert (
@@ -2086,7 +2087,7 @@ def test_places_that_take_the_read_with_it(tmp_path):
         )
         for i in range(20)
     ]
-    pages = {p["path"]: p["html"] for p in seo_pages.build(_site(tmp_path, {"CA": rows}))}
+    pages = {p["path"]: p["html"] for p in _build_pages(_site(tmp_path, {"CA": rows}))}
     bay = pages["/internships/san-francisco-bay-area/"]
     # was: "Internships in the San Francisco Bay Area | InternScout" (2026-10-13: the count before the brand)
     assert "<title>Internships in the San Francisco Bay Area: 20+ Open</title>" in bay
@@ -2102,7 +2103,7 @@ def test_places_that_take_the_read_with_it(tmp_path):
     )
     assert "<h1>Software Engineering internships in the San Francisco Bay Area</h1>" in combo
     assert " in San Francisco Bay Area" not in "".join(pages.values())
-    assert seo_pages.in_place("MA") == "in Massachusetts"
+    assert runtime.in_place("MA") == "in Massachusetts"
 
 
 # ---- 2026-10-13: titles and descriptions written for clicks (employer_title, listing_title and the rest)
@@ -2111,7 +2112,7 @@ _DASHES = ("—", "–")  # em and en dash
 
 
 def test_count_floor_steps_down_and_names_no_count_under_ten():
-    floor = seo_pages.count_floor
+    floor = runtime.count_floor
     assert [floor(n) for n in (0, 1, 5, 9)] == ["", "", "", ""]
     assert [floor(n) for n in (10, 14, 15, 99, 100, 103, 2446, 6081, 12345)] == [
         "10+",
@@ -2127,7 +2128,7 @@ def test_count_floor_steps_down_and_names_no_count_under_ten():
 
 
 def test_fit_head_drops_the_brand_then_the_tail_then_the_subjects_extra_words():
-    fit = seo_pages.fit_head
+    fit = runtime.fit_head
     subj = ["Under Armour Internships Summer 2027", "Under Armour Internships"]
     # 66 with "Open Roles" and the brand; the shorter tail keeps the brand.
     assert (
@@ -2148,25 +2149,25 @@ def test_fit_head_drops_the_brand_then_the_tail_then_the_subjects_extra_words():
     # Nothing fits: the last subject, cut at a word, never mid-word.
     name = "Executive Office for United States Attorneys and the Office of the Attorneys"
     cut = fit([f"{name} Internships Summer 2027", f"{name} Internships"], [": 10+ Open"])
-    assert len(cut) <= seo_pages.TITLE_MAX and f"{name} Internships".startswith(cut)
+    assert len(cut) <= runtime.TITLE_MAX and f"{name} Internships".startswith(cut)
     assert cut == "Executive Office for United States Attorneys and the Office" and isinstance(
-        cut, seo_pages.Head
+        cut, runtime.Head
     )
 
 
 def test_listing_descriptions_name_the_term_and_who_is_hiring():
     rows = [_row(i, company_name=f"Co {'ABCDE'[i % 5]}") for i in range(20)]
-    text = seo_pages.listing_description(
+    text = runtime.listing_description(
         20, "mechanical engineering internships", "in Massachusetts", rows, "October 13, 2026"
     )
     assert text.startswith(
         "20 open mechanical engineering internships for college students in Massachusetts, "
         "most for Summer 2027. Hiring now: Co A, Co B, Co C and 2 more."
     )
-    assert len(text) <= seo_pages.DESC_AIM and not any(d in text for d in _DASHES)
+    assert len(text) <= runtime.DESC_AIM and not any(d in text for d in _DASHES)
     # No term most roles share: no "most for".
     mixed = [_row(i, term=("Summer 2027", "Fall 2027", None)[i % 3]) for i in range(9)]
-    assert "most for" not in seo_pages.listing_description(
+    assert "most for" not in runtime.listing_description(
         9, "internships", "", mixed, "October 13, 2026"
     )
 
@@ -2188,7 +2189,7 @@ def test_canadian_place_pages_name_co_ops_and_places_read_cleanly(tmp_path):
         )
         for i in range(12)
     ]
-    pages = {p["path"]: p["html"] for p in seo_pages.build(_site(tmp_path, {"ON": rows}))}
+    pages = {p["path"]: p["html"] for p in _build_pages(_site(tmp_path, {"ON": rows}))}
     h = pages["/internships/waterloo-region/"]
     assert (
         _head(h, r"<title>(.*?)</title>") == "Internships and Co-ops in Waterloo Region: 10+ Open"
@@ -2198,7 +2199,7 @@ def test_canadian_place_pages_name_co_ops_and_places_read_cleanly(tmp_path):
         in _head(h, r'<meta name="description" content="(.*?)"/>')
     )
     # The places boards write that read as two towns, a site number or a country.
-    name = seo_pages.place_name
+    name = runtime.place_name
     assert name({"loc": "US, MA - Framingham", "state": "MA"}) == "Framingham, MA"
     assert (
         name({"loc": "United States - California - Foster City", "state": "CA"})
@@ -2213,7 +2214,7 @@ def test_canadian_place_pages_name_co_ops_and_places_read_cleanly(tmp_path):
 
 
 def test_no_rewritten_title_or_description_carries_a_dash_or_an_exact_count(tmp_path):
-    for p in seo_pages.build(_pay_site(tmp_path)):
+    for p in _build_pages(_pay_site(tmp_path)):
         path = p["path"]
         if (
             p["items"] is None
@@ -2225,7 +2226,7 @@ def test_no_rewritten_title_or_description_carries_a_dash_or_an_exact_count(tmp_
         desc = _head(p["html"], r'<meta name="description" content="(.*?)"/>')
         assert not any(d in title + desc for d in _DASHES), (path, title, desc)
         n = len(p["items"])
-        assert f"{n:,} Open" not in title or seo_pages.count_floor(n) == f"{n:,}+", (path, title)
+        assert f"{n:,} Open" not in title or runtime.count_floor(n) == f"{n:,}+", (path, title)
 
 
 # ---- thin field-in-a-place pages: built and linked, but noindex and out of the sitemap (2026-10-13)
@@ -2239,12 +2240,12 @@ def _combo_site(tmp_path, n):
 
 
 def _built(site, live=(), held=(), earning=frozenset()):
-    return {p["path"]: p for p in seo_pages.build(site, set(live), frozenset(held), earning)}
+    return {p["path"]: p for p in _build_pages(site, set(live), frozenset(held), earning)}
 
 
 def test_combo_indexed_thresholds_slack_and_search_traffic():
-    need, slack = seo_pages.INDEX_COMBO, seo_pages.INDEX_SLACK
-    ok = seo_pages.combo_indexed
+    need, slack = runtime.INDEX_COMBO, runtime.INDEX_SLACK
+    ok = runtime.combo_indexed
     assert need == 20 and slack == 2
     assert ok(need, COMBO, set()) and not ok(need - 1, COMBO, set())  # a new page needs INDEX_COMBO
     assert ok(need - slack, COMBO, {COMBO})  # an indexed one keeps going
@@ -2253,8 +2254,9 @@ def test_combo_indexed_thresholds_slack_and_search_traffic():
 
 
 def test_a_thin_field_in_a_place_page_is_built_and_linked_but_kept_out_of_search(tmp_path):
-    site = _combo_site(tmp_path, seo_pages.MIN_COMBO)  # 15 roles: made, but under INDEX_COMBO
-    built = _built(site)
+    site = _combo_site(tmp_path, runtime.MIN_COMBO)  # 15 roles: made, but under INDEX_COMBO
+    pages, state, hooks = _build_with_state(site, earning=frozenset())
+    built = {p["path"]: p for p in pages}
     page = built[COMBO]
     assert page["thin"] and not page["index"]
     assert f'<link rel="canonical" href="https://internscout.org{COMBO}"/>' in page["html"]
@@ -2262,25 +2264,25 @@ def test_a_thin_field_in_a_place_page_is_built_and_linked_but_kept_out_of_search
     # Still linked for the students who browse: from its field's page and its state's page.
     assert f'href="{COMBO}"' in built["/internships/mechanical-engineering/"]["html"]
     assert f'href="{COMBO}"' in built["/internships/massachusetts/"]["html"]
-    seo_pages.write(site, list(built.values()))
+    publish._write_site(site, list(built.values()), state, hooks)
     sitemap = open(os.path.join(site, "sitemap.xml"), encoding="utf-8").read()
     assert f"<loc>https://internscout.org{COMBO}</loc>" not in sitemap
     assert "<loc>https://internscout.org/internships/mechanical-engineering/</loc>" in sitemap
     assert COMBO not in open(os.path.join(site, "llms.txt"), encoding="utf-8").read()
     from internscout import feeds
 
-    feeds.write_all(site, list(built.values()))  # and its feed, for the club channels
+    feeds.write_all(site, list(built.values()), state.generated)  # and its feed, for the club channels
     assert os.path.exists(
         os.path.join(site, "internships", "mechanical-engineering", "massachusetts", "feed.xml")
     )
-    held = seo_pages.held_paths(os.path.join(site, seo_pages.HELD_FILE))
+    held = publish._held_paths(os.path.join(site, runtime.HELD_FILE))
     # was: == {COMBO}. The near pages with too few roles are held the same way (2026-10-18).
-    assert {p for p in held if not p.startswith(seo_pages.NEAR_ROOT)} == {COMBO}
+    assert {p for p in held if not p.startswith(runtime.NEAR_ROOT)} == {COMBO}
 
 
 def test_of_the_small_pages_only_the_employer_page_is_thin(tmp_path):
     # Five roles at one employer in one state, for one major: every page small, none of them a combo.
-    rows = [_row(i, company_name="Small Co") for i in range(seo_pages.MIN_EMPLOYER)]
+    rows = [_row(i, company_name="Small Co") for i in range(runtime.MIN_EMPLOYER)]
     site = _site(
         tmp_path,
         {"MA": rows},
@@ -2310,19 +2312,19 @@ def test_duplicates_keeps_the_bigger_of_two_near_same_lists():
     lists = {"/a/": ids(0, 20), "/b/": ids(0, 19), "/c/": ids(100, 120), "/d/": ids(0, 200)}
     # /b/ is near_same as /a/ and smaller: out. /c/ shares nothing. /d/ holds all of /a/ and far more: a
     # different list to a reader, so both stay (a city inside its state).
-    assert seo_pages.duplicates(lists, set(lists), frozenset()) == {"/b/"}
-    assert seo_pages.duplicates(lists, set(lists), frozenset({"/b/"})) == set()  # earning stays
+    assert runtime.duplicates(lists, set(lists), frozenset()) == {"/b/"}
+    assert runtime.duplicates(lists, set(lists), frozenset({"/b/"})) == set()  # earning stays
     assert (
-        seo_pages.duplicates(lists, set(lists) - {"/a/"}, frozenset()) == set()
+        runtime.duplicates(lists, set(lists) - {"/a/"}, frozenset()) == set()
     )  # only indexed pages count
     # Of two pages the same size, the first by path stays.
     same = {"/y/": ids(0, 20), "/x/": ids(0, 20)}
-    assert seo_pages.duplicates(same, set(same), frozenset()) == {"/y/"}
+    assert runtime.duplicates(same, set(same), frozenset()) == {"/y/"}
 
 
 def test_duplicates_does_not_flip_a_pair_near_the_line():
     ids = lambda a, b: frozenset(range(a, b))
-    dup = seo_pages.duplicates
+    dup = runtime.duplicates
     # The page in the live sitemap stays, even when it is the smaller one: sizes that cross between two
     # ingests do not swap which of the pair is indexed.
     pair = {"/big/": ids(0, 20), "/small/": ids(0, 19)}
@@ -2330,7 +2332,7 @@ def test_duplicates_does_not_flip_a_pair_near_the_line():
     assert dup(pair, set(pair), frozenset(), live={"/small/"}) == {"/big/"}
     # Sharing 17 of 20 (0.85): a new page is out, one in the live sitemap stays until SAME_SHARE (0.9).
     near = {"/a/": ids(0, 20), "/b/": ids(3, 20)}
-    assert seo_pages.SAME_SHARE == 0.9 and dup(near, set(near), frozenset()) == {"/b/"}
+    assert runtime.SAME_SHARE == 0.9 and dup(near, set(near), frozenset()) == {"/b/"}
     assert dup(near, set(near), frozenset(), live={"/a/", "/b/"}) == set()
     assert dup(pair, set(pair), frozenset(), live={"/big/", "/small/"}) == {"/small/"}  # 0.95: out
 
@@ -2361,7 +2363,8 @@ def _toronto_site(tmp_path):
 
 def test_a_page_that_is_another_pages_list_is_built_and_linked_but_noindex(tmp_path):
     site = _toronto_site(tmp_path)
-    built = _built(site)
+    pages, state, hooks = _build_with_state(site, earning=frozenset())
+    built = {p["path"]: p for p in pages}
     thin = {p for p, v in built.items() if v["thin"] and v["kind"] in ("state", "combo")}
     assert thin == {
         TORONTO,
@@ -2374,12 +2377,12 @@ def test_a_page_that_is_another_pages_list_is_built_and_linked_but_noindex(tmp_p
     assert (
         f'href="{TORONTO}"' in built["/internships/mechanical-engineering/"]["html"]
     )  # still linked
-    seo_pages.write(site, list(built.values()))
+    publish._write_site(site, list(built.values()), state, hooks)
     assert (
         f"<loc>https://internscout.org{TORONTO}</loc>"
         not in open(os.path.join(site, "sitemap.xml"), encoding="utf-8").read()
     )
-    assert TORONTO in seo_pages.held_paths(os.path.join(site, seo_pages.HELD_FILE))
+    assert TORONTO in publish._held_paths(os.path.join(site, runtime.HELD_FILE))
     # The one the live sitemap has stays, and one people find in search is never taken out.
     again = _built(site, live={TORONTO})
     assert again[TORONTO]["index"] and again[ONTARIO]["thin"]
@@ -2387,14 +2390,14 @@ def test_a_page_that_is_another_pages_list_is_built_and_linked_but_noindex(tmp_p
 
 
 def test_a_page_people_find_in_search_stays_indexed_however_small(tmp_path):
-    site = _combo_site(tmp_path, seo_pages.MIN_COMBO)
+    site = _combo_site(tmp_path, runtime.MIN_COMBO)
     page = _built(site, earning=frozenset({COMBO}))[COMBO]
     assert page["index"] and not page["thin"]
     assert 'content="noindex' not in page["html"]
 
 
 def test_a_page_that_grows_is_indexed_again_and_one_role_does_not_flip_it(tmp_path):
-    need, slack = seo_pages.INDEX_COMBO, seo_pages.INDEX_SLACK
+    need, slack = runtime.INDEX_COMBO, runtime.INDEX_SLACK
     assert _built(_combo_site(tmp_path / "a", need))[COMBO]["index"]  # big enough
     assert not _built(_combo_site(tmp_path / "b", need - 1))[COMBO]["index"]  # new, one short
     assert _built(_combo_site(tmp_path / "c", need - 1), live={COMBO})[COMBO][
@@ -2406,17 +2409,17 @@ def test_a_page_that_grows_is_indexed_again_and_one_role_does_not_flip_it(tmp_pa
 
 def test_a_noindex_page_is_still_live_for_keep_at(tmp_path):
     # 12 roles: under MIN_COMBO for a new page, over keep_at(MIN_COMBO) for one the site already serves.
-    n = seo_pages.keep_at(seo_pages.MIN_COMBO) + 2
-    assert n < seo_pages.MIN_COMBO
+    n = runtime.keep_at(runtime.MIN_COMBO) + 2
+    assert n < runtime.MIN_COMBO
     assert COMBO not in _built(_combo_site(tmp_path / "new", n))
     kept = _built(_combo_site(tmp_path / "held", n), held={COMBO})  # served last deploy, noindex
     assert COMBO in kept and kept[COMBO]["thin"]
-    assert seo_pages.held_paths(str(tmp_path / "missing.txt")) == frozenset()
+    assert publish._held_paths(str(tmp_path / "missing.txt")) == frozenset()
 
 
-def test_index_combo_zero_indexes_every_page_again(tmp_path, monkeypatch):
-    monkeypatch.setattr(seo_pages, "INDEX_COMBO", 0)  # the one-constant revert
-    built = _built(_combo_site(tmp_path, seo_pages.MIN_COMBO))
+def test_index_combo_zero_indexes_every_page_again(tmp_path):
+    pages = _build_pages(_combo_site(tmp_path, runtime.MIN_COMBO), earning=frozenset(), index_combo=0)
+    built = {p["path"]: p for p in pages}
     assert built[COMBO]["index"] and not any(
         v["thin"] for v in built.values() if v["kind"] != "near"
     )
@@ -2424,7 +2427,7 @@ def test_index_combo_zero_indexes_every_page_again(tmp_path, monkeypatch):
 
 def test_earning_paths_reads_clicks_and_impressions(tmp_path):
     f = tmp_path / "gsc.json"
-    keep = seo_pages.SEARCH_KEEP_IMPRESSIONS
+    keep = runtime.SEARCH_KEEP_IMPRESSIONS
     f.write_text(
         json.dumps(
             {
@@ -2438,12 +2441,12 @@ def test_earning_paths_reads_clicks_and_impressions(tmp_path):
         ),
         encoding="utf-8",
     )
-    assert seo_pages.earning_paths(str(f)) == {"/a/", "/b/"}
-    assert seo_pages.earning_paths(str(tmp_path / "missing.json")) == frozenset()
+    assert runtime.earning_paths(str(f)) == {"/a/", "/b/"}
+    assert runtime.earning_paths(str(tmp_path / "missing.json")) == frozenset()
     f.write_text("not json", encoding="utf-8")
-    assert seo_pages.earning_paths(str(f)) == frozenset()
+    assert runtime.earning_paths(str(f)) == frozenset()
     # The committed snapshot reads, and holds pages people found.
-    assert "/internships/law/massachusetts/" in seo_pages.earning_paths()
+    assert "/internships/law/massachusetts/" in runtime.earning_paths()
 
 
 def test_the_deploy_passes_last_deploys_noindex_list_back_in():
@@ -2451,7 +2454,7 @@ def test_the_deploy_passes_last_deploys_noindex_list_back_in():
         os.path.join(os.path.dirname(__file__), "..", "..", ".github", "workflows", "pages.yml"),
         encoding="utf-8",
     ).read()
-    assert f"https://internscout.org/{seo_pages.HELD_FILE} -o live-noindex.txt" in wf
+    assert f"https://internscout.org/{runtime.HELD_FILE} -o live-noindex.txt" in wf
     assert (
         "python -m scripts.make_og_image --site ../_site ../live-sitemap.xml ../live-noindex.txt"
         in wf
@@ -2475,14 +2478,14 @@ def test_the_deploy_passes_last_deploys_noindex_list_back_in():
     ],
 )
 def test_nationwide_dashboard_links_send_state_all(kwargs, href):
-    assert seo_pages.dash_link(**kwargs) == href
+    assert runtime.dash_link(**kwargs) == href
 
 
 def test_page_loads_the_self_hosted_faces_and_the_shared_tokens():
     # 2026-10-14 (A2 design spec): the landing pages named IBM Plex Sans and Source Serif 4 but never loaded
     # them, so they drew in Georgia and Segoe. page() now preloads the site's own copies (docs/fonts/, served
     # at /fonts/) and carries the dashboard's whole token block; tests/site/tokens.test.mjs checks the values.
-    out = seo_pages.page(
+    out = runtime.page(
         "/internships/x/",
         "T",
         "D",
@@ -2513,15 +2516,15 @@ def test_page_loads_the_self_hosted_faces_and_the_shared_tokens():
         assert token in head
     assert "fonts.googleapis.com" not in out
     # Nothing under 12px, and no px font size outside the scale.
-    assert not re.search(r"font-size:\s*\d", seo_pages.CSS)
-    assert not re.search(r"font:[^;{}]*?\d+(?:\.\d+)?px", seo_pages.CSS)
+    assert not re.search(r"font-size:\s*\d", runtime.CSS)
+    assert not re.search(r"font:[^;{}]*?\d+(?:\.\d+)?px", runtime.CSS)
 
 
 # ---- Landing design (2026-10-14: D21 to D24 of the design review)
 
 
 def test_landing_rows_match_the_dashboard_rows_and_reach_44px_on_a_phone():
-    css = seo_pages.CSS
+    css = runtime.CSS
     # Company names in ink on every row, linked or not; underlined only on hover.
     assert ".co a{color:var(--ink);text-decoration:none}" in css
     # "Open posting" is a secondary button; "Auto-Apply this" a quiet accent link beside it.
@@ -2547,9 +2550,9 @@ def test_one_solid_button_per_landing_page(tmp_path):
             ats="workday",
             apply_url=f"https://bigco.wd1.myworkdayjobs.com/job/{i}",
         )
-        for i in range(seo_pages.MIN_EMPLOYER)
+        for i in range(runtime.MIN_EMPLOYER)
     ] + [_row(100 + i) for i in range(6)]
-    pages = {p["path"]: p["html"] for p in seo_pages.build(_site(tmp_path, {"MA": rows}))}
+    pages = {p["path"]: p["html"] for p in _build_pages(_site(tmp_path, {"MA": rows}))}
     checked = 0
     for path, html in pages.items():
         main = html.split("<main>")[1].split("</main>")[0]
@@ -2565,19 +2568,19 @@ def test_one_solid_button_per_landing_page(tmp_path):
 def test_one_crumb_draws_no_breadcrumb_line(tmp_path):
     pages = {
         p["path"]: p["html"]
-        for p in seo_pages.build(_site(tmp_path, {"MA": [_row(i) for i in range(6)]}))
+        for p in _build_pages(_site(tmp_path, {"MA": [_row(i) for i in range(6)]}))
     }
     hub = pages["/internships/"]
     assert 'class="crumbs"' not in hub and "› Internships" not in hub
     ma = pages["/internships/massachusetts/"]
     assert '<p class="crumbs"><a href="/internships/">Internships</a> › ' in ma
-    assert "<main>\n<h1>" in hub and "main>h1:first-child{margin-top:var(--s6)}" in seo_pages.CSS
+    assert "<main>\n<h1>" in hub and "main>h1:first-child{margin-top:var(--s6)}" in runtime.CSS
 
 
 def test_compare_table_scrolls_by_keyboard_with_a_named_first_column(tmp_path):
     pages = {
         p["path"]: p["html"]
-        for p in seo_pages.build(_site(tmp_path, {"MA": [_row(i) for i in range(6)]}))
+        for p in _build_pages(_site(tmp_path, {"MA": [_row(i) for i in range(6)]}))
     }
     compare = pages["/compare/"]
     assert (
@@ -2682,10 +2685,16 @@ def _files(site):
     return out
 
 
+def _freeze_placement_publisher(monkeypatch):
+    # The in-process legacy runs used the root fixture's near-off default.
+    monkeypatch.setattr(runtime, "BuildState", partial(runtime.BuildState, near_on=False))
+    monkeypatch.setattr(publish, "_today_utc", lambda: "2026-09-23")
+
+
 def _main_into(tmp_path, name, placements=None, raw=None):
-    """Run seo_pages.main into a fresh copy of the fixture site; every file it holds, as bytes."""
+    """Run the standalone publisher into a fresh copy of the fixture site; every file it holds, as bytes."""
     site = _placement_site(tmp_path, name)
-    argv = ["seo_pages", site]
+    argv = ["publish", site]
     if placements is not None or raw is not None:
         f = tmp_path / f"{name}-placements.json"
         f.write_text(
@@ -2693,7 +2702,7 @@ def _main_into(tmp_path, name, placements=None, raw=None):
             encoding="utf-8",
         )
         argv += ["--placements", str(f)]
-    seo_pages.main(argv)
+    publish.main(argv)
     return _files(site)
 
 
@@ -2708,7 +2717,7 @@ def _box(text):
 
 
 def test_t7_pages_are_byte_identical_once_the_box_is_taken_out(tmp_path, monkeypatch):
-    monkeypatch.setattr(seo_pages, "today_utc", lambda: "2026-09-23")
+    _freeze_placement_publisher(monkeypatch)
     without = _main_into(tmp_path, "none")
     empty = _main_into(tmp_path, "empty", [])
     with_ = _main_into(tmp_path, "two", TWO)
@@ -2722,7 +2731,7 @@ def test_t7_pages_are_byte_identical_once_the_box_is_taken_out(tmp_path, monkeyp
     assert len(boxed) > 10
     for path in without:
         if path in boxed:
-            assert seo_pages.strip_placements(boxed[path]).encode() == without[path], path
+            assert runtime.strip_placements(boxed[path]).encode() == without[path], path
         else:
             # The sitemap, noindex-pages.txt, robots.txt, the llms files, every feed.xml and every page
             # without a box: the same bytes.
@@ -2734,23 +2743,23 @@ def test_t7_pages_are_byte_identical_once_the_box_is_taken_out(tmp_path, monkeyp
 def test_t7_page_records_other_than_html_are_untouched(tmp_path):
     from internscout import placements
 
-    pages = seo_pages.build(_placement_site(tmp_path))
-    kept, _ = placements.resolve(TWO, {x["id"]: x for x in seo_pages.LISTINGS}, "2026-09-23")
+    pages, state, hooks = _build_with_state(_placement_site(tmp_path))
+    kept, _ = placements.resolve(TWO, {x["id"]: x for x in state.listings}, "2026-09-23")
     assert len(kept) == 2
-    after = seo_pages.add_paid_boxes(pages, kept, "2026-09-23")
+    after = runtime.invoke(state, hooks, publish._add_paid_boxes, pages, kept, "2026-09-23")
     assert len(after) == len(pages) and any(a["html"] != b["html"] for a, b in zip(pages, after))
     for a, b in zip(pages, after):
         assert {k: v for k, v in a.items() if k != "html"} == {
             k: v for k, v in b.items() if k != "html"
         }
-        assert seo_pages.strip_placements(b["html"]) == a["html"]
+        assert runtime.strip_placements(b["html"]) == a["html"]
         assert a["items"] is b["items"]  # the very same list, not a copy that could differ
 
 
 def test_t7_where_a_box_may_go(tmp_path, monkeypatch):
-    monkeypatch.setattr(seo_pages, "today_utc", lambda: "2026-09-23")
+    _freeze_placement_publisher(monkeypatch)
     files = _main_into(tmp_path, "two", TWO)
-    pages = seo_pages.build(_placement_site(tmp_path, "again"))
+    pages = _build_pages(_placement_site(tmp_path, "again"))
     boxed = _box_pages(files)
     kinds = set()
     for p in pages:
@@ -2758,10 +2767,10 @@ def test_t7_where_a_box_may_go(tmp_path, monkeypatch):
         ids = {x["id"] for x in p.get("items") or []}
         if key not in boxed:
             # A listing page that has one of the two listings and may carry a box always gets one.
-            assert not (p["kind"] in seo_pages.PLACEMENT_KINDS and {"id5", "id40"} & ids), p["path"]
+            assert not (p["kind"] in runtime.PLACEMENT_KINDS and {"id5", "id40"} & ids), p["path"]
             continue
         kinds.add(p["kind"])
-        assert p["kind"] in seo_pages.PLACEMENT_KINDS, p["path"]
+        assert p["kind"] in runtime.PLACEMENT_KINDS, p["path"]
         text = boxed[key]
         assert text.count("<!--paid-->") == 1 and text.count("<!--/paid-->") == 1, p[
             "path"
@@ -2776,7 +2785,7 @@ def test_t7_where_a_box_may_go(tmp_path, monkeypatch):
 
 
 def test_t7_the_box_markup(tmp_path, monkeypatch):
-    monkeypatch.setattr(seo_pages, "today_utc", lambda: "2026-09-23")
+    _freeze_placement_publisher(monkeypatch)
     files = _main_into(tmp_path, "one", [_pl()])
     text = files["internships/at/tie-co/index.html"].decode()
     box = _box(text)
@@ -2838,17 +2847,17 @@ def test_t7_a_short_list_gets_the_box_after_its_last_row():
         "start": "2026-09-01",
         "end": "2026-10-01",
     }
-    out = seo_pages.add_paid_boxes([p], [pl], "2026-09-23")[0]["html"]
+    out = publish._add_paid_boxes([p], [pl], "2026-09-23")[0]["html"]
     assert out.index("<!--paid-->") == page.index("</ul>")
     # No list, or a page that may not carry a box: none.
     assert (
-        seo_pages.add_paid_boxes([dict(p, html="<main></main>")], [pl], "2026-09-23")[0]["html"]
+        publish._add_paid_boxes([dict(p, html="<main></main>")], [pl], "2026-09-23")[0]["html"]
         == "<main></main>"
     )
-    assert seo_pages.add_paid_boxes([dict(p, kind=None)], [pl], "2026-09-23")[0]["html"] == page
-    assert seo_pages.add_paid_boxes([dict(p, items=None)], [pl], "2026-09-23")[0]["html"] == page
+    assert publish._add_paid_boxes([dict(p, kind=None)], [pl], "2026-09-23")[0]["html"] == page
+    assert publish._add_paid_boxes([dict(p, items=None)], [pl], "2026-09-23")[0]["html"] == page
     # An end day that is not a day would write a broken script, so no box.
-    assert seo_pages.add_paid_boxes([p], [dict(pl, end="soon")], "2026-09-23")[0]["html"] == page
+    assert publish._add_paid_boxes([p], [dict(pl, end="soon")], "2026-09-23")[0]["html"] == page
 
 
 def test_t7_rotation_is_set_by_the_path_and_the_day_never_the_order_given():
@@ -2883,8 +2892,8 @@ def test_t7_rotation_is_set_by_the_path_and_the_day_never_the_order_given():
             "kind": "field",
             "state": None,
         }
-        a = seo_pages.add_paid_boxes([p], pls, "2026-09-23")[0]["html"]
-        b = seo_pages.add_paid_boxes([p], list(reversed(pls)), "2026-09-23")[0]["html"]
+        a = publish._add_paid_boxes([p], pls, "2026-09-23")[0]["html"]
+        b = publish._add_paid_boxes([p], list(reversed(pls)), "2026-09-23")[0]["html"]
         assert a == b and a.count("<!--paid-->") == 1
         chosen.add(next(i for i in range(3) if f"Co {i}" in a))
     assert chosen == {0, 1, 2}  # each has a chance; nothing in the record weighs it
@@ -2901,13 +2910,13 @@ def test_t7_two_builds_with_placements_are_identical(tmp_path):
         json.dumps({"placements": [dict(p, start="2000-01-01", end="2999-01-01") for p in TWO]}),
         encoding="utf-8",
     )
-    backend = os.path.dirname(os.path.dirname(os.path.abspath(seo_pages.__file__)))
+    backend = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     builds = []
     for seed in (1, 2):
         site = str(tmp_path / f"b{seed}")
         shutil.copytree(base, site)
         subprocess.run(
-            [sys.executable, "-m", "internscout.seo_pages", site, "--placements", str(f)],
+            [sys.executable, "-m", "internscout.site.publish", site, "--placements", str(f)],
             cwd=backend,
             check=True,
             capture_output=True,
@@ -2922,7 +2931,7 @@ def test_t7_two_builds_with_placements_are_identical(tmp_path):
 def test_main_drops_bad_placements_with_a_warning_and_survives_a_bad_file(
     tmp_path, monkeypatch, capsys
 ):
-    monkeypatch.setattr(seo_pages, "today_utc", lambda: "2026-09-23")
+    _freeze_placement_publisher(monkeypatch)
     files = _main_into(
         tmp_path,
         "mixed",

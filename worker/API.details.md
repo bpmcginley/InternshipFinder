@@ -634,7 +634,35 @@ Deletes orders never confirmed after 7 days (always, even while orders are off).
 email that failed, reminds Bruce once about an order waiting more than a day, ends closed roles and makes
 the offer above, sends an offer email that failed, and refunds offers unanswered after 30 days.
 
+## Signed top-up event recovery
+
+The existing `POST /billing/webhook` signature and `stripe_events` receipt boundary also
+accepts configured historical top-ups. The existing Stripe secret, webhook secret and
+validated dedicated `STRIPE_PRICE_TOPUP` configure this path independently of current sales.
+The fixed `topup-v1` terms and authenticated mode are checked by the existing authoritative
+Checkout/payment readers. Inactive Prices and disabled sales do not suppress recovery.
+No extra Price request is required.
+
+Marked or durably associated top-up events never fall through to subscription or employer
+handling. Pending recovery returns the existing generic billing error and releases the
+receipt for Stripe retry. Confirmed settlement, expiry, reconciliation and terminal replay
+use existing typed helpers and durable claim/revision checks. Unknown reversals can use
+at most one bounded Charge GET to resolve a missing PaymentIntent and one bounded
+PaymentIntent GET to classify its metadata. Each uses the existing 10-second/256-KiB
+pinned Stripe reader with manual redirects and no provider writes. Known employer payment
+associations need no discovery GET. No top-up configuration means no extra database or
+provider work for unrelated historical billing events. No event fields or redirects grant
+credit directly, and no new receipt or storage is introduced.
+
 ## One-time Auto-Apply checkout
+
+`GET /billing/topup/offer` uses the same origin, current-session and configuration gates
+as checkout. The optional `topups: true` in `GET /config` is a configuration hint only.
+It requires no provider request and carries no price or account information. The
+authenticated offer route checks current Auto-Apply availability, verifies the configured
+one-time Price and product, rechecks service availability and session identity, and returns
+200 with `{enabled: true, offer: {amount, currency, units}}` and `Cache-Control: no-store`.
+Amount is in minor currency units. The response contains no provider references.
 
 `POST /billing/topup/checkout` defaults off. It requires the exact `TOPUPS_ENABLED` and
 `PAYMENTS_ENABLED` opt-ins and the existing private Stripe configuration. It accepts the
@@ -642,7 +670,8 @@ two existing HTTPS dashboard Origins, `https://internscout.org` and
 `https://bpmcginley.github.io`, only when permitted by the configured CORS list.
 
 An existing session bearer authorizes the request without sliding its expiry. The server
-validates the configured offer before reserving a checkout. The configured first-party
+validates current Auto-Apply availability and the configured offer before reserving a
+checkout. The configured first-party
 dashboard root is the return destination for both completion and cancellation. The handler
 ignores request body and query fields. The existing reservation permits one active checkout
 attempt per account.

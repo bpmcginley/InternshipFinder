@@ -7,14 +7,23 @@ const at = new Date("2026-11-11T12:00:00Z");
 const site = "https://internscout.org";
 const legacy = "https://bpmcginley.github.io";
 const checkoutPath = "/billing/topup/checkout";
+const offerPath = "/billing/topup/offer";
 const settings = { ...stripeEnv, SITE_URL: site };
 const account = attempt().user_hash;
 const login = (db) =>
   createSession(db, { user: account, tier: "edu", provider: "google" }, new Date(+at - 86400000));
 const attempts = (db) => db.prepare("SELECT COUNT(*) AS n FROM topup_checkout_attempts").first("n");
 const sessionTimes = (db) => db.prepare("SELECT last_used,expires FROM sessions").first();
-const req = ({ origin = site, token, headers = {}, body, query = "", method = "POST" } = {}) =>
-  new Request("https://local.invalid" + checkoutPath + query, {
+const req = ({
+  origin = site,
+  token,
+  headers = {},
+  body,
+  query = "",
+  method = "POST",
+  path = checkoutPath,
+} = {}) =>
+  new Request("https://local.invalid" + path + query, {
     method,
     headers: {
       ...(origin && { Origin: origin }),
@@ -175,5 +184,133 @@ export async function revocationDuringPricePreventsReservation(db) {
   });
   await expect(result, 401, { status: "auth" });
   assert.deepEqual(calls, ["price"]);
+  assert.equal(await attempts(db), 0);
+}
+
+const offerRequest = (options = {}) => req({ path: offerPath, method: "GET", ...options });
+
+export async function offerIsVerifiedAndContainsOnlyDisplayTerms(db) {
+  const { token } = await login(db);
+  const before = await sessionTimes(db);
+  let priceReads = 0;
+  const run = (request, config = settings) =>
+    handle(request, { ...config, DB: db }, null, {
+      now: () => at,
+      fetch: async (url, options) => {
+        assert.match(url, /^https:\/\/api\.stripe\.com\/v1\/prices\//);
+        assert.equal(options.method, "GET");
+        priceReads++;
+        return reply(price());
+      },
+    });
+  const config = req({ method: "GET", path: "/config" });
+  const off = await (await run(config, {})).json();
+  assert.equal(Object.hasOwn(off, "topups"), false);
+  const hinted = await (await run(config)).json();
+  assert.equal(hinted.topups, true);
+  assert.equal(JSON.stringify(hinted).includes(settings.STRIPE_PRICE_TOPUP), false);
+  assert.equal(priceReads, 0);
+
+  const display = { enabled: true, offer: { amount: 300, currency: "usd", units: 25 } };
+  for (const origin of [site, legacy]) {
+    const response = await run(offerRequest({ token, origin, query: "?amount=1&units=99" }));
+    assert.equal(response.headers.get("Access-Control-Allow-Origin"), origin);
+    await expect(response, 200, display);
+  }
+  assert.equal(priceReads, 2);
+  assert.equal(await attempts(db), 0);
+  assert.deepEqual(await sessionTimes(db), before);
+}
+
+export async function offerGatesRejectBeforeAnyPriceRead(db) {
+  const { token } = await login(db);
+  let providerCalls = 0;
+  const noDb = { prepare: () => assert.fail("Early offer gate must precede D1") };
+  const run = (request, config = settings, binding = db) =>
+    handle(request, { ...config, DB: binding }, null, {
+      now: () => at,
+      fetch: async () => {
+        providerCalls++;
+        return reply(price());
+      },
+    });
+  for (const config of [{}, { ...settings, STRIPE_PRICE_TOPUP: "invalid" }])
+    await expect(await run(offerRequest({ token }), config, noDb), 503, { status: "disabled" });
+  for (const origin of [null, "https://foreign.invalid"])
+    await expect(await run(offerRequest({ token, origin }), settings, noDb), 403, {
+      status: "unavailable",
+    });
+  for (const request of [
+    offerRequest({ token: "synthetic.provider.token" }),
+    offerRequest({ headers: { Cookie: "session=" + token }, query: "?token=" + token }),
+  ])
+    await expect(await run(request, settings, noDb), 401, { status: "auth" });
+  for (const config of [
+    { ...settings, MONTHLY_BUDGET_CENTS: "0" },
+    { ...settings, GLOBAL_RPM: "0" },
+  ]) {
+    await expect(await run(offerRequest({ token }), config), 503, { status: "disabled" });
+    await expect(await run(req({ token }), config), 503, { status: "disabled" });
+  }
+  assert.equal(providerCalls, 0);
+  assert.equal(await attempts(db), 0);
+}
+
+export async function offerRefusesUnverifiedOrRevokedPriceResults(db) {
+  const { token } = await login(db);
+  const expires = new Date(+at + 50);
+  await db.prepare("UPDATE sessions SET expires=?").bind(expires.toISOString()).run();
+  let now = at;
+  const run = (fetch) =>
+    handle(offerRequest({ token }), { ...settings, DB: db }, null, {
+      now: () => now,
+      fetch,
+    });
+  await expect(await run(async () => reply({ ...price(), active: false })), 503, {
+    status: "disabled",
+  });
+  await expect(
+    await run(async () => {
+      now = expires;
+      return reply(price());
+    }),
+    401,
+    { status: "auth" },
+  );
+  now = at;
+  await expect(
+    await run(async () => {
+      await endSession(db, token);
+      return reply(price());
+    }),
+    401,
+    { status: "auth" },
+  );
+  assert.equal(await attempts(db), 0);
+}
+
+export async function pauseDuringPriceBlocksOfferAndCheckout(db) {
+  const { token } = await login(db);
+  const env = { ...settings, DAILY_BUDGET_CENTS: "1", DB: db };
+  const day = at.toISOString().slice(0, 10);
+  let priceReads = 0;
+  for (const request of [offerRequest({ token }), req({ token })]) {
+    const response = await handle(request, env, null, {
+      now: () => at,
+      fetch: async (url, options) => {
+        assert.match(url, /\/prices\//);
+        assert.equal(options.method, "GET");
+        priceReads++;
+        await db
+          .prepare("INSERT INTO spend (user_hash,month,cents) VALUES ('*',?,1)")
+          .bind(day)
+          .run();
+        return reply(price());
+      },
+    });
+    await expect(response, 503, { status: "disabled" });
+    await db.prepare("DELETE FROM spend WHERE user_hash='*' AND month=?").bind(day).run();
+  }
+  assert.equal(priceReads, 2);
   assert.equal(await attempts(db), 0);
 }
