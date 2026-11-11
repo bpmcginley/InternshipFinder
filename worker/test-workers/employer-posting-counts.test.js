@@ -48,13 +48,10 @@ it("leaves the current production hit route unwired", async () => {
   );
   expect(response.status).toBe(204);
   expect(await db.prepare("SELECT COUNT(*) AS n FROM event_counts").first("n")).toBe(0);
-  expect(
-    await db
-      .prepare(
-        "SELECT COUNT(*) AS n FROM sqlite_master WHERE name IN ('employer_posting_counts', 'employer_posting_day_caps')",
-      )
-      .first("n"),
-  ).toBe(0);
+  expect(await db.prepare("SELECT COUNT(*) AS n FROM employer_posting_counts").first("n")).toBe(0);
+  expect(await db.prepare("SELECT COUNT(*) AS n FROM employer_posting_day_caps").first("n")).toBe(
+    0,
+  );
 });
 it("keeps actual local D1 reads constant at the 10000-key bound", async () => {
   const measured = await employerDayCapReads(env.DB);
