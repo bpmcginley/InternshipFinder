@@ -13,6 +13,13 @@ import json
 from pathlib import Path
 import re
 import subprocess
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
+try:
+    from internscout.public_data import public_data_dir
+finally:
+    sys.path.pop(0)
 
 
 def payload(data: bytes, kib_per_second: float) -> dict:
@@ -38,6 +45,8 @@ def main() -> None:
     if args.kib_per_second <= 0:
         parser.error("--kib-per-second must be greater than zero")
     root = args.root
+    data = Path(public_data_dir(root / "docs"))
+    index = data / "listings/index.json"
     source = (root / "backend/internscout/export_static.py").read_text(encoding="utf-8")
     preview_rows = int(re.search(r"^FIRST_SCREEN_ROWS = (\d+)$", source, re.MULTILINE).group(1))
     first = (
@@ -45,32 +54,35 @@ def main() -> None:
             ["git", "show", f"{args.baseline_ref}:docs/data/first.json"], cwd=root
         )
         if args.baseline_ref
-        else asset(root / "docs/data/first.json")
+        else asset(data / "first.json")
     )
     rows = json.loads(first)
-    current_rows = json.loads(asset(root / "docs/data/first.json"))
+    current_rows = json.loads(asset(data / "first.json"))
     candidate = json.dumps(
         current_rows[:preview_rows], ensure_ascii=False, separators=(",", ":")
     ).encode("utf-8")
-    assets = [
-        "index.html",
-        "js/core.js",
-        "js/app.js",
-        "data/listings/index.json",
-        "fonts/ibm-plex-sans-latin.woff2",
-        "fonts/source-serif-4-latin.woff2",
-    ]
+    assets = {
+        name: root / "docs" / name
+        for name in (
+            "index.html",
+            "js/core.js",
+            "js/app.js",
+            "data/listings/index.json",
+            "fonts/ibm-plex-sans-latin.woff2",
+            "fonts/source-serif-4-latin.woff2",
+        )
+    }
+    assets["data/listings/index.json"] = index
     print(
         json.dumps(
             {
                 "measurement": "local payload bytes; not a browser timing or field measurement",
                 "data_generated_at": json.loads(
-                    (root / "docs/data/listings/index.json").read_bytes()
+                    index.read_bytes()
                 )["generated_at"],
                 "transfer_model_kib_per_second": args.kib_per_second,
                 "assets": {
-                    name: payload(asset(root / "docs" / name), args.kib_per_second)
-                    for name in assets
+                    name: payload(asset(path), args.kib_per_second) for name, path in assets.items()
                 },
                 "baseline_ref": args.baseline_ref or "working tree",
                 "baseline_preview": {"rows": len(rows), **payload(first, args.kib_per_second)},
