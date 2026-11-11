@@ -1,0 +1,35 @@
+Synthetic preview: 3 new student roles
+Week ending 2026-11-10
+
+InternScout found 3 new student roles this week, 3 of them in the Northeast or remote. In each field below, those come first.
+
+See every new role: https://example.com/new-roles
+
+
+Mechanical Engineering: 3 new this week
+---------------------------------------
+
+* Mechanical Engineering Intern at Fixture Employer 1
+  Example City, MA · Pay not listed
+  https://jobs.example.com/fixture-1
+
+* Design Engineering Intern at Fixture Employer 2
+  Example City, MA · Pay not listed
+  https://jobs.example.com/fixture-2
+
+* Research Intern at Fixture Employer 3
+  Example City, MA · Pay not listed
+  https://jobs.example.com/fixture-3
+
+See all 3 open mechanical engineering roles: https://example.com/mechanical
+
+
+----------------------------------------
+Built by one student, made for all students.
+
+InternScout is a free internship search made by a UMass Amherst student. It is not affiliated with UMass Amherst or with any employer listed here. These roles come from public job boards, so always check the posting on the employer's own site before applying.
+
+You're getting this because you signed up for new-internship emails at internscout.org.
+Unsubscribe: {{ unsubscribe_url }}
+
+[POSTAL ADDRESS REQUIRED BEFORE SENDING]
