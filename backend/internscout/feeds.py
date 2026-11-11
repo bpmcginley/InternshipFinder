@@ -42,7 +42,12 @@ def _standalone_settings() -> tuple[str, datetime | None]:
 def _settings() -> tuple[str, datetime | None]:
     legacy = sys.modules.get(f"{__package__}.seo_pages")
     if legacy is not None:
-        return legacy.SITE, legacy.GENERATED
+        try:
+            generated = legacy.GENERATED
+            return legacy.SITE, generated
+        except AttributeError:
+            # Python registers the module before running its initialization.
+            pass
     return _standalone_settings()
 
 
