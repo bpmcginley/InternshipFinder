@@ -9,13 +9,19 @@ import { json } from "./http.js";
 const CATALOG = "https://internscout.org/data/employer-posting-keys.json";
 const MAX_BYTES = 256 * 1024;
 const DEADLINE = 5_000;
-// Operator-reviewed public release identity only. No descriptor is configured by this package.
+// Explicit, mutually exclusive modes. No descriptor is configured by this package.
 export function employerCatalogDescriptor(env) {
   if (!employerPostingCountsEnabled(env)) return null;
   try {
     const raw = env.EMPLOYER_POSTING_CATALOG;
     if (typeof raw !== "string" || raw.length > 512) return null;
     const value = JSON.parse(raw);
+    if (
+      value?.mode === "published" &&
+      Object.keys(value).sort().join(",") === "mode,url" &&
+      value.url === CATALOG
+    )
+      return value;
     if (
       !value ||
       Object.keys(value).sort().join(",") !== "sha256,url,version" ||
@@ -32,11 +38,12 @@ export function employerCatalogDescriptor(env) {
   }
 }
 
-// Runs under the existing cache's request-owned abort/deadline. Pin raw bounded bytes before
-// the one canonical parser sees them. Late/noncooperative I/O cannot return usable membership.
-async function pinnedCatalog(descriptor, fetcher, signal, clock) {
+// Both modes use the existing request-owned bounds and one canonical parser. Published
+// mode trusts the approved first-party publication; pinned mode additionally verifies bytes.
+async function loadCatalog(descriptor, fetcher, signal, clock) {
+  const published = descriptor.mode === "published";
   const start = clock(),
-    url = `${descriptor.url}?v=${descriptor.version}`;
+    url = published ? descriptor.url : `${descriptor.url}?v=${descriptor.version}`;
   let response,
     reader,
     previous = start;
@@ -62,7 +69,12 @@ async function pinnedCatalog(descriptor, fetcher, signal, clock) {
   signal.addEventListener("abort", discard, { once: true });
   try {
     live();
-    response = await fetcher(url, { signal, redirect: "error", credentials: "omit" });
+    response = await fetcher(url, {
+      signal,
+      redirect: "manual",
+      credentials: "omit",
+      ...(published ? { method: "GET", cache: "no-store" } : {}),
+    });
     live();
     if (response?.status !== 200 || response.redirected || response.url !== url)
       throw new Error("Catalog unavailable");
@@ -82,11 +94,14 @@ async function pinnedCatalog(descriptor, fetcher, signal, clock) {
       size += value.length;
     }
     const bytes = buffer.subarray(0, size);
-    const hash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)), (n) =>
-      n.toString(16).padStart(2, "0"),
-    ).join("");
+    if (!published) {
+      const hash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)), (n) =>
+        n.toString(16).padStart(2, "0"),
+      ).join("");
+      live();
+      if (hash !== descriptor.sha256) throw new Error("Catalog unavailable");
+    }
     live();
-    if (hash !== descriptor.sha256) throw new Error("Catalog unavailable");
     return new Response(bytes);
   } finally {
     discard();
@@ -110,7 +125,10 @@ export function createEmployerPostingRuntime({ clock = Date.now } = {}) {
         current = null;
         return null;
       }
-      const identity = `${descriptor.url}|${descriptor.version}|${descriptor.sha256}`;
+      const identity =
+        descriptor.mode === "published"
+          ? `${descriptor.url}|published`
+          : `${descriptor.url}|${descriptor.version}|${descriptor.sha256}`;
       if (current?.identity !== identity)
         current = {
           identity,
@@ -128,7 +146,7 @@ export function createEmployerPostingRuntime({ clock = Date.now } = {}) {
         db,
         cache,
         now,
-        load: (signal) => pinnedCatalog(descriptor, fetcher, signal, clock),
+        load: (signal) => loadCatalog(descriptor, fetcher, signal, clock),
       });
       return (receipt) => counter.countAdmitted(receipt);
     },
