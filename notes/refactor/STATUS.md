@@ -309,6 +309,11 @@ Track ingest and Pages through the G3 observation using the public commit, tree 
 - On `e43c1ea4`, open Product claims covered neither employer-entry test file. Four pure employer CTA cases now call the existing site runtime helpers directly, with the same copy, escaping, company-only prefill and disclosure assertions. The generated employer-page case still exercises the legacy build entry and its shared fixtures.
 - The two test files and the Golden build and mutation checks passed all seven cases against the 699-file fixture. Three standalone CTA cases also passed with legacy facade imports and sockets blocked. Runtime, fixtures and publishing entry points have the same bytes.
 
+## WP-6.2 shared listing test fixtures
+
+- After [#380](https://github.com/bpmcginley/InternshipFinder/pull/380) published, Product released the two donor helpers and ten callers. On `a673000f`, `_row` and `_site` moved byte-for-byte into a test-only module. The original donor imports both names for existing callers. The ten released files use the new fixture path, and the campaign test drops its unused facade import. All other test statements, fixtures and monkeypatches are unchanged.
+- All 350 focused and Golden tests passed against the unchanged 794-file Golden. The 64 isolated growth tests also passed with facade imports and sockets blocked. The isolated harness reused the actual CI-event, private-state and Workday safety fixtures and omitted only the legacy near-page fixture. Product's retained advisor, fact-line and launch tests passed through the original aliases.
+
 ## Dashboard ranking test clock
 
 - The first Node coverage attempt in run [42943022453](https://github.com/bpmcginley/InternshipFinder/actions/runs/42943022453/attempts/1) reported an existing assertion failure in `tests/site/dashboard.test.mjs:252` on #259. The same coverage run passed on retry. The failure was in the cached-ranking fixture, which evaluated time-sensitive scores against a changing clock.

@@ -5,7 +5,7 @@ import re
 
 from internscout import seo_pages
 from internscout.site.runtime import employer_key, employer_offer
-from test_seo_pages import _row, _site
+from tests.seo_fixture_data import _row, _site
 
 
 def test_public_company_key_prefill_is_escaped_and_never_places_an_order():
