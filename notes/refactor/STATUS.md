@@ -438,6 +438,12 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 - Compared all 13 handler bodies with the previous switch after accounting for the three explicit guard wrappers. All 29 remaining switch cases, fallback, CORS and scheduled behavior retain their original code. This keeps student billing, AI metering and referral units, account deletion's billing check, paid placement, employer checkout, review, refunds and their limits under Q3.
 - The API contract inventory checks both dispatch paths and rejects duplicates. All 86 response snapshots from #253 matched. Node 22.23.4 passed 343 Worker tests, local Workers passed 15 tests in six files and checkout passed 40 tests. Both offline Golden tests passed with all 695 hashes matching. JavaScript lint reported zero findings and the Worker type report retained 914 existing errors.
 
+## WP-4.3 financial and adjacent route table
+
+- With Q3 approved, moved the 29 remaining switch cases into the contract-keyed table. The table has 42 exact routes. The seven placement mutations share their original handler, including the body-shape check, manual capacity hold and background field bookkeeping.
+- Compared all 29 moved statement sequences with `eba347bf`. The request-local tier is still read after sign-in. Existing handler guards, body limits, provider calls, SQL and background work retain their order. The outer response handling, CORS and scheduled code match byte-for-byte. The Product unsubscribe import and route are outside this change.
+- The 86 fixed response cases match. Two synthetic guard-order probes verify webhook body limits before signature verification and placement JSON shape before the manual capacity hold. Node 22 passed 384 Worker and checkout tests, local Workers passed 15 tests, and both Golden tests passed. JavaScript lint reported zero findings and Worker type reporting retained 914 existing errors.
+
 ## WP-4.4 worker test runners
 
 - Added worker/TESTING.md and linked it from the local setup section of worker/README.md. Corrected the testing prerequisite to Node 22, matching CI and the built-in node:sqlite dependency; pinned dependency setup uses npm ci. All other README sections remain unchanged.
