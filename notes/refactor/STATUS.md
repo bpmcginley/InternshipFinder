@@ -612,6 +612,12 @@ Bruce authorized the refactor lead to finish and merge this existing counter PR.
 - The Pages build requests full Git ancestry with a blobless filter and passes its checkout to the existing asset stamping step. The graph planner fingerprints reviewed first-parent module files, rejects malformed active graphs, skips invalid historical graph content and still fails on Git read errors. A file-only blobless clone recovered both historical native graphs byte-for-byte after a classic rollback.
 - Offline tests exercised generation changes, unsafe imports, missing historical blobs and rollback. The retention-enabled Stage 4 Golden build matched all 794 artifact paths, still loaded classic Core, staged no native generations and passed the publication allowlist. Activation remains a separate package.
 
+## WP-5.1 native dashboard Core activation
+
+- This activation follows the separate retention package and the published Product Stage 4 baseline `3753530d`. The dashboard loads the seven native Core files through a bare generation URL. The ordered 121-key `window.IS` API, deferred startup order, classic Core for cached HTML, and classic App, share, placements and checkout scripts keep their existing behavior.
+- The Stage 4 Golden grows from 794 to 808 paths. Seven source files and their seven immutable staged copies are added. The only changed existing artifact is the dashboard's Core script tag. The other 793 artifacts are byte-identical.
+- Offline Edge booted the classic and two native generations, then revisited cached old HTML. A delayed native graph left the static hero available and the early index and first-screen fetches each ran once. Both generations' module URLs were each requested once. Synthetic extension replies and pushes passed for every view. Node 22 passed all 325 site and 348 extension tests. Focused Python and Golden checks passed 58 with one Windows symlink skip. Six packaging tests passed.
+
 ## WP-6.3 ingest timing from existing runs
 
 Both completed runs succeeded. The ingest and export, coverage, and commit columns are step wall-clock durations from Actions metadata. The board phase is the elapsed-seconds value from the existing `[boards]` summary inside the ingest and export step.

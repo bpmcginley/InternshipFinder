@@ -1,3 +1,4 @@
+import { installCore } from "./core-fixture.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -32,7 +33,7 @@ function harness() {
   };
   ctx.window = ctx;
   vm.createContext(ctx);
-  vm.runInContext(readFileSync(new URL("../../docs/js/core.js", import.meta.url), "utf8"), ctx);
+  installCore(ctx);
   const app = readFileSync(new URL("../../docs/js/app.js", import.meta.url), "utf8");
   vm.runInContext(
     app.replace(

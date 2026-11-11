@@ -1,5 +1,6 @@
 // The launch text for paid listings (S8, 2026-10-14; B2 plan section 9 PR 8, B1-data-privacy.md section 7):
 // the privacy page's #paid-listings section, the terms' employer section and the one-time dashboard notice.
+import { installCore } from "./core-fixture.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -129,7 +130,7 @@ function harness() {
   const ctx = { React: react, URLSearchParams, setTimeout, clearTimeout, console, CONFIG: {}, localStorage: { getItem() { return null; } }, sessionStorage: { getItem() { return null; } },
     addEventListener() {}, postMessage() {}, location: { search: "", origin: "https://internscout.org" }, document: { documentElement: { dataset: {} }, addEventListener() {}, removeEventListener() {} } };
   ctx.window = ctx; vm.createContext(ctx);
-  vm.runInContext(read("docs/js/core.js"), ctx);
+  installCore(ctx);
   vm.runInContext(APP.replace('ReactDOM.createRoot(document.getElementById("root")).render(h(App));', "window.components = { PlaceNotice };"), ctx);
   return ctx.components;
 }

@@ -1,12 +1,10 @@
-// Sign-in in docs/js/core.js: the Worker session that keeps the dashboard signed in, the ID token it
+// Sign-in in the dashboard Core: the Worker session that keeps the dashboard signed in, the ID token it
 // falls back to, and IS.authInfo, the one reader for both. Loaded the same way core.test.mjs loads
-// core.js (evaluated against a stand-in `window`), with the browser globals sign-in needs added.
+// the native Core factory with the browser globals sign-in needs.
+import { installCore } from "./core-fixture.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import vm from "node:vm";
 
-const CORE = readFileSync(new URL("../../docs/js/core.js", import.meta.url), "utf8");
 const WORKER = "https://worker.test";
 const DAY = 864e5;
 
@@ -45,8 +43,7 @@ function loadCore(fetchImpl, { hash = "" } = {}) {
     console,
   };
   ctx.window = ctx;
-  vm.createContext(ctx);
-  vm.runInContext(CORE, ctx);
+  installCore(ctx);
   return { IS: ctx.IS, ctx };
 }
 
