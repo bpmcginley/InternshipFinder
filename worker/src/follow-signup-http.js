@@ -64,6 +64,12 @@ export function createFollowSignupHttp({
       if (active >= MAX_IN_FLIGHT) return unavailable();
       active += 1;
       try {
+        // Qualify release authority only for a request that can consume a body slot.
+        if (typeof context?.prepareAdmission === "function") {
+          const prepared = context.prepareAdmission();
+          if (prepared instanceof Response) return prepared;
+          context = prepared;
+        }
         const input = await readFollowBody(request.body, MAX_BODY_BYTES, timers, (bytes) => {
           if (!bytes.length || (declared !== null && bytes.length !== Number(declared)))
             return null;

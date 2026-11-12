@@ -116,10 +116,9 @@ const requestFollowManagement = ({ request, env, db }) => {
   });
 };
 
-const signupFollow = ({ request, env, db, now, d }) => {
-  const closed = () => new HttpError(404, "not_found", "No such endpoint");
-  if (env.FOLLOW_SIGNUP_ENABLED !== "1" || typeof d.followSignupRelease !== "function")
-    throw closed();
+const followSignupClosed = () => json({ error: "not_found", message: "No such endpoint" }, 404);
+
+function prepareFollowSignupAdmission({ db, now, d }) {
   let policy, dailyLimit, latest = +now;
   const clock = () => {
     const value = d.now(), at = +value;
@@ -131,7 +130,7 @@ const signupFollow = ({ request, env, db, now, d }) => {
     return new Date(at);
   };
   try {
-    if (!Number.isSafeInteger(latest)) throw closed();
+    if (!Number.isSafeInteger(latest)) return followSignupClosed();
     const supplied = d.followSignupRelease();
     if (
       !supplied ||
@@ -141,21 +140,20 @@ const signupFollow = ({ request, env, db, now, d }) => {
         "dailyLimit,deadlineMs,maxBytes,maxKeys,origin,previousValid,release"
     ) {
       void Promise.prototype.then.call(Promise.resolve(supplied), undefined, () => {});
-      throw closed();
+      return followSignupClosed();
     }
     ({ dailyLimit } = supplied);
     policy = prepareFollowCatalogRelease(supplied);
     if (!Number.isSafeInteger(dailyLimit) || dailyLimit <= 0 ||
-        !Number.isFinite(+new Date(policy.release.expiresAt))) throw closed();
+        !Number.isFinite(+new Date(policy.release.expiresAt))) return followSignupClosed();
     clock();
   } catch {
-    throw closed();
+    return followSignupClosed();
   }
-  return followSignup(request, {
+  return {
     db,
     dailyLimit,
     clock,
-    originAllowed: (r) => followOriginAllowed(r, env),
     loadCatalog: async () => {
       const result = await loadFollowCatalog({
         ...policy, enabled: true, fetch: d.fetch, now: () => +clock(),
@@ -164,6 +162,15 @@ const signupFollow = ({ request, env, db, now, d }) => {
         ? { ...result, expiresAt: policy.release.expiresAt }
         : result;
     },
+  };
+}
+
+const signupFollow = ({ request, env, db, now, d }) => {
+  if (env.FOLLOW_SIGNUP_ENABLED !== "1" || typeof d.followSignupRelease !== "function")
+    return followSignupClosed();
+  return followSignup(request, {
+    originAllowed: (r) => followOriginAllowed(r, env),
+    prepareAdmission: () => prepareFollowSignupAdmission({ db, now, d }),
   });
 };
 
