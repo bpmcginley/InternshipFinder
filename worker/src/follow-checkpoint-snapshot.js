@@ -32,6 +32,10 @@ function record(value, phase, maxHeaderBytes) {
   const replay = phase === "accepted" && Object.hasOwn(value, "generation");
   const keys = ["slot", "header", "digest", "payloadSha", "starts", "expires", "nonce", "etag"];
   if (replay) keys.push("generation", "replayUntil");
+  if (Object.hasOwn(value, "promotionKey")) {
+    if (!replay || !matches(sha, value.promotionKey)) throw new Error();
+    keys.push("promotionKey");
+  }
   if (
     !fields(value, keys) ||
     ![0, 1].includes(value.slot) ||
