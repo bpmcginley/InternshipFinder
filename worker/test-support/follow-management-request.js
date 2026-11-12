@@ -188,6 +188,7 @@ export async function ambiguousCommittedReceiptsNeverRetryOrRevealInbox(db) {
     "duplicate",
     "returnHole",
     "zeroWithWrite",
+    "inflatedAggregate",
   ]) {
     await db.prepare("DELETE FROM follow_management_outbox").run();
     let calls = 0;
@@ -203,6 +204,7 @@ export async function ambiguousCommittedReceiptsNeverRetryOrRevealInbox(db) {
           if (fault === "hole") delete r[0];
           if (fault === "returnHole") delete r[0].results[0];
           if (fault === "zeroWithWrite") r[0].results = [];
+          if (fault === "inflatedAggregate") r[0].meta.changes = 99;
           if (fault === "duplicate") r[1].results.push(r[1].results[0]);
         }
         return r;
@@ -212,7 +214,7 @@ export async function ambiguousCommittedReceiptsNeverRetryOrRevealInbox(db) {
     assert.equal(calls, 2);
     assert.equal((await jobs(db)).length, 1);
   }
-  assert.equal((await rate(db))[0].calls, 8);
+  assert.equal((await rate(db))[0].calls, 9);
 }
 
 export async function uncertainRateNeverQueuesOrRefunds(db) {

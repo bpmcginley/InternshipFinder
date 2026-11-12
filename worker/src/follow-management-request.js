@@ -116,6 +116,7 @@ export async function enqueueFollowManagementRequest(db, input, options = {}) {
       !Array.isArray(write.results) ||
       write.results.length > 1 ||
       write.meta.changes < write.results.length ||
+      write.meta.changes - write.results.length > 1 ||
       (write.results.length === 0 && write.meta.changes !== 0) ||
       (write.results.length === 1 &&
         (!Object.hasOwn(write.results, 0) ||

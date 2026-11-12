@@ -361,6 +361,24 @@ export async function managementExpiryUsesSqlClockCapAndStableTies(db) {
 }
 
 export async function managementExpiryAcknowledgementsAndLostCommitNeverRetry(db) {
+  let inflatedCalls = 0;
+  assert.deepEqual(
+    await expireFollowManagementRequests(
+      {
+        prepare: () => ({ bind: () => ({}) }),
+        batch: async () => {
+          inflatedCalls++;
+          return [
+            { success: true, results: [], meta: { changes: 99 } },
+            { success: true, results: [{ removed: 1 }], meta: { changes: 0 } },
+          ];
+        },
+      },
+      { enabled: true, maxRows: 1 },
+    ),
+    { status: "unavailable" },
+  );
+  assert.equal(inflatedCalls, 1);
   for (const receipt of [
     null,
     {},
