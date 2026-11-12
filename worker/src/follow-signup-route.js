@@ -3,11 +3,15 @@ import { sessionUser, sessionTokenHash } from "./session.js";
 import { canonicalFollow, normalizeFollowEmail } from "./follows.js";
 import { admitFollowSignup } from "./follow-signup-admission.js";
 import { createFollowSignupHttp } from "./follow-signup-http.js";
+import { validFollowCatalogKey } from "./follow-catalog.js";
 
 const unavailable = () => ({ status: "unavailable" });
 // Shape validation only. Actual membership always uses the trusted current signup catalog below.
 const shape = Object.fromEntries(
-  ["companies", "fields", "states"].map((kind) => [kind, { has: () => true }]),
+  ["companies", "fields", "states"].map((kind) => [
+    kind,
+    { has: (value) => validFollowCatalogKey(value, kind) },
+  ]),
 );
 
 // Instantiate once per isolate, not once per request. No default origin, catalog URL or activation.

@@ -73,6 +73,47 @@ export async function rejectedInputsNeverReachCatalogOrStorage() {
     await response(await handle(post(input(true), headers), { db }), 503);
 }
 
+export async function impossibleKeysRejectBeforeAuthOrCatalog() {
+  const never = () => assert.fail("Unexpected auth/catalog/storage I/O");
+  const db = { prepare: never, batch: never };
+  const handle = createFollowSignupRoute(options({ loadCatalog: never }));
+  const scopes = [
+    ...["", " fixture", "fixture\n", "bad\u0000key", "\ud800"].map((company) => ({
+      kind: "company",
+      company,
+    })),
+    ...["", "BAD", "bad-field", "a"].map((field) => ({
+      kind: "search",
+      fields: [field],
+      states: [],
+    })),
+    ...["", "ma", "USA", "M\n"].map((state) => ({ kind: "search", fields: [], states: [state] })),
+  ];
+  for (const link of [false, true])
+    for (const scope of scopes)
+      await response(await handle(post({ ...input(link), scope }), { db }), 400);
+}
+
+export async function syntacticallyValidUnknownKeysStillConsultCatalog() {
+  let loads = 0;
+  const db = { prepare: () => assert.fail("Unknown membership must not write") };
+  const handle = createFollowSignupRoute(
+    options({
+      loadCatalog: async () => {
+        loads++;
+        return available();
+      },
+    }),
+  );
+  for (const scope of [
+    { kind: "company", company: "unknown company" },
+    { kind: "search", fields: ["future_field"], states: [] },
+    { kind: "search", fields: [], states: ["ZZ"] },
+  ])
+    await response(await handle(post({ ...input(), scope }), { db }), 400);
+  assert.equal(loads, 3);
+}
+
 export async function anonymousUsesOnlyCurrentTrustedCatalog(db) {
   const seen = [],
     wrapper = {
