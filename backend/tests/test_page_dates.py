@@ -6,7 +6,10 @@ from datetime import datetime, timezone
 
 import pytest
 
-from internscout import page_dates, seo_pages
+from internscout import page_dates
+from internscout.site import publish, runtime, sitemap
+
+pytestmark = pytest.mark.without_seo_facade
 
 
 @pytest.fixture(autouse=True)
@@ -55,10 +58,12 @@ def _site(tmp_path):
     return rows
 
 
-def _build(site):
-    live = seo_pages.live_paths(str(site / "sitemap.xml"))
-    pages = seo_pages.build(str(site), live)
-    seo_pages.write(str(site), pages)
+def _build(site, *, compare_as_of=runtime.COMPARE_AS_OF, hooks=None):
+    state = runtime.BuildState(near_on=False, compare_as_of=compare_as_of)
+    hooks = hooks or runtime.BuildHooks()
+    live = sitemap.live_paths(str(site / "sitemap.xml"), sitemap.SITE_PATH)
+    pages = runtime.invoke(state, hooks, runtime.build, str(site), live)
+    publish._write_site(str(site), pages, state, hooks)
     return {p["path"]: p for p in pages}
 
 
@@ -112,8 +117,8 @@ def test_numbers_page_export_labels_do_not_redate_unchanged_statistics(tmp_path)
     first = _build(tmp_path)
     _export_day(tmp_path)
     later = _build(tmp_path)
-    assert seo_pages.NUMBERS_PATH in first
-    assert first[seo_pages.NUMBERS_PATH]["lastmod"] == later[seo_pages.NUMBERS_PATH]["lastmod"]
+    assert runtime.NUMBERS_PATH in first
+    assert first[runtime.NUMBERS_PATH]["lastmod"] == later[runtime.NUMBERS_PATH]["lastmod"]
 
 
 def test_unrelated_new_listing_does_not_date_pricing(tmp_path):
@@ -199,15 +204,14 @@ def test_real_source_dates_are_stable_across_exports_and_meaningful_when_changed
 
 def test_real_comparison_source_dates_on_about_pricing_and_compare(tmp_path, monkeypatch):
     _site(tmp_path)
-    monkeypatch.setattr(seo_pages, "COMPARE_AS_OF", "September 23, 2026")
-    first = _build(tmp_path)
+    compare_as_of = "September 23, 2026"
+    first = _build(tmp_path, compare_as_of=compare_as_of)
     _export_day(tmp_path)
-    unchanged = _build(tmp_path)
+    unchanged = _build(tmp_path, compare_as_of=compare_as_of)
     for path in ("/about/", "/pricing/", "/compare/"):
         assert unchanged[path]["lastmod"] == first[path]["lastmod"]
-    monkeypatch.setattr(seo_pages, "COMPARE_AS_OF", "September 24, 2026")
     monkeypatch.setattr(page_dates, "observed_day", lambda: "2026-09-25")
-    changed = _build(tmp_path)
+    changed = _build(tmp_path, compare_as_of="September 24, 2026")
     for path in ("/about/", "/pricing/", "/compare/"):
         assert changed[path]["lastmod"] == "2026-09-25"
 
@@ -225,9 +229,7 @@ def test_numeric_listing_description_does_not_hide_a_source_updated_date():
     )
 
 
-def test_actual_template_export_labels_stay_stable_with_source_date_collision(
-    tmp_path, monkeypatch
-):
+def test_actual_template_export_labels_stay_stable_with_source_date_collision(tmp_path):
     rows = _site(tmp_path)
     employers = [
         "Aster Labs",
@@ -251,11 +253,13 @@ def test_actual_template_export_labels_stay_stable_with_source_date_collision(
         for i in range(36)
     ]
     (tmp_path / "data/listings/MA.json").write_text(json.dumps(rows), encoding="utf-8")
-    monkeypatch.setattr(seo_pages, "NEAR_ON", True)
-    monkeypatch.setattr(seo_pages, "COMPARE_AS_OF", "September 23, 2026")
-    first = seo_pages.build(str(tmp_path))
+    hooks = runtime.BuildHooks()
+    compare_as_of = "September 23, 2026"
+    state = runtime.BuildState(near_on=True, compare_as_of=compare_as_of)
+    first = runtime.invoke(state, hooks, runtime.build, str(tmp_path))
     _export_day(tmp_path)
-    later = seo_pages.build(str(tmp_path))
+    state = runtime.BuildState(near_on=True, compare_as_of=compare_as_of)
+    later = runtime.invoke(state, hooks, runtime.build, str(tmp_path))
     old = {
         p["path"]: page_dates.fingerprint(p["path"], p["html"], datetime(2026, 9, 23))
         for p in first
@@ -274,15 +278,14 @@ def test_actual_template_export_labels_stay_stable_with_source_date_collision(
 def test_next_day_copy_correction_uses_observation_day_with_unchanged_export(tmp_path, monkeypatch):
     _site(tmp_path)
     _build(tmp_path)
-    original = seo_pages.pricing_page
 
     def corrected():
-        title, desc, body, ld = original()
+        title, desc, body, ld = runtime.pricing_page()
         return title, desc, body + "<p>Corrected product copy.</p>", ld
 
-    monkeypatch.setattr(seo_pages, "pricing_page", corrected)
+    hooks = runtime.BuildHooks(pricing_page=corrected)
     monkeypatch.setattr(page_dates, "observed_day", lambda: "2026-09-25")
-    after = _build(tmp_path)
+    after = _build(tmp_path, hooks=hooks)
     assert after["/pricing/"]["lastmod"] == "2026-09-25"
 
 

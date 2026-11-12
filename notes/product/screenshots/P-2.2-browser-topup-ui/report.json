@@ -1,0 +1,488 @@
+[
+  {
+    "phase": "before",
+    "width": 1280,
+    "theme": "light",
+    "calls": [
+      {
+        "path": "/config",
+        "method": "GET",
+        "body": null,
+        "hasBearer": false
+      },
+      {
+        "path": "/me",
+        "method": "GET",
+        "body": null,
+        "hasBearer": true
+      }
+    ],
+    "errors": [],
+    "blockedExternalAttempts": [
+      "https://static.cloudflareinsights.com/beacon.min.js"
+    ],
+    "externalRequests": 0
+  },
+  {
+    "phase": "before",
+    "width": 1280,
+    "theme": "dark",
+    "calls": [
+      {
+        "path": "/config",
+        "method": "GET",
+        "body": null,
+        "hasBearer": false
+      },
+      {
+        "path": "/me",
+        "method": "GET",
+        "body": null,
+        "hasBearer": true
+      }
+    ],
+    "errors": [],
+    "blockedExternalAttempts": [
+      "https://static.cloudflareinsights.com/beacon.min.js"
+    ],
+    "externalRequests": 0
+  },
+  {
+    "phase": "before",
+    "width": 375,
+    "theme": "light",
+    "calls": [
+      {
+        "path": "/config",
+        "method": "GET",
+        "body": null,
+        "hasBearer": false
+      },
+      {
+        "path": "/me",
+        "method": "GET",
+        "body": null,
+        "hasBearer": true
+      }
+    ],
+    "errors": [],
+    "blockedExternalAttempts": [
+      "https://static.cloudflareinsights.com/beacon.min.js"
+    ],
+    "externalRequests": 0
+  },
+  {
+    "phase": "before",
+    "width": 375,
+    "theme": "dark",
+    "calls": [
+      {
+        "path": "/config",
+        "method": "GET",
+        "body": null,
+        "hasBearer": false
+      },
+      {
+        "path": "/me",
+        "method": "GET",
+        "body": null,
+        "hasBearer": true
+      }
+    ],
+    "errors": [],
+    "blockedExternalAttempts": [
+      "https://static.cloudflareinsights.com/beacon.min.js"
+    ],
+    "externalRequests": 0
+  },
+  {
+    "phase": "after",
+    "width": 1280,
+    "theme": "light",
+    "calls": [
+      {
+        "path": "/config",
+        "method": "GET",
+        "body": null,
+        "hasBearer": false
+      },
+      {
+        "path": "/me",
+        "method": "GET",
+        "body": null,
+        "hasBearer": true
+      },
+      {
+        "path": "/billing/topup/offer",
+        "method": "GET",
+        "body": null,
+        "hasBearer": true
+      },
+      {
+        "path": "/billing/topup/checkout",
+        "method": "POST",
+        "body": null,
+        "hasBearer": true
+      },
+      {
+        "path": "/billing/topup/offer",
+        "method": "GET",
+        "body": null,
+        "hasBearer": true
+      }
+    ],
+    "errors": [],
+    "blockedExternalAttempts": [
+      "https://static.cloudflareinsights.com/beacon.min.js"
+    ],
+    "externalRequests": 0
+  },
+  {
+    "phase": "after",
+    "width": 1280,
+    "theme": "dark",
+    "calls": [
+      {
+        "path": "/config",
+        "method": "GET",
+        "body": null,
+        "hasBearer": false
+      },
+      {
+        "path": "/me",
+        "method": "GET",
+        "body": null,
+        "hasBearer": true
+      },
+      {
+        "path": "/billing/topup/offer",
+        "method": "GET",
+        "body": null,
+        "hasBearer": true
+      },
+      {
+        "path": "/billing/topup/checkout",
+        "method": "POST",
+        "body": null,
+        "hasBearer": true
+      },
+      {
+        "path": "/billing/topup/offer",
+        "method": "GET",
+        "body": null,
+        "hasBearer": true
+      }
+    ],
+    "errors": [],
+    "blockedExternalAttempts": [
+      "https://static.cloudflareinsights.com/beacon.min.js"
+    ],
+    "externalRequests": 0
+  },
+  {
+    "phase": "after",
+    "width": 375,
+    "theme": "light",
+    "calls": [
+      {
+        "path": "/config",
+        "method": "GET",
+        "body": null,
+        "hasBearer": false
+      },
+      {
+        "path": "/me",
+        "method": "GET",
+        "body": null,
+        "hasBearer": true
+      },
+      {
+        "path": "/billing/topup/offer",
+        "method": "GET",
+        "body": null,
+        "hasBearer": true
+      },
+      {
+        "path": "/billing/topup/checkout",
+        "method": "POST",
+        "body": null,
+        "hasBearer": true
+      },
+      {
+        "path": "/billing/topup/offer",
+        "method": "GET",
+        "body": null,
+        "hasBearer": true
+      }
+    ],
+    "errors": [],
+    "blockedExternalAttempts": [
+      "https://static.cloudflareinsights.com/beacon.min.js"
+    ],
+    "externalRequests": 0
+  },
+  {
+    "phase": "after",
+    "width": 375,
+    "theme": "dark",
+    "calls": [
+      {
+        "path": "/config",
+        "method": "GET",
+        "body": null,
+        "hasBearer": false
+      },
+      {
+        "path": "/me",
+        "method": "GET",
+        "body": null,
+        "hasBearer": true
+      },
+      {
+        "path": "/billing/topup/offer",
+        "method": "GET",
+        "body": null,
+        "hasBearer": true
+      },
+      {
+        "path": "/billing/topup/checkout",
+        "method": "POST",
+        "body": null,
+        "hasBearer": true
+      },
+      {
+        "path": "/billing/topup/offer",
+        "method": "GET",
+        "body": null,
+        "hasBearer": true
+      }
+    ],
+    "errors": [],
+    "blockedExternalAttempts": [
+      "https://static.cloudflareinsights.com/beacon.min.js"
+    ],
+    "externalRequests": 0
+  },
+  {
+    "scenario": "absent",
+    "calls": [
+      {
+        "path": "/config",
+        "method": "GET",
+        "body": null,
+        "hasBearer": false
+      },
+      {
+        "path": "/me",
+        "method": "GET",
+        "body": null,
+        "hasBearer": true
+      }
+    ],
+    "errors": []
+  },
+  {
+    "scenario": "remaining",
+    "calls": [
+      {
+        "path": "/config",
+        "method": "GET",
+        "body": null,
+        "hasBearer": false
+      },
+      {
+        "path": "/me",
+        "method": "GET",
+        "body": null,
+        "hasBearer": true
+      }
+    ],
+    "errors": []
+  },
+  {
+    "scenario": "paused",
+    "calls": [
+      {
+        "path": "/config",
+        "method": "GET",
+        "body": null,
+        "hasBearer": false
+      },
+      {
+        "path": "/me",
+        "method": "GET",
+        "body": null,
+        "hasBearer": true
+      }
+    ],
+    "errors": []
+  },
+  {
+    "scenario": "anonymous",
+    "calls": [
+      {
+        "path": "/config",
+        "method": "GET",
+        "body": null,
+        "hasBearer": false
+      }
+    ],
+    "errors": []
+  },
+  {
+    "scenario": "offerError",
+    "calls": [
+      {
+        "path": "/config",
+        "method": "GET",
+        "body": null,
+        "hasBearer": false
+      },
+      {
+        "path": "/me",
+        "method": "GET",
+        "body": null,
+        "hasBearer": true
+      },
+      {
+        "path": "/billing/topup/offer",
+        "method": "GET",
+        "body": null,
+        "hasBearer": true
+      }
+    ],
+    "errors": []
+  },
+  {
+    "scenario": "late checkout after close",
+    "calls": [
+      {
+        "path": "/config",
+        "method": "GET",
+        "body": null,
+        "hasBearer": false
+      },
+      {
+        "path": "/me",
+        "method": "GET",
+        "body": null,
+        "hasBearer": true
+      },
+      {
+        "path": "/billing/topup/offer",
+        "method": "GET",
+        "body": null,
+        "hasBearer": true
+      },
+      {
+        "path": "/billing/topup/checkout",
+        "method": "POST",
+        "body": null,
+        "hasBearer": true
+      }
+    ],
+    "blocked": [
+      "https://static.cloudflareinsights.com/beacon.min.js"
+    ]
+  },
+  {
+    "scenario": "late checkout after sign out",
+    "calls": [
+      {
+        "path": "/config",
+        "method": "GET",
+        "body": null,
+        "hasBearer": false
+      },
+      {
+        "path": "/me",
+        "method": "GET",
+        "body": null,
+        "hasBearer": true
+      },
+      {
+        "path": "/billing/topup/offer",
+        "method": "GET",
+        "body": null,
+        "hasBearer": true
+      },
+      {
+        "path": "/billing/topup/checkout",
+        "method": "POST",
+        "body": null,
+        "hasBearer": true
+      },
+      {
+        "path": "/session",
+        "method": "DELETE",
+        "body": null,
+        "hasBearer": true
+      }
+    ],
+    "blocked": [
+      "https://static.cloudflareinsights.com/beacon.min.js"
+    ]
+  },
+  {
+    "scenario": "invalid checkout URL",
+    "calls": [
+      {
+        "path": "/config",
+        "method": "GET",
+        "body": null,
+        "hasBearer": false
+      },
+      {
+        "path": "/me",
+        "method": "GET",
+        "body": null,
+        "hasBearer": true
+      },
+      {
+        "path": "/billing/topup/offer",
+        "method": "GET",
+        "body": null,
+        "hasBearer": true
+      },
+      {
+        "path": "/billing/topup/checkout",
+        "method": "POST",
+        "body": null,
+        "hasBearer": true
+      }
+    ],
+    "blocked": [
+      "https://static.cloudflareinsights.com/beacon.min.js"
+    ]
+  },
+  {
+    "scenario": "verified checkout local navigation",
+    "intercepted": 1,
+    "calls": [
+      {
+        "path": "/config",
+        "method": "GET",
+        "body": null,
+        "hasBearer": false
+      },
+      {
+        "path": "/me",
+        "method": "GET",
+        "body": null,
+        "hasBearer": true
+      },
+      {
+        "path": "/billing/topup/offer",
+        "method": "GET",
+        "body": null,
+        "hasBearer": true
+      },
+      {
+        "path": "/billing/topup/checkout",
+        "method": "POST",
+        "body": null,
+        "hasBearer": true
+      }
+    ]
+  }
+]

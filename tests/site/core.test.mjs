@@ -1,12 +1,11 @@
-// docs/js/core.js runs in the browser with no build step and no exports, so it is loaded here the way
-// the page loads it: evaluated against a stand-in `window`, after which it hangs its API on window.IS.
+import { readAppSource } from "./app-fixture.mjs";
+// Import the same Core factory as the browser, with a fresh stand-in window for each test.
 // Kept outside docs/ so the test isn't published with the site.
+import { installCore } from "./core-fixture.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import vm from "node:vm";
 
-const CORE = readFileSync(new URL("../../docs/js/core.js", import.meta.url), "utf8");
 
 // A fresh copy of core.js for each test, with `fetch` answered by the test.
 function loadCore(fetchImpl) {
@@ -35,8 +34,7 @@ function loadCore(fetchImpl) {
     console,
   };
   ctx.window = ctx;
-  vm.createContext(ctx);
-  vm.runInContext(CORE, ctx);
+  installCore(ctx);
   return ctx.IS;
 }
 
@@ -807,11 +805,11 @@ test("every filter goes into the address and comes back the same", () => {
 });
 
 test("the dashboard reads its filters from the address and writes them back with replaceState", () => {
-  const app = readFileSync(new URL("../../docs/js/app.js", import.meta.url), "utf8");
-  assert.match(app, /const fromLink = \(\) => IS\.filtersFromUrl\(location\.search\);/);
+  const app = readAppSource();
+  assert.match(app, /const fromLink = \(\) => IS\.filtersFromUrl\(browser\.location\.search\);/);
   assert.match(
     app,
-    /IS\.filterSearch\(location\.search, f, initF\(p\)\);\s*if \(search !== location\.search\) history\.replaceState\(/,
+    /IS\.filterSearch\(browser\.location\.search, f, initF\(p\)\);\s*if \(search !== browser\.location\.search\) browser\.history\.replaceState\(/,
   );
   assert.doesNotMatch(app, /history\.pushState/);
   // The analytics beacon's single-page mode would count each replaceState as a page view.

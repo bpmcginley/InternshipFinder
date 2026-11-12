@@ -27,7 +27,7 @@ jobs:
       - name: Install test and coverage dependencies
         working-directory: backend
         run: |
-          python -m pip install -r requirements.txt -r requirements-coverage.txt pytest pillow cryptography
+          python -m pip install -r requirements.txt -r requirements-coverage.txt pytest cryptography -r ../scripts/share-card-requirements.txt
           python -m pip install --no-deps -e ..
           if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
             sudo -n timeout --kill-after=10s 3m apt-get install -y -qq ffmpeg >/dev/null || echo "::warning::no ffmpeg: the Reel render test is skipped"

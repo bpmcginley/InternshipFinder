@@ -1,3 +1,4 @@
+import { readAppSource } from "./app-fixture.mjs";
 // D29 (2026-10-14 design review): the site's ways into the extension's setup say "Set up Auto-Apply (about
 // 2 minutes)", as the extension's own buttons do. "Deep Dive" sounded long and optional; it now names only
 // the optional Interview and Voice steps.
@@ -9,7 +10,7 @@ const read = (p) => readFileSync(new URL("../../" + p, import.meta.url), "utf8")
 const code = (s) => s.replace(/<!--[\s\S]*?-->/g, "").replace(/^\s*\/\/.*$/gm, "");
 
 test("the dashboard's setup button, notice and queue note say Set up Auto-Apply", () => {
-  const app = code(read("docs/js/app.js"));
+  const app = code(readAppSource());
   // Once set up it says "Edit setup", as the extension's popup and side panel do (lib/entry.js).
   assert.match(app, /info\.onboarded \? "Edit setup" : "Set up Auto-Apply \(about 2 minutes\)"/);
   assert.match(

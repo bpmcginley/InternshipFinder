@@ -1,7 +1,8 @@
+import { createTestApp, readAppSource } from "./app-fixture.mjs";
+import { installCore } from "./core-fixture.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import vm from "node:vm";
 
 // Exercise the components and their actual handlers without a browser or installing a DOM library.
 function uiHarness() {
@@ -74,16 +75,8 @@ function uiHarness() {
     document: { documentElement: { dataset: {} }, addEventListener() {}, removeEventListener() {} },
   };
   ctx.window = ctx;
-  vm.createContext(ctx);
-  vm.runInContext(readFileSync(new URL("../../docs/js/core.js", import.meta.url), "utf8"), ctx);
-  const app = readFileSync(new URL("../../docs/js/app.js", import.meta.url), "utf8");
-  vm.runInContext(
-    app.replace(
-      'ReactDOM.createRoot(document.getElementById("root")).render(h(App));',
-      "window.components = { MultiSelect, Setup, Row, Why, Digest };",
-    ),
-    ctx,
-  );
+  installCore(ctx);
+  const components = createTestApp(ctx);
   const attach = (node) => {
     if (!node || typeof node !== "object") return;
     if (node.props.ref)
@@ -99,7 +92,7 @@ function uiHarness() {
     node.children.forEach(attach);
   };
   return {
-    components: ctx.components,
+    components: components,
     events,
     render(component, props) {
       cursor = 0;
@@ -468,7 +461,7 @@ test("the Why panel uses h3 headings, keeps Report, and closes on Escape (D11, D
 test("phones get a laptop install button that goes to install.html#phone (D19), and footer links are spaced (D20)", () => {
   const index = readFileSync(new URL("../../docs/index.html", import.meta.url), "utf8");
   const install = readFileSync(new URL("../../docs/install.html", import.meta.url), "utf8");
-  const app = readFileSync(new URL("../../docs/js/app.js", import.meta.url), "utf8");
+  const app = readAppSource();
   assert.match(
     index,
     /class="btn touch-only" href="install.html#phone">Send Auto-Apply to my laptop</,
@@ -533,10 +526,10 @@ test("Open posting is remembered, and back on the page the row asks once: Mark a
 });
 
 test("the dashboard asks only after the tab was hidden and shown again, and keeps the answer as the row's status (U9)", () => {
-  const app = readFileSync(new URL("../../docs/js/app.js", import.meta.url), "utf8");
+  const app = readAppSource();
   assert.match(
     app,
-    /if \(document\.visibilityState === "hidden"\) \{ o\.left = true; return; \}\s*if \(!o\.left\) return;/,
+    /if \(browser\.document\.visibilityState === "hidden"\) \{ o\.left = true; return; \}\s*if \(!o\.left\) return;/,
   );
   assert.match(
     app,

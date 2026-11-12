@@ -2,10 +2,11 @@
 internship postings that might be in region."""
 
 from __future__ import annotations
+import logging
 from .base import client
 from .common import board_item, counts_of, html_to_text, reported_count, stamp_board_newest
 from ..classify import is_internship
-from ..console_log import console_exception
+from ..console_log import console, console_exception
 from ..region import board_state, maybe_in_region, place_bare_cities
 
 LIST_URL = "https://boards-api.greenhouse.io/v1/boards/{token}/jobs"
@@ -85,5 +86,9 @@ def fetch_greenhouse(companies: list[dict]) -> list[dict]:
             try:
                 out += fetch_greenhouse_board(c, co)
             except Exception as e:
-                print(f"[greenhouse] {co['name']} ({co['ats_token']}) failed: {e}")
+                console(
+                    f"[greenhouse] board fetch failed: {type(e).__name__}",
+                    level=logging.WARNING,
+                    exception_type=type(e).__name__,
+                )
     return out

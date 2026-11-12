@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { FIELD_CAP, TERMS_VERSION, ordersCron } from "../../src/orders.js";
+import { FIELD_CAP, TERMS_VERSION } from "../../src/orders/shared.js";
+import { ordersCron } from "../../src/orders/cron.js";
 import { parseArgs, toRequest, run } from "../../scripts/placement.mjs";
 import { handle } from "../../src/index.js";
 import { NOW, makeEnv } from "../../test/helpers.js";

@@ -22,7 +22,7 @@ import tempfile
 REPO = Path(__file__).resolve().parents[2]
 FIXTURE = Path(__file__).with_name("fixtures") / "golden"
 STAMP = "2026-11-10T12:00:00+00:00"
-TEXT_SUFFIXES = {".py", ".html", ".js", ".css", ".json", ".txt", ".md", ".webmanifest", ".svg"}
+TEXT_SUFFIXES = {".py", ".html", ".js", ".mjs", ".css", ".json", ".txt", ".md", ".webmanifest", ".svg"}
 
 
 def copy_file(source, target):
@@ -46,6 +46,8 @@ def prepare(work):
         REPO / "docs", work / "site", ignore=shutil.ignore_patterns("data"), copy_function=copy_file
     )
     (work / "site" / "CNAME").unlink(missing_ok=True)
+    (work / "scripts").mkdir()
+    copy_file(REPO / "scripts" / "make_og_image.py", work / "scripts" / "make_og_image.py")
     shutil.copytree(FIXTURE / "inputs", work / "inputs", copy_function=copy_file)
     (work / "backend" / "data").mkdir()
     copy_file(
@@ -127,7 +129,9 @@ def stage(name, work):
         args = [str(work / "site" / "data")]
         module = "internscout.export_static"
     elif name == "pages":
+        sys.path.insert(0, str(work))
         args = [
+            "--site",
             str(work / "site"),
             str(work / "inputs" / "live-sitemap.xml"),
             str(work / "inputs" / "live-noindex.txt"),
@@ -136,7 +140,7 @@ def stage(name, work):
             "--placements-report",
             str(work / "placements-report.json"),
         ]
-        module = "internscout.seo_pages"
+        module = "scripts.make_og_image"
     elif name == "assets":
         args = [str(work / "site")]
         module = "internscout.asset_versions"
@@ -215,6 +219,20 @@ def differences(files):
             assert not old or hashlib.sha256(old).hexdigest() == expected[name], (
                 "Baseline archive/manifest mismatch"
             )
+            if name.endswith("/share.png") and old and name in files:
+                from PIL import Image, features
+
+                with (
+                    Image.open(io.BytesIO(old)) as baseline,
+                    Image.open(io.BytesIO(files[name])) as built,
+                ):
+                    pixels = baseline.tobytes() == built.tobytes()
+                lines.append(
+                    f"{name}: bytes changed, pixel match={pixels}; "
+                    f"FreeType={features.version_module('freetype2')}, "
+                    f"zlib-ng={features.version_feature('zlib_ng')}"
+                )
+                continue
             try:
                 before, after = old.decode("utf-8"), files.get(name, b"").decode("utf-8")
             except UnicodeDecodeError:

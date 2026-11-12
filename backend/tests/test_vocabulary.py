@@ -39,7 +39,7 @@ def test_browser_generator_only_replaces_the_owned_ranges(tmp_path):
     paths = (
         "scripts/generate_vocabulary.py",
         "backend/internscout/vocabulary.json",
-        "docs/js/core.js",
+        "docs/js/core/profile.mjs",
         "docs/js/buy.js",
     )
     for name in paths:
