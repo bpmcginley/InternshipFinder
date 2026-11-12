@@ -127,3 +127,4 @@ import "./topup-webhook.test.js";
 import "./purchased-allowance.test.js";
 
 import "./follow-delivery-owner.test.js";
+import "./follow-owned-digest-runtime.test.js";

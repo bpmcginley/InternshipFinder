@@ -268,11 +268,45 @@ export async function finishFollowDigestAttempt(db, id, lease, outcome, now = ne
     db
       .prepare(
         "UPDATE follow_digest_outbox SET state=?,accepted_at=?,payload=NULL,lease_token=NULL,lease_until=NULL " +
-          "WHERE id=? AND state='attempting' AND lease_token=? AND lease_until>?",
+          "WHERE id=? AND state='attempting' AND lease_token=? AND lease_until>? RETURNING 1 AS changed",
       )
       .bind(outcome, outcome === "accepted" ? at : null, id, lease, at),
   ]);
-  return result[1].meta.changes > 0;
+  if (
+    !Array.isArray(result) ||
+    result.length !== 2 ||
+    !Object.hasOwn(result, 0) ||
+    !Object.hasOwn(result, 1) ||
+    result.some(
+      (r) =>
+        r?.success !== true ||
+        !Array.isArray(r.results) ||
+        !Number.isSafeInteger(r.meta?.changes) ||
+        r.meta.changes < 0,
+    )
+  )
+    return false;
+  const [subscriber, terminal] = result;
+  if (
+    subscriber.results.length !== 0 ||
+    subscriber.meta.changes > 1 ||
+    (outcome === "uncertain" && subscriber.meta.changes !== 0)
+  )
+    return false;
+  const rows = terminal.results;
+  // RETURNING counts the direct outbox update, independently of watermark triggers.
+  return (
+    rows.length === 1 &&
+    Object.hasOwn(rows, 0) &&
+    rows[0] !== null &&
+    typeof rows[0] === "object" &&
+    !Array.isArray(rows[0]) &&
+    Object.keys(rows[0]).length === 1 &&
+    Object.hasOwn(rows[0], "changed") &&
+    rows[0].changed === 1 &&
+    terminal.meta.changes >= 1 &&
+    subscriber.meta.changes === (outcome === "accepted" ? 1 : 0)
+  );
 }
 
 export function followOutboxExpiryStatements(db, now) {

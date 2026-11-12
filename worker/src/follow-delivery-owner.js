@@ -167,12 +167,7 @@ export async function finishFollowDeliveryOwner(
   result,
   { maxCandidates, maxExpired } = {},
 ) {
-  const owned = tickets.get(ticket);
-  tickets.delete(ticket); // One acknowledged invocation, including lost-write acknowledgements.
-  if (!owned) return unavailable();
-  const { db, generation } = owned;
-  let resume;
-  try {
+  return finishOwner(ticket, () => {
     if (
       !Number.isSafeInteger(maxCandidates) ||
       maxCandidates < 1 ||
@@ -181,7 +176,32 @@ export async function finishFollowDeliveryOwner(
       maxExpired < 1
     )
       fail();
-    resume = clean(result, maxCandidates, maxExpired);
+    return clean(result, maxCandidates, maxExpired);
+  });
+}
+// The one-candidate digest tick has no durable cursor. Release only on a complete,
+// unambiguous receipt, without rewriting link continuation or concurrent redactions.
+export async function finishFollowDigestOwner(ticket, result) {
+  return finishOwner(ticket, () => {
+    exact(result, ["status", "counts"]);
+    if (!["processed", "paused"].includes(result.status)) fail();
+    const c = result.counts;
+    exact(c, Object.keys(c || {}));
+    const keys = Object.keys(c);
+    if (keys.some((key) => !["accepted", "paused"].includes(key)) || keys.length > 1) fail();
+    if (keys.length && c[keys[0]] !== 1) fail();
+    if (result.status === "paused" ? c.paused !== 1 : Object.hasOwn(c, "paused")) fail();
+    return null;
+  });
+}
+async function finishOwner(ticket, validate) {
+  const owned = tickets.get(ticket);
+  tickets.delete(ticket); // One acknowledged invocation, including lost-write acknowledgements.
+  if (!owned) return unavailable();
+  const { db, generation } = owned;
+  let resume;
+  try {
+    resume = validate();
   } catch {
     try {
       await db
@@ -198,7 +218,7 @@ export async function finishFollowDeliveryOwner(
   try {
     let query, args;
     if (resume === null) {
-      // Proven send-free policy flip. Preserve concurrent cursor redactions and next_kind.
+      // No cursor update. Preserve concurrent redactions and next_kind.
       query =
         "UPDATE follow_delivery_owner SET phase='ready' WHERE singleton=1 AND version=1 AND phase='running' AND generation=?";
       args = [generation];
