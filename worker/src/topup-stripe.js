@@ -27,8 +27,6 @@ export async function readTopupAssociation(env, kind, id, fetchImpl) {
   const prefix = new Map([
     ["charges", "ch"],
     ["payment_intents", "pi"],
-    ["refunds", "re"],
-    ["disputes", "du"],
   ]).get(kind);
   if (
     !topupRecoveryConfigured(env) ||
@@ -42,6 +40,33 @@ export async function readTopupAssociation(env, kind, id, fetchImpl) {
     throw unavailable();
   return boundedRequest(
     { STRIPE_SECRET_KEY: env.STRIPE_SECRET_KEY },
+    kind + "/" + encodeURIComponent(id),
+    {},
+    fetchImpl,
+    null,
+    "GET",
+    TOPUP_CHECKOUT_BOUNDS.timeoutMs,
+  );
+}
+
+// History-only direct target after a fully proven settled payment. No current sales Price gate.
+export async function readHistoricalTopupTarget(env, kind, id, fetchImpl) {
+  const secret = env?.STRIPE_SECRET_KEY;
+  const prefix = new Map([
+    ["refunds", "re"],
+    ["disputes", "du"],
+  ]).get(kind);
+  if (
+    typeof secret !== "string" ||
+    !secret ||
+    !prefix ||
+    typeof id !== "string" ||
+    !new RegExp("^" + prefix + "_[A-Za-z0-9_]{1,250}$").test(id) ||
+    typeof fetchImpl !== "function"
+  )
+    throw unavailable();
+  return boundedRequest(
+    { STRIPE_SECRET_KEY: secret },
     kind + "/" + encodeURIComponent(id),
     {},
     fetchImpl,

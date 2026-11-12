@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { captureTopupSettlement, settleFirstTopup } from "../src/topup-first-settlement.js";
 import { observeVerifiedTopupEvent as observe } from "../src/topup-history-events.js";
 import { readVerifiedTopupPurchase } from "../src/topup-purchase-recovery.js";
-import { readTopupAssociation } from "../src/topup-stripe.js";
+import { readTopupAssociation, readHistoricalTopupTarget } from "../src/topup-stripe.js";
 import { attempt, session } from "./topup-stripe.js";
 const env = { STRIPE_SECRET_KEY: "fixture-not-a-key", TOPUPS_ENABLED: "0", PAYMENTS_ENABLED: "0" };
 const offer = {
@@ -668,11 +668,9 @@ export async function directAssociationKindsAreFixedBeforeTransport(db) {
     ["charges", "ch_fixture"],
     ["payment_intents", "pi_fixture"],
     ["checkout/sessions", "cs_fixture"],
-    ["refunds", "re_fixture"],
-    ["disputes", "du_fixture"],
   ])
     assert.deepEqual(await readTopupAssociation(config, kind, id, fetchImpl), {});
-  assert.equal(calls, 5);
+  assert.equal(calls, 3);
 }
 export async function historicalDiscoveryCannotSubstituteForCanonicalCharge(db) {
   const f = await setup(db);
@@ -738,4 +736,85 @@ export async function lateTargetResponseCannotReachObservation(db) {
   assert.equal(cancelled, 1);
   assert.equal((await state(db)).receipts.length, 0);
   assert.equal((await state(db)).revision, 1);
+}
+export async function historicalTargetsDoNotRequireCurrentSalesPrice(db) {
+  for (const kind of ["refund", "dispute"]) {
+    const f = await setup(db);
+    f[kind + "s"] = [item(kind, kind === "refund" ? "pending" : "under_review", 1)];
+    assert.deepEqual(
+      await observe(db, env, event(kind), {
+        enabled: true,
+        livemode: false,
+        apiVersions: [version],
+        resolveOffer: () => offer,
+        fetchImpl: f.fetch,
+      }),
+      { status: "observed", revision: 2 },
+    );
+    assert.equal(f.calls.length, 4);
+    assert.equal((await state(db)).receipts.length, 1);
+  }
+}
+export async function historicalTargetPortRejectsMalformedInputsAndKeepsDiscoveryGated(db) {
+  let calls = 0;
+  const fetchImpl = async (url) => {
+    calls++;
+    const response = new Response("{}");
+    Object.defineProperty(response, "url", { value: url });
+    return response;
+  };
+  for (const kind of [
+    "charges",
+    "payment_intents",
+    "checkout/sessions",
+    "constructor",
+    "__proto__",
+    "toString",
+    "refunds/other",
+    {},
+    null,
+  ])
+    await assert.rejects(() => readHistoricalTopupTarget(env, kind, "re_fixture", fetchImpl));
+  for (const id of [null, [], {}, new String("re_fixture"), "re_fixture/other", "du_fixture", ""])
+    await assert.rejects(() => readHistoricalTopupTarget(env, "refunds", id, fetchImpl));
+  for (const secret of [undefined, null, {}, [], new String("fixture"), ""])
+    await assert.rejects(() =>
+      readHistoricalTopupTarget({ STRIPE_SECRET_KEY: secret }, "refunds", "re_fixture", fetchImpl),
+    );
+  for (const [kind, id] of [
+    ["charges", "ch_fixture"],
+    ["payment_intents", "pi_fixture"],
+    ["checkout/sessions", "cs_fixture"],
+  ])
+    await assert.rejects(() => readTopupAssociation(env, kind, id, fetchImpl));
+  for (const [kind, id] of [
+    ["refunds", "re_fixture"],
+    ["disputes", "du_fixture"],
+  ])
+    await assert.rejects(() =>
+      readTopupAssociation({ ...env, STRIPE_PRICE_TOPUP: "price_fixture" }, kind, id, fetchImpl),
+    );
+  assert.equal(calls, 0);
+  for (const [kind, id] of [
+    ["refunds", "re_fixture"],
+    ["disputes", "du_fixture"],
+  ])
+    assert.deepEqual(await readHistoricalTopupTarget(env, kind, id, fetchImpl), {});
+  assert.equal(calls, 2);
+  const f = await setup(db);
+  f.refunds = [item("refund", "pending", 1)];
+  const e = event();
+  delete e.data.object.payment_intent;
+  assert.deepEqual(
+    await observe(db, env, e, {
+      enabled: true,
+      livemode: false,
+      apiVersions: [version],
+      resolveOffer: () => offer,
+      fetchImpl: f.fetch,
+    }),
+    { status: "unavailable" },
+  );
+  assert.equal(f.calls.length, 0);
+  assert.equal((await state(db)).receipts.length, 0);
 }
