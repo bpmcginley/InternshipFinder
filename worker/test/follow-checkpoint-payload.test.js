@@ -127,6 +127,40 @@ test("checkpoint reassembly requires exact generation digest and correct phase h
     );
 });
 
+test("checkpoint phases reject coercible values without invoking conversion hooks", async () => {
+  for (const row of fixture.cases.slice(0, 2)) {
+    let conversions = 0;
+    const coercible = {
+      toString() {
+        conversions++;
+        return row.phase;
+      },
+    };
+    const symbolic = {
+      [Symbol.toPrimitive]() {
+        conversions++;
+        return row.phase;
+      },
+    };
+    for (const phase of [
+      [row.phase],
+      new String(row.phase),
+      coercible,
+      symbolic,
+      null,
+      undefined,
+      1,
+    ]) {
+      await assert.rejects(codec.split(encode(row.checkpoint), phase), /Invalid checkpoint/);
+      await assert.rejects(
+        codec.reassemble(encode(row.payload), encode(row.header), phase, row.sha256),
+        /Invalid checkpoint/,
+      );
+    }
+    assert.equal(conversions, 0);
+  }
+});
+
 test("checkpoint codec copies Buffer inputs before digest awaits", async () => {
   const row = fixture.cases[0],
     input = Buffer.from(row.checkpoint);

@@ -6,6 +6,7 @@ const headers = {
   pending: ["predecessor", "candidate_commit", "candidate_tree", "public_tree", "prepared_at"],
   accepted: ["accepted_commit", "public_tree", "accepted_at"],
 };
+const validPhase = (phase) => phase === "pending" || phase === "accepted";
 const sha = /^[a-f0-9]{64}$/;
 const git = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/;
 const utc = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{6}Z$/;
@@ -74,7 +75,7 @@ function validatePayload(value, maxRows) {
   }
 }
 function validateHeader(value, phase) {
-  if (!Object.hasOwn(headers, phase) || !fields(value, headers[phase])) reject();
+  if (!validPhase(phase) || !fields(value, headers[phase])) reject();
   const ids =
     phase === "pending"
       ? [value.candidate_commit, value.candidate_tree, value.public_tree]
@@ -124,7 +125,7 @@ export function createFollowCheckpointPayloadCodec({
       reject();
   }
   async function split(raw, phase) {
-    if (!Object.hasOwn(headers, phase)) reject();
+    if (!validPhase(phase)) reject();
     const { bytes, text, value } = parse(raw, maxCheckpointBytes);
     if (!fields(value, [...common, ...headers[phase]])) reject();
     const payload = pick(value, common),
@@ -141,6 +142,7 @@ export function createFollowCheckpointPayloadCodec({
     };
   }
   async function reassemble(payloadRaw, headerRaw, phase, expectedSha256) {
+    if (!validPhase(phase)) reject();
     if (!matches(sha, expectedSha256)) reject();
     const payload = parse(payloadRaw, maxPayloadBytes),
       header = parse(headerRaw, maxHeaderBytes);
