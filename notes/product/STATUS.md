@@ -326,6 +326,8 @@ The golden harness now covers static assets as well as generated pages. Each sit
 
 | C | P-2.3u Optional employer publication | audit_site | `codex/product-p2.3u-publication` | [#410](https://github.com/bpmcginley/InternshipFinder/pull/410) | Draft needs-bruce; review/CI pending | Explicit publisher option stages and renders one captured selected export. Default artifacts unchanged; browser/Worker collection stays off. |
 
+| C | P-2.1ao bounded R2 slots | audit_growth_generated | `codex/product-p2.1ao-r2-slots` | Draft PR pending | Claimed; local qualification only | Two fixed private payload slots, explicit byte bounds, conditional nonce envelopes. No control authority, routes, bindings or activation. |
+
 ## Waiting for Bruce
 
 P-2.1u [#341](https://github.com/bpmcginley/InternshipFinder/pull/341) remains owner-gated after archive-reader integration. Publication, scheduling and activation remain pending.
@@ -336,6 +338,7 @@ Dates are when the item was recorded, not a claim that a separate message was se
 
 | Recorded | Item | Ready artifact / next action | Done |
 |---|---|---|---|
+| 2026-11-11 | P-2.1ao bounded R2 slots | Draft PR pending; offline conditional-write qualification only. | Needs-bruce; storage choice, physical retention, control authority and restore witness remain unqualified. No activation. |
 | 2026-11-11 | Dormant outbound Worker compatibility | [#414](https://github.com/bpmcginley/InternshipFinder/pull/414) repairs the proven native redirect option in archive and top-up readers. Independent review, CI and coordinated integration required. All existing enablement/configuration gates remain. | Draft needs-bruce; no provider call or deployment |
 | 2026-11-11 | Optional employer publication adapter | Draft [#410](https://github.com/bpmcginley/InternshipFinder/pull/410), synthetic publication parity and paired screenshots verified; exact review/CI pending. | Owner source publication and coordinated activation remain pending; default off |
 | 2026-11-11 | P-2.3p employer Worker route | [#402](https://github.com/bpmcginley/InternshipFinder/pull/402) adds a default-off pinned-catalog route and private readiness. Independent review/CI, same-release publication and separate verified retention scheduling precede enablement. No production settings or remote operations. | Draft needs-bruce |
