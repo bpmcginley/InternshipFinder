@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { createFollowCheckpointPayloadCodec } from "../src/follow-checkpoint-payload.js";
@@ -108,6 +109,42 @@ test("checkpoint payload rejects malformed shape, ordering, identity and timesta
     await assert.rejects(codec.split(encode(raw), "pending"), /Invalid checkpoint/);
   }
   await assert.rejects(codec.split(new Uint8Array([255]), "pending"), /Invalid checkpoint/);
+});
+
+test("checkpoint timestamp rules apply to both phases and directions", async (t) => {
+  for (const row of fixture.cases.slice(0, 2)) {
+    const phaseTime = row.phase === "pending" ? "prepared_at" : "accepted_at";
+    for (const [name, change] of [
+      [
+        "unknown first-seen offset",
+        (payload) => (payload.rows[0][1] = "2026-11-11T12:00:00-00:00"),
+      ],
+      [
+        "phase time in the coverage millisecond",
+        (payload, header) => (header[phaseTime] = payload.covers_after.slice(0, -4) + "001Z"),
+      ],
+    ]) {
+      const payload = JSON.parse(row.payload);
+      const header = JSON.parse(row.header);
+      change(payload, header);
+      const checkpoint = encode(canonical({ ...payload, ...header }));
+      const sha256 = createHash("sha256").update(checkpoint).digest("hex");
+      await t.test(`split ${row.phase} rejects ${name}`, async () => {
+        await assert.rejects(codec.split(checkpoint, row.phase), /Invalid checkpoint/);
+      });
+      await t.test(`reassemble ${row.phase} rejects ${name}`, async () => {
+        await assert.rejects(
+          codec.reassemble(
+            encode(canonical(payload)),
+            encode(canonical(header)),
+            row.phase,
+            sha256,
+          ),
+          /Invalid checkpoint/,
+        );
+      });
+    }
+  }
 });
 
 test("checkpoint reassembly requires exact generation digest and correct phase header", async () => {

@@ -41,6 +41,30 @@ const codec = createFollowCheckpointPayloadCodec({
   maxRows: 30000,
 });
 const live = (record, now) => record && record.starts <= now && now < record.expires;
+const validCutoff = (state, r) => {
+  if (
+    !Number.isSafeInteger(r?.starts) ||
+    !Number.isSafeInteger(r?.expires) ||
+    !Number.isSafeInteger(r?.cutoff) ||
+    r.cutoff <= r.starts ||
+    r.cutoff > r.expires
+  )
+    return false;
+  try {
+    const prior = JSON.parse(r.header).predecessor;
+    if (prior.checkpoint_sha256 === null) return !state.initialized && r.cutoff === r.expires;
+    if (!state.accepted) return state.initialized; // The captured deadline survives retirement.
+    const accepted = JSON.parse(state.accepted.header);
+    return (
+      prior.commit === accepted.accepted_commit &&
+      prior.public_tree === accepted.public_tree &&
+      prior.checkpoint_sha256 === state.accepted.digest &&
+      r.cutoff === Math.min(r.expires, state.accepted.expires)
+    );
+  } catch {
+    return false;
+  }
+};
 const position = (state) => ({ current: state.current, receipt: state.receipt });
 
 // This injected test double is deliberately outside the SQLite snapshot restored by tests.
@@ -207,6 +231,7 @@ export class CheckpointIntegration extends DurableObject {
     const prepared = await this.slots.prepare(entry.parts.payload);
     const reservation = {
       ...entry.record,
+      cutoff: Math.min(entry.record.expires, before.accepted?.expires ?? entry.record.expires),
       nonce: prepared.nonce,
       fenceEtag: fence.etag,
       fenceNonce: fence.nonce,
@@ -214,6 +239,8 @@ export class CheckpointIntegration extends DurableObject {
     const result = await this.change((state, now) => {
       if (
         !equal(state, before) ||
+        !validCutoff(state, reservation) ||
+        now >= reservation.cutoff ||
         !live(reservation, now) ||
         !this.predecessorMatches(state, reservation, now)
       )
@@ -233,6 +260,8 @@ export class CheckpointIntegration extends DurableObject {
       !r ||
       r.nonce !== nonce ||
       !prepared ||
+      !validCutoff(state, r) ||
+      this.now() >= r.cutoff ||
       !live(r, this.now()) ||
       !this.predecessorMatches(state, r, this.now())
     )
@@ -245,7 +274,7 @@ export class CheckpointIntegration extends DurableObject {
   async reconcileReserved(nonce) {
     const before = await this.admitted(),
       r = before?.reservation;
-    if (!r || r.nonce !== nonce) return "held";
+    if (!r || r.nonce !== nonce || !validCutoff(before, r)) return "held";
     const object = await this.slots.read(r.slot);
     if (object.status !== "present") return "held";
     const payload =
@@ -253,19 +282,20 @@ export class CheckpointIntegration extends DurableObject {
     const fence =
       object.kind === "tombstone" && object.etag === r.fenceEtag && object.nonce === r.fenceNonce;
     if (!payload && !fence) return "held";
-    const eligible = (state, now) => live(r, now) && this.predecessorMatches(state, r, now);
+    const eligible = (state, now) =>
+      now < r.cutoff && live(r, now) && this.predecessorMatches(state, r, now);
     if (eligible(before, this.now())) {
       if (!payload) return "uncertain"; // A negative read cannot establish that PUT completed.
       await codec.reassemble(object.payload, encoder.encode(r.header), "pending", r.digest);
       return this.change((state, now) => {
         if (!equal(state, before) || !eligible(state, now)) return false;
-        const { fenceEtag, fenceNonce, ...record } = r;
+        const { fenceEtag, fenceNonce, cutoff, ...record } = r;
         state.pending = { ...record, etag: object.etag };
         state.reservation = null;
         return true;
       });
     }
-    const expired = (now) => now >= Math.min(r.expires, before.accepted?.expires ?? r.expires);
+    const expired = (now) => now >= r.cutoff;
     if (!expired(this.now())) return "held"; // Unavailable eligibility is not proof of expiry.
     // Replacing the exact fence also prevents an earlier in-flight conditional PUT from committing.
     this.uploads.delete(nonce);

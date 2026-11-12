@@ -66,6 +66,7 @@ function validatePayload(value, maxRows) {
       !matches(/^[a-f0-9]{16}$/, row[0]) ||
       row[0] <= previous ||
       !matches(rawTime, row[1]) ||
+      row[1].endsWith("-00:00") ||
       !["observed_by", "verified_utc"].includes(row[2])
     )
       reject();
@@ -121,8 +122,9 @@ export function createFollowCheckpointPayloadCodec({
   function checked(payload, header, phase) {
     validatePayload(payload, maxRows);
     validateHeader(header, phase);
-    if (payload.covers_after >= header[phase === "pending" ? "prepared_at" : "accepted_at"])
-      reject();
+    const recordedAt = header[phase === "pending" ? "prepared_at" : "accepted_at"];
+    const recordedMillisecond = recordedAt.slice(0, -4) + "000Z";
+    if (payload.covers_after >= recordedMillisecond) reject();
   }
   async function split(raw, phase) {
     if (!validPhase(phase)) reject();

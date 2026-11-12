@@ -36,6 +36,10 @@ jobs:
         run: npm run typecheck:python -- --output type-reports/python.json
       - name: Report worker type debt
         run: npm run typecheck:worker -- --output type-reports/worker.json
+      - name: Report site type debt
+        run: npm run typecheck:site -- --output type-reports/site.json
+      - name: Report extension type debt
+        run: npm run typecheck:extension -- --output type-reports/extension.json
       - name: Upload sanitized locations and counts
         uses: actions/upload-artifact@v7
         with:

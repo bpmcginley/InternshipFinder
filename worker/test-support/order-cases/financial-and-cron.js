@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { endExpiredPlacements } from "../../src/placements.js";
-import { FIELD_CAP, TERMS_VERSION, ordersCron } from "../../src/orders.js";
+import { FIELD_CAP, TERMS_VERSION } from "../../src/orders/shared.js";
+import { ordersCron } from "../../src/orders/cron.js";
 import { NOW, makeEnv } from "../../test/helpers.js";
 import { ID, ON, ROLES, SITE, TODAY, fakeEmail, hold, siteReply, stripeFake, world } from "./fixtures.js";
 

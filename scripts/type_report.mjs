@@ -8,16 +8,32 @@ import { fileURLToPath } from "node:url";
 const root = fileURLToPath(new URL("../", import.meta.url));
 const position = (value) => Number.isSafeInteger(value) && value >= 1 ? value : 1;
 
-function safeFile(file) {
+const pythonFiles = /^(backend\/internscout|growth|worker\/src)\/[A-Za-z0-9_./-]+\.(py|js)$/;
+const javascriptProjects = {
+  worker: {
+    config: "worker/jsconfig.json",
+    files: /^worker\/src\/[A-Za-z0-9_./-]+\.js$/,
+  },
+  site: {
+    config: "jsconfig.site.json",
+    files: /^docs\/(?:js\/(?!(?:app-modules|buy-modules|modules)\/)|widget\/)[A-Za-z0-9_./-]+\.(?:js|mjs)$/,
+  },
+  extension: {
+    config: "jsconfig.extension.json",
+    files: /^extension\/(?!(?:test|vendor|node_modules)\/)[A-Za-z0-9_./-]+\.(?:js|mjs)$/,
+  },
+};
+
+function safeFile(file, allowedFiles) {
   const relative = path.relative(root, path.resolve(root, String(file))).replaceAll("\\", "/");
-  return /^(backend\/internscout|growth|worker\/src)\/[A-Za-z0-9_./-]+\.(py|js)$/.test(relative)
+  return allowedFiles.test(relative)
     && !relative.split("/").includes("..") ? relative : "<configuration>";
 }
 
 export function pythonDiagnostics(report) {
   if (!Array.isArray(report.generalDiagnostics) || !report.summary) throw new Error("Invalid report");
   return report.generalDiagnostics.map((item) => ({
-    file: safeFile(item.file),
+    file: safeFile(item.file, pythonFiles),
     line: position(item.range?.start?.line + 1),
     column: position(item.range?.start?.character + 1),
     severity: ["error", "warning", "information"].includes(item.severity) ? item.severity : "error",
@@ -25,14 +41,17 @@ export function pythonDiagnostics(report) {
   }));
 }
 
-export function workerDiagnostics(output) {
+export function javascriptDiagnostics(output, area) {
+  if (!Object.hasOwn(javascriptProjects, area)) throw new Error("Unknown area");
   const diagnostics = [];
   for (const line of output.split(/\r?\n/)) {
     // Discard the complete message, including continuation lines and literal values.
     const match = /^(.*?)\((\d+),(\d+)\): error TS(\d+):/.exec(line);
     if (match) {
-      const file = safeFile(match[1]);
-      if (file === "<configuration>") throw new Error("Unexpected diagnostic path");
+      const file = safeFile(match[1], javascriptProjects[area].files);
+      if (file === "<configuration>" || (area !== "worker" && file.endsWith(".min.js"))) {
+        throw new Error("Unexpected diagnostic path");
+      }
       diagnostics.push({ file, line: position(Number(match[2])), column: position(Number(match[3])),
         severity: "error", rule: `TS${match[4]}` });
     } else if (/^error TS\d+:/.test(line)) {
@@ -55,15 +74,15 @@ export function summarize(tool, diagnostics) {
 
 function check(area) {
   const python = area === "python";
-  if (!python && area !== "worker") throw new Error("Unknown area");
+  if (!python && !Object.hasOwn(javascriptProjects, area)) throw new Error("Unknown area");
   const args = python
     ? ["node_modules/pyright/index.js", "--project", "pyrightconfig.json", "--outputjson"]
-    : ["node_modules/typescript/bin/tsc", "--project", "worker/jsconfig.json", "--pretty", "false"];
+    : ["node_modules/typescript/bin/tsc", "--project", javascriptProjects[area].config, "--pretty", "false"];
   // Never inherit stdout/stderr: checkers can echo private literals from existing source.
   const result = spawnSync(process.execPath, args, { cwd: root, encoding: "utf8", maxBuffer: 32 * 1024 * 1024 });
   if (result.error || result.signal || ![0, 1, 2].includes(result.status)) throw new Error("Checker failed");
   if (python && result.status === 2) throw new Error("Python configuration failure");
-  const diagnostics = python ? pythonDiagnostics(JSON.parse(result.stdout)) : workerDiagnostics(result.stdout);
+  const diagnostics = python ? pythonDiagnostics(JSON.parse(result.stdout)) : javascriptDiagnostics(result.stdout, area);
   if (result.status !== 0 && diagnostics.length === 0) throw new Error("No usable diagnostics");
   return summarize(python ? "pyright" : "typescript", diagnostics);
 }
