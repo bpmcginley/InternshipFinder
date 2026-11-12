@@ -125,22 +125,31 @@ test("unavailable storage is retryable without logging request targets or intern
 test("four in-flight slots bound storage work and release on completion or failure", async () => {
   const timers = fakeTimers();
   const endpoint = createFollowUnsubscribeEndpoint(timers);
-  const releases = [];
-  const db = dbFor(() => new Promise((resolve, reject) => releases.push({ resolve, reject })));
-  const pending = Array.from({ length: 4 }, () => endpoint(post(), db, NOW));
-  while (releases.length < 4) await new Promise((resolve) => setTimeout(resolve, 0));
+  const heldRequest = () => {
+    const started = Promise.withResolvers();
+    const storage = Promise.withResolvers();
+    const db = dbFor(() => {
+      started.resolve();
+      return storage.promise;
+    });
+    return { response: endpoint(post(), db, NOW), started: started.promise, storage };
+  };
+  // Each request owns its completion regardless of when its token digest reaches D1.
+  const pending = Array.from({ length: 4 }, heldRequest);
+  await Promise.all(pending.map(({ started }) => started));
   assert.equal(timers.scheduled, 4);
   assert.equal(timers.active.size, 0, "body deadlines are cleared before D1 begins");
   timers.expire(); // A body timer must never release a slot while deletion is still in flight.
   const busy = await endpoint(post(), noDb, NOW);
   assert.equal(busy.headers.get("Retry-After"), "60");
   await status(busy, 503);
-  releases[0].reject(new Error("synthetic storage failure"));
-  await status(await pending[0], 503);
-  const fifth = endpoint(post(), db, NOW);
-  while (releases.length < 5) await new Promise((resolve) => setTimeout(resolve, 0));
-  for (const release of releases.slice(1)) release.resolve({ meta: { changes: 0 } });
-  for (const response of await Promise.all([...pending.slice(1), fifth]))
+  pending[0].storage.reject(new Error("synthetic storage failure"));
+  await status(await pending[0].response, 503);
+  const fifth = heldRequest();
+  await fifth.started;
+  const remaining = [...pending.slice(1), fifth];
+  for (const { storage } of remaining) storage.resolve({ meta: { changes: 0 } });
+  for (const response of await Promise.all(remaining.map(({ response }) => response)))
     await status(response, 204);
   await status(await endpoint(post(URL.replace(TOKEN, "bad")), noDb, NOW), 400);
   await status(

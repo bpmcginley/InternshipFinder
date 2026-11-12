@@ -52,7 +52,7 @@ export function requestFollowConfirmation(db, email, input, catalog, now = new D
   return writeFollowRequest(db, email, input, catalog, now, true);
 }
 
-async function writeFollowRequest(db, email, input, catalog, now, queueConfirmation) {
+export function normalizeFollowEmail(email) {
   if (typeof email !== "string") invalid();
   email = email.trim().toLowerCase();
   if (
@@ -60,6 +60,11 @@ async function writeFollowRequest(db, email, input, catalog, now, queueConfirmat
     !/^[^\s@<>\x00-\x1f\x7f]+@[^\s@<>\x00-\x1f\x7f]+\.[^\s@<>\x00-\x1f\x7f]+$/.test(email)
   )
     invalid();
+  return email;
+}
+
+async function writeFollowRequest(db, email, input, catalog, now, queueConfirmation) {
+  email = normalizeFollowEmail(email);
   const scopeKey = canonicalFollow(input, catalog),
     id = crypto.randomUUID(),
     at = stamp(now),
@@ -117,6 +122,12 @@ async function writeFollowRequest(db, email, input, catalog, now, queueConfirmat
 }
 
 // Random generation + 256-bit secret; only the hash and generation enter D1.
+export async function createFollowCapability(prefix = "") {
+  const generation = crypto.randomUUID();
+  const raw = prefix + generation + "." + hex(crypto.getRandomValues(new Uint8Array(32)));
+  return { generation, raw, digest: await hash(raw) };
+}
+
 // Confirmation/management reissues invalidate previous links in the same scope. Unsubscribe links
 // remain valid until deletion, including previously delivered links after a later dispatch.
 export async function mintFollowToken(
@@ -132,9 +143,7 @@ export async function mintFollowToken(
     (purpose === "confirm" ? !scopeKey : scopeKey !== "" || ownerUserHash !== null)
   )
     invalid();
-  const generation = crypto.randomUUID(),
-    raw = generation + "." + hex(crypto.getRandomValues(new Uint8Array(32)));
-  const digest = await hash(raw);
+  const { generation, raw, digest } = await createFollowCapability();
   let expiry =
     purpose === "unsubscribe"
       ? null
@@ -259,12 +268,88 @@ export async function listManagedFollows(db, raw, now = new Date()) {
   return result[0].results.length ? result[1].results : null;
 }
 
+// One SQL statement admits the capability and reads its bounded page at the same UTC instant.
+export async function listManagedFollowsPage(db, raw, after, now = new Date()) {
+  const result = await db.batch([
+    db
+      .prepare(
+        "SELECT CASE WHEN s.scope_key IS NULL THEN 0 ELSE 1 END AS present," +
+          "s.scope_key,s.created,s.confirmed_at FROM follow_tokens t LEFT JOIN follow_subscriptions s " +
+          "ON s.subscriber_id=t.subscriber_id AND s.scope_key>? WHERE t.token_hash=? AND t.purpose='manage' " +
+          "AND t.expires_at>? AND t.expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now') ORDER BY s.scope_key LIMIT 51",
+      )
+      .bind(after ?? "", await tokenHash(raw), stamp(now)),
+  ]);
+  if (
+    !Array.isArray(result) ||
+    result.length !== 1 ||
+    result[0]?.success !== true ||
+    !Array.isArray(result[0].results) ||
+    result[0].results.length > 51
+  )
+    throw new Error("Follow management unavailable");
+  const rows = result[0].results;
+  if (!rows.length) return null;
+  if (
+    rows.length === 1 &&
+    rows[0]?.present === 0 &&
+    rows[0].scope_key === null &&
+    rows[0].created === null &&
+    rows[0].confirmed_at === null
+  )
+    return { scopes: [], next: null };
+  for (const row of rows) {
+    if (
+      row?.present !== 1 ||
+      typeof row.scope_key !== "string" ||
+      !row.scope_key.length ||
+      encoder.encode(row.scope_key).length > 4096 ||
+      typeof row.created !== "string" ||
+      row.created.length > 32 ||
+      (row.confirmed_at !== null &&
+        (typeof row.confirmed_at !== "string" || row.confirmed_at.length > 32))
+    )
+      throw new Error("Follow management unavailable");
+  }
+  return {
+    scopes: rows
+      .slice(0, 50)
+      .map(({ scope_key, created, confirmed_at }) => ({ scope_key, created, confirmed_at })),
+    next: rows.length > 50 ? rows[49].scope_key : null,
+  };
+}
+
+function checkedManagementReceipt(result) {
+  if (
+    result?.success !== true ||
+    !Number.isSafeInteger(result.meta?.changes) ||
+    result.meta.changes < 0
+  )
+    throw new Error("Follow management unavailable");
+}
+
 // Explicit management action. Keep the token for further actions within its original 30-minute
 // lifetime, unless the last scope is removed. Tokens for the removed scope cannot confirm it later.
-export async function removeManagedFollow(db, raw, scopeKey, now = new Date()) {
+export async function removeManagedFollow(
+  db,
+  raw,
+  scopeKey,
+  now = new Date(),
+  databaseClock = false,
+) {
   if (typeof scopeKey !== "string") invalid();
   const digest = await tokenHash(raw),
     at = stamp(now);
+  if (databaseClock) {
+    const receipt = await db
+      .prepare(
+        "INSERT INTO follow_management_removals (token_hash,scope_key,admitted_at) VALUES (?,?,?)",
+      )
+      .bind(digest, scopeKey, at)
+      .run();
+    checkedManagementReceipt(receipt);
+    return receipt.meta.changes > 0;
+  }
   const result = await db.batch([
     db
       .prepare(
@@ -292,11 +377,14 @@ export async function removeManagedFollow(db, raw, scopeKey, now = new Date()) {
   return result[1].meta.changes > 0;
 }
 
-export async function deleteManagedFollows(db, raw, now = new Date()) {
+export async function deleteManagedFollows(db, raw, now = new Date(), databaseClock = false) {
+  const eligible =
+    liveToken + (databaseClock ? " AND expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now')" : "");
   const result = await db
-    .prepare("DELETE FROM follow_subscribers WHERE id IN (" + liveToken + ")")
+    .prepare("DELETE FROM follow_subscribers WHERE id IN (" + eligible + ")")
     .bind(await tokenHash(raw), "manage", stamp(now))
     .run();
+  if (databaseClock) checkedManagementReceipt(result);
   return result.meta.changes > 0;
 }
 
@@ -321,6 +409,7 @@ export async function deleteLinkedFollows(db, ownerUserHash) {
 
 export function followExpiryStatements(db, now) {
   return [
+    db.prepare("DELETE FROM follow_confirmation_outbox WHERE expires_at<=?").bind(stamp(now)),
     db
       .prepare(
         "DELETE FROM follow_tokens WHERE expires_at<=? OR (purpose='confirm' AND EXISTS " +

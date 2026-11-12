@@ -28,7 +28,7 @@ export function fakeD1() {
         return { success: true, meta: { changes: 0 }, results: sql.prepare(query).all(...params).map((r) => ({ ...r })) };
       }
       const r = sql.prepare(query).run(...params);
-      return { success: true, meta: { changes: Number(r.changes) } };
+      return { success: true, meta: { changes: Number(r.changes) }, results: [] };
     },
   });
   async function runBatch(list) {
