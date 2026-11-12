@@ -1,6 +1,8 @@
 // Test-only protocol rehearsal. No production entry point or selected witness provider.
 import { DurableObject } from "cloudflare:workers";
 import { createFollowCheckpointSnapshotReader } from "../src/follow-checkpoint-snapshot.js";
+import { createFollowCheckpointStage } from "../src/follow-checkpoint-stage.js";
+import { createFollowCheckpointPromotion } from "../src/follow-checkpoint-promotion.js";
 import { handleFollowCheckpoint } from "../src/follow-checkpoint-http.js";
 import { createFollowCheckpointR2Slots } from "../src/follow-checkpoint-r2.js";
 import { createFollowCheckpointPayloadCodec } from "../src/follow-checkpoint-payload.js";
@@ -165,13 +167,45 @@ export class CheckpointIntegration extends DurableObject {
       maxControlBytes: 16384,
     })(maxBytes);
   }
+  async inspectStageReservation(digest) {
+    const state = await this.admitted();
+    if (!state) return { status: "held" };
+    const r = state.reservation;
+    if (!r) return { status: "none" };
+    return r.digest === digest ? { status: "reservation", nonce: r.nonce } : { status: "held" };
+  }
+  stageSnapshot(body, limit = 3_000_000) {
+    return createFollowCheckpointStage({
+      codec,
+      maxBytes: 3_000_000,
+      inspect: (digest) => this.inspectStageReservation(digest),
+      read: (size) => this.readSnapshot(size),
+      reserve: (bytes) => this.reservePending(bytes),
+      upload: (nonce) => this.uploadReserved(nonce),
+      reconcile: (nonce) => this.reconcileReserved(nonce),
+    })(body, limit);
+  }
+  promoteSnapshot(body, limit, options) {
+    return createFollowCheckpointPromotion({
+      codec,
+      maxBytes: 3_000_000,
+      capture: () =>
+        this.ctx.storage.transactionSync(() => ({ raw: this.snapshot(), now: this.now() })),
+      read: (size) => this.readSnapshot(size),
+      change: (action) => this.change(action),
+    })(body, limit, options);
+  }
   async fetch(request) {
     const hash = async (text) =>
       Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", encoder.encode(text))), (v) =>
         v.toString(16).padStart(2, "0"),
       ).join("");
     return handleFollowCheckpoint(request, {
-      openStore: () => ({ read: (maxBytes) => this.readSnapshot(maxBytes) }),
+      openStore: () => ({
+        read: (maxBytes) => this.readSnapshot(maxBytes),
+        reservePending: (body, maxBytes) => this.stageSnapshot(body, maxBytes),
+        promote: (body, maxBytes, options) => this.promoteSnapshot(body, maxBytes, options),
+      }),
       maxBytes: 3_000_000,
       writer: await hash("A".repeat(43)),
       operator: await hash("B".repeat(43)),

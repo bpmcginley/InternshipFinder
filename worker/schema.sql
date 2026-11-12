@@ -1050,3 +1050,23 @@ CREATE TABLE IF NOT EXISTS topup_retention (
     (resolved_at IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',resolved_zero_since) IS resolved_zero_since
       AND resolved_zero_since >= resolved_at))
 , history_proven INTEGER NOT NULL DEFAULT 0 CHECK(history_proven IN (0,1)), evidence_digest TEXT CHECK(evidence_digest IS NULL OR (length(evidence_digest)=64 AND evidence_digest NOT GLOB '*[^0-9a-f]*')));
+
+-- Pending confirmation queue. Credentials and rendered mail are created only at dispatch.
+CREATE TABLE IF NOT EXISTS follow_confirmation_outbox (
+  id TEXT PRIMARY KEY NOT NULL,
+  subscriber_id TEXT NOT NULL,
+  scope_key TEXT NOT NULL,
+  queued_at TEXT NOT NULL,
+  expires_at TEXT NOT NULL CHECK (expires_at > queued_at), claim_id TEXT,
+  UNIQUE (subscriber_id, scope_key),
+  FOREIGN KEY (subscriber_id, scope_key)
+    REFERENCES follow_subscriptions(subscriber_id, scope_key) ON DELETE CASCADE
+);
+
+CREATE TRIGGER IF NOT EXISTS follow_confirmation_scope_changed
+AFTER UPDATE OF created, confirmed_at ON follow_subscriptions
+WHEN NEW.created != OLD.created OR NEW.confirmed_at IS NOT OLD.confirmed_at
+BEGIN
+  DELETE FROM follow_confirmation_outbox
+    WHERE subscriber_id = OLD.subscriber_id AND scope_key = OLD.scope_key;
+END;
