@@ -200,3 +200,21 @@ def test_exact_output_bound_and_empty_preview():
     selected["listings/index.json"] = raw(index)
     result = stage_follow_companies(selected, b"[]", **repin(selected, b"[]", args))
     assert result.files["first.json"] == b"[]"
+
+
+def test_oversized_selected_rejects_before_catalog_preparation(monkeypatch):
+    import internscout.site.follow_company_stage as stage
+
+    _, first, args = fixture()
+    oversized = dict.fromkeys(range(26**2 + 5), b"")
+    calls = []
+
+    def forbidden(*_args, **_kwargs):
+        calls.append(True)
+        pytest.fail("oversized selected reached snapshot/preparation")
+
+    monkeypatch.setattr(stage, "prepare_follow_catalog", forbidden)
+    with pytest.raises(ValueError):
+        stage.stage_follow_companies(oversized, first, **args)
+    assert not calls
+    assert stage.stage_follow_companies(oversized, first) is None

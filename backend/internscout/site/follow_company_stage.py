@@ -57,6 +57,7 @@ def stage_follow_companies(
         or len(first_bytes) > max_first_bytes
         or hashlib.sha256(first_bytes).hexdigest() != first_sha256
         or type(selected) is not dict
+        or len(selected) > 26**2 + 4
     ):
         codec._invalid()
     captured = dict(selected)
