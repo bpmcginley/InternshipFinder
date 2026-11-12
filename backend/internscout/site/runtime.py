@@ -14,7 +14,7 @@ Quality rules, because mass-produced pages that say nothing are exactly what sea
     filler text, so two pages only read alike when their data is alike;
   * everything that came from a job board is HTML-escaped, and only http(s) links are ever emitted.
 
-Run:  python -m internscout.seo_pages <site_dir>
+Run:  python -m internscout.site.publish <site_dir>
       where <site_dir> is a copy of docs/ (it reads <site_dir>/data and writes into <site_dir>).
 """
 
