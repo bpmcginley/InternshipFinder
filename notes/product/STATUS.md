@@ -400,6 +400,7 @@ The golden harness now covers static assets as well as generated pages. Each sit
 
 | C | P-2.1aq checkpoint payload codec | audit_growth_generated | `codex/product-p2.1aq-payload-codec` | [#471](https://github.com/bpmcginley/InternshipFinder/pull/471) | Offline qualification only | Exact Python canonical byte and digest parity, including closed lineage. Fifteen focused Node checks and seven Python checks pass. No storage/control/witness integration. |
 | D | P-2.1ar offline checkpoint integration | audit_growth_generated | `codex/product-p2.1ar-checkpoint-integration` | [#474](https://github.com/bpmcginley/InternshipFinder/pull/474) | Draft; local qualification passed; review/CI pending | Twelve native SQLite/R2 integration cases, 759 registered Node and 15 unchanged private-runtime checks pass. Injected external witness only; production entry/store/config unchanged. |
+| D | P-2.1as offline upload reservations | audit_worker_extension | `codex/product-p2.1as-reservations` | [#476](https://github.com/bpmcginley/InternshipFinder/pull/476) | Draft; corrective exact review and CI pending | Native cutoff regressions pass, including immutable admitted cutoff after accepted retirement and cleanup. Malformed cutoff holds, genesis/linked-predecessor consistency and delayed-write fencing verified. Configured coverage is tracked in the PR. Test-only five-file scope; no activation. |
 
 ## Waiting for Bruce
 
@@ -414,6 +415,7 @@ Dates are when the item was recorded, not a claim that a separate message was se
 
 | Recorded | Item | Ready artifact / next action | Done |
 |---|---|---|---|
+| 2026-11-11 | P-2.1as offline upload reservations | [#476](https://github.com/bpmcginley/InternshipFinder/pull/476): native cutoff correction qualifies cleanup after predecessor retirement. | Needs-bruce; corrective exact review/CI, downstream #478 cutoff binding, provider retention and durable witness remain separate gates. |
 | 2026-11-11 | P-2.1ao bounded R2 slots | [#468](https://github.com/bpmcginley/InternshipFinder/pull/468): offline conditional-write qualification passes; the malformed-header regression also rejects a leading UTF-8 BOM. | Storage choice, physical retention, control authority and restore witness remain unqualified. No activation. |
 | 2026-11-11 | P-2.1aq checkpoint payload codec | [#471](https://github.com/bpmcginley/InternshipFinder/pull/471): pure bounded split/reassembly and cross-language fixtures pass locally; timestamp regressions pass in both phases and directions. | Storage selection, activation and restore qualification remain pending. |
 | 2026-11-11 | P-2.1ar offline checkpoint integration | [#474](https://github.com/bpmcginley/InternshipFinder/pull/474): isolated native storage and simulated witness/rollback qualification pass locally; review/CI pending. | Needs-bruce; durable witness, physical retention and activation remain unqualified. |

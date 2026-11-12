@@ -20,6 +20,30 @@ const codec = createFollowCheckpointPayloadCodec({
   maxRows: 30000,
 });
 const live = (record, now) => record && record.starts <= now && now < record.expires;
+const validCutoff = (state, r) => {
+  if (
+    !Number.isSafeInteger(r?.starts) ||
+    !Number.isSafeInteger(r?.expires) ||
+    !Number.isSafeInteger(r?.cutoff) ||
+    r.cutoff <= r.starts ||
+    r.cutoff > r.expires
+  )
+    return false;
+  try {
+    const prior = JSON.parse(r.header).predecessor;
+    if (prior.checkpoint_sha256 === null) return !state.initialized && r.cutoff === r.expires;
+    if (!state.accepted) return state.initialized; // The captured deadline survives retirement.
+    const accepted = JSON.parse(state.accepted.header);
+    return (
+      prior.commit === accepted.accepted_commit &&
+      prior.public_tree === accepted.public_tree &&
+      prior.checkpoint_sha256 === state.accepted.digest &&
+      r.cutoff === Math.min(r.expires, state.accepted.expires)
+    );
+  } catch {
+    return false;
+  }
+};
 const position = (state) => ({ current: state.current, receipt: state.receipt });
 
 // This injected test double is deliberately outside the SQLite snapshot restored by tests.
@@ -59,6 +83,7 @@ export class CheckpointIntegration extends DurableObject {
     );
     // Witness is injected by the local test; restart without it must fail closed.
     this.witness = null;
+    this.uploads = new Map(); // Single-use upload bodies never enter SQLite or survive eviction.
   }
   now() {
     return this.ctx.storage.sql
@@ -107,28 +132,28 @@ export class CheckpointIntegration extends DurableObject {
       },
     };
   }
-  // Trusted fixture bootstrap, not the unimplemented pre-upload reservation/staging API.
-  async initialize(pendingBytes, oldBytes = null) {
+  // Only the already-accepted predecessor and initial fencing keys are trusted fixture seeds.
+  async bootstrap(oldBytes = null) {
     if (this.state()) throw new Error("fixture already initialized");
-    const entries = [await this.descriptor(pendingBytes, "pending", 0)];
-    if (oldBytes) entries.push(await this.descriptor(oldBytes, "accepted", 1));
+    const old = oldBytes ? await this.descriptor(oldBytes, "accepted", 1) : null;
     const state = {
       current: { epoch: id(), revision: 0, token: id() },
       receipt: null,
       initialized: Boolean(oldBytes),
       pending: null,
+      reservation: null,
       accepted: null,
       retired: null,
     };
     for (const slot of [0, 1]) {
       const fence = await this.slots.write(slot, null, await this.slots.tombstone());
       if (fence.status !== "stored") throw new Error("fixture slot occupied");
-      const entry = entries[slot];
+      const entry = slot === 1 ? old : null;
       if (!entry) continue;
       const prepared = await this.slots.prepare(entry.parts.payload);
       const put = await this.slots.write(slot, fence.etag, prepared);
       if (put.status !== "stored") throw new Error("fixture payload unavailable");
-      state[slot ? "accepted" : "pending"] = {
+      state.accepted = {
         ...entry.record,
         nonce: prepared.nonce,
         etag: put.etag,
@@ -137,6 +162,119 @@ export class CheckpointIntegration extends DurableObject {
     this.save(state);
     this.witness = new WitnessDouble(state.current);
     return position(state);
+  }
+  async initialize(pendingBytes, oldBytes = null) {
+    await this.bootstrap(oldBytes);
+    const reserved = await this.reservePending(pendingBytes);
+    if (reserved.status !== "reserved") throw new Error("fixture reservation refused");
+    if ((await this.uploadReserved(reserved.nonce)) !== "stored")
+      throw new Error("fixture upload uncertain");
+    if ((await this.reconcileReserved(reserved.nonce)) !== "committed")
+      throw new Error("fixture staging refused");
+    return position(this.state());
+  }
+  predecessorMatches(state, record, now) {
+    const prior = JSON.parse(record.header).predecessor;
+    if (!state.accepted) return !state.initialized && prior.checkpoint_sha256 === null;
+    const accepted = JSON.parse(state.accepted.header);
+    return (
+      live(state.accepted, now) &&
+      prior.commit === accepted.accepted_commit &&
+      prior.public_tree === accepted.public_tree &&
+      prior.checkpoint_sha256 === state.accepted.digest
+    );
+  }
+  async reservePending(raw) {
+    const before = await this.admitted();
+    if (!before || before.pending || before.reservation || before.retired)
+      return { status: "held" };
+    const slot = before.accepted ? 1 - before.accepted.slot : 0;
+    const entry = await this.descriptor(raw, "pending", slot);
+    const fence = await this.slots.read(slot);
+    if (fence.status !== "present" || fence.kind !== "tombstone") return { status: "held" };
+    const prepared = await this.slots.prepare(entry.parts.payload);
+    const reservation = {
+      ...entry.record,
+      cutoff: Math.min(entry.record.expires, before.accepted?.expires ?? entry.record.expires),
+      nonce: prepared.nonce,
+      fenceEtag: fence.etag,
+      fenceNonce: fence.nonce,
+    };
+    const result = await this.change((state, now) => {
+      if (
+        !equal(state, before) ||
+        !validCutoff(state, reservation) ||
+        now >= reservation.cutoff ||
+        !live(reservation, now) ||
+        !this.predecessorMatches(state, reservation, now)
+      )
+        return false;
+      state.reservation = reservation;
+      return true;
+    });
+    if (result !== "committed") return { status: result };
+    this.uploads.set(prepared.nonce, prepared);
+    return { status: "reserved", nonce: prepared.nonce };
+  }
+  async uploadReserved(nonce) {
+    const state = await this.admitted(),
+      r = state?.reservation;
+    const prepared = this.uploads.get(nonce);
+    if (
+      !r ||
+      r.nonce !== nonce ||
+      !prepared ||
+      !validCutoff(state, r) ||
+      this.now() >= r.cutoff ||
+      !live(r, this.now()) ||
+      !this.predecessorMatches(state, r, this.now())
+    )
+      return "held";
+    this.uploads.delete(nonce); // No retry after an ambiguous result or a process restart.
+    if (this.beforeUpload) await this.beforeUpload();
+    const result = await this.slots.write(r.slot, r.fenceEtag, prepared);
+    return result.status;
+  }
+  async reconcileReserved(nonce) {
+    const before = await this.admitted(),
+      r = before?.reservation;
+    if (!r || r.nonce !== nonce || !validCutoff(before, r)) return "held";
+    const object = await this.slots.read(r.slot);
+    if (object.status !== "present") return "held";
+    const payload =
+      object.kind === "payload" && object.nonce === r.nonce && object.sha256 === r.payloadSha;
+    const fence =
+      object.kind === "tombstone" && object.etag === r.fenceEtag && object.nonce === r.fenceNonce;
+    if (!payload && !fence) return "held";
+    const eligible = (state, now) =>
+      now < r.cutoff && live(r, now) && this.predecessorMatches(state, r, now);
+    if (eligible(before, this.now())) {
+      if (!payload) return "uncertain"; // A negative read cannot establish that PUT completed.
+      await codec.reassemble(object.payload, encoder.encode(r.header), "pending", r.digest);
+      return this.change((state, now) => {
+        if (!equal(state, before) || !eligible(state, now)) return false;
+        const { fenceEtag, fenceNonce, cutoff, ...record } = r;
+        state.pending = { ...record, etag: object.etag };
+        state.reservation = null;
+        return true;
+      });
+    }
+    const expired = (now) => now >= r.cutoff;
+    if (!expired(this.now())) return "held"; // Unavailable eligibility is not proof of expiry.
+    // Replacing the exact fence also prevents an earlier in-flight conditional PUT from committing.
+    this.uploads.delete(nonce);
+    return this.change(
+      (state, now) => {
+        if (!equal(state, before) || !expired(now)) return false;
+        state.reservation = null;
+        return true;
+      },
+      async () => {
+        if (this.beforeReservationCleanup) await this.beforeReservationCleanup();
+        const result = await this.slots.write(r.slot, object.etag, await this.slots.tombstone());
+        return result.status === "stored";
+      },
+    );
   }
   async change(action, effect = null) {
     const before = await this.admitted();
