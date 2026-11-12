@@ -1752,7 +1752,9 @@
 "new york - 1166|NY":null,
 "new york - 225 liberty street|NY":null,
 "new york - 245 park avenue|NY":null,
+"new york - 300 vesey street|NY":null,
 "new york - 32 old slip|NY":null,
+"new york - 322 eighth avenue|NY":null,
 "new york - 499 park|NY":null,
 "new york - manhattan|NY":[
 40.7815,
@@ -3109,6 +3111,7 @@
 -76.8706
 ],
 "wayne pa|PA":null,
+"waynesboro-pennsylvania-united states of america|PA":null,
 "waynesboro|PA":[
 39.7558,
 -77.5777

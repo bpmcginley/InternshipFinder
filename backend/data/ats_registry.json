@@ -14493,6 +14493,12 @@
    "fails": 0,
    "added": "2026-09-17"
   },
+  "chathamfinancial|wd501|ChathamFinancial": {
+   "name": "Chatham Financial",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-12"
+  },
   "chemours|wd103|Chemours": {
    "name": "Chemours",
    "quant": false,
@@ -15110,6 +15116,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-18"
+  },
+  "dover|wd103|Dover": {
+   "name": "Dover",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-12"
   },
   "dowjones|wd1|Dow_Jones_Career": {
    "name": "Dow Jones",
@@ -16023,6 +16035,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "greyco|wd108|GTI": {
+   "name": "Greystone",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-12"
+  },
   "greystar|wd1|External": {
    "name": "Greystar Worldwide",
    "quant": false,
@@ -16654,6 +16672,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "itw|wd5|external": {
+   "name": "Illinois Tool Works",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-12"
+  },
   "ivytech|wd1|ivy_tech_careers": {
    "name": "Ivy Tech Community College",
    "quant": false,
@@ -16730,10 +16754,9 @@
   "jj|wd5|JJ": {
    "name": "Johnson & Johnson",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-18",
-   "sector": "engineering_manufacturing",
-   "last_fail": "2026-11-12"
+   "sector": "engineering_manufacturing"
   },
   "jll|wd1|jllcareers": {
    "name": "Jones Lang LaSalle (JLL)",
@@ -17201,6 +17224,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "martinmarietta|wd5|Martin_Marietta_Careers": {
+   "name": "Martin Marietta",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-12"
   },
   "marvell|wd1|MarvellCareers": {
    "name": "Marvell",
@@ -17953,6 +17982,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "octa|wd1.myworkdaysite.com|OCTA_Careers": {
+   "name": "Orange County Transportation Authority",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-12"
+  },
   "ohiohealth|wd5|OhioHealthJobs": {
    "name": "OhioHealth",
    "quant": false,
@@ -18037,6 +18072,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "osc|wd3|OSCCareers": {
+   "name": "Ontario Securities Commission",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-12"
   },
   "oshkoshcorporation|wd5|Oshkosh": {
    "name": "Oshkosh",
@@ -18271,6 +18312,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "plusgrade|wd10|Plusgrade_External_Site": {
+   "name": "Plusgrade",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-12"
   },
   "pnc|wd5|External": {
    "name": "PNC Financial Services",
@@ -19781,6 +19828,12 @@
    "fails": 0,
    "added": "2026-09-18",
    "sector": "health"
+  },
+  "trinitylifesciences|wd108|Trinity": {
+   "name": "Trinity Life Sciences",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-12"
   },
   "troweprice|wd5|TRowePrice": {
    "name": "T. Rowe Price",
