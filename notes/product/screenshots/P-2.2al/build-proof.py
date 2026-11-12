@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[4]
 SPEC = importlib.util.spec_from_file_location("golden", ROOT / "backend/tests/golden_build.py")
 GOLDEN = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(GOLDEN)
-BASE = "6827576b64790afc2a4a659a316a5a983beb29bb"
+BASE = "10525eba2fd2dd0e0f06272cf246a841ae0fee4a"
 results = {}
 with tempfile.TemporaryDirectory(prefix="internscout-disclosure-proof-") as directory:
     for phase in ("before", "after"):
@@ -22,8 +22,13 @@ with tempfile.TemporaryDirectory(prefix="internscout-disclosure-proof-") as dire
                     subprocess.check_output(["git", "show", f"{BASE}:docs/{name}"], cwd=ROOT)
                 )
         results[phase] = GOLDEN.build(work)
-    assert not GOLDEN.differences(results["before"]), "Baseline is not the exact golden output"
     before, after = (GOLDEN.manifest(results[p]) for p in ("before", "after"))
+    baseline = json.loads(
+        subprocess.check_output(
+            ["git", "show", f"{BASE}:backend/tests/fixtures/golden/manifest.json"], cwd=ROOT
+        )
+    )
+    assert before == baseline, "Baseline is not the exact parent golden output"
     changed = [p for p in sorted(before.keys() | after.keys()) if before.get(p) != after.get(p)]
     assert changed == ["privacy.html", "terms.html"], changed
     report = {
