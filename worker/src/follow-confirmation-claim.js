@@ -12,13 +12,15 @@ const unavailable = () => new Error("Follow confirmation claim unavailable");
 const pending = `q.queued_at<=${DB_NOW} AND q.expires_at>${DB_NOW}
   AND EXISTS (SELECT 1 FROM follow_subscriptions s
     WHERE s.subscriber_id=q.subscriber_id AND s.scope_key=q.scope_key
-      AND s.confirmed_at IS NULL AND s.created<=q.queued_at
-      AND q.expires_at=strftime('%Y-%m-%dT%H:%M:%fZ',s.created,'+7 days'))`;
+      AND s.created<=q.queued_at AND (s.owner_user_hash IS NULL OR q.owner_user_hash IS NULL)
+      AND ((s.confirmed_at IS NULL AND q.expires_at=strftime('%Y-%m-%dT%H:%M:%fZ',s.created,'+7 days'))
+        OR (s.confirmed_at IS NOT NULL AND q.owner_user_hash IS NOT NULL
+          AND q.expires_at=strftime('%Y-%m-%dT%H:%M:%fZ',q.queued_at,'+7 days'))))`;
 const unclaimed = `q.claim_id IS NULL AND ${pending}
   AND NOT EXISTS (SELECT 1 FROM follow_tokens t
     WHERE t.subscriber_id=q.subscriber_id AND t.scope_key=q.scope_key
       AND t.purpose='confirm' AND t.expires_at>${DB_NOW})`;
-const exactJob = `q.subscriber_id=? AND q.scope_key=? AND q.queued_at=? AND q.expires_at=?
+const exactJob = `q.subscriber_id=? AND q.scope_key=? AND q.queued_at=? AND q.expires_at=? AND q.owner_user_hash IS ?
   AND EXISTS (SELECT 1 FROM follow_subscribers u WHERE u.id=q.subscriber_id AND u.email=?)`;
 const sameDay = `?<=${DB_NOW} AND substr(?,1,10)=date('now')`;
 const jobValues = (job) => [
@@ -26,6 +28,7 @@ const jobValues = (job) => [
   job.scope_key,
   job.queued_at,
   job.expires_at,
+  job.owner_user_hash ?? null,
   job.email,
 ];
 
@@ -33,7 +36,7 @@ export async function readUnclaimedFollowConfirmation(db, jobId) {
   if (typeof jobId !== "string" || !JOB_ID.test(jobId)) return null;
   const result = await db
     .prepare(
-      `SELECT q.subscriber_id,q.scope_key,q.queued_at,q.expires_at,u.email
+      `SELECT q.subscriber_id,q.scope_key,q.queued_at,q.expires_at,q.owner_user_hash,u.email
        FROM follow_confirmation_outbox q JOIN follow_subscribers u ON u.id=q.subscriber_id
        WHERE q.id=? AND ${unclaimed}`,
     )
@@ -88,8 +91,8 @@ export async function commitFollowConfirmationClaim(db, jobId, prepared, attempt
   const credentials = [
     db
       .prepare(
-        `INSERT INTO follow_tokens (token_hash,subscriber_id,purpose,scope_key,generation,expires_at)
-         SELECT ?,subscriber_id,'confirm',scope_key,?,expires_at ${claimed}`,
+        `INSERT INTO follow_tokens (token_hash,subscriber_id,purpose,scope_key,generation,expires_at,owner_user_hash)
+         SELECT ?,subscriber_id,'confirm',scope_key,?,expires_at,owner_user_hash ${claimed}`,
       )
       .bind(confirm.digest, confirm.generation, jobId, claimId),
     db
@@ -165,7 +168,7 @@ export async function readFollowConfirmationTransportFence(db, jobId, job, prepa
        WHERE q.id=? AND q.claim_id=? AND ${pending} AND ${exactJob} AND ${sameDay}
          AND EXISTS (SELECT 1 FROM follow_tokens t JOIN follow_request_deletions d ON d.confirm_hash=t.token_hash
            WHERE t.token_hash=? AND t.generation=? AND t.purpose='confirm' AND t.subscriber_id=q.subscriber_id
-             AND t.scope_key=q.scope_key AND t.expires_at=q.expires_at AND d.token_hash=?)
+             AND t.scope_key=q.scope_key AND t.expires_at=q.expires_at AND t.owner_user_hash IS q.owner_user_hash AND d.token_hash=?)
          AND EXISTS (SELECT 1 FROM follow_tokens t WHERE t.token_hash=? AND t.generation=?
            AND t.purpose='unsubscribe' AND t.subscriber_id=q.subscriber_id AND t.scope_key='' AND t.expires_at IS NULL)`,
     )
