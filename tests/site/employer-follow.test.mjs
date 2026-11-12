@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mountCompanyFollow } from "../../docs/js/follow-company.mjs";
+import { mountCompanyFollow, mountCompanyFollowPage } from "../../docs/js/follow-company.mjs";
 import { FOLLOW_COPY, normalizeFollowEmail } from "../../docs/js/app/follow-form.mjs";
 
 function fixture(options = {}) {
@@ -79,7 +79,10 @@ function fixture(options = {}) {
       return new Response(null, { status: 202 });
     },
   };
-  const control = mountCompanyFollow(browser, root, options);
+  doc.querySelectorAll = () => [root];
+  const control = options.page
+    ? mountCompanyFollowPage(browser, options)
+    : mountCompanyFollow(browser, root, options);
   const [toggle, form] = root.childNodes,
     [label, helper, submit, status] = form?.childNodes || [],
     email = label?.childNodes[0];
@@ -97,6 +100,7 @@ function fixture(options = {}) {
     calls,
     mutate: () => observer(),
     hide: () => events.get("pagehide")?.(),
+    show: (persisted = true) => events.get("pageshow")?.({ persisted }),
   };
 }
 
@@ -179,4 +183,50 @@ test("single flight and busy Escape preserve request; changed/detached/pagehide 
     assert.equal(f.email.value, "");
     assert.notEqual(f.status.textContent, FOLLOW_COPY.accepted);
   }
+});
+
+test("persisted pageshow remounts empty and stale accepted receipt cannot update the fresh form", async () => {
+  let settle,
+    signal,
+    count = 0;
+  const f = fixture({
+    page: true,
+    request: async (_input, options) => {
+      count++;
+      signal = options.signal;
+      return new Promise((resolve) => (settle = resolve));
+    },
+  });
+  f.toggle.fire("click");
+  f.email.value = "synthetic@example.test";
+  const pending = f.form.fire("submit");
+  f.hide();
+  assert(signal.aborted);
+  assert.equal(f.email.value, "");
+  assert.equal(f.root.childNodes.length, 0);
+  f.show(false);
+  assert.equal(f.root.childNodes.length, 0);
+  f.show();
+  const [toggle, form] = f.root.childNodes,
+    email = form.childNodes[0].childNodes[0],
+    status = form.childNodes[3];
+  assert.notEqual(form, f.form);
+  assert.equal(form.hidden, true);
+  assert.equal(email.value, "");
+  toggle.fire("click");
+  settle({ status: "accepted" });
+  await pending;
+  assert.equal(f.root.childNodes[1], form);
+  assert.equal(status.textContent, undefined);
+  assert.equal(count, 1);
+  email.value = "next@example.test";
+  const next = form.fire("submit");
+  settle({ status: "accepted" });
+  await next;
+  assert.equal(status.textContent, FOLLOW_COPY.accepted);
+  assert.equal(count, 2);
+  f.hide();
+  f.root.setAttribute("data-follow-company-key", "unapproved");
+  f.show();
+  assert.equal(f.root.childNodes.length, 0);
 });

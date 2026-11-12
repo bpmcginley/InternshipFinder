@@ -30,6 +30,7 @@ class CompanyFollow:
     key: str
     label: str
     identities: tuple[tuple[str, str, str], ...]
+    spellings: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -140,13 +141,16 @@ def with_company_follow(
         or any(row[2] != key for row in identities)
     ):
         raise ValueError("Invalid employer Follow selection")
-    return replace(model, follow_company=CompanyFollow(key, model.name, identities))
+    return replace(
+        model, follow_company=CompanyFollow(key, model.name, identities, tuple(model.spellings))
+    )
 
 
 def validated_company_follow(model: Page) -> CompanyFollow | None:
     selected = model.follow_company
     if selected is not None and (
         type(selected) is not CompanyFollow
+        or selected.spellings != tuple(model.spellings)
         or selected.label != model.name
         or not _follow_text(selected.key, 200)
         or selected.identities != _follow_identities(model)

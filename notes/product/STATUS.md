@@ -821,4 +821,4 @@ Draft needs-bruce [#443](https://github.com/bpmcginley/InternshipFinder/pull/443
 
 | Package | Owner | Branch | State |
 |---|---|---|---|
-| P-2.1cu | audit_growth_generated | `codex/product-p2.1cu-employer-follow` | [#575](https://github.com/bpmcginley/InternshipFinder/pull/575) draft; 477 site / 11 Edge scenarios; optional source, independent review/CI and G3/same-export/provider gates |
+| P-2.1cu | audit_growth_generated | `codex/product-p2.1cu-employer-follow` | [#575](https://github.com/bpmcginley/InternshipFinder/pull/575) draft; 478 site / 11 Edge scenarios; optional source, independent review/CI and G3/same-export/provider gates |

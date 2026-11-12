@@ -52,6 +52,11 @@ async function run(browser, phase, width, theme, broken = "") {
       return route.fulfill({ status: next, headers, body: next === 200 ? "{}" : "" });
     }
     assert.equal(u.origin, origin, "no third-party request");
+    if (u.pathname === "/fixture-away/")
+      return route.fulfill({
+        body: "<!doctype html><title>Offline fixture away</title>",
+        contentType: "text/html",
+      });
     if (u.pathname === routePath) {
       assert.equal(req.method(), "GET");
       assert.equal(u.search, "");
@@ -136,6 +141,20 @@ async function run(browser, phase, width, theme, broken = "") {
     await form
       .getByText("Email follows are unavailable. Please try again later.", { exact: true })
       .waitFor();
+    await page.evaluate(() => {
+      window.__persistedReturns = 0;
+      window.addEventListener("pageshow", (e) => {
+        if (e.persisted) window.__persistedReturns++;
+      });
+    });
+    await page.goto(origin + "/fixture-away/");
+    await page.goBack({ waitUntil: "commit" });
+    await toggle.waitFor();
+    assert.equal(await page.evaluate(() => window.__persistedReturns), 1, "actual BFCache return");
+    assert.equal(await form.isVisible(), false);
+    await toggle.click();
+    assert.equal(await email.inputValue(), "");
+    await email.fill("synthetic@example.test");
     next = "held";
     await submit.click();
     while (!held) await page.waitForTimeout(10);
@@ -143,6 +162,27 @@ async function run(browser, phase, width, theme, broken = "") {
       e.form.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })),
     );
     assert.equal(await form.getAttribute("aria-busy"), "true");
+    await page.evaluate(() => {
+      window.dispatchEvent(new PageTransitionEvent("pagehide", { persisted: true }));
+      window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: true }));
+    });
+    assert.equal(await form.isVisible(), false);
+    await toggle.click();
+    assert.equal(await email.inputValue(), "");
+    await held().catch(() => {});
+    await page.waitForTimeout(30);
+    assert.equal(
+      await form
+        .getByText("If this address can receive email, a confirmation link is on its way.", {
+          exact: true,
+        })
+        .count(),
+      0,
+    );
+    held = null;
+    await email.fill("synthetic@example.test");
+    await submit.click();
+    while (!held) await page.waitForTimeout(10);
     await page.evaluate(() =>
       document
         .querySelector("[data-follow-company-key]")
@@ -176,6 +216,7 @@ async function run(browser, phase, width, theme, broken = "") {
     broken,
     mockPosts: calls.length,
     expectedModuleErrors: errors.length,
+    actualPersistedReturn: phase === "after" && !broken,
   });
   await ctx.close();
 }
@@ -183,6 +224,7 @@ async function run(browser, phase, width, theme, broken = "") {
   const browser = await chromium.launch({
     executablePath: "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe",
     headless: true,
+    ignoreDefaultArgs: ["--disable-back-forward-cache"],
     args: ["--disable-background-networking", "--disable-component-update", "--disable-sync"],
   });
   try {

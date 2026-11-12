@@ -186,7 +186,35 @@ export function mountCompanyFollow(browser, root, { request } = {}) {
   return { destroy };
 }
 
-if (typeof window !== "undefined") {
-  for (const root of document.querySelectorAll("[data-follow-company-key]"))
-    mountCompanyFollow(window, root);
+// BFCache restores a new empty form, never a saved input or an old request continuation.
+export function mountCompanyFollowPage(browser, options = {}) {
+  const entries = [...browser.document.querySelectorAll("[data-follow-company-key]")].map(
+    (root) => ({
+      root,
+      key: root.getAttribute("data-follow-company-key"),
+      label: root.getAttribute("data-follow-company-label"),
+      control: mountCompanyFollow(browser, root, options),
+    }),
+  );
+  const restore = (event) => {
+    if (event.persisted !== true) return;
+    for (const entry of entries) {
+      entry.control?.destroy();
+      entry.control = null;
+      if (
+        entry.root.getAttribute("data-follow-company-key") === entry.key &&
+        entry.root.getAttribute("data-follow-company-label") === entry.label
+      )
+        entry.control = mountCompanyFollow(browser, entry.root, options);
+    }
+  };
+  browser.addEventListener("pageshow", restore);
+  return {
+    destroy() {
+      browser.removeEventListener("pageshow", restore);
+      for (const entry of entries) entry.control?.destroy();
+    },
+  };
 }
+
+if (typeof window !== "undefined") mountCompanyFollowPage(window);

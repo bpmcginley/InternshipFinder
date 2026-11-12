@@ -165,3 +165,20 @@ def test_exact_python_catalog_fixture_alias_is_used_without_normalizing():
             aliases={value.name: "company without roles"},
             companies=frozenset(catalog["signup"]["companies"]),
         )
+
+
+@pytest.mark.parametrize("change", ["append", "replace", "remove", "reorder"])
+def test_changed_approved_spellings_reject_before_renderer(change):
+    value = model()
+    value.spellings.append("Fixture Incorporated")
+    enabled = selected(value)
+    if change == "append":
+        enabled.spellings.append("Unapproved Other")
+    elif change == "replace":
+        enabled.spellings[0] = "Unapproved Other"
+    elif change == "remove":
+        enabled.spellings.pop()
+    else:
+        enabled.spellings.reverse()
+    with pytest.raises(ValueError, match="Stale employer Follow selection"):
+        runtime._render_employer_page(enabled)

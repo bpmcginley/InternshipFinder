@@ -5,15 +5,17 @@
     "theme": "light",
     "broken": "",
     "mockPosts": 0,
-    "expectedModuleErrors": 0
+    "expectedModuleErrors": 0,
+    "actualPersistedReturn": false
   },
   {
     "phase": "after",
     "width": 1280,
     "theme": "light",
     "broken": "",
-    "mockPosts": 3,
-    "expectedModuleErrors": 0
+    "mockPosts": 4,
+    "expectedModuleErrors": 0,
+    "actualPersistedReturn": true
   },
   {
     "phase": "before",
@@ -21,15 +23,17 @@
     "theme": "dark",
     "broken": "",
     "mockPosts": 0,
-    "expectedModuleErrors": 0
+    "expectedModuleErrors": 0,
+    "actualPersistedReturn": false
   },
   {
     "phase": "after",
     "width": 1280,
     "theme": "dark",
     "broken": "",
-    "mockPosts": 3,
-    "expectedModuleErrors": 0
+    "mockPosts": 4,
+    "expectedModuleErrors": 0,
+    "actualPersistedReturn": true
   },
   {
     "phase": "before",
@@ -37,15 +41,17 @@
     "theme": "light",
     "broken": "",
     "mockPosts": 0,
-    "expectedModuleErrors": 0
+    "expectedModuleErrors": 0,
+    "actualPersistedReturn": false
   },
   {
     "phase": "after",
     "width": 375,
     "theme": "light",
     "broken": "",
-    "mockPosts": 3,
-    "expectedModuleErrors": 0
+    "mockPosts": 4,
+    "expectedModuleErrors": 0,
+    "actualPersistedReturn": true
   },
   {
     "phase": "before",
@@ -53,15 +59,17 @@
     "theme": "dark",
     "broken": "",
     "mockPosts": 0,
-    "expectedModuleErrors": 0
+    "expectedModuleErrors": 0,
+    "actualPersistedReturn": false
   },
   {
     "phase": "after",
     "width": 375,
     "theme": "dark",
     "broken": "",
-    "mockPosts": 3,
-    "expectedModuleErrors": 0
+    "mockPosts": 4,
+    "expectedModuleErrors": 0,
+    "actualPersistedReturn": true
   },
   {
     "phase": "after",
@@ -69,7 +77,8 @@
     "theme": "light",
     "broken": "missing",
     "mockPosts": 0,
-    "expectedModuleErrors": 0
+    "expectedModuleErrors": 0,
+    "actualPersistedReturn": false
   },
   {
     "phase": "after",
@@ -77,7 +86,8 @@
     "theme": "light",
     "broken": "old",
     "mockPosts": 0,
-    "expectedModuleErrors": 1
+    "expectedModuleErrors": 1,
+    "actualPersistedReturn": false
   },
   {
     "phase": "after",
@@ -85,6 +95,7 @@
     "theme": "light",
     "broken": "setup",
     "mockPosts": 0,
-    "expectedModuleErrors": 1
+    "expectedModuleErrors": 1,
+    "actualPersistedReturn": false
   }
 ]
