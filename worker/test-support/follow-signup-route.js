@@ -11,6 +11,7 @@ const catalog = {
   },
   valid: { companies: new Set(["retired"]) },
 };
+const available = (expiresAt = Date.now() + 60000) => ({ status: "available", catalog, expiresAt });
 const input = (link = false) => ({
   email: "reader@example.test",
   scope: { kind: "company", company: "fixture" },
@@ -26,7 +27,7 @@ const options = (more = {}) => ({
   enabled: true,
   dailyLimit: 10,
   originAllowed: (r) => r.headers.get("Origin") === origin,
-  loadCatalog: async () => ({ status: "available", catalog }),
+  loadCatalog: async () => available(),
   ...more,
 });
 const count = async (db, table) =>
@@ -165,7 +166,7 @@ export async function staleLookupAndCatalogNeverExtendSession(db) {
         loadCatalog: async () => {
           loads++;
           clock = new Date(expiry);
-          return { status: "available", catalog };
+          return available();
         },
       }),
     );
@@ -211,6 +212,65 @@ export async function expiryDuringRateWriteKeepsCapButDoesNotQueue(db) {
   assert.equal(await count(db, "follow_subscribers"), 0);
 }
 
+export async function catalogCutoffIsRequiredAndCheckedBeforeStorage() {
+  const now = Date.now(),
+    never = () => assert.fail("Unexpected storage");
+  for (const expiresAt of [
+    undefined,
+    null,
+    "2000",
+    NaN,
+    Infinity,
+    Number.MAX_SAFE_INTEGER,
+    now,
+    now - 1,
+  ]) {
+    const handle = createFollowSignupRoute(
+      options({
+        clock: () => new Date(now),
+        loadCatalog: async () => ({ status: "available", catalog, expiresAt }),
+      }),
+    );
+    await response(await handle(post(), { db: { prepare: never, batch: never } }), 503);
+  }
+  const handle = createFollowSignupRoute(
+    options({ loadCatalog: async () => ({ status: "available", catalog }) }),
+  );
+  await response(await handle(post(), { db: { prepare: never, batch: never } }), 503);
+}
+
+export async function catalogExpiresDuringRateForAnonymousAndLinked(db) {
+  for (const linked of [false, true]) {
+    const s = linked ? await session(db) : null;
+    let now = Date.now();
+    const expiresAt = now + 10000;
+    const release = Object.freeze(available(expiresAt));
+    const wrapper = {
+      prepare(sql) {
+        const statement = db.prepare(sql);
+        if (!sql.startsWith("INSERT INTO rate")) return statement;
+        return {
+          bind: (...args) => ({
+            run: async () => {
+              const result = await statement.bind(...args).run();
+              now = expiresAt;
+              return result;
+            },
+          }),
+        };
+      },
+      batch: (ss) => db.batch(ss),
+    };
+    const handle = createFollowSignupRoute(
+      options({ clock: () => new Date(now), loadCatalog: async () => release }),
+    );
+    await response(await handle(post(input(linked), s?.headers), { db: wrapper }), 503);
+    assert.equal(await count(db, "follow_subscribers"), 0);
+    assert.equal(await count(db, "follow_confirmation_outbox"), 0);
+  }
+  assert.equal((await db.prepare("SELECT calls FROM rate").first()).calls, 2);
+}
+
 export async function sqlFencesRevocationAndDatabaseExpiry(db) {
   for (const mode of ["revoked", "expired"]) {
     const s = await session(db);
@@ -224,7 +284,7 @@ export async function sqlFencesRevocationAndDatabaseExpiry(db) {
               .prepare("UPDATE sessions SET expires=? WHERE id=?")
               .bind("2020-01-01T00:00:00.000Z", s.id)
               .run();
-          return { status: "available", catalog };
+          return available();
         },
       }),
     );
@@ -243,7 +303,7 @@ export async function oneFactorySharesCapacityAcrossRequestContexts(db) {
       loadCatalog: () =>
         new Promise((resolve) => {
           gates.push(true);
-          releases.push(() => resolve({ status: "available", catalog }));
+          releases.push(() => resolve(available()));
         }),
     }),
   );

@@ -61,24 +61,40 @@ export function createFollowSignupRoute({
           identity = await sessionUser(db, token, { now: +fresh(), refresh: false });
           if (!live()) return unavailable();
         }
-        const loaded = await loadCatalog();
         fresh();
-        if (!live() || loaded?.status !== "available" || !loaded.catalog?.signup)
+        const loaded = await loadCatalog();
+        if (
+          !live() ||
+          loaded?.status !== "available" ||
+          !loaded.catalog?.signup ||
+          Object.keys(loaded).sort().join(",") !== "catalog,expiresAt,status"
+        )
           return unavailable();
+        // The trusted port binds this primitive cutoff to the same validated release snapshot.
+        const { expiresAt } = loaded;
+        if (
+          !Number.isSafeInteger(expiresAt) ||
+          expiresAt <= 0 ||
+          !Number.isFinite(+new Date(expiresAt))
+        )
+          return unavailable();
+        const admittedClock = () => {
+          const at = fresh();
+          if (+at >= expiresAt || (identity && !(Date.parse(identity.expires) > +at)))
+            throw new Error();
+          return at;
+        };
+        admittedClock();
         if (identity) {
           sessionProof = { id: await sessionTokenHash(token), user: identity.user };
-          if (!live()) return unavailable();
+          admittedClock();
         }
         return await admitFollowSignup(db, input, {
           enabled: true,
           dailyLimit,
           catalog: loaded.catalog.signup,
           sessionProof,
-          clock: () => {
-            const at = fresh();
-            if (identity && !(Date.parse(identity.expires) > +at)) throw new Error();
-            return at;
-          },
+          clock: admittedClock,
         });
       } catch {
         return unavailable();
