@@ -52,17 +52,37 @@ export async function claimFollowConfirmation(db, jobId) {
   const results = await db.batch(statements).catch(() => {
     throw unavailable();
   });
-  if (!Array.isArray(results) || results.length !== statements.length) throw unavailable();
+  if (
+    !Array.isArray(results) ||
+    results.length !== statements.length ||
+    results.some((result) => result?.success !== true)
+  ) {
+    throw unavailable();
+  }
   const [claim, confirmation, deleteRequest, addressWide, fence] = results;
   const writes = [claim, confirmation, deleteRequest, addressWide].map(
     (result) => result?.meta?.changes,
   );
-  if (writes.every((changes) => changes === 0)) return null;
-  if (writes.some((changes) => changes !== 1) || !Array.isArray(fence?.results)) {
+  if (!Array.isArray(fence?.results) || fence.results.length > 1 || fence.meta?.changes !== 0) {
     throw unavailable();
   }
-  const expiresAt = fence.results[0]?.expires_at;
-  if (!(Date.now() < Date.parse(expiresAt))) return null;
+  if (writes.every((changes) => changes === 0)) {
+    if (fence.results.length) throw unavailable();
+    return null;
+  }
+  if (writes.some((changes) => changes !== 1)) throw unavailable();
+  if (!fence.results.length) return null;
+  const receipt = fence.results[0];
+  const expiresAt = receipt?.expires_at;
+  const expiry = typeof expiresAt === "string" ? Date.parse(expiresAt) : NaN;
+  if (
+    !Number.isFinite(expiry) ||
+    new Date(expiry).toISOString() !== expiresAt ||
+    Object.keys(receipt).length !== 1
+  ) {
+    throw unavailable();
+  }
+  if (!(Date.now() < expiry)) return null;
   return {
     claimId,
     expiresAt,

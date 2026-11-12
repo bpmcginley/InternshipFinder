@@ -147,6 +147,45 @@ it("cannot reconstruct or mint again after a committed batch loses acknowledgeme
   expect(await rows("SELECT COUNT(*) AS n FROM follow_request_deletions")).toEqual([{ n: 1 }]);
 });
 
+it.each([
+  ["a failed write", (result) => (result[0].success = false)],
+  ["a missing read success", (result) => delete result[4].success],
+  ["two fence rows", (result) => result[4].results.push(result[4].results[0])],
+  ["a read reporting writes", (result) => (result[4].meta.changes = 1)],
+  ["a nonstring expiry", (result) => (result[4].results[0].expires_at = 4102444800000)],
+  ["a noncanonical expiry", (result) => (result[4].results[0].expires_at = "2100-01-01")],
+  [
+    "a fence row after zero writes",
+    (result) => result.slice(0, 4).forEach(({ meta }) => (meta.changes = 0)),
+  ],
+])("withholds raw credentials when a committed batch reports %s", async (_, alter) => {
+  const pending = await queue("one");
+  const malformed = batchThrough(async (statements) => {
+    const result = await env.DB.batch(statements);
+    alter(result);
+    return result;
+  });
+  const outcome = await claim(pending, malformed).then(
+    () => "unexpected success",
+    (error) => error.message,
+  );
+  expect(outcome).toBe("Follow confirmation claim unavailable");
+  expect((await row(pending)).claim_id).not.toBeNull();
+  expect(await claim(pending)).toBeNull();
+});
+
+it("treats a successful empty final fence as spent after all four writes", async () => {
+  const pending = await queue("one");
+  const expiredAtFence = batchThrough(async (statements) => {
+    const result = await env.DB.batch(statements);
+    result[4].results = [];
+    return result;
+  });
+  expect(await claim(pending, expiredAtFence)).toBeNull();
+  expect((await row(pending)).claim_id).not.toBeNull();
+  expect(await claim(pending)).toBeNull();
+});
+
 it("withholds the credentials when the exact expiry is reached before the Worker sees the receipt", async () => {
   const pending = await queue("one");
   const expiry = Date.parse((await row(pending)).expires_at);
