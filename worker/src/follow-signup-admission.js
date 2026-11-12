@@ -1,3 +1,4 @@
+import { requestLinkedFollowConfirmation } from "./follow-linked-request.js";
 import { canonicalFollow, normalizeFollowEmail, requestFollowConfirmation } from "./follows.js";
 import { bumpUnder } from "./limits.js";
 
@@ -7,6 +8,20 @@ const uuid = (value) =>
   typeof value === "string" && /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/.test(value);
 const result = (status) => ({ status });
 const unavailable = () => result("unavailable");
+const sessionHash = (value) => typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
+
+function copySessionProof(value) {
+  if (
+    !value ||
+    typeof value !== "object" ||
+    Array.isArray(value) ||
+    Object.keys(value).sort().join(",") !== "id,user"
+  )
+    return null;
+  const { id, user } = value;
+  return sessionHash(id) && sessionHash(user) ? { id, user } : null;
+}
+
 const instant = (clock) => {
   const value = clock();
   if (
@@ -22,7 +37,7 @@ const instant = (clock) => {
 export async function admitFollowSignup(db, input, options = {}) {
   if (options?.enabled !== true) return result("disabled");
   const { dailyLimit, catalog, clock = () => new Date() } = options;
-  let snapshot, email, scopeKey;
+  let snapshot, email, scopeKey, session;
   try {
     if (!Number.isSafeInteger(dailyLimit) || dailyLimit <= 0 || typeof clock !== "function")
       return unavailable();
@@ -44,8 +59,11 @@ export async function admitFollowSignup(db, input, options = {}) {
       typeof input.link !== "boolean"
     )
       return result("invalid");
-    // Never downgrade a requested account link into an unlinked subscription.
-    if (input.link) return result("unsupported");
+    if (input.link) {
+      // The request body cannot supply proof. Snapshot the trusted caller's exact pair before I/O.
+      session = copySessionProof(options.sessionProof);
+      if (!session) return result("unsupported");
+    }
     email = normalizeFollowEmail(input.email);
     scopeKey = canonicalFollow(input.scope, snapshot);
   } catch {
@@ -80,9 +98,16 @@ export async function admitFollowSignup(db, input, options = {}) {
         for (let index = 0; index < statements.length; index++)
           if (!Object.hasOwn(rows, index) || rows[index]?.success !== true) throw new Error();
         const results = rows.at(-1).results;
-        if (!Array.isArray(results) || results.length !== 1 || !Object.hasOwn(results, 0))
-          throw new Error();
+        if (!Array.isArray(results) || results.length > 1) throw new Error();
+        if (!results.length && session) return rows;
+        if (!Object.hasOwn(results, 0)) throw new Error();
         const row = results[0];
+        // The linked helper validates its own exact row fields. Reject holes and null rows here
+        // so a malformed acknowledgement cannot be mistaken for its legitimate empty result.
+        if (session) {
+          if (!row || typeof row !== "object" || Array.isArray(row)) throw new Error();
+          return rows;
+        }
         if (
           !row ||
           typeof row !== "object" ||
@@ -95,13 +120,11 @@ export async function admitFollowSignup(db, input, options = {}) {
         return rows;
       },
     };
-    const receipt = await requestFollowConfirmation(
-      queueDB,
-      email,
-      JSON.parse(scopeKey),
-      snapshot,
-      now,
-    );
+    const scope = JSON.parse(scopeKey);
+    const receipt = session
+      ? await requestLinkedFollowConfirmation(queueDB, email, scope, snapshot, session)
+      : await requestFollowConfirmation(queueDB, email, scope, snapshot, now);
+    if (session && receipt === null) return result("accepted");
     if (
       !uuid(receipt?.subscriberId) ||
       receipt.scopeKey !== scopeKey ||
