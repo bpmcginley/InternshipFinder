@@ -198,14 +198,18 @@ export function createAccount(browser, { C, ls, ss, DAY, demandStates, PROFILE_K
   }
 
   // GET /me: this month's allowance ({tier, paused, allowance:{task:{used,limit}}}), or null.
-  async function fetchMe(token) {
+  async function fetchMe(token, current = () => true) {
     if (!workerOn() || !token) return null;
     try {
+      if (!current()) return null;
       const r = await browser.fetch(C.workerUrl.replace(/\/$/, "") + "/me", { headers: { Authorization: "Bearer " + token } });
-      // was: if (r.status === 401) { signOut(); return null; }
+      // The native loader can end this request's authority even when a token is reused.
+      // Keep one-argument callers' current-session rejection/refresh behavior unchanged.
+      if (!current()) return null;
       if (r.status === 401) { forget(token); return null; }
       if (r.ok) touchSession(token);
-      return r.ok ? await r.json() : null;
+      const data = r.ok ? await r.json() : null;
+      return current() ? data : null;
     } catch (e) { return null; }
   }
   // Referral credits (worker/src/referral.js). A classmate's invite code rides in on ?ref= and waits
