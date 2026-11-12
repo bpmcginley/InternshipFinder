@@ -1,0 +1,74 @@
+[
+  {
+    "phase": "before",
+    "width": 1280,
+    "theme": "light",
+    "persistedSessionRetained": false,
+    "authenticatedMeReads": 3,
+    "errors": [],
+    "externalRequests": 0
+  },
+  {
+    "phase": "before",
+    "width": 1280,
+    "theme": "dark",
+    "persistedSessionRetained": false,
+    "authenticatedMeReads": 3,
+    "errors": [],
+    "externalRequests": 0
+  },
+  {
+    "phase": "before",
+    "width": 375,
+    "theme": "light",
+    "persistedSessionRetained": false,
+    "authenticatedMeReads": 3,
+    "errors": [],
+    "externalRequests": 0
+  },
+  {
+    "phase": "before",
+    "width": 375,
+    "theme": "dark",
+    "persistedSessionRetained": false,
+    "authenticatedMeReads": 3,
+    "errors": [],
+    "externalRequests": 0
+  },
+  {
+    "phase": "after",
+    "width": 1280,
+    "theme": "light",
+    "persistedSessionRetained": true,
+    "authenticatedMeReads": 4,
+    "errors": [],
+    "externalRequests": 0
+  },
+  {
+    "phase": "after",
+    "width": 1280,
+    "theme": "dark",
+    "persistedSessionRetained": true,
+    "authenticatedMeReads": 4,
+    "errors": [],
+    "externalRequests": 0
+  },
+  {
+    "phase": "after",
+    "width": 375,
+    "theme": "light",
+    "persistedSessionRetained": true,
+    "authenticatedMeReads": 4,
+    "errors": [],
+    "externalRequests": 0
+  },
+  {
+    "phase": "after",
+    "width": 375,
+    "theme": "dark",
+    "persistedSessionRetained": true,
+    "authenticatedMeReads": 4,
+    "errors": [],
+    "externalRequests": 0
+  }
+]

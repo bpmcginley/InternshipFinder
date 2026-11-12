@@ -24,6 +24,19 @@ async function sha256Hex(s) {
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+export { sha256Hex as sessionTokenHash };
+
+// For an optional session-owned transaction. The account column is fixed by the caller's SQL.
+export function sessionWriteFence(session, accountColumn) {
+  if (session === undefined) return { sql: "", args: [] };
+  return {
+    sql:
+      ` AND ${accountColumn}=? AND EXISTS(SELECT 1 FROM sessions s WHERE s.id=? AND s.user_hash=? ` +
+      "AND julianday(s.expires)>julianday('now'))",
+    args: [session.user, session.id, session.user],
+  };
+}
+
 const expiresFrom = (now) => new Date(now.getTime() + LIFETIME_MS).toISOString();
 
 // POST /session, after the ID token has been verified. Returns the new token and its expiry. The new row

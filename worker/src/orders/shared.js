@@ -19,6 +19,7 @@ export function text(body, field, { required = false } = {}) {
 export const DAYS = 30;              // days each role runs
 export const FIELD_CAP = 5;          // paid roles running at once that share a field tag
 export const MAX_START_DAYS = 90;    // the start day is today up to this many days ahead
+export const MAX_ORDER_BYTES = 4_000;
 
 // The terms an order accepts: docs/terms.html's "Last updated" day (tests/site/buy.test.mjs holds the two
 // together), and the clickwrap box exactly as docs/employers/buy/ shows it, stored on every order (legal

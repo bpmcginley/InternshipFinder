@@ -8,6 +8,59 @@ const OFFER = Object.freeze({
   currency: "usd",
   units: 25,
 });
+// Historical recovery stays configured when current sales or the Price are inactive.
+export function topupRecoveryConfigured(env) {
+  return (
+    typeof env?.STRIPE_SECRET_KEY === "string" &&
+    !!env.STRIPE_SECRET_KEY &&
+    typeof env.STRIPE_PRICE_TOPUP === "string" &&
+    /^price_[A-Za-z0-9_]{1,250}$/.test(env.STRIPE_PRICE_TOPUP)
+  );
+}
+export function historicalTopupOffer(env, version, livemode) {
+  return topupRecoveryConfigured(env) && version === OFFER.version && typeof livemode === "boolean"
+    ? { ...OFFER, priceId: env.STRIPE_PRICE_TOPUP, livemode }
+    : null;
+}
+// At most one bounded GET per association step. No arbitrary path or provider writes.
+export async function readTopupAssociation(env, kind, id, fetchImpl) {
+  const prefix = { charges: "ch", payment_intents: "pi" }[kind];
+  if (
+    !topupRecoveryConfigured(env) ||
+    !(kind === "checkout/sessions"
+      ? validTopupCheckoutId(id)
+      : prefix &&
+        typeof id === "string" &&
+        new RegExp("^" + prefix + "_[A-Za-z0-9_]{1,250}$").test(id)) ||
+    typeof fetchImpl !== "function"
+  )
+    throw unavailable();
+  return boundedRequest(
+    { STRIPE_SECRET_KEY: env.STRIPE_SECRET_KEY },
+    kind + "/" + encodeURIComponent(id),
+    {},
+    fetchImpl,
+    null,
+    "GET",
+    TOPUP_CHECKOUT_BOUNDS.timeoutMs,
+  );
+}
+
+export function topupConfigured(env) {
+  return (
+    env?.TOPUPS_ENABLED === "1" &&
+    paymentsOn(env) &&
+    typeof env.STRIPE_PRICE_TOPUP === "string" &&
+    /^price_[A-Za-z0-9_]{1,250}$/.test(env.STRIPE_PRICE_TOPUP)
+  );
+}
+
+export function topupDisplayOffer(adapter) {
+  if (adapter?.enabled !== true || adapter.offer !== OFFER) return null;
+  const { amount, currency, units } = OFFER;
+  return { amount, currency, units };
+}
+
 const unavailable = () => new Error("Top-up checkout is unavailable");
 const uuid = (value) =>
   typeof value === "string" && /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/.test(value);
@@ -24,7 +77,7 @@ function callback(value, origin) {
     throw unavailable();
   return url.href;
 }
-function checkoutUrl(value, id) {
+export function checkoutUrl(value, id) {
   if (typeof value !== "string" || value.length > 8192 || /[\\\s]/.test(value)) throw unavailable();
   let url;
   try {
@@ -146,15 +199,11 @@ export async function prepareTopupStripe(
   timeoutMs = TOPUP_CHECKOUT_BOUNDS.timeoutMs,
 ) {
   if (
-    !env ||
-    env.TOPUPS_ENABLED !== "1" ||
-    !paymentsOn(env) ||
+    !topupConfigured(env) ||
     typeof fetchImpl !== "function" ||
     !Number.isInteger(timeoutMs) ||
     timeoutMs < 1 ||
-    timeoutMs > TOPUP_CHECKOUT_BOUNDS.timeoutMs ||
-    typeof env.STRIPE_PRICE_TOPUP !== "string" ||
-    !/^price_[A-Za-z0-9_]{1,250}$/.test(env.STRIPE_PRICE_TOPUP)
+    timeoutMs > TOPUP_CHECKOUT_BOUNDS.timeoutMs
   )
     return { enabled: false };
   // Snapshot private configuration. Price/session paths and raw errors must never reach logs.
