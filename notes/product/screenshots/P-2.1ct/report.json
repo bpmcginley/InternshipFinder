@@ -1,0 +1,222 @@
+[
+  {
+    "phase": "before",
+    "width": 1280,
+    "theme": "light",
+    "enabled": false,
+    "signed": false,
+    "variant": "valid",
+    "mockPosts": 0,
+    "external": 0,
+    "pageErrors": 0
+  },
+  {
+    "phase": "default",
+    "width": 1280,
+    "theme": "light",
+    "enabled": false,
+    "signed": false,
+    "variant": "valid",
+    "mockPosts": 0,
+    "external": 0,
+    "pageErrors": 0
+  },
+  {
+    "phase": "after",
+    "width": 1280,
+    "theme": "light",
+    "enabled": true,
+    "signed": false,
+    "variant": "valid",
+    "mockPosts": 5,
+    "external": 0,
+    "pageErrors": 0
+  },
+  {
+    "phase": "after",
+    "width": 1280,
+    "theme": "light",
+    "enabled": true,
+    "signed": true,
+    "variant": "valid",
+    "mockPosts": 4,
+    "external": 0,
+    "pageErrors": 0
+  },
+  {
+    "phase": "before",
+    "width": 1280,
+    "theme": "dark",
+    "enabled": false,
+    "signed": false,
+    "variant": "valid",
+    "mockPosts": 0,
+    "external": 0,
+    "pageErrors": 0
+  },
+  {
+    "phase": "default",
+    "width": 1280,
+    "theme": "dark",
+    "enabled": false,
+    "signed": false,
+    "variant": "valid",
+    "mockPosts": 0,
+    "external": 0,
+    "pageErrors": 0
+  },
+  {
+    "phase": "after",
+    "width": 1280,
+    "theme": "dark",
+    "enabled": true,
+    "signed": false,
+    "variant": "valid",
+    "mockPosts": 3,
+    "external": 0,
+    "pageErrors": 0
+  },
+  {
+    "phase": "after",
+    "width": 1280,
+    "theme": "dark",
+    "enabled": true,
+    "signed": true,
+    "variant": "valid",
+    "mockPosts": 4,
+    "external": 0,
+    "pageErrors": 0
+  },
+  {
+    "phase": "before",
+    "width": 375,
+    "theme": "light",
+    "enabled": false,
+    "signed": false,
+    "variant": "valid",
+    "mockPosts": 0,
+    "external": 0,
+    "pageErrors": 0
+  },
+  {
+    "phase": "default",
+    "width": 375,
+    "theme": "light",
+    "enabled": false,
+    "signed": false,
+    "variant": "valid",
+    "mockPosts": 0,
+    "external": 0,
+    "pageErrors": 0
+  },
+  {
+    "phase": "after",
+    "width": 375,
+    "theme": "light",
+    "enabled": true,
+    "signed": false,
+    "variant": "valid",
+    "mockPosts": 3,
+    "external": 0,
+    "pageErrors": 0
+  },
+  {
+    "phase": "after",
+    "width": 375,
+    "theme": "light",
+    "enabled": true,
+    "signed": true,
+    "variant": "valid",
+    "mockPosts": 4,
+    "external": 0,
+    "pageErrors": 0
+  },
+  {
+    "phase": "before",
+    "width": 375,
+    "theme": "dark",
+    "enabled": false,
+    "signed": false,
+    "variant": "valid",
+    "mockPosts": 0,
+    "external": 0,
+    "pageErrors": 0
+  },
+  {
+    "phase": "default",
+    "width": 375,
+    "theme": "dark",
+    "enabled": false,
+    "signed": false,
+    "variant": "valid",
+    "mockPosts": 0,
+    "external": 0,
+    "pageErrors": 0
+  },
+  {
+    "phase": "after",
+    "width": 375,
+    "theme": "dark",
+    "enabled": true,
+    "signed": false,
+    "variant": "valid",
+    "mockPosts": 3,
+    "external": 0,
+    "pageErrors": 0
+  },
+  {
+    "phase": "after",
+    "width": 375,
+    "theme": "dark",
+    "enabled": true,
+    "signed": true,
+    "variant": "valid",
+    "mockPosts": 4,
+    "external": 0,
+    "pageErrors": 0
+  },
+  {
+    "phase": "after",
+    "width": 375,
+    "theme": "light",
+    "enabled": true,
+    "signed": false,
+    "variant": "missing",
+    "mockPosts": 0,
+    "external": 0,
+    "pageErrors": 0
+  },
+  {
+    "phase": "after",
+    "width": 375,
+    "theme": "light",
+    "enabled": true,
+    "signed": false,
+    "variant": "malformed",
+    "mockPosts": 0,
+    "external": 0,
+    "pageErrors": 0
+  },
+  {
+    "phase": "after",
+    "width": 375,
+    "theme": "light",
+    "enabled": true,
+    "signed": false,
+    "variant": "closed",
+    "mockPosts": 0,
+    "external": 0,
+    "pageErrors": 0
+  },
+  {
+    "phase": "after",
+    "width": 375,
+    "theme": "light",
+    "enabled": true,
+    "signed": false,
+    "variant": "root-fallback",
+    "mockPosts": 0,
+    "external": 0,
+    "pageErrors": 0
+  }
+]

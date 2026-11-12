@@ -170,7 +170,7 @@ export function createRows(browser, {
   // `needsAccess` (U11): with the extension installed, a row whose application is not on a site Auto-Apply
   // already has access to (SUPPORTED_ATS) says, quietly, that it will ask for that site first.
   // was: const Row = React.memo(function Row({ r, sc, ctx, keys, state, onState, job, checked, onCheck, canAuto, canTry, onAuto, queueBusy, open, onWhy, onRank, elig, patterns }) {
-  const Row = browser.React.memo(function Row({ r, sc, ctx, keys, state, onState, job, checked, onCheck, canAuto, canTry, onAuto, queueBusy, open, onWhy, onRank, elig, patterns, ask, onOpen, onAnswer, saved, onSave, myList, fresh, missingText }) {
+  const Row = browser.React.memo(function Row({ r, sc, ctx, keys, state, onState, job, checked, onCheck, canAuto, canTry, onAuto, queueBusy, open, onWhy, onRank, elig, patterns, ask, onOpen, onAnswer, saved, onSave, myList, fresh, missingText, follow }) {
     const [aaOpen, setAaOpen] = useState(false);
     const whyBtn = useRef(), statusSel = useRef();
     const asking = !!ask && (state === "none" || state === "interested") && !job;
@@ -241,7 +241,7 @@ export function createRows(browser, {
       tryAuto && aaOpen && h("tr", { className: "aa-info", id: "aa-" + r.id }, h("td", { colSpan: cols },
         "The free InternScout extension fills this application from your resume. You review it and press Submit yourself. Free monthly allowance. ",
         h("a", { href: installUrl("dashboard-row"), target: "_blank", rel: "noopener" }, "Add it to Chrome"))),
-      open && h("tr", { className: "why", id: "why-" + r.id }, h("td", { colSpan: cols }, h(Why, { r, sc, ctx, elig, patterns, onClose: closeWhy, onRank }))));
+      open && h("tr", { className: "why", id: "why-" + r.id }, h("td", { colSpan: cols }, h(Why, { r, sc, ctx, elig, patterns, onClose: closeWhy, onRank }), follow)));
   });
 
   // The list is filtered and re-sorted on every change to the search text, so the box keeps its own
