@@ -111,6 +111,33 @@ test("accepted signup returns an empty acknowledgement and keeps linked intent e
   assert.equal(calls, 1);
 });
 
+test("duplicate and escaped member aliases cannot override explicit consent or scope", async () => {
+  const endpoint = createFollowSignupHttp({ enabled: true, originAllowed, admit: never });
+  for (const body of [
+    json.replace('"link":false', '"link":true,"link":false'),
+    json.replace('"link":false', String.raw`"l\u0069nk":true,"link":false`),
+    json.replace('"link":false', '"link":false,"link":false'),
+    json.replace('"email":', '"email":"other@example.test","email":'),
+    json.replace('"company":"acme"', String.raw`"company":"other","c\u006fmpany":"acme"`),
+  ]) {
+    await expectResponse(await endpoint(request(body)), 400);
+  }
+  const ordinary = createFollowSignupHttp({
+    enabled: true,
+    originAllowed,
+    admit(value) {
+      assert.deepEqual(value, { ...input, email: 'text { "key": "value" }' });
+      return { status: "accepted" };
+    },
+  });
+  const reordered = JSON.stringify(
+    { scope: input.scope, link: false, email: 'text { "key": "value" }' },
+    null,
+    2,
+  );
+  await expectResponse(await ordinary(request(reordered)), 202);
+});
+
 test("downstream statuses and errors never expose account or database details", async () => {
   const cases = [
     [{ status: "invalid" }, 400],

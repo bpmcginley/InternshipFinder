@@ -35,14 +35,21 @@ it("bounded signup HTTP admits one exact pending job through actual D1", async (
     link: false,
     scope: { kind: "company", company: "acme" },
   };
-  const post = (input) =>
+  const postJson = (json) =>
     handle(
       new Request("https://api.example.test/follows/request", {
         method: "POST",
         headers: { Origin: origin, "Content-Type": "application/json" },
-        body: JSON.stringify(input),
+        body: json,
       }),
     );
+  const post = (input) => postJson(JSON.stringify(input));
+  const duplicate = JSON.stringify(body).replace('"link":false', '"link":true,"link":false');
+  expect((await postJson(duplicate)).status).toBe(400);
+  expect(await env.DB.prepare("SELECT calls FROM rate").first()).toBeNull();
+  expect(
+    await env.DB.prepare("SELECT COUNT(*) AS count FROM follow_confirmation_outbox").first(),
+  ).toEqual({ count: 0 });
   expect((await post({ ...body, link: true })).status).toBe(503);
   expect((await post({ ...body, scope: { kind: "company", company: "unknown" } })).status).toBe(
     400,

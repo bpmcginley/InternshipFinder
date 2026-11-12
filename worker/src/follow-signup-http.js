@@ -8,6 +8,25 @@ const empty = (status, extra = {}) =>
   new Response(null, { status, headers: { ...headers, ...extra } });
 const unavailable = () => empty(503, { "Retry-After": "60" });
 
+function hasDuplicateMembers(text) {
+  const objects = [];
+  let previous;
+  // JSON.parse already verified grammar. Match full strings so braces and
+  // colons within values cannot look like object delimiters.
+  for (const [token] of text.matchAll(/"(?:[^"\\]|\\.)*"|[{}:]/g)) {
+    if (token === "{") objects.push(new Set());
+    if (token === "}") objects.pop();
+    if (token === ":") {
+      const key = JSON.parse(previous);
+      const keys = objects.at(-1);
+      if (keys.has(key)) return true;
+      keys.add(key);
+    }
+    previous = token;
+  }
+  return false;
+}
+
 // The future route supplies a trusted origin policy and admission function.
 // There is no default route, sender, session parser, catalog source or configuration.
 export function createFollowSignupHttp({
@@ -40,14 +59,14 @@ export function createFollowSignupHttp({
         const input = await readFollowBody(request.body, MAX_BODY_BYTES, timers, (bytes) => {
           if (!bytes.length || (declared !== null && bytes.length !== Number(declared)))
             return null;
-          const value = JSON.parse(
-            new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes),
-          );
+          const text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
+          const value = JSON.parse(text);
           return value &&
             typeof value === "object" &&
             !Array.isArray(value) &&
             Object.keys(value).sort().join(",") === "email,link,scope" &&
-            typeof value.link === "boolean"
+            typeof value.link === "boolean" &&
+            !hasDuplicateMembers(text)
             ? value
             : null;
         });
