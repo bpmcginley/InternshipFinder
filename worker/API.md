@@ -598,7 +598,7 @@ current status does not allow (or a row that changed while it was being saved).
 
 ## Paid listing orders (bought on the site; off until `EMPLOYER_CHECKOUT` is `"1"`)
 
-Added 2026-10-19 (`src/orders.js`, `src/mail.js`; the design is `worker/ORDERS.md`). An employer buys a
+Added 2026-10-19 (`src/orders/`, `src/mail.js`; the design is `worker/ORDERS.md`). An employer buys a
 paid listing for 1 or 3 of its open roles on `internscout.org/employers/buy/`; Bruce approves or refuses
 each order from a signed link in his email. Approving runs the same placement steps as the admin routes
 above (`update` if the start day has passed, `check` with all eight checks, `on`), by `"bruce"`, so every
