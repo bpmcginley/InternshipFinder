@@ -331,7 +331,7 @@ The golden harness now covers static assets as well as generated pages. Each sit
 
 | C | P-2.1aq checkpoint payload codec | audit_growth_generated | `codex/product-p2.1aq-payload-codec` | [#471](https://github.com/bpmcginley/InternshipFinder/pull/471) | Draft; local qualification passed; review/CI pending | Exact Python canonical byte/digest parity, including closed lineage; 757 Node and seven new Python checks pass. No storage/control/witness integration. |
 
-| D | P-2.1ar offline checkpoint integration | audit_growth_generated | `codex/product-p2.1ar-checkpoint-integration` | Draft PR pending | Claimed; local qualification only | Native SQLite control metadata and fixed R2 slots with codec and injected external witness. No production entry/store/config changes. |
+| D | P-2.1ar offline checkpoint integration | audit_growth_generated | `codex/product-p2.1ar-checkpoint-integration` | [#474](https://github.com/bpmcginley/InternshipFinder/pull/474) | Draft; local qualification passed; review/CI pending | Twelve native SQLite/R2 integration cases, 759 registered Node and 15 unchanged private-runtime checks pass. Injected external witness only; production entry/store/config unchanged. |
 
 ## Waiting for Bruce
 
@@ -345,7 +345,7 @@ Dates are when the item was recorded, not a claim that a separate message was se
 
 | Recorded | Item | Ready artifact / next action | Done |
 |---|---|---|---|
-| 2026-11-11 | P-2.1ar offline checkpoint integration | Draft PR pending; isolated native storage and simulated witness/rollback qualification. | Needs-bruce; durable witness, physical retention and activation remain unqualified. |
+| 2026-11-11 | P-2.1ar offline checkpoint integration | [#474](https://github.com/bpmcginley/InternshipFinder/pull/474): isolated native storage and simulated witness/rollback qualification pass locally; review/CI pending. | Needs-bruce; durable witness, physical retention and activation remain unqualified. |
 | 2026-11-11 | P-2.1aq checkpoint payload codec | [#471](https://github.com/bpmcginley/InternshipFinder/pull/471): pure bounded split/reassembly and cross-language fixtures pass locally; independent review/CI pending. | Needs-bruce; no storage choice, activation or restore qualification. |
 | 2026-11-11 | P-2.1ao bounded R2 slots | [#468](https://github.com/bpmcginley/InternshipFinder/pull/468): offline conditional-write qualification passes; independent review and CI pending. | Needs-bruce; storage choice, physical retention, control authority and restore witness remain unqualified. No activation. |
 | 2026-11-11 | Dormant outbound Worker compatibility | [#414](https://github.com/bpmcginley/InternshipFinder/pull/414) repairs the proven native redirect option in archive and top-up readers. Independent review, CI and coordinated integration required. All existing enablement/configuration gates remain. | Draft needs-bruce; no provider call or deployment |
