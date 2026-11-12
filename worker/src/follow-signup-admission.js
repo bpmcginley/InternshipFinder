@@ -76,10 +76,20 @@ export async function admitFollowSignup(db, input, options = {}) {
       prepare: (sql) => db.prepare(sql),
       batch: async (statements) => {
         const rows = await db.batch(statements);
+        if (!Array.isArray(rows) || rows.length !== statements.length) throw new Error();
+        for (let index = 0; index < statements.length; index++)
+          if (!Object.hasOwn(rows, index) || rows[index]?.success !== true) throw new Error();
+        const results = rows.at(-1).results;
+        if (!Array.isArray(results) || results.length !== 1 || !Object.hasOwn(results, 0))
+          throw new Error();
+        const row = results[0];
         if (
-          !Array.isArray(rows) ||
-          rows.length !== statements.length ||
-          rows.some((r) => r?.success !== true)
+          !row ||
+          typeof row !== "object" ||
+          Array.isArray(row) ||
+          Object.keys(row).sort().join(",") !== "id,job_id" ||
+          !uuid(row.id) ||
+          !(row.job_id === null || uuid(row.job_id))
         )
           throw new Error();
         return rows;

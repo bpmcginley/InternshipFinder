@@ -192,6 +192,39 @@ export async function explicitNonSuccessBatchCannotReturnReceipt(db) {
   assert.equal((await rows(db, "rate"))[0].calls, 1);
 }
 
+export async function malformedCommittedAcknowledgementsFailClosed(db) {
+  const changes = [
+    (result) => {
+      delete result.at(-1).results[0].job_id;
+    },
+    (result) => {
+      result.at(-1).results.push(result.at(-1).results[0]);
+    },
+    (result) => {
+      delete result[1];
+    },
+  ];
+  let calls = 0;
+  for (const [index, alter] of changes.entries()) {
+    const wrapped = {
+      prepare: (sql) => db.prepare(sql),
+      batch: async (statements) => {
+        calls++;
+        const result = await db.batch(statements);
+        alter(result);
+        return result;
+      },
+    };
+    assert.deepEqual(
+      await admitFollowSignup(wrapped, request(`malformed${index}@example.test`), options()),
+      { status: "unavailable" },
+    );
+    assert.equal(calls, index + 1);
+    assert.equal(await count(db, "follow_confirmation_outbox"), index + 1);
+    assert.equal((await rows(db, "rate"))[0].calls, index + 1);
+  }
+}
+
 export async function failedQueueBatchAndClockRolloverStayClosed(db) {
   await db
     .prepare(
