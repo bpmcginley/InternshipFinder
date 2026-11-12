@@ -328,9 +328,44 @@ class IngestWriterTests(unittest.TestCase):
                 f"[listing-data] source=main-fallback commit={main} tree={main_tree}",
             )
 
+    def test_successful_publish_can_emit_exact_github_outputs_without_changing_stdout(self):
+        writer.prepare(self.data, self.primary, self.state)
+        self.update_snapshot()
+        output = self.root / "writer outputs.txt"
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(ROOT / "scripts/ingest_data_writer.py"),
+                "publish",
+                "data",
+                "state",
+                "--message",
+                "Synthetic catch-up snapshot",
+                "--github-output",
+                str(output),
+            ],
+            cwd=self.root,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        commit = writer.revision(self.remote, writer.BRANCH)
+        tree = writer.revision(self.remote, f"{commit}:{writer.PUBLIC}")
+        self.assertEqual(
+            result.stdout.splitlines(),
+            [
+                "Published validated data snapshot.",
+                f"[ingest-data] commit={commit} tree={tree}",
+            ],
+        )
+        self.assertEqual(
+            output.read_text(encoding="utf-8").splitlines(), [f"commit={commit}", f"tree={tree}"]
+        )
+
     def test_noop_and_valid_empty_export(self):
         writer.prepare(self.data, self.primary, self.state)
         observed = writer.revision(self.remote, writer.BRANCH)
+        output = self.root / "writer outputs.txt"
         result = subprocess.run(
             [
                 sys.executable,
@@ -340,6 +375,8 @@ class IngestWriterTests(unittest.TestCase):
                 "state",
                 "--message",
                 "No changes",
+                "--github-output",
+                str(output),
             ],
             cwd=self.root,
             capture_output=True,
@@ -351,6 +388,7 @@ class IngestWriterTests(unittest.TestCase):
             result.stdout.splitlines(),
             ["No changes.", writer.publication_marker(self.data, observed)],
         )
+        self.assertFalse(output.exists())
         (self.data / SHARD).unlink()
         (self.data / SIDECAR).unlink()
         self.write_public(self.data, None)

@@ -134,9 +134,44 @@ jobs:
         run: python -m internscout.coverage "$INTERNSCOUT_PUBLIC_DATA/listings"
 
       - name: Commit updated data
+        id: publish-data
+        env:
+          AUTOMATIC_CATCHUP: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.actor == 'github-actions[bot]' && github.triggering_actor == 'github-actions[bot]' && inputs.force == false }}
         run: |
           data="$GITHUB_WORKSPACE/.ingest-data"
           git -C "$data" config user.name "internscout-bot"
           git -C "$data" config user.email "actions@github.com"
+          outputs=()
+          if [ "$AUTOMATIC_CATCHUP" = true ]; then outputs=(--github-output "$GITHUB_OUTPUT"); fi
           python3 scripts/ingest_data_writer.py publish "$data" "$INTERNSCOUT_DATA" \
-            --message "data: refresh listings ($(date -u +%FT%TZ))"
+            --message "data: refresh listings ($(date -u +%FT%TZ))" "${outputs[@]}"
+
+      # Token-started workflow_dispatch runs can lack a direct workflow_run follower.
+      - name: Record the automatic catch-up publication
+        id: catchup-receipt
+        if: steps.publish-data.outputs.commit != ''
+        env:
+          CATCHUP_FORCE: ${{ inputs.force }}
+          DATA_COMMIT: ${{ steps.publish-data.outputs.commit }}
+          DATA_TREE: ${{ steps.publish-data.outputs.tree }}
+        run: python3 scripts/catchup_pages.py receipt
+
+      - name: Keep the automatic catch-up receipt
+        id: catchup-artifact
+        if: steps.catchup-receipt.outputs.artifact_name != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.catchup-receipt.outputs.artifact_name }}
+          path: ${{ runner.temp }}/catchup-publication/catchup-publication.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Request Pages for the automatic catch-up publication
+        if: steps.catchup-receipt.outputs.artifact_name != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CATCHUP_FORCE: ${{ inputs.force }}
+          DATA_COMMIT: ${{ steps.publish-data.outputs.commit }}
+          DATA_TREE: ${{ steps.publish-data.outputs.tree }}
+          CATCHUP_ARTIFACT_ID: ${{ steps.catchup-artifact.outputs.artifact-id }}
+        run: python3 scripts/catchup_pages.py dispatch
