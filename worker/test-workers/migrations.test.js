@@ -7,6 +7,7 @@ import {
   createCachedEmployerPostingCounter,
   EMPLOYER_POSTING_EVENT,
 } from "../src/employer-posting-counts.js";
+import { requestFollowConfirmation } from "../src/follows.js";
 
 const baselineName = "0001_baseline.sql";
 const migrationNames = [
@@ -31,6 +32,7 @@ const migrationNames = [
   "0019_topup_retention_evidence.sql",
   "0020_topup_retirement_provenance.sql",
   "0021_follow_confirmation_outbox.sql",
+  "0022_follow_confirmation_claim.sql",
 ];
 const legacySql = [...env.TEST_SCHEMA_SQL, ...env.TEST_EXTRA_SCHEMA_SQL];
 const databases = [env.LEGACY_DB, env.MIGRATION_DB];
@@ -46,13 +48,17 @@ const ledger = () => rows(env.MIGRATION_DB, "SELECT name FROM d1_migrations ORDE
 beforeEach(async () => {
   // Explicit cleanup also makes the proof independent of test-runner storage isolation defaults.
   for (const db of databases) {
+    await db.prepare("DROP TRIGGER IF EXISTS follow_confirmation_scope_changed").run();
     await run(
       db,
-      // Wrangler can group late CREATE statements with a trigger. Explicitly reset the
-      // altered table too, so migration0020 is replayed against its actual old shape.
-      ["topup_retention", ...tableNames.toReversed(), "d1_migrations"].map(
-        (name) => `DROP TABLE IF EXISTS "${name}"`,
-      ),
+      // Wrangler can group late CREATE statements with a trigger. Reset both altered
+      // tables explicitly so their migrations replay against the actual prior shape.
+      [
+        "follow_confirmation_outbox",
+        "topup_retention",
+        ...tableNames.toReversed(),
+        "d1_migrations",
+      ].map((name) => `DROP TABLE IF EXISTS "${name}"`),
     );
   }
 });
@@ -94,6 +100,29 @@ it("migrations create the complete legacy schema, including constraints and trig
   expect(expected.objects.filter((row) => row.type === "trigger")).toHaveLength(12);
   expect(expected.objects.filter((row) => row.type === "view")).toHaveLength(1);
   expect(await ledger()).toEqual(migrationNames.map((name) => ({ name })));
+});
+
+it("0022 preserves a populated pending queue without inventing a claim", async () => {
+  const db = env.MIGRATION_DB;
+  await applyD1Migrations(
+    db,
+    env.TEST_MIGRATIONS.filter(({ name }) => name < "0022_follow_confirmation_claim.sql"),
+  );
+  const { confirmationJobId } = await requestFollowConfirmation(
+    db,
+    "upgrade@example.test",
+    { kind: "company", company: "one" },
+    { companies: new Set(["one"]) },
+  );
+  const job = () =>
+    db
+      .prepare("SELECT * FROM follow_confirmation_outbox WHERE id=?")
+      .bind(confirmationJobId)
+      .first();
+  const before = await job();
+  expect(before?.id).toBe(confirmationJobId);
+  await apply();
+  expect(await job()).toEqual({ ...before, claim_id: null });
 });
 
 it("employer count tables accept only aggregates on fresh and upgraded local D1", async () => {
