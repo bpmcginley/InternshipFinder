@@ -321,7 +321,7 @@ The golden harness now covers static assets as well as generated pages. Each sit
 
 | D | P-2.2am Attached checkout recovery | mylist_review | `codex/product-p2.2am-attached-recovery` | [#464](https://github.com/bpmcginley/InternshipFinder/pull/464) | Draft needs-bruce | GET-only recovery of one account-owned attached Checkout with verified historical mode and existing settlement. Independent review, route integration and enablement pending. |
 
-| D | P-2.2ao Attached recovery HTTP | mylist_review | `codex/product-p2.2ao-recovery-http` | Draft claim | Needs-bruce | Authenticated bodyless recovery of one attached Checkout. Refactor owns route/API files pending release. |
+| D | P-2.2ao Attached recovery HTTP | mylist_review | `codex/product-p2.2ao-recovery-http` | [#472](https://github.com/bpmcginley/InternshipFinder/pull/472) | Draft needs-bruce | Authenticated bodyless recovery of one attached Checkout. Refactor owns route/API files pending release. |
 
 ## Waiting for Bruce
 
@@ -333,7 +333,7 @@ Dates are when the item was recorded, not a claim that a separate message was se
 
 | Recorded | Item | Ready artifact / next action | Done |
 |---|---|---|---|
-| 2026-11-11 | Attached checkout recovery HTTP | P-2.2ao draft implementation. Exact review, route ownership handoff and owner release pending. | Needs-bruce. |
+| 2026-11-11 | Attached checkout recovery HTTP | Draft [#472](https://github.com/bpmcginley/InternshipFinder/pull/472). Exact review, route ownership handoff and owner release pending. | Needs-bruce. |
 | 2026-11-11 | Attached checkout recovery | Draft [#464](https://github.com/bpmcginley/InternshipFinder/pull/464) adds dormant attached recovery. Independent review, route integration and owner release pending. | Needs-bruce. |
 | 2026-11-11 | P-2.2aj Purchased Auto-Apply balance | [#460](https://github.com/bpmcginley/InternshipFinder/pull/460) projects spendable purchased runs for the signed-in account in `GET /me`. Separate invite attribution and preserve the compatibility remainder. Focused Node and local Workers/D1 tests passed, including signed-in isolation, held and refunded runs, and disabled creation. | Draft needs-bruce. Exact review, hosted checks and coordinated release remain. |
 | 2026-11-11 | P-2.2ah Pending payment during account deletion | [#454](https://github.com/bpmcginley/InternshipFinder/pull/454) maps the atomic top-up deletion trigger to a pending-payment 409 with retry guidance. Original exact independent review and hosted checks passed. Current-main integration requires fresh exact proof. | Needs-bruce. |

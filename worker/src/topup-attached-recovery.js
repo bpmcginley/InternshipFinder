@@ -10,7 +10,14 @@ import {
 
 const pending = () => ({ status: "pending" });
 
-export async function recoverAttachedTopup(db, env, token, fetchImpl, clock = () => new Date()) {
+export async function recoverAttachedTopup(
+  db,
+  env,
+  token,
+  fetchImpl,
+  clock = () => new Date(),
+  { admit, returnUrl } = {},
+) {
   let latest = -Infinity;
   const fresh = () => {
     const now = clock();
@@ -70,6 +77,11 @@ export async function recoverAttachedTopup(db, env, token, fetchImpl, clock = ()
     if (selectionFailure) return selectionFailure;
     if (!a) return { status: "inactive" };
     if (a.state !== "open" || !validTopupCheckoutId(a.checkout_id)) return pending();
+    if (admit) {
+      const at = fresh();
+      if (!(await admit(user, at))) return (await sessionFailure()) ?? { status: "limited" };
+      if (Math.floor(+fresh() / 60000) !== Math.floor(+at / 60000)) return pending();
+    }
     const checkout = await readTopupAssociation(config, "checkout/sessions", a.checkout_id, get);
     const checkoutFailure = await sessionFailure();
     if (checkoutFailure) return checkoutFailure;
@@ -94,7 +106,9 @@ export async function recoverAttachedTopup(db, env, token, fetchImpl, clock = ()
       clock: fresh,
       beforeApply: async () => !(await sessionFailure()),
       session,
+      returnUrl,
     });
+    if (result.status === "open") return result; // The final SQL read already fenced session and attempt.
     const outcomeFailure = await sessionFailure();
     if (outcomeFailure) return outcomeFailure;
     return ["settled", "expired"].includes(result.status) ? { status: result.status } : pending();

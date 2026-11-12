@@ -6,6 +6,7 @@ import { recoverTopupAttempt as recover } from "../src/topup-attempt-recovery.js
 import { captureTopupSettlement } from "../src/topup-first-settlement.js";
 import { deleteUser } from "../src/limits.js";
 import { createSession, sessionTokenHash } from "../src/session.js";
+import { topupRecoveryResponse } from "../src/topup-recovery-http.js";
 import { recoverAttachedTopup } from "../src/topup-attached-recovery.js";
 import { attempt, session } from "./topup-stripe.js";
 const env = { STRIPE_SECRET_KEY: "fixture-not-a-key", TOPUPS_ENABLED: "0", PAYMENTS_ENABLED: "0" };
@@ -670,4 +671,147 @@ export async function attachedRecoveryDistinguishesUncertainSessionLookups(db) {
     assert.deepEqual(await rows(db, "topup_attempt_revisions"), []);
     await noGrant(db);
   }
+}
+
+const recoveryOrigin = "https://example.invalid";
+const recoveryPath = recoveryOrigin + "/billing/topup/recover";
+function recoveryRequest(token, options = {}) {
+  return new Request(options.url ?? recoveryPath, {
+    method: options.method ?? "POST",
+    body: options.body,
+    headers: { Authorization: "Bearer " + token, Origin: options.origin ?? recoveryOrigin },
+  });
+}
+
+async function recoveryHttp(db, f, token, options = {}) {
+  const result = await topupRecoveryResponse({
+    request: recoveryRequest(token, options),
+    env: { ...attachedEnv, DB: db },
+    fetchImpl: f.fetch,
+    clock,
+    originAllowed: (request) => request.headers.get("Origin") === recoveryOrigin,
+    returnUrl: recoveryOrigin + "/",
+    ...options.deps,
+  });
+  assert.equal(result.headers.get("Cache-Control"), "no-store");
+  return [result.status, await result.json(), result.headers.get("Retry-After")];
+}
+
+async function makeOpen(db, f) {
+  const { now: epoch } = await db.prepare("SELECT unixepoch('now') AS now").first();
+  Object.assign(f.checkout, {
+    status: "open",
+    payment_status: "unpaid",
+    payment_intent: null,
+    expires_at: epoch + 1800,
+    success_url: recoveryOrigin + "/",
+    cancel_url: recoveryOrigin + "/",
+    url: "https://checkout.stripe.com/c/pay/cs_fixture#synthetic",
+  });
+}
+
+export async function recoveryHttpBodylessBoundary(db) {
+  const f = await setup(db);
+  const token = await signedIn(db, f.a.user_hash);
+  const forbidden = () => assert.fail("Unexpected database or provider access");
+  const cases = [
+    [{ deps: { env: {}, fetchImpl: forbidden } }, 503, "disabled"],
+    [{ method: "GET" }, 405, "unavailable"],
+    [{ origin: "https://outsider.invalid" }, 403, "unavailable"],
+    [{ body: '{"checkoutId":"cs_fixture"}' }, 400, "invalid"],
+    [{ url: recoveryPath + "?checkoutId=cs_fixture" }, 400, "invalid"],
+    [{ deps: { returnUrl: "http://example.invalid/" } }, 503, "unavailable"],
+  ];
+  for (const [options, code, status] of cases)
+    assert.deepEqual(await recoveryHttp(db, f, token, options), [code, { status }, null]);
+  assert.deepEqual(await recoveryHttp(db, f, "not-a-session"), [401, { status: "auth" }, null]);
+  const outsider = await signedIn(db, "b".repeat(64));
+  assert.deepEqual(await recoveryHttp(db, f, outsider), [200, { status: "inactive" }, null]);
+  assert.equal(f.calls.length, 0);
+  assert.deepEqual(await rows(db, "topup_attempt_revisions"), []);
+}
+
+export async function recoveryHttpOpenUsesHistoricalIdentityAndLiveReadFence(db) {
+  const cases = [
+    "open",
+    "wrong URL",
+    "wrong return",
+    "provider expiry",
+    "revision changed",
+    "revoked",
+  ];
+  for (const scenario of cases) {
+    await db.prepare("DELETE FROM rate WHERE bucket LIKE '%:topup-recovery'").run();
+    const f = await setup(db);
+    await makeOpen(db, f);
+    const token = await signedIn(db, f.a.user_hash);
+    if (scenario === "wrong URL") f.checkout.url = "https://checkout.stripe.com/c/pay/cs_other";
+    if (scenario === "wrong return") f.checkout.cancel_url = "https://outsider.invalid/";
+    if (scenario === "provider expiry") f.checkout.expires_at -= 1800;
+    f.before = async () => {
+      if (f.calls.length !== 2) return;
+      if (scenario === "revision changed") await captureTopupSettlement(db, f.a.id);
+      if (scenario === "revoked")
+        await db
+          .prepare("DELETE FROM sessions WHERE id=?")
+          .bind(await sessionTokenHash(token))
+          .run();
+    };
+    const expected =
+      scenario === "open"
+        ? [200, { status: "open", url: f.checkout.url }, null]
+        : scenario === "revoked"
+          ? [401, { status: "auth" }, null]
+          : [202, { status: "pending" }, null];
+    assert.deepEqual(await recoveryHttp(db, f, token), expected);
+    assert.equal(f.calls.length, 2);
+    assert.equal((await rows(db, "topup_checkout_attempts"))[0].state, "open");
+    await noGrant(db);
+  }
+}
+
+export async function recoveryHttpPaidAndExpiredNeverCreate(db) {
+  for (const outcome of ["settled", "expired", "pending"]) {
+    await db.prepare("DELETE FROM rate WHERE bucket LIKE '%:topup-recovery'").run();
+    const f = await setup(db);
+    const token = await signedIn(db, f.a.user_hash);
+    if (outcome === "expired") {
+      f.checkout.status = "expired";
+      f.checkout.payment_status = "unpaid";
+      f.checkout.payment_intent = null;
+    } else if (outcome === "pending") f.checkout.payment_status = "unpaid";
+    assert.deepEqual(await recoveryHttp(db, f, token), [
+      outcome === "pending" ? 202 : 200,
+      { status: outcome },
+      null,
+    ]);
+    assert.equal(f.calls.length, outcome === "settled" ? 10 : 2);
+    assert.equal(
+      (await rows(db, "topup_checkout_attempts"))[0].state,
+      outcome === "pending" ? "open" : outcome,
+    );
+  }
+}
+
+export async function recoveryHttpUsesIsolatedBudgets(db) {
+  await db.prepare("DELETE FROM rate WHERE bucket LIKE '%:topup-recovery'").run();
+  const f = await setup(db);
+  await makeOpen(db, f);
+  const token = await signedIn(db, f.a.user_hash);
+  const outsider = await signedIn(db, "b".repeat(64));
+  assert.deepEqual(await recoveryHttp(db, f, outsider), [200, { status: "inactive" }, null]);
+  assert.deepEqual(
+    (await rows(db, "rate")).filter(({ bucket }) => bucket.endsWith(":topup-recovery")),
+    [],
+  );
+  for (let i = 0; i < 3; i++) assert.equal((await recoveryHttp(db, f, token))[0], 200);
+  assert.deepEqual(await recoveryHttp(db, f, token), [429, { status: "limited" }, "60"]);
+  assert.equal(f.calls.length, 6);
+  await db.prepare("DELETE FROM rate WHERE bucket LIKE '%:topup-recovery'").run();
+  await db
+    .prepare("INSERT INTO rate(user_hash,bucket,calls) VALUES('topup-recovery',?,30)")
+    .bind("m:" + now.toISOString().slice(0, 16) + ":topup-recovery")
+    .run();
+  assert.deepEqual(await recoveryHttp(db, f, token), [429, { status: "limited" }, "60"]);
+  assert.equal(f.calls.length, 6);
 }
