@@ -1,6 +1,11 @@
 // Dormant authenticated-event association. No coverage authority or balance transition.
 import { topupReversalObject } from "./topup-reversal-types.js";
-import { readTopupAssociation, readHistoricalTopupTarget } from "./topup-stripe.js";
+import {
+  readTopupAssociation,
+  readHistoricalTopupTarget,
+  readEmployerHistoryObject,
+  topupRecoveryConfigured,
+} from "./topup-stripe.js";
 import { readVerifiedTopupPayment } from "./topup-purchase-recovery.js";
 import { PAYMENT_EVIDENCE_BOUNDS } from "./topup-payment-evidence.js";
 import { referenceHash } from "./topup-ledger.js";
@@ -183,7 +188,10 @@ export async function observeVerifiedTopupEvent(db, env, event, options = {}) {
   };
   async function run() {
     if (!paymentId) {
-      const c = await readTopupAssociation(config, "charges", chargeId, get);
+      const c =
+        excludeEmployerPayments && topupRecoveryConfigured(config)
+          ? await readEmployerHistoryObject(config, "charges", chargeId, get)
+          : await readTopupAssociation(config, "charges", chargeId, get);
       live();
       if (c?.object !== "charge" || c.id !== chargeId || c.livemode !== livemode) return pending();
       paymentId = ref(c.payment_intent, "payment_intent", livemode);

@@ -818,6 +818,7 @@ async function employerFixture(db, kind = "refund") {
   };
   f.pages = [[f.employerEvent]];
   const original = f.fetch;
+  f.encode = (value) => JSON.stringify(value);
   f.options.fetchImpl = async (url, init) => {
     const path = new URL(url).pathname;
     const name = new Map([
@@ -838,7 +839,7 @@ async function employerFixture(db, kind = "refund") {
     await f.before(url);
     const value = structuredClone(f.employer[name]);
     f.alter(value, path);
-    const r = new Response(JSON.stringify(value));
+    const r = new Response(f.encode(value, path));
     Object.defineProperty(r, "url", { value: url });
     return r;
   };
@@ -1028,4 +1029,56 @@ export async function employerDiscoveryUsesFiveReadsAndFixedPortRejectsInvalidKi
   g.pages = [[g.employerEvent], [{ ...g.employerEvent, id: "evt_invalid", created: g.input.to }]];
   assert.equal((await g.exclude()).status, "closed");
   assert.equal(g.calls.length, 0);
+}
+
+async function malformedEmployerBytes(db, fault) {
+  for (const phase of ["refund", "dispute", "charge", "intent", "checkout", "discovery"]) {
+    const f = await employerFixture(db, phase === "dispute" ? "dispute" : "refund");
+    if (phase === "discovery") delete f.employerEvent.data.object.payment_intent;
+    const paths = {
+      refund: "/v1/refunds/re_employer",
+      dispute: "/v1/disputes/du_employer",
+      charge: "/v1/charges/ch_employer",
+      intent: "/v1/payment_intents/pi_employer",
+      checkout: "/v1/checkout/sessions/cs_employer",
+      discovery: "/v1/charges/ch_employer",
+    };
+    let malformed = 0;
+    f.encode = (value, path) => {
+      const text = JSON.stringify(value);
+      if (path !== paths[phase]) return text;
+      malformed++;
+      if (fault === "utf8") {
+        const encoder = new TextEncoder();
+        return new Uint8Array([
+          ...encoder.encode(text.slice(0, -1) + ',"ignored":"'),
+          255,
+          ...encoder.encode('"}'),
+        ]);
+      }
+      const first = fault === "escaped" ? '"meta\\u0064ata"' : '"metadata"';
+      const contradiction = first + ':{"kind":"autofill_topup"},"metadata":';
+      return text.includes('"metadata":')
+        ? text.replace('"metadata":', contradiction)
+        : text.slice(0, -1) + "," + contradiction + "{}}";
+    };
+    assert.equal((await f.exclude()).status, "closed", phase + ":" + fault);
+    assert.equal(malformed, 1);
+    assert.equal(
+      f.calls.length,
+      { refund: 1, dispute: 1, charge: 2, intent: 3, checkout: 4, discovery: 1 }[phase],
+    );
+    assert.equal(await count(db, "topup_history_receipts"), 0);
+    assert.equal(await revision(db), 1);
+    assert.deepEqual(await balance(db), [25, 0, 0, 0]);
+  }
+}
+export async function employerRawDuplicateMetadataCannotHideTopupAssociation(db) {
+  await malformedEmployerBytes(db, "duplicate");
+}
+export async function employerEscapedDuplicateNamesCannotHideTopupAssociation(db) {
+  await malformedEmployerBytes(db, "escaped");
+}
+export async function employerMalformedUtf8CannotAuthorizeExclusion(db) {
+  await malformedEmployerBytes(db, "utf8");
 }

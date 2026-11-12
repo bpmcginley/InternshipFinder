@@ -1,5 +1,5 @@
 // Internal positive evidence only. The caller has validated a supported event and no claim.
-import { readEmployerHistoryObject, readHistoricalTopupTarget } from "./topup-stripe.js";
+import { readEmployerHistoryObject } from "./topup-stripe.js";
 import { referenceHash, validTopupCheckoutId } from "./topup-ledger.js";
 const pending = () => ({ status: "pending" });
 const fields = "id,status,price,paid_amount,paid_session,payment_intent,paid_ref,paid_at";
@@ -61,7 +61,7 @@ export async function excludeVerifiedEmployerPayment(
   if (!consistent(event.data.object)) return pending();
   // All reads reuse the caller's pinned credential, shared request count and deadline.
   if (kind !== "charge") {
-    const target = await readHistoricalTopupTarget(config, kind + "s", event.data.object.id, get);
+    const target = await readEmployerHistoryObject(config, kind + "s", event.data.object.id, get);
     live();
     const targetCharge = ref(target?.charge, "charge", livemode);
     if (
