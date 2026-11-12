@@ -53,6 +53,7 @@ import "./follow-management-claim.test.js";
 import "./follow-management-delivery.test.js";
 import "./follow-outbox.test.js";
 import "./follow-retention.test.js";
+import "./follow-management-request-http.test.js";
 import "./follow-unsubscribe.test.js";
 import "./follow-unsubscribe-endpoint.test.js";
 import "./follow-token-endpoint.test.js";
