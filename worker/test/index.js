@@ -62,6 +62,7 @@ import "./follow-checkpoint-r2.test.js";
 import "./follow-checkpoint-r2-native.test.js";
 import "./follow-checkpoint-payload.test.js";
 import "./follow-checkpoint-integration.test.js";
+import "./follow-checkpoint-runtime.test.js";
 
 import "./topup-ledger.test.js";
 import "./topup-decisions.test.js";
