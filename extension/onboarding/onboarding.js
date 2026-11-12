@@ -24,6 +24,7 @@ const OPTIONAL_STEPS = ["facts", "interview", "voice"];
 let S, savedSnapshot, pendingResumeImport;
 let saveChain = Promise.resolve();
 let restoreChain = Promise.resolve();
+let latestRestore;
 let renderEpoch = 0;
 let interviewChat = null;
 let interviewWrites = Promise.resolve();
@@ -140,19 +141,32 @@ function useProfile({ store, revision, notice }) {
     ? restoredMessage(notice) + (S.files.resume ? "" : " Your files stay on each device, so add your resume under Resume.")
     : "";
 }
+function retireInterviewForRestore(revision) {
+  const previous = interviewChat;
+  const next = interviewChat = interviewConversation(null, revision);
+  next.restoring = true;
+  next.interrupted = !!(previous?.pending || previous?.failed || previous?.interrupted);
+  previous?.pending?.abort();
+  clearTimeout(saveTimer);
+  return next;
+}
+const restoreTime = (revision) => Date.parse(revision) || 0;
 chrome.storage.onChanged.addListener((ch, area) => {
   const change = area === "local" && ch[RESTORED_KEY];
-  if (!change?.newValue || change.newValue.at === change.oldValue?.at) return;
+  const revision = change?.newValue?.at;
+  const time = restoreTime(revision);
+  const loadedOrQueued = Math.max(restoreTime(seenRestore), restoreTime(latestRestore));
+  if (revision === change?.oldValue?.at || time <= loadedOrQueued) return;
+  latestRestore = revision;
+  const waiting = S ? retireInterviewForRestore(revision) : null;
   const refresh = async () => {
     await startup;
-    if (change.newValue.at === seenRestore) return;
+    if (latestRestore !== revision || time <= restoreTime(seenRestore)) return;
     const profile = await loadProfileWithRestore();
-    if (profile.revision === seenRestore) return;
-    const previous = interviewChat;
-    const next = interviewChat = interviewConversation(null, profile.revision);
-    next.interrupted = !!(previous?.pending || previous?.failed || previous?.interrupted);
-    previous?.pending?.abort();
-    clearTimeout(saveTimer);
+    if (latestRestore !== revision || profile.revision === seenRestore) return;
+    const next = waiting || retireInterviewForRestore(profile.revision);
+    next.revision = profile.revision;
+    next.restoring = false;
     useProfile(profile);
     if (profile.notice && rerun) step = "review";
     render();
@@ -865,6 +879,7 @@ async function requestInterview(conversation) {
 
 async function interview(epoch) {
   const conversation = interviewChat ??= interviewConversation();
+  if (conversation.restoring) return;
   if (!conversation.messages) {
     await interviewWrites;
     const stored = (await chrome.storage.local.get(CHAT_KEY))[CHAT_KEY] || [];

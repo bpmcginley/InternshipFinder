@@ -32,6 +32,7 @@ async function capture(browser, width, colorScheme) {
     const listeners = [];
     const data = {
       store: { version: 3, profile: { voice: { sample: "Old local Voice sample" } } },
+      "internscout.session": { token: "iss_synthetic_session", expires: "2099-01-01T00:00:00Z" },
     };
     const evidence = window.evidence = { data };
     const local = {
@@ -61,8 +62,32 @@ async function capture(browser, width, colorScheme) {
         listeners.forEach((listen) => listen(changes, "local"));
       },
     };
+    const fetchOther = window.fetch.bind(window);
+    window.fetch = (url, init) => {
+      if (String(url) !== "https://internscout-api.bpmcginley.workers.dev/ai?stream=1") return fetchOther(url, init);
+      if (JSON.parse(init.body).task !== "deep_dive") throw new Error("Unexpected synthetic task");
+      evidence.posts = (evidence.posts || 0) + 1;
+      return new Promise((resolve, reject) => {
+        init.signal.addEventListener("abort", () => {
+          evidence.aborted = true;
+          reject(init.signal.reason);
+        }, { once: true });
+      });
+    };
+    evidence.restoreDuringInterview = () => {
+      navigator.locks.request("internscout-store", async () => {
+        const gate = new Promise((resolve) => { evidence.releaseRestore = resolve; });
+        const store = structuredClone(data.store);
+        store.profile.voice.sample = "Second account Voice sample";
+        await local.set({
+          store,
+          [marker]: { updated: "2026-11-12T14:06:00Z", at: "2026-11-12T14:07:00Z", shown: false },
+        });
+        await gate;
+      });
+    };
     window.chrome = {
-      storage: { local, onChanged: { addListener: (listen) => listeners.push(listen) } },
+      storage: { local, session: { get: async () => ({}) }, onChanged: { addListener: (listen) => listeners.push(listen) } },
       runtime: { async sendMessage({ type }) {
         if (type === "auth:status") return { signedIn: true };
         if (type === "auth:offer_status") return { waiting: false };
@@ -89,6 +114,19 @@ async function capture(browser, width, colorScheme) {
   }
   await sample.fill("Synthetic edit after the restore notice.");
   await page.waitForFunction(() => evidence.data.store.profile.voice.sample === "Synthetic edit after the restore notice.");
+  if (!before && width === 1280 && colorScheme === "light") {
+    await page.locator('[data-step="interview"]').click();
+    await page.waitForFunction(() => evidence.posts === 1);
+    await page.evaluate(() => evidence.restoreDuringInterview());
+    await page.waitForFunction(() => evidence.aborted);
+    assert.equal(await page.evaluate(async () => {
+      const locks = await navigator.locks.query();
+      return locks.held.some(({ name }) => name === "internscout-store") && !!evidence.releaseRestore;
+    }), true);
+    await page.evaluate(() => evidence.releaseRestore());
+    await page.getByRole("button", { name: "Retry", exact: true }).waitFor();
+    assert.equal(await page.evaluate(() => evidence.posts), 1);
+  }
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ phase, width, colorScheme, markerReadLocked: !before }));
   await context.close();
