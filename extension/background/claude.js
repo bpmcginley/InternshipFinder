@@ -1,9 +1,9 @@
 // Minimal Anthropic Messages API client (raw fetch; MV3 cannot load the SDK from a CDN and the
 // extension has no bundler). The key never leaves the extension except to api.anthropic.com.
-import { callGemini, callWorker, taskFor } from "./gemini.js";
+import { callGemini, callWorker, taskFor, workerError } from "./gemini.js";
 import { recordUsage } from "../lib/usage.js";
 import { WORKER_URL } from "../lib/config.js";
-import { ensureToken, refreshAfter401 } from "../lib/auth.js";
+import { ensureToken, getSession, refreshAfter401 } from "../lib/auth.js";
 import { abortableSleep as sleep, throwIfAborted } from "./abort.js";
 
 const URL = "https://api.anthropic.com/v1/messages";
@@ -13,16 +13,23 @@ const URL = "https://api.anthropic.com/v1/messages";
 // calls of one Auto-Apply or Deep Dive run into one allowance unit.
 // Otherwise routes by model id: gemini-* goes to Google with the Gemini key, everything else to Anthropic.
 // Every own-key call is priced and added to the monthly total; the cost comes back as resp.cost_usd.
-export async function callAI({ ai, model, kind, task, run_id, ...opts }) {
+export async function callAI({ ai, model, kind, task, run_id, workerSession, ...opts }) {
   if (ai && ai.provider === "internscout") {
+    // Check only the exact live session before every attempt of a bound PDF request.
+    const verifySession = workerSession
+      ? async () => {
+          if ((await getSession())?.token !== workerSession) throw workerError(401, { error: "auth" });
+        }
+      : undefined;
     // was: refreshToken: ensureToken. A 401 on a session token now drops that session (lib/auth.js).
     const resp = await callWorker({
       url: WORKER_URL,
-      token: await ensureToken(),
+      token: workerSession || (await ensureToken()),
       refreshToken: refreshAfter401,
       task: task || taskFor(kind),
       run_id,
       ...opts,
+      verifySession,
     });
     resp.cost_usd = 0;
     return resp;

@@ -43,8 +43,16 @@ export function canonicalFollow(input, catalog) {
 }
 
 // The caller supplies a trusted public catalog, never a catalog received from a signup request.
-// No token is minted here: a later outbox dispatcher mints it immediately before rendering.
-export async function requestFollow(db, email, input, catalog, now = new Date()) {
+export function requestFollow(db, email, input, catalog, now = new Date()) {
+  return writeFollowRequest(db, email, input, catalog, now, false);
+}
+
+// The queue contains only scope references and timestamps. A later dispatcher mints credentials.
+export function requestFollowConfirmation(db, email, input, catalog, now = new Date()) {
+  return writeFollowRequest(db, email, input, catalog, now, true);
+}
+
+async function writeFollowRequest(db, email, input, catalog, now, queueConfirmation) {
   if (typeof email !== "string") invalid();
   email = email.trim().toLowerCase();
   if (
@@ -53,32 +61,58 @@ export async function requestFollow(db, email, input, catalog, now = new Date())
   )
     invalid();
   const scopeKey = canonicalFollow(input, catalog),
-    id = crypto.randomUUID();
-  const result = await db.batch([
+    id = crypto.randomUUID(),
+    at = stamp(now),
+    expiredBefore = cutoff(now);
+  const statements = [
     db
       .prepare(
         "INSERT INTO follow_subscribers (id,email,created) VALUES (?,?,?) ON CONFLICT(email) DO NOTHING",
       )
-      .bind(id, email, stamp(now)),
+      .bind(id, email, at),
     db
       .prepare(
         "DELETE FROM follow_tokens WHERE purpose='confirm' AND scope_key=? AND subscriber_id IN " +
           "(SELECT s.subscriber_id FROM follow_subscriptions s JOIN follow_subscribers u ON u.id=s.subscriber_id " +
           "WHERE u.email=? AND s.scope_key=? AND s.confirmed_at IS NULL AND s.created<=?)",
       )
-      .bind(scopeKey, email, scopeKey, cutoff(now)),
+      .bind(scopeKey, email, scopeKey, expiredBefore),
     db
       .prepare(
         "INSERT INTO follow_subscriptions (subscriber_id,scope_key,created) SELECT id,?,? FROM follow_subscribers WHERE email=? " +
           "ON CONFLICT(subscriber_id,scope_key) DO UPDATE SET created=excluded.created " +
           "WHERE confirmed_at IS NULL AND created<=?",
       )
-      .bind(scopeKey, stamp(now), email, cutoff(now)),
-    db.prepare("SELECT id FROM follow_subscribers WHERE email=?").bind(email),
-  ]);
+      .bind(scopeKey, at, email, expiredBefore),
+  ];
+  if (queueConfirmation) {
+    statements.push(
+      db
+        .prepare(
+          "INSERT INTO follow_confirmation_outbox (id,subscriber_id,scope_key,queued_at,expires_at) " +
+            "SELECT ?,s.subscriber_id,s.scope_key,?,strftime('%Y-%m-%dT%H:%M:%fZ',s.created,'+7 days') " +
+            "FROM follow_subscriptions s JOIN follow_subscribers u ON u.id=s.subscriber_id " +
+            "WHERE u.email=? AND s.scope_key=? AND s.confirmed_at IS NULL AND s.created>? AND s.created<=? " +
+            "ON CONFLICT(subscriber_id,scope_key) DO NOTHING",
+        )
+        .bind(crypto.randomUUID(), at, email, scopeKey, expiredBefore, at),
+      db
+        .prepare(
+          "SELECT u.id,j.id AS job_id FROM follow_subscribers u " +
+            "LEFT JOIN follow_confirmation_outbox j ON j.subscriber_id=u.id " +
+            "AND j.scope_key=? AND j.queued_at<=? AND j.expires_at>? WHERE u.email=?",
+        )
+        .bind(scopeKey, at, at, email),
+    );
+  } else {
+    statements.push(db.prepare("SELECT id FROM follow_subscribers WHERE email=?").bind(email));
+  }
+  const result = await db.batch(statements);
+  const row = result.at(-1).results[0];
   return {
-    subscriberId: result.at(-1).results[0].id,
+    subscriberId: row.id,
     scopeKey,
+    ...(queueConfirmation ? { confirmationJobId: row.job_id ?? null } : {}),
   };
 }
 

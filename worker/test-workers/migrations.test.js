@@ -30,6 +30,7 @@ const migrationNames = [
   "0018_purchased_run_generations.sql",
   "0019_topup_retention_evidence.sql",
   "0020_topup_retirement_provenance.sql",
+  "0021_follow_confirmation_outbox.sql",
 ];
 const legacySql = [...env.TEST_SCHEMA_SQL, ...env.TEST_EXTRA_SCHEMA_SQL];
 const databases = [env.LEGACY_DB, env.MIGRATION_DB];
@@ -88,9 +89,9 @@ it("migrations create the complete legacy schema, including constraints and trig
   await initialize();
   const expected = await schema(env.LEGACY_DB);
   expect(await schema(env.MIGRATION_DB)).toEqual(expected);
-  expect(expected.objects.filter((row) => row.type === "table")).toHaveLength(63);
+  expect(expected.objects.filter((row) => row.type === "table")).toHaveLength(64);
   expect(expected.objects.filter((row) => row.type === "index")).toHaveLength(34);
-  expect(expected.objects.filter((row) => row.type === "trigger")).toHaveLength(11);
+  expect(expected.objects.filter((row) => row.type === "trigger")).toHaveLength(12);
   expect(expected.objects.filter((row) => row.type === "view")).toHaveLength(1);
   expect(await ledger()).toEqual(migrationNames.map((name) => ({ name })));
 });
@@ -289,7 +290,10 @@ it("migration bookkeeping skips an applied baseline and rolls back a failed migr
 });
 
 it("0020 preserves old retention timestamps but cannot infer historical eligibility", async () => {
-  await applyD1Migrations(env.MIGRATION_DB, env.TEST_MIGRATIONS.slice(0, -1));
+  await applyD1Migrations(
+    env.MIGRATION_DB,
+    env.TEST_MIGRATIONS.filter(({ name }) => name < "0020_topup_retirement_provenance.sql"),
+  );
   const hash = "a".repeat(64),
     checkout = "b".repeat(64),
     user = "c".repeat(64);
