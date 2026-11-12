@@ -328,7 +328,7 @@ The golden harness now covers static assets as well as generated pages. Each sit
 
 | C | P-2.1ao bounded R2 slots | audit_growth_generated | `codex/product-p2.1ao-r2-slots` | [#468](https://github.com/bpmcginley/InternshipFinder/pull/468) | Draft; local qualification passed; review/CI pending | Two fixed payload slots; 752 Node checks include actual isolated workerd R2, two 2.54 MB payloads, CAS/stale cleanup/lost acknowledgement. No control authority, routes, live bindings or activation. |
 
-| C | P-2.1aq checkpoint payload codec | audit_growth_generated | `codex/product-p2.1aq-payload-codec` | Draft PR pending | Claimed; offline codec only | Common payload and phase headers preserve canonical bytes. No storage/control/witness integration. |
+| C | P-2.1aq checkpoint payload codec | audit_growth_generated | `codex/product-p2.1aq-payload-codec` | [#471](https://github.com/bpmcginley/InternshipFinder/pull/471) | Draft; local qualification passed; review/CI pending | Exact Python canonical byte/digest parity, including closed lineage; 757 Node and seven new Python checks pass. No storage/control/witness integration. |
 
 ## Waiting for Bruce
 
@@ -340,7 +340,7 @@ Dates are when the item was recorded, not a claim that a separate message was se
 
 | Recorded | Item | Ready artifact / next action | Done |
 |---|---|---|---|
-| 2026-11-11 | P-2.1aq checkpoint payload codec | Draft PR pending; pure bounded split/reassembly and cross-language fixtures. | Needs-bruce; no storage choice, activation or restore qualification. |
+| 2026-11-11 | P-2.1aq checkpoint payload codec | [#471](https://github.com/bpmcginley/InternshipFinder/pull/471): pure bounded split/reassembly and cross-language fixtures pass locally; independent review/CI pending. | Needs-bruce; no storage choice, activation or restore qualification. |
 | 2026-11-11 | P-2.1ao bounded R2 slots | [#468](https://github.com/bpmcginley/InternshipFinder/pull/468): offline conditional-write qualification passes; independent review and CI pending. | Needs-bruce; storage choice, physical retention, control authority and restore witness remain unqualified. No activation. |
 | 2026-11-11 | Dormant outbound Worker compatibility | [#414](https://github.com/bpmcginley/InternshipFinder/pull/414) repairs the proven native redirect option in archive and top-up readers. Independent review, CI and coordinated integration required. All existing enablement/configuration gates remain. | Draft needs-bruce; no provider call or deployment |
 | 2026-11-11 | Optional employer publication adapter | Draft [#410](https://github.com/bpmcginley/InternshipFinder/pull/410), synthetic publication parity and paired screenshots verified; exact review/CI pending. | Owner source publication and coordinated activation remain pending; default off |
