@@ -54,7 +54,7 @@ Workers Logs stay off for the same reason.
 | `src/billing.js` | Optional paid plans: Stripe Checkout, the billing portal, webhook checks |
 | `src/referral.js` | Referral credits: invite codes, `GET /invite`, `POST /invite/claim`, extra units |
 | `src/placements.js` | Paid listings: public `GET /placements`, the admin routes, the daily auto-end |
-| `src/orders.js` | Paid listings bought on the site: the order, email link, field cap, Checkout, review page, credits, daily cron (`ORDERS.md`) |
+| `src/orders/` | Paid listings bought on the site: the order, email link, field cap, Checkout, review page, credits, daily cron (`ORDERS.md`) |
 | `src/mail.js` | Plain-text email over the Cloudflare Email Sending binding `EMAIL` (orders only) |
 | `scripts/placement.mjs` | Bruce's command line for the placement admin routes, plus `orders` and `pilot-code` (token from the environment) |
 | `src/config.js` | Models, per-task allowances, prices, rate limits. Edit here, then deploy |
@@ -290,7 +290,7 @@ on its end day. Read the tables directly with
 
 ## Paid listings bought on the site (off until `EMPLOYER_CHECKOUT = "1"`)
 
-Added 2026-10-19 (`src/orders.js`, API.md "Paid listing orders"). Employers buy a listing on
+Added 2026-10-19 (`src/orders/`, API.md "Paid listing orders"). Employers buy a listing on
 internscout.org/employers/buy/ and you make one Approve or Refuse click per order from the review email.
 The design, the rules and the steps to turn it on (Email Sending onboarding, the `[[send_email]]`
 binding, the `REVIEW_TO` secret, the Stripe webhook events) are in [ORDERS.md](ORDERS.md).

@@ -1,0 +1,42 @@
+{
+  "base": "54b9aa16cc01cb29247c7ec0a8116390155c0501",
+  "before_count": 836,
+  "after_count": 836,
+  "removed": [
+    "js/app-modules/83e84089fe5fa7918627fca5e0bd03047648cbebd4c5e0f6da56eb562f894831/allowance.mjs",
+    "js/app-modules/83e84089fe5fa7918627fca5e0bd03047648cbebd4c5e0f6da56eb562f894831/controls.mjs",
+    "js/app-modules/83e84089fe5fa7918627fca5e0bd03047648cbebd4c5e0f6da56eb562f894831/dashboard.mjs",
+    "js/app-modules/83e84089fe5fa7918627fca5e0bd03047648cbebd4c5e0f6da56eb562f894831/entry.mjs",
+    "js/app-modules/83e84089fe5fa7918627fca5e0bd03047648cbebd4c5e0f6da56eb562f894831/extension.mjs",
+    "js/app-modules/83e84089fe5fa7918627fca5e0bd03047648cbebd4c5e0f6da56eb562f894831/index.mjs",
+    "js/app-modules/83e84089fe5fa7918627fca5e0bd03047648cbebd4c5e0f6da56eb562f894831/navigation.mjs",
+    "js/app-modules/83e84089fe5fa7918627fca5e0bd03047648cbebd4c5e0f6da56eb562f894831/presentation.mjs",
+    "js/app-modules/83e84089fe5fa7918627fca5e0bd03047648cbebd4c5e0f6da56eb562f894831/rows.mjs",
+    "js/app-modules/83e84089fe5fa7918627fca5e0bd03047648cbebd4c5e0f6da56eb562f894831/setup.mjs",
+    "js/app-modules/83e84089fe5fa7918627fca5e0bd03047648cbebd4c5e0f6da56eb562f894831/tracker.mjs"
+  ],
+  "added": [
+    "js/app-modules/fd921884229f700ab7e4607e02e15812dd4dd0ef7e4db398b2aa15110f14dd10/allowance.mjs",
+    "js/app-modules/fd921884229f700ab7e4607e02e15812dd4dd0ef7e4db398b2aa15110f14dd10/controls.mjs",
+    "js/app-modules/fd921884229f700ab7e4607e02e15812dd4dd0ef7e4db398b2aa15110f14dd10/dashboard.mjs",
+    "js/app-modules/fd921884229f700ab7e4607e02e15812dd4dd0ef7e4db398b2aa15110f14dd10/entry.mjs",
+    "js/app-modules/fd921884229f700ab7e4607e02e15812dd4dd0ef7e4db398b2aa15110f14dd10/extension.mjs",
+    "js/app-modules/fd921884229f700ab7e4607e02e15812dd4dd0ef7e4db398b2aa15110f14dd10/index.mjs",
+    "js/app-modules/fd921884229f700ab7e4607e02e15812dd4dd0ef7e4db398b2aa15110f14dd10/navigation.mjs",
+    "js/app-modules/fd921884229f700ab7e4607e02e15812dd4dd0ef7e4db398b2aa15110f14dd10/presentation.mjs",
+    "js/app-modules/fd921884229f700ab7e4607e02e15812dd4dd0ef7e4db398b2aa15110f14dd10/rows.mjs",
+    "js/app-modules/fd921884229f700ab7e4607e02e15812dd4dd0ef7e4db398b2aa15110f14dd10/setup.mjs",
+    "js/app-modules/fd921884229f700ab7e4607e02e15812dd4dd0ef7e4db398b2aa15110f14dd10/tracker.mjs"
+  ],
+  "changed": [
+    "index.html",
+    "js/app/allowance.mjs",
+    "js/app/dashboard.mjs"
+  ],
+  "changed_module_bytes": [
+    "allowance.mjs",
+    "dashboard.mjs"
+  ],
+  "all_archive_hashes_match_manifest": true,
+  "unchanged_remaining_bytes": true
+}

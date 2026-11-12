@@ -6,7 +6,10 @@ from datetime import date, datetime, timedelta, timezone
 
 import pytest
 
-from internscout import insights, page_dates, seo_pages, seo_role_details as details
+from internscout import insights, page_dates, seo_role_details as details
+from internscout.site import publish, runtime, sitemap
+
+pytestmark = pytest.mark.without_seo_facade
 
 
 def row(text, **over):
@@ -163,13 +166,26 @@ def fixture_site(tmp_path):
     return rows
 
 
+def _build(site, *, write=False):
+    site_dir = str(site)
+    state = runtime.BuildState(near_on=False)
+    hooks = runtime.BuildHooks()
+    live = (
+        sitemap.live_paths(str(site / "sitemap.xml"), sitemap.SITE_PATH) if write else frozenset()
+    )
+    pages = runtime.invoke(state, hooks, runtime.build, site_dir, live)
+    if write:
+        publish._write_site(site_dir, pages, state, hooks)
+    return {p["path"]: p for p in pages}
+
+
 def test_only_allowlisted_employer_html_changes_not_page_membership_schema_or_controls(
     tmp_path, monkeypatch
 ):
     fixture_site(tmp_path)
-    expected = {p["path"]: p for p in seo_pages.build(str(tmp_path))}
+    expected = _build(tmp_path)
     monkeypatch.setattr(details, "COHORT_PATHS", frozenset())
-    original = {p["path"]: p for p in seo_pages.build(str(tmp_path))}
+    original = _build(tmp_path)
     assert expected.keys() == original.keys()
     changed = [path for path in expected if expected[path]["html"] != original[path]["html"]]
     assert changed == ["/internships/at/under-armour/"]
@@ -200,7 +216,7 @@ def test_optional_details_are_escaped_without_changing_application_links():
         apply_url="https://jobs.example.com/role",
         first_seen="2026-09-01",
     )
-    html = seo_pages.listing_rows(
+    html = runtime.listing_rows(
         [r],
         datetime(2026, 9, 23, tzinfo=timezone.utc),
         details={"example": (("Example <label>", 'value <script>&"'),)},
@@ -213,13 +229,8 @@ def test_visible_source_fact_change_updates_only_cohort_content_date(tmp_path, m
     rows = fixture_site(tmp_path)
     monkeypatch.setattr(page_dates, "observed_day", lambda: "2026-09-24")
 
-    def build():
-        pages = seo_pages.build(str(tmp_path), seo_pages.live_paths(str(tmp_path / "sitemap.xml")))
-        seo_pages.write(str(tmp_path), pages)
-        return {p["path"]: p for p in pages}
-
-    before = build()
-    same = build()
+    before = _build(tmp_path, write=True)
+    same = _build(tmp_path, write=True)
     assert (
         before["/internships/at/under-armour/"]["lastmod"]
         == same["/internships/at/under-armour/"]["lastmod"]
@@ -230,7 +241,7 @@ def test_visible_source_fact_change_updates_only_cohort_content_date(tmp_path, m
     descriptions = json.loads((tmp_path / "data/listings/MA.desc.json").read_text())
     descriptions[rows[0]["id"]] = updated
     (tmp_path / "data/listings/MA.desc.json").write_text(json.dumps(descriptions), encoding="utf-8")
-    after = build()
+    after = _build(tmp_path, write=True)
     assert after["/internships/at/under-armour/"]["lastmod"] == "2026-09-24"
     assert after["/internships/at/sonos/"]["lastmod"] == before["/internships/at/sonos/"]["lastmod"]
     assert (
@@ -353,7 +364,7 @@ def test_export_bound_selects_the_same_visible_forty_per_employer_not_global_id_
     for name in ("Under Armour", "Medtronic", "Lyft", "Bose"):
         expected = {
             r["id"]
-            for r in seo_pages.shown(
+            for r in runtime.shown(
                 [dict(r, keys={"MA"}) for r in rows if r["company_name"] == name]
             )
         }
