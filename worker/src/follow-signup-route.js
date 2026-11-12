@@ -97,6 +97,7 @@ export function createFollowSignupRoute({
           enabled: true,
           dailyLimit,
           catalog: loaded.catalog.signup,
+          catalogExpiresAtMs: expiresAt,
           sessionProof,
           clock: admittedClock,
         });

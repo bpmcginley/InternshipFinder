@@ -17,13 +17,13 @@ for (const expireDuringRate of [false, true])
       origin = "https://example.test",
       url = origin + "/qualified.json";
     let reads = 0;
-    let now = 1100;
+    let now = Date.now();
     const release = Object.freeze({
       url,
       sourceSha256: wire.source_sha256,
       catalogSha256: createHash("sha256").update(bytes).digest("hex"),
-      notBefore: 1000,
-      expiresAt: 2000,
+      notBefore: now - 1000,
+      expiresAt: now + 60000,
     });
     const loadCatalog = async (...args) => {
       assert.equal(args.length, 0);
