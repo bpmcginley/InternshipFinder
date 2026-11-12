@@ -175,6 +175,43 @@ export async function fundedProviderResponse({
     if (f.terminal) usage = f.usage;
     return f.usable;
   };
+  // Count original SSE framing before decoding or acceptance. CRLF is one line
+  // ending; bare CR also ends a line. A blank line resets only after its bytes
+  // count, including an initial UTF-8 BOM, comments and ignored SSE fields.
+  let wireEventBytes = 0,
+    wireLineBytes = 0,
+    wireCR = false,
+    wireFirstLine = true,
+    wireBom = true;
+  const wireLine = () => {
+    if (!wireLineBytes || (wireFirstLine && wireLineBytes === 3 && wireBom)) wireEventBytes = 0;
+    wireLineBytes = 0;
+    wireFirstLine = false;
+  };
+  const wireCount = () => {
+    if (++wireEventBytes > limits.maxEventBytes) throw upstreamError();
+  };
+  const scanWire = (bytes) => {
+    for (const byte of bytes) {
+      if (wireCR) {
+        wireCR = false;
+        if (byte === 10) {
+          wireCount();
+          wireLine();
+          continue;
+        }
+        wireLine();
+      }
+      wireCount();
+      if (byte === 13) wireCR = true;
+      else if (byte === 10) wireLine();
+      else {
+        wireLineBytes++;
+        if (wireFirstLine && wireLineBytes <= 3)
+          wireBom = wireBom && byte === [239, 187, 191][wireLineBytes - 1];
+      }
+    }
+  };
   const scan = (piece, final = false) => {
     text += piece;
     let usable = false,
@@ -189,10 +226,7 @@ export async function fundedProviderResponse({
           event = "";
         }
       } else if (line.startsWith("data:")) event += line.slice(5).replace(/^ /, "") + "\n";
-      if (new TextEncoder().encode(event).byteLength > limits.maxEventBytes) throw upstreamError();
     }
-    if (new TextEncoder().encode(text + event).byteLength > limits.maxEventBytes)
-      throw upstreamError();
     if (final && (text.trim() || event)) throw upstreamError(); // Incomplete event is not proof of completion.
     return usable;
   };
@@ -204,6 +238,7 @@ export async function fundedProviderResponse({
       if (!(result.value instanceof Uint8Array)) throw upstreamError();
       total += result.value.byteLength;
       if (total > limits.maxBytes) throw upstreamError();
+      if (stream) scanWire(result.value);
     }
     return result;
   };
