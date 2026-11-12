@@ -114,7 +114,7 @@ export async function acquireFollowDeliveryOwner(db) {
     if (!Array.isArray(rows) || rows.length !== 2 || !changed(rows[0])) return unavailable();
     const row = selected(rows[1]);
     const resume = owner(row);
-    if (row.generation !== generation) fail();
+    if (row.generation !== generation || row.phase !== "running") fail();
     // Logical expiry uses DB time, never the caller's clock. Validate stored values first.
     for (const kind of ["confirmation", "management"]) {
       if (resume[kind]) {

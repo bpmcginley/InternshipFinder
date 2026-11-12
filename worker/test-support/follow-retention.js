@@ -367,6 +367,7 @@ export async function managementExpiryAcknowledgementsAndLostCommitNeverRetry(db
     { success: false },
     { success: true, meta: { changes: 0 } },
     { success: true, results: [], meta: { changes: 0 } },
+    { success: true, results: [{ removed: 0 }], meta: { changes: 0 } },
     { success: true, results: [{ removed: -1 }], meta: { changes: 0 } },
     { success: true, results: [{ removed: 1.5 }], meta: { changes: 0 } },
     { success: true, results: [{ removed: 2 }], meta: { changes: 0 } },

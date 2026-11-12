@@ -184,6 +184,22 @@ export async function lostAcquisitionAckNeverInvokesAndStaysClosed(db) {
   assert.equal((await acquire(db)).status, "held");
   assert.equal(sends, 0);
 }
+
+export async function acquiredReceiptMustStillReportRunning(db) {
+  for (const phase of ["ready", "held"]) {
+    await db
+      .prepare(
+        "UPDATE follow_delivery_owner SET phase='ready',generation=lower(hex(randomblob(16)))",
+      )
+      .run();
+    const wrapped = observe(db, undefined, async (_sql, results) => {
+      results[1].results[0].phase = phase;
+      return results;
+    });
+    assert.equal((await acquire(wrapped)).status, "unavailable");
+    assert.equal((await row(db)).phase, "running");
+  }
+}
 export async function lostReadyAckCannotHoldOrReplaySuccessor(db) {
   let lose = false;
   const wrapped = observe(db, async (sql, value) => {

@@ -82,7 +82,8 @@ export async function expireFollowManagementRequests(db, options = {}) {
       !Number.isSafeInteger(receipt.removed) ||
       receipt.removed < 0 ||
       receipt.removed > maxRows ||
-      rows[0].meta.changes < receipt.removed
+      rows[0].meta.changes < receipt.removed ||
+      (receipt.removed === 0 && rows[0].meta.changes !== 0)
     )
       return unavailable();
     return { status: "maintained", removed: receipt.removed };
