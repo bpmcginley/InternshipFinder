@@ -323,7 +323,10 @@ export async function competingCapacityClaimPreservesEitherKindCursor(db) {
       batch: async (statements) => {
         if (!raced && statements.length > 2) {
           raced = true;
-          assert.equal(await reserveFollowSendAttempt(db, 1), true);
+          const at = await db
+            .prepare("SELECT strftime('%Y-%m-%dT%H:%M:%fZ','now') AS at")
+            .first("at");
+          assert.equal(await reserveFollowSendAttempt(db, 1, new Date(at)), true);
         }
         return db.batch(statements);
       },
@@ -343,6 +346,60 @@ export async function competingCapacityClaimPreservesEitherKindCursor(db) {
       ...config(db, async () => sends++),
       cap: 2,
       maxCandidates: 2,
+      continuation: first.continuation,
+    });
+    assert.equal(second.counts.accepted, 1, JSON.stringify({ kind, second }));
+    assert.equal(sends, 1);
+  }
+}
+
+export async function ambiguousPostClaimBudgetReadKeepsManagementHead(db) {
+  for (const fault of ["false", "throw", "hole"]) {
+    await db.batch(
+      ["follow_subscribers", "follow_send_budget", "rate"].map((t) =>
+        db.prepare(`DELETE FROM ${t}`),
+      ),
+    );
+    await seed(db, "management");
+    let raced = false,
+      sends = 0;
+    const wrapped = {
+      prepare: (s) => db.prepare(s),
+      batch: async (statements) => {
+        if (!raced && statements.length > 2) {
+          raced = true;
+          const at = await db.prepare("SELECT strftime('%Y-%m-%dT%H:%M:%fZ','now') at").first("at");
+          assert.equal(await reserveFollowSendAttempt(db, 1, new Date(at)), true);
+        } else if (raced && statements.length === 1) {
+          const rows = await db.batch(statements);
+          if (fault === "throw") throw Error("synthetic uncertain budget");
+          if (fault === "false") rows[0].success = false;
+          if (fault === "hole") delete rows[0];
+          return rows;
+        }
+        return db.batch(statements);
+      },
+    };
+    const prior = {
+      expires_at: "2020-01-01T00:00:00.000Z",
+      id: "00000000-0000-0000-0000-000000000000",
+    };
+    const first = await tick({
+      ...config(wrapped, async () => sends++),
+      cap: 1,
+      continuation: { confirmation: null, management: prior, nextKind: "management" },
+    });
+    assert.equal(first.status, "unavailable");
+    assert.equal(sends, 0);
+    assert.deepEqual(first.continuation.management, prior);
+    assert.equal(first.continuation.nextKind, "management");
+    assert.equal(
+      await db.prepare("SELECT claim_id FROM follow_management_outbox").first("claim_id"),
+      null,
+    );
+    const second = await tick({
+      ...config(db, async () => sends++),
+      cap: 2,
       continuation: first.continuation,
     });
     assert.equal(second.counts.accepted, 1);

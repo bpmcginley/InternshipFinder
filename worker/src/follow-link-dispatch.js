@@ -206,16 +206,21 @@ export async function runFollowLinkDispatch({
           : await deliverFollowManagement({ ...common, enabled: true, presentation, buildLinks });
       if (!["accepted", "uncertain", "unavailable", "paused"].includes(result?.status))
         throw new Error();
-      // The claim remains authority. A competing debit can exhaust capacity after preflight.
-      if (result.status === "unavailable") await admitted();
-      if (result.status === "paused" || (result.status === "unavailable" && exhausted)) {
+      // Preserve the blocked turn BEFORE a fallible capacity read. An uncertain receipt
+      // cannot authorize skipping an unclaimed head; committed claims already fence replay.
+      if (result.status === "paused" || result.status === "unavailable") {
         next[kind] = beforeCursor;
         next.nextKind = kind;
-        return finish("paused");
+        if (result.status === "paused") return finish("paused");
+        await admitted();
+        if (exhausted) return finish("paused");
+        fresh();
+        next[kind] = { expires_at: row.expires_at, id: row.id };
+        next.nextKind = kinds[1 - k];
       }
       counts[result.status]++;
       if (result.status === "uncertain") return finish("uncertain");
-      fresh();
+      if (result.status !== "unavailable") fresh();
     }
     return finish("processed");
   } catch {
