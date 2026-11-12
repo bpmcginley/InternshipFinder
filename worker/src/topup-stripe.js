@@ -77,7 +77,7 @@ function callback(value, origin) {
     throw unavailable();
   return url.href;
 }
-function checkoutUrl(value, id) {
+export function checkoutUrl(value, id) {
   if (typeof value !== "string" || value.length > 8192 || /[\\\s]/.test(value)) throw unavailable();
   let url;
   try {

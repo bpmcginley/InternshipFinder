@@ -1,11 +1,13 @@
 // Real composition and real storage; every provider response below is synthetic.
 import assert from "node:assert/strict";
+import { handle } from "../src/index.js";
 import { hmacHex, verifyWebhook } from "../src/billing.js";
 import { recoverVerifiedTopupCheckoutEvent } from "../src/topup-checkout-events.js";
 import { recoverTopupAttempt as recover } from "../src/topup-attempt-recovery.js";
 import { captureTopupSettlement } from "../src/topup-first-settlement.js";
 import { deleteUser } from "../src/limits.js";
 import { createSession, sessionTokenHash } from "../src/session.js";
+import { topupRecoveryResponse } from "../src/topup-recovery-http.js";
 import { recoverAttachedTopup } from "../src/topup-attached-recovery.js";
 import { attempt, session } from "./topup-stripe.js";
 const env = { STRIPE_SECRET_KEY: "fixture-not-a-key", TOPUPS_ENABLED: "0", PAYMENTS_ENABLED: "0" };
@@ -670,4 +672,260 @@ export async function attachedRecoveryDistinguishesUncertainSessionLookups(db) {
     assert.deepEqual(await rows(db, "topup_attempt_revisions"), []);
     await noGrant(db);
   }
+}
+
+const recoveryOrigin = "https://example.invalid";
+const recoveryPath = recoveryOrigin + "/billing/topup/recover";
+function recoveryRequest(token, options = {}) {
+  return new Request(options.url ?? recoveryPath, {
+    method: options.method ?? "POST",
+    body: options.body,
+    headers: { Authorization: "Bearer " + token, Origin: options.origin ?? recoveryOrigin },
+  });
+}
+
+async function recoveryHttp(db, f, token, options = {}) {
+  const result = await topupRecoveryResponse({
+    request: recoveryRequest(token, options),
+    env: { ...attachedEnv, DB: db },
+    fetchImpl: f.fetch,
+    clock,
+    originAllowed: (request) => request.headers.get("Origin") === recoveryOrigin,
+    returnUrl: recoveryOrigin + "/",
+    ...options.deps,
+  });
+  assert.equal(result.headers.get("Cache-Control"), "no-store");
+  return [result.status, await result.json(), result.headers.get("Retry-After")];
+}
+
+async function makeOpen(db, f) {
+  const { now: epoch } = await db.prepare("SELECT unixepoch('now') AS now").first();
+  Object.assign(f.checkout, {
+    status: "open",
+    payment_status: "unpaid",
+    payment_intent: null,
+    expires_at: epoch + 1800,
+    success_url: recoveryOrigin + "/",
+    cancel_url: recoveryOrigin + "/",
+    url: "https://checkout.stripe.com/c/pay/cs_fixture#synthetic",
+  });
+}
+
+export async function recoveryHttpBodylessBoundary(db) {
+  const f = await setup(db);
+  const token = await signedIn(db, f.a.user_hash);
+  const forbidden = () => assert.fail("Unexpected database or provider access");
+  const cases = [
+    [{ deps: { env: {}, fetchImpl: forbidden } }, 503, "disabled"],
+    [{ method: "GET" }, 405, "unavailable"],
+    [{ origin: "https://outsider.invalid" }, 403, "unavailable"],
+    [{ body: '{"checkoutId":"cs_fixture"}' }, 400, "invalid"],
+    [{ url: recoveryPath + "?checkoutId=cs_fixture" }, 400, "invalid"],
+    [{ deps: { returnUrl: "http://example.invalid/" } }, 503, "unavailable"],
+  ];
+  for (const [options, code, status] of cases)
+    assert.deepEqual(await recoveryHttp(db, f, token, options), [code, { status }, null]);
+  assert.deepEqual(await recoveryHttp(db, f, "not-a-session"), [401, { status: "auth" }, null]);
+  const outsider = await signedIn(db, "b".repeat(64));
+  assert.deepEqual(await recoveryHttp(db, f, outsider), [200, { status: "inactive" }, null]);
+  assert.equal(f.calls.length, 0);
+  assert.deepEqual(await rows(db, "topup_attempt_revisions"), []);
+}
+
+export async function recoveryHttpOpenUsesHistoricalIdentityAndLiveReadFence(db) {
+  const cases = [
+    "open",
+    "wrong URL",
+    "wrong return",
+    "provider expiry",
+    "revision changed",
+    "revoked",
+  ];
+  for (const scenario of cases) {
+    await db.prepare("DELETE FROM rate WHERE bucket LIKE '%:topup-recovery'").run();
+    const f = await setup(db);
+    await makeOpen(db, f);
+    const token = await signedIn(db, f.a.user_hash);
+    if (scenario === "wrong URL") f.checkout.url = "https://checkout.stripe.com/c/pay/cs_other";
+    if (scenario === "wrong return") f.checkout.cancel_url = "https://outsider.invalid/";
+    if (scenario === "provider expiry") f.checkout.expires_at -= 1800;
+    f.before = async () => {
+      if (f.calls.length !== 2) return;
+      if (scenario === "revision changed") await captureTopupSettlement(db, f.a.id);
+      if (scenario === "revoked")
+        await db
+          .prepare("DELETE FROM sessions WHERE id=?")
+          .bind(await sessionTokenHash(token))
+          .run();
+    };
+    const expected =
+      scenario === "open"
+        ? [200, { status: "open", url: f.checkout.url }, null]
+        : scenario === "revoked"
+          ? [401, { status: "auth" }, null]
+          : [202, { status: "pending" }, null];
+    assert.deepEqual(await recoveryHttp(db, f, token), expected);
+    assert.equal(f.calls.length, 2);
+    assert.equal((await rows(db, "topup_checkout_attempts"))[0].state, "open");
+    await noGrant(db);
+  }
+}
+
+export async function recoveryHttpPaidAndExpiredNeverCreate(db) {
+  for (const outcome of ["settled", "expired", "pending"]) {
+    await db.prepare("DELETE FROM rate WHERE bucket LIKE '%:topup-recovery'").run();
+    const f = await setup(db);
+    const token = await signedIn(db, f.a.user_hash);
+    if (outcome === "expired") {
+      f.checkout.status = "expired";
+      f.checkout.payment_status = "unpaid";
+      f.checkout.payment_intent = null;
+    } else if (outcome === "pending") f.checkout.payment_status = "unpaid";
+    assert.deepEqual(await recoveryHttp(db, f, token), [
+      outcome === "pending" ? 202 : 200,
+      { status: outcome },
+      null,
+    ]);
+    assert.equal(f.calls.length, outcome === "settled" ? 10 : 2);
+    assert.equal(
+      (await rows(db, "topup_checkout_attempts"))[0].state,
+      outcome === "pending" ? "open" : outcome,
+    );
+  }
+}
+
+export async function recoveryHttpUsesIsolatedBudgets(db) {
+  await db.prepare("DELETE FROM rate WHERE bucket LIKE '%:topup-recovery'").run();
+  const f = await setup(db);
+  await makeOpen(db, f);
+  const token = await signedIn(db, f.a.user_hash);
+  const outsider = await signedIn(db, "b".repeat(64));
+  assert.deepEqual(await recoveryHttp(db, f, outsider), [200, { status: "inactive" }, null]);
+  assert.deepEqual(
+    (await rows(db, "rate")).filter(({ bucket }) => bucket.endsWith(":topup-recovery")),
+    [],
+  );
+  for (let i = 0; i < 3; i++) assert.equal((await recoveryHttp(db, f, token))[0], 200);
+  assert.deepEqual(await recoveryHttp(db, f, token), [429, { status: "limited" }, "60"]);
+  assert.equal(f.calls.length, 6);
+  await db.prepare("DELETE FROM rate WHERE bucket LIKE '%:topup-recovery'").run();
+  await db
+    .prepare("INSERT INTO rate(user_hash,bucket,calls) VALUES('topup-recovery',?,30)")
+    .bind("m:" + now.toISOString().slice(0, 16) + ":topup-recovery")
+    .run();
+  assert.deepEqual(await recoveryHttp(db, f, token), [429, { status: "limited" }, "60"]);
+  assert.equal(f.calls.length, 6);
+}
+
+const dashboardOrigin = "https://internscout.org";
+
+async function dashboardRequest(
+  db,
+  f,
+  token,
+  path,
+  { method = "POST", origin = dashboardOrigin, body, config = attachedEnv } = {},
+) {
+  const work = [];
+  const result = await handle(
+    new Request("https://api.example.invalid" + path, {
+      method,
+      body,
+      headers: { Authorization: "Bearer " + token, Origin: origin },
+    }),
+    { ...config, DB: db },
+    { waitUntil: (promise) => work.push(promise) },
+    { now: clock, fetch: f.fetch },
+  );
+  await Promise.all(work);
+  return { result, data: await result.json() };
+}
+
+export async function mountedRecoveryKeepsCreationSeparate(db) {
+  const path = "/billing/topup/recover";
+  for (const outcome of ["open", "settled", "expired"]) {
+    await db.prepare("DELETE FROM rate WHERE bucket LIKE '%:topup-recovery'").run();
+    const f = await setup(db);
+    const token = await signedIn(db, f.a.user_hash);
+    if (outcome !== "settled") {
+      await makeOpen(db, f);
+      f.checkout.success_url = f.checkout.cancel_url = dashboardOrigin + "/";
+      if (outcome === "expired") f.checkout.status = "expired";
+    }
+    for (const [url, options, code, status] of [
+      [path, { config: {} }, 503, "disabled"],
+      [path, { method: "GET" }, 405, "unavailable"],
+      [path, { origin: "https://outsider.invalid" }, 403, "unavailable"],
+      [path + "?checkout=ignored", {}, 400, "invalid"],
+      [path, { body: "{}" }, 400, "invalid"],
+      ["/billing/topup/checkout", {}, 503, "disabled"],
+    ]) {
+      const { result, data } = await dashboardRequest(db, f, token, url, options);
+      assert.equal(result.status, code);
+      assert.equal(result.headers.get("Cache-Control"), "no-store");
+      assert.deepEqual(data, { status });
+      if (code === 405) assert.equal(result.headers.get("Allow"), "POST");
+    }
+    assert.equal(f.calls.length, 0);
+    const { result, data } = await dashboardRequest(db, f, token, path);
+    assert.equal(result.status, 200);
+    assert.equal(result.headers.get("Access-Control-Allow-Origin"), dashboardOrigin);
+    assert.deepEqual(
+      data,
+      outcome === "open" ? { status: outcome, url: f.checkout.url } : { status: outcome },
+    );
+    assert.equal(f.calls.length, outcome === "settled" ? 10 : 2);
+    if (outcome === "open") {
+      for (let n = 0; n < 2; n++)
+        assert.equal((await dashboardRequest(db, f, token, path)).result.status, 200);
+      const limited = await dashboardRequest(db, f, token, path);
+      assert.equal(limited.result.status, 429);
+      assert.equal(limited.result.headers.get("Retry-After"), "60");
+      assert.match(limited.result.headers.get("Access-Control-Expose-Headers"), /Retry-After/);
+      assert.equal(f.calls.length, 6);
+    }
+  }
+}
+
+export async function mountedRecoveryHintIsOptionalAndAccountScoped(db) {
+  const f = await setup(db);
+  const token = await signedIn(db, f.a.user_hash);
+  const outsider = await signedIn(db, "b".repeat(64));
+  const options = { method: "GET" };
+  let lookups = 0,
+    hintSql;
+  const observed = {
+    batch: (statements) => db.batch(statements),
+    prepare(sql) {
+      if (sql.startsWith("SELECT a.checkout_id FROM topup_checkout_attempts")) {
+        lookups++;
+        hintSql = sql;
+      }
+      return db.prepare(sql);
+    },
+  };
+  const disabled = await dashboardRequest(observed, f, token, "/me", { ...options, config: {} });
+  assert.equal(disabled.result.status, 200);
+  assert.equal(lookups, 0);
+  const other = await dashboardRequest(observed, f, outsider, "/me", options);
+  assert.equal(other.result.status, 200);
+  assert.equal(Object.hasOwn(other.data, "can_recover_topup"), false);
+  const owner = await dashboardRequest(observed, f, token, "/me", options);
+  assert.equal(owner.result.status, 200);
+  assert.equal(owner.result.headers.get("Cache-Control"), "no-store");
+  assert.deepEqual(owner.data, { ...disabled.data, can_recover_topup: true });
+  assert.equal(lookups, 2);
+  const plan = await db
+    .prepare("EXPLAIN QUERY PLAN " + hintSql)
+    .bind(await sessionTokenHash(token), f.a.user_hash)
+    .all();
+  assert.ok(
+    plan.results.some(({ detail }) =>
+      /SEARCH a USING INDEX topup_checkout_one_active/.test(detail),
+    ),
+  );
+  await db.prepare("UPDATE topup_checkout_attempts SET checkout_id=NULL,state='creating'").run();
+  const unattached = await dashboardRequest(observed, f, token, "/me", options);
+  assert.deepEqual(unattached.data, disabled.data);
+  assert.equal(f.calls.length, 0);
 }
