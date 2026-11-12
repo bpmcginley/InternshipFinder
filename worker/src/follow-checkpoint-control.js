@@ -4,6 +4,12 @@ import { classifyFollowCheckpointWitness as classify } from "./follow-checkpoint
 const copy = (value) => structuredClone(value);
 const equal = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const position = (state) => ({ current: state.current, receipt: state.receipt });
+function synchronousTrue(result) {
+  if (result === true) return true;
+  // Never await or accept async predicates, but consume their possible rejection.
+  void Promise.prototype.then.call(Promise.resolve(result), undefined, () => {});
+  return false;
+}
 const id = () =>
   Array.from(crypto.getRandomValues(new Uint8Array(16)), (v) =>
     v.toString(16).padStart(2, "0"),
@@ -75,7 +81,7 @@ export class FollowCheckpointControl {
       const witness = this.witness(),
         before = await this.#admitted(witness);
       if (!before || before.current.revision === Number.MAX_SAFE_INTEGER) return "held";
-      if (action(copy(before), this.now()) !== true) return "stale";
+      if (!synchronousTrue(action(copy(before), this.now()))) return "stale";
       const intent = {
         nonce: id(),
         next: {
@@ -89,7 +95,7 @@ export class FollowCheckpointControl {
       if (this.beforeCommit) await this.beforeCommit();
       const committed = this.storage.transactionSync(() => {
         const state = this.state();
-        if (!equal(state, before) || action(state, this.now()) !== true) return false;
+        if (!equal(state, before) || !synchronousTrue(action(state, this.now()))) return false;
         state.current = intent.next;
         state.receipt = { nonce: intent.nonce, previous: before.current };
         this.#save(state);

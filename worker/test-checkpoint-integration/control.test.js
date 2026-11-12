@@ -303,3 +303,23 @@ test("failed witness supplier keeps admission, change and recovery closed", asyn
     expect(i.snapshot()).toBe(before);
   });
 });
+
+for (const rejectAt of [1, 2])
+  test(`rejecting async predicate at evaluation ${rejectAt} is consumed without writes`, async () => {
+    const object = await fixture();
+    await runInDurableObject(object, async (i) => {
+      const before = i.snapshot();
+      let calls = 0;
+      const outcome = await i.control.change((state) => {
+        state.initialized = true;
+        return ++calls === rejectAt
+          ? Promise.reject(new Error("synthetic rejected predicate"))
+          : true;
+      });
+      expect(outcome).toBe(rejectAt === 1 ? "stale" : "held");
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(calls).toBe(rejectAt);
+      expect(i.snapshot()).toBe(before);
+      expect((await i.witness.read()).phase).toBe(rejectAt === 1 ? "stable" : "prepared");
+    });
+  });
