@@ -13,6 +13,7 @@ import { purchasedRunsFor } from "./funded-purchase.js";
 import { bonusFor, claim, inviteInfo, noteAccount } from "./referral.js";
 import { cleanStates, demandCounts, dropStale, setDemand, touchSeen } from "./demand.js";
 import { countEvent, countHit } from "./visits.js";
+import { followTokenEndpoints } from "./follow-token-endpoint.js";
 import { followUnsubscribeEndpoint } from "./follow-unsubscribe-endpoint.js";
 import { topupCheckoutResponse, topupOfferResponse } from "./topup-checkout-http.js";
 import { canRecoverAttachedTopup } from "./topup-attached-recovery.js";
@@ -199,6 +200,8 @@ const withAdmin = (handler) => async (context) => {
 const safeRouteHandlers = {
   // Token deletion stays available independently of future signup/sending switches.
   "POST /follows/unsubscribe": async ({ request, db, now }) => followUnsubscribeEndpoint(request, db, now),
+  "POST /follows/confirm": async ({ request, db, d }) => followTokenEndpoints.confirm(request, db, d.now),
+  "POST /follows/delete-request": async ({ request, db, d }) => followTokenEndpoints.deleteRequest(request, db, d.now),
 
   // Stay signed in: trade a fresh provider ID token for a long-lived session token (session.js).
   // Only an ID token can start a session, so a stolen session token cannot make more of itself.
