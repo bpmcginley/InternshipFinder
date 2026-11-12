@@ -1,6 +1,9 @@
 // Called only after existing raw-body signature verification and receipt acquisition.
 import { recoverVerifiedTopupCheckoutEvent } from "./topup-checkout-events.js";
-import { recoverVerifiedTopupReversalEvent } from "./topup-reversal-events.js";
+import {
+  recoverVerifiedTopupReversalEvent,
+  snapshotTopupHistoryPolicy,
+} from "./topup-reversal-events.js";
 import {
   topupRecoveryConfigured,
   historicalTopupOffer,
@@ -29,9 +32,39 @@ const reference = (value, kind, mode) =>
       ? value.id
       : null;
 
+// Capture before receipt/discovery awaits. Only this top-up branch receives the pinned env.
+export function snapshotTopupHistoryInput(env, event, historyPolicy) {
+  if (historyPolicy?.enabled !== true) return { historyPolicy: null };
+  event = structuredClone(event);
+  if (!objectTypes.has(event?.type)) return { event, historyPolicy: null };
+  let policy;
+  try {
+    policy = snapshotTopupHistoryPolicy(historyPolicy);
+    if (!policy) throw new Error("Invalid history policy");
+  } catch {
+    policy = Object.freeze({ enabled: true }); // Invalid opt-in must not become legacy recovery.
+  }
+  return {
+    event,
+    historyPolicy: policy,
+    env: Object.freeze({
+      STRIPE_SECRET_KEY: env?.STRIPE_SECRET_KEY,
+      STRIPE_PRICE_TOPUP: env?.STRIPE_PRICE_TOPUP,
+    }),
+  };
+}
+
 // null means positively outside this boundary. pending MUST release the existing receipt
 // for retry, never fall through to employer/subscription handling or acknowledge success.
-export async function topupWebhook({ db, env, event, fetchImpl, clock }) {
+export async function topupWebhook({ db, env, event, fetchImpl, clock, historyPolicy }) {
+  try {
+    const captured = snapshotTopupHistoryInput(env, event, historyPolicy);
+    historyPolicy = captured.historyPolicy;
+    event = captured.event ?? event;
+    env = captured.env ?? env;
+  } catch {
+    return pending();
+  }
   const o = event?.data?.object,
     checkout = typeof event?.type === "string" && event.type.startsWith("checkout.session."),
     expected = objectTypes.get(event?.type),
@@ -53,6 +86,7 @@ export async function topupWebhook({ db, env, event, fetchImpl, clock }) {
     event,
     fetchImpl,
     clock,
+    historyPolicy,
     resolveOffer: (version, livemode) => historicalTopupOffer(env, version, livemode),
   };
   try {
