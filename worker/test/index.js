@@ -61,6 +61,7 @@ import "./follow-unsubscribe-endpoint.test.js";
 import "./follow-token-endpoint.test.js";
 import "./follow-signup-http.test.js";
 import "./follow-mail.test.js";
+import "./follow-email-transport.test.js";
 import "./follow-request-deletion.test.js";
 import "./follow-matching.test.js";
 import "./follow-progress.test.js";
