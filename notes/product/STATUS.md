@@ -371,6 +371,8 @@ The golden harness now covers static assets as well as generated pages. Each sit
 
 ## Waiting for Bruce
 
+P-4.4c advisor signup build wiring claims `backend/internscout/site/publish.py`, narrow per-build `runtime.py` plumbing, a new offline test, and owned Product notes. Draft needs-bruce, default off; no provider calls or settings. Integration is held until after G3 because backend source matches ingest push filters. Tags/no automation verification and conditional privacy publication remain activation gates.
+
 - **P-2.2ap native checkout recovery UI [#475](https://github.com/bpmcginley/InternshipFinder/pull/475)**: audit_site, `codex/product-p2.2ap-recovery-ui`, on published `82c3c429`. Draft needs-bruce; conditional Account/allowance recovery and exact pending-checkout deletion guidance implemented. 16 focused and 400 site tests, two golden tests and 24 paired synthetic screenshots. Session, refresh and cross-tab deletion races corrected. #472 is deployed with recovery off pending provider configuration. Independent review and hosted checks remain.
 
 
