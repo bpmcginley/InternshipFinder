@@ -46,6 +46,7 @@ import "./follow-outbox.test.js";
 import "./follow-retention.test.js";
 import "./follow-unsubscribe.test.js";
 import "./follow-unsubscribe-endpoint.test.js";
+import "./follow-token-endpoint.test.js";
 import "./follow-mail.test.js";
 import "./follow-request-deletion.test.js";
 import "./follow-matching.test.js";

@@ -14,6 +14,22 @@ const route = (method, path, auth, request, response, gate = "none") =>
 export const ROUTES = Object.freeze([
   route(
     "POST",
+    "/follows/confirm",
+    "follow-action-token",
+    "No query parameters. Exactly one confirmation token as a 101-byte text/plain body with an absolute 5-second read deadline.",
+    "Empty no-store 204 for confirmation, 410 for unavailable confirmation, 400 for malformed input, 503 with Retry-After: 60 for timeout/capacity/storage. GET/HEAD fall through to 404.",
+    "none; authorizes only an existing confirmation credential",
+  ),
+  route(
+    "POST",
+    "/follows/delete-request",
+    "follow-action-token",
+    "No query parameters. Exactly one fd_ request-deletion token as a 104-byte text/plain body with an absolute 5-second read deadline.",
+    "Empty no-store 204 for deletion/replay/unknown, 400 for malformed input, 503 with Retry-After: 60 for timeout/capacity/storage. GET/HEAD fall through to 404.",
+    "none; deletion remains available when signup or sending is off",
+  ),
+  route(
+    "POST",
     "/follows/unsubscribe",
     "follow-unsubscribe-token",
     "Exactly one query parameter token=deletion-only UUID.secret; URL-encoded or multipart List-Unsubscribe=One-Click, at most 4,096 bytes with an absolute 5-second body-read deadline; no login, cookies or Origin required",
@@ -353,6 +369,7 @@ export const SPECIAL_ROUTES = Object.freeze([
 ]);
 
 export const AUTH = Object.freeze({
+  "follow-action-token": "Purpose-specific follow bearer in the POST body, checked against its stored hash.",
   "follow-unsubscribe-token":
     "Existing hashed, deletion-only follow token in the HTTPS URL query; never a confirmation, management or request-only deletion capability.",
   public: "No sign-in required; route-specific validation still applies.",

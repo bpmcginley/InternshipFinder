@@ -10,6 +10,8 @@ The router trims trailing slashes before exact matching. Global OPTIONS is handl
 
 | Method and path | Authentication | Feature gate | Request shape | Response shape |
 |---|---|---|---|---|
+| `POST /follows/confirm` | follow-action-token | none; authorizes only an existing confirmation credential | No query parameters. Exactly one confirmation token as a 101-byte text/plain body with an absolute 5-second read deadline. | Empty no-store 204 for confirmation, 410 for unavailable confirmation, 400 for malformed input, 503 with Retry-After: 60 for timeout/capacity/storage. GET/HEAD fall through to 404. |
+| `POST /follows/delete-request` | follow-action-token | none; deletion remains available when signup or sending is off | No query parameters. Exactly one fd_ request-deletion token as a 104-byte text/plain body with an absolute 5-second read deadline. | Empty no-store 204 for deletion/replay/unknown, 400 for malformed input, 503 with Retry-After: 60 for timeout/capacity/storage. GET/HEAD fall through to 404. |
 | `POST /follows/unsubscribe` | follow-unsubscribe-token | none; deletion remains available when signup or sending is off | Exactly one query parameter token=deletion-only UUID.secret; URL-encoded or multipart List-Unsubscribe=One-Click, at most 4,096 bytes with an absolute 5-second body-read deadline; no login, cookies or Origin required | Empty no-store 204 for deletion/replay/unknown/wrong-purpose; malformed 400; body timeout/capacity/storage 503 with Retry-After: 60; GET/HEAD fall through to 404 without mutation |
 | `GET /config` | public | none | none | JSON {providers: Provider[], allowance: PlanAllowances, payments: {enabled, plans}, topups?: true, paused: boolean, invite: {bonus, max}, sessions: true, sync: boolean} |
 | `GET /me` | user | none | none | JSON {month, plan, plan_renews, can_upgrade, upgrade_offer, can_manage, can_recover_topup?: true, tier, paused, allowance: {task: {used, limit, bonus?, purchased?}}} |
@@ -63,6 +65,7 @@ The router trims trailing slashes before exact matching. Global OPTIONS is handl
 
 ### Authentication keys
 
+- **follow-action-token:** Purpose-specific follow bearer in the POST body, checked against its stored hash.
 - **follow-unsubscribe-token:** Existing hashed, deletion-only follow token in the HTTPS URL query; never a confirmation, management or request-only deletion capability.
 - **public:** No sign-in required; route-specific validation still applies.
 - **user:** Provider ID token or live session bearer token, through the existing authenticateUser path.
