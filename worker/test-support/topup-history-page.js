@@ -330,3 +330,55 @@ export async function changedEpochIsNeverClosedByFailedPage(db) {
   assert.equal(calls, 1);
   assert.deepEqual((await capture(db, false, { enabled: true })).coverage, newer);
 }
+
+export async function synchronousMetadataAbortCancelsResponseExactlyOnce(db) {
+  const f = await fixture(db),
+    controller = new AbortController();
+  let calls = 0,
+    discards = 0,
+    cancelled = 0;
+  const read = create({
+    enabled: true,
+    requestVersion: version,
+    request: async (url) => {
+      calls++;
+      const raw = new Response(
+        new ReadableStream({
+          cancel() {
+            cancelled++;
+          },
+        }),
+      );
+      const cancel = raw.body.cancel.bind(raw.body);
+      raw.body.cancel = (...args) => {
+        discards++;
+        return cancel(...args);
+      };
+      Object.defineProperty(raw, "url", {
+        get() {
+          controller.abort();
+          return url;
+        },
+      });
+      return raw;
+    },
+  });
+  // A real signal abort inside metadata validation, while the original traversal still awaits its page.
+  const result = await traverse(db, f.input, {
+    enabled: true,
+    clock: () => f.now,
+    readPage: (q, signal) => {
+      signal.addEventListener("abort", () => controller.abort(), { once: true });
+      return read(q, controller.signal);
+    },
+  });
+  assert.deepEqual(result, { status: "closed" });
+  assert.equal(calls, 1);
+  assert.equal(discards, 1);
+  assert.equal(cancelled, 1);
+  assert.deepEqual((await capture(db, false, { enabled: true })).coverage, {
+    ...f.input.expected,
+    health: "closed",
+    revision: 2,
+  });
+}

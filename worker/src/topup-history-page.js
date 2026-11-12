@@ -115,6 +115,12 @@ export function createTopupHistoryPageReader({ enabled = false, requestVersion, 
               deny();
               return;
             }
+            // Injected metadata access can synchronously abort this handoff.
+            if (finished || signal.aborted) {
+              discard(response);
+              deny();
+              return;
+            }
             finished = true;
             signal.removeEventListener("abort", deny);
             resolve(response); // No read, clone, buffering or parsing here.
