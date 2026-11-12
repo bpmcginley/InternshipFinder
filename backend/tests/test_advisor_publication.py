@@ -49,7 +49,9 @@ def test_enabled_without_weekly_pages_rejects_before_any_output(tmp_path, majors
     assert files(site) == before
 
 
-@pytest.mark.parametrize("fault", ["wrong-tag", "comment", "template", "hidden", "duplicate"])
+@pytest.mark.parametrize(
+    "fault", ["wrong-tag", "comment", "template", "hidden", "duplicate", "disabled-fieldset"]
+)
 def test_one_weekly_page_without_control_rejects_entire_artifact(tmp_path, monkeypatch, fault):
     from internscout.site.render import advisor
 
@@ -65,6 +67,7 @@ def test_one_weekly_page_without_control_rejects_entire_artifact(tmp_path, monke
                 "template": "<template>" + body + "</template>",
                 "hidden": body.replace("<form ", "<form hidden "),
                 "duplicate": body + body,
+                "disabled-fieldset": "<fieldset disabled>" + body + "</fieldset>",
             }[fault]
         return page
 
@@ -84,6 +87,8 @@ def test_one_weekly_page_without_control_rejects_entire_artifact(tmp_path, monke
         ("<textarea>\n", "</textarea>"),
         ("<template>\n", "</template>"),
         ("<template/>\n", "</template>"),
+        ("<details>\n", "</details>"),
+        ("<dialog>\n", "</dialog>"),
         ('<div hidden>\n', "</div>"),
         ('<div aria-hidden="true">\n', "</div>"),
         ('<div style="display: none">\n', "</div>"),

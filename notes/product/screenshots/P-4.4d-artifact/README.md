@@ -15,8 +15,10 @@ The sole new visible string relative to #479 is: "If you choose Subscribe as an 
 | 375 / light | [before](./before-form-375-light.png) | [after](./after-form-375-light.png) | [before](./before-privacy-375-light.png) | [after](./after-privacy-375-light.png) |
 | 375 / dark | [before](./before-form-375-dark.png) | [after](./after-form-375-dark.png) | [before](./before-privacy-375-dark.png) | [after](./after-privacy-375-dark.png) |
 
-Validation: 110 advisor/build/widget/golden cases pass, including real entry + stamping, malformed anchor rejection before writes, both newline styles, exact surrounding bytes and fresh changed-catalog rollback. Default golden artifacts are unchanged. Provider settings, live signup and post-G3 publication remain unqualified.
+Validation: 115 advisor/build/widget/golden cases pass, including real entry + stamping, malformed anchor rejection before writes, both newline styles, exact surrounding bytes and fresh changed-catalog rollback. Default golden artifacts are unchanged. Provider settings, live signup and post-G3 publication remain unqualified.
 
 Exact parent #479 enabled build versus the new enabled build differs only in privacy.html: every other generated/stamped byte is identical, including both form pages. Both used the same synthetic fixture, actual share-card entry and asset stamping. [Byte proof](parent-parity.json). All 400 serial Node 22 site checks also pass.
 
 The post-review structural/empty-catalog correction preserves every byte of all three valid fixture artifacts (before, after, rollback). Existing sixteen images and native browser evidence therefore remain exact. New negative tests fail before output for invisible headings/items, empty advisor sets and missing/hidden controls on any weekly page.
+
+Native Edge independently verified that wrapping the disclosure in closed details or dialog hides it (adding open restores visibility), and wrapping the advisor checkbox in a disabled fieldset makes it disabled. Five publisher regressions now reject these containers before output. Fresh normal-entry/stamped before/enabled/rollback artifacts remain byte-identical; existing images remain exact.

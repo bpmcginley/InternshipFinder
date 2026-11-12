@@ -234,6 +234,8 @@ class _AdvisorMarkup(HTMLParser):
         hidden = (
             any(blocked for _, blocked, _ in self.stack)
             or tag in self._INERT
+            or (tag in {"details", "dialog"} and "open" not in attrs)
+            or (tag == "fieldset" and "disabled" in attrs)
             or "hidden" in attrs
             or "inert" in attrs
             or (attrs.get("aria-hidden") or "").strip().lower() == "true"
