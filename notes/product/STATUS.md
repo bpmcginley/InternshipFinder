@@ -428,6 +428,7 @@ Dates are when the item was recorded, not a claim that a separate message was se
 
 | Recorded | Item | Ready artifact / next action | Done |
 |---|---|---|---|
+| 2026-11-12 | P-3.6 Deep Dive interview turn ownership | `codex/product-extension-interview-turn` claims `extension/onboarding/onboarding.js` and focused synthetic evidence. | Draft needs-bruce. Independent review and exact checks pending. |
 | 2026-11-12 | P-2.1au native checkpoint test budget | [#485](https://github.com/bpmcginley/InternshipFinder/pull/485): dedicated native test wall-clock correction, with all fixtures and production files unchanged. | Needs-bruce; independent review and exact hosted checks required. |
 | 2026-11-11 | P-2.1at offline cleanup recovery | [#478](https://github.com/bpmcginley/InternshipFinder/pull/478): test-only interrupted cleanup qualification on exact #476. | Merged after exact independent review and hosted checks. Provider retention, durable witness, restore and activation remain open. |
 | 2026-11-11 | P-2.1as offline upload reservations | [#476](https://github.com/bpmcginley/InternshipFinder/pull/476): native cutoff correction qualifies cleanup after predecessor retirement. | Merged and verified. Provider retention, durable witness and activation remain open. |
