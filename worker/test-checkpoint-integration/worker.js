@@ -1,13 +1,8 @@
 // Test-only protocol rehearsal. No production entry point or selected witness provider.
 import { DurableObject } from "cloudflare:workers";
 import { FollowCheckpointControl } from "../src/follow-checkpoint-control.js";
-import {
-  createFollowCheckpointReservation,
-  describeFollowCheckpoint,
-} from "../src/follow-checkpoint-reservation.js";
-import { createFollowCheckpointSnapshotReader } from "../src/follow-checkpoint-snapshot.js";
-import { createFollowCheckpointStage } from "../src/follow-checkpoint-stage.js";
-import { createFollowCheckpointPromotion } from "../src/follow-checkpoint-promotion.js";
+import { describeFollowCheckpoint } from "../src/follow-checkpoint-reservation.js";
+import { createFollowCheckpointRuntime } from "../src/follow-checkpoint-runtime.js";
 import { handleFollowCheckpoint } from "../src/follow-checkpoint-http.js";
 import { createFollowCheckpointR2Slots } from "../src/follow-checkpoint-r2.js";
 import { createFollowCheckpointPayloadCodec } from "../src/follow-checkpoint-payload.js";
@@ -111,8 +106,11 @@ export class CheckpointIntegration extends DurableObject {
     this.witness = null;
     // Mirror prepared receipts only for the synthetic delayed-PUT probes.
     this.uploads = new Map();
-    this.reservations = createFollowCheckpointReservation({
+    this.runtime = createFollowCheckpointRuntime({
       enabled: true,
+      maxBytes: 3_000_000,
+      maxHeaderBytes: 2000,
+      maxControlBytes: 16384,
       control: this.control,
       codec,
       slots: {
@@ -149,6 +147,7 @@ export class CheckpointIntegration extends DurableObject {
         );
       },
     });
+    this.reservations = this.runtime.reservations;
   }
   now() {
     return this.control.now();
@@ -166,40 +165,16 @@ export class CheckpointIntegration extends DurableObject {
     return this.control.admitted();
   }
   readSnapshot(maxBytes = 3_000_000) {
-    return createFollowCheckpointSnapshotReader({
-      capture: () =>
-        this.ctx.storage.transactionSync(() => ({ raw: this.snapshot(), now: this.now() })),
-      readWitness: () => this.witness?.read(),
-      slots: this.slots,
-      codec,
-      maxBytes: 3_000_000,
-      maxHeaderBytes: 2000,
-      maxControlBytes: 16384,
-    })(maxBytes);
+    return this.runtime.read(maxBytes);
   }
   inspectStageReservation(digest) {
     return this.reservations.inspectStageReservation(digest);
   }
   stageSnapshot(body, limit = 3_000_000) {
-    return createFollowCheckpointStage({
-      codec,
-      maxBytes: 3_000_000,
-      inspect: (digest) => this.inspectStageReservation(digest),
-      read: (size) => this.readSnapshot(size),
-      reserve: (bytes) => this.reservePending(bytes),
-      upload: (nonce) => this.uploadReserved(nonce),
-      reconcile: (nonce) => this.reconcileReserved(nonce),
-    })(body, limit);
+    return this.runtime.reservePending(body, limit);
   }
   promoteSnapshot(body, limit, options) {
-    return createFollowCheckpointPromotion({
-      codec,
-      maxBytes: 3_000_000,
-      capture: () =>
-        this.ctx.storage.transactionSync(() => ({ raw: this.snapshot(), now: this.now() })),
-      read: (size) => this.readSnapshot(size),
-      change: (action) => this.change(action),
-    })(body, limit, options);
+    return this.runtime.promote(body, limit, options);
   }
   async fetch(request) {
     const hash = async (text) =>

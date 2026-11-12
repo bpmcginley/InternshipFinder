@@ -102,7 +102,7 @@ for (const fault of [
       if (fault === "clock") {
         let calls = 0;
         const now = instance.now();
-        instance.now = () => now - calls++;
+        instance.control.now = () => now - calls++;
       }
       if (fault === "witness") instance.witness = null;
       if (fault === "closed") instance.witness.value.phase = "closed";
