@@ -259,8 +259,8 @@ test("active accepted predecessor is preserved while its exact successor stages"
 test("lost reconciliation acknowledgement succeeds only from exact committed readback", async () => {
   const { object, raw } = await setup();
   await runInDurableObject(object, (i) => {
-    const reconcile = i.reconcileReserved.bind(i);
-    i.reconcileReserved = async (nonce) => {
+    const reconcile = i.reservations.reconcileReserved;
+    i.reservations.reconcileReserved = async (nonce) => {
       await reconcile(nonce);
       throw new Error("lost acknowledgement");
     };
