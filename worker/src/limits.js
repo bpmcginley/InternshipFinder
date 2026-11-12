@@ -534,7 +534,7 @@ export async function settle(db, user, admitted, cents, usage, meta) {
 // too, in the same batch, so the account is signed out on every device.
 export async function deleteUser(db, user, now = new Date()) {
   const month = monthOf(now);
-  await db.batch([
+  const statements = [
     db.prepare("DELETE FROM demand WHERE user_hash = ?").bind(user),
     db.prepare("DELETE FROM usage WHERE user_hash = ? AND month < ?").bind(user, month),
     db.prepare("DELETE FROM runs WHERE user_hash = ? AND month < ?").bind(user, month),
@@ -545,7 +545,19 @@ export async function deleteUser(db, user, now = new Date()) {
     forgetProfile(db, user),
     forgetSessions(db, user),
     forgetCopies(db, user),
-  ]);
+  ];
+  try {
+    await db.batch(statements);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    const trigger = /^D1_ERROR: topup_payment_pending: SQLITE_CONSTRAINT(?: \(extended: SQLITE_CONSTRAINT_TRIGGER\))?$/;
+    if (message !== "topup_payment_pending" && !trigger.test(message)) throw error;
+    throw new HttpError(
+      409,
+      "topup_payment_pending",
+      "Finish or let your pending checkout expire before deleting your data. Contact support if a billing confirmation is pending.",
+    );
+  }
 }
 
 // was: // Daily cron: old rate buckets, last month's runs and per-account spend, usage older than a year.
