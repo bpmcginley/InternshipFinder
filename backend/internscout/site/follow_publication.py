@@ -1,10 +1,8 @@
-"""Dormant bounded local capture; never selects, publishes or fetches a public export."""
+"""Dormant bounded byte staging; never opens, selects, publishes or fetches an export."""
 
 from dataclasses import dataclass
 import hashlib
-from pathlib import Path
 import re
-import stat
 
 from .. import follow_catalog as codec
 
@@ -19,24 +17,6 @@ class CatalogStage:
 
 def _digest(value):
     return isinstance(value, str) and re.fullmatch(r"[a-f0-9]{64}", value) is not None
-
-
-def _regular(path: Path):
-    # Reject links in ancestors too; there is no environment/default-path fallback.
-    for ancestor in (path, *path.parents):
-        if ancestor.is_symlink() or ancestor.is_junction():
-            raise ValueError("Follow catalog staging requires regular local inputs")
-    if not stat.S_ISREG(path.stat().st_mode):
-        raise ValueError("Follow catalog staging requires regular local inputs")
-
-
-def _read(path: Path, limit: int) -> bytes:
-    _regular(path)
-    with path.open("rb") as source:
-        data = source.read(limit + 1)
-    if len(data) > limit:
-        raise ValueError("Follow catalog staging input exceeds bound")
-    return data
 
 
 def _prior(raw, digest, max_keys):
@@ -89,11 +69,11 @@ def _prior(raw, digest, max_keys):
 
 
 def prepare_follow_catalog(
-    export_dir=None,
+    selected=None,
     *,
     enabled=False,
     source_sha256=None,
-    prior_path=None,
+    prior_bytes=None,
     prior_sha256=None,
     genesis=False,
     max_source_bytes=None,
@@ -114,37 +94,30 @@ def prepare_follow_catalog(
     if not _digest(source_sha256) or type(genesis) is not bool:
         codec._invalid()
     if genesis:
-        if prior_path is not None or prior_sha256 is not None:
+        if prior_bytes is not None or prior_sha256 is not None:
             codec._invalid()
         retained = {kind: frozenset() for kind in codec._KINDS}
     else:
-        if prior_path is None or not _digest(prior_sha256):
+        if (
+            type(prior_bytes) is not bytes
+            or len(prior_bytes) > max_bytes
+            or not _digest(prior_sha256)
+        ):
             codec._invalid()
-        retained = _prior(_read(Path(prior_path), max_bytes), prior_sha256, max_keys)
-    if export_dir is None:
+        retained = _prior(prior_bytes, prior_sha256, max_keys)
+    if type(selected) is not dict or len(selected) > 26**2 + 4:
         codec._invalid()
-    root = Path(export_dir)
-    if not root.is_dir():
-        codec._invalid()
-    remaining = max_source_bytes
-
-    def capture(relative):
-        nonlocal remaining
-        data = _read(root / relative, remaining)
-        remaining -= len(data)
-        return data
-
-    index = capture("listings/index.json")
-    manifest = codec._read(index)
-    files = manifest.get("files") if isinstance(manifest, dict) else None
+    captured = dict(selected)
     if (
-        not isinstance(files, dict)
-        or len(files) > 26**2 + 2
-        or any(not isinstance(key, str) or not codec._SHARD.fullmatch(key) for key in files)
+        any(type(path) is not str or type(data) is not bytes for path, data in captured.items())
+        or sum(len(data) for data in captured.values()) > max_source_bytes
+        or "listings/index.json" not in captured
+        or "majors.json" not in captured
     ):
         codec._invalid()
-    shards = {f"listings/{key}.json": capture(f"listings/{key}.json") for key in sorted(files)}
-    majors = capture("majors.json")
+    index, majors = captured.pop("listings/index.json"), captured.pop("majors.json")
+    # The producer validates the exact declared shard paths, count and content.
+    shards = captured
     payload = codec.build_follow_catalog(
         index,
         shards,
