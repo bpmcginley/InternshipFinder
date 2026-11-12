@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
 import { captureTopupSettlement, settleFirstTopup } from "../src/topup-first-settlement.js";
 import { attempt, session } from "./topup-stripe.js";
+import { validateTopupHistoryTraversal } from "../src/topup-history-traversal.js";
 import { observeVerifiedTopupEvent } from "../src/topup-history-events.js";
-import { replayTopupHistoryTarget as replay } from "../src/topup-history-replay.js";
+import {
+  replayTopupHistoryTarget as replay,
+  replayTopupHistoryWindow,
+} from "../src/topup-history-replay.js";
 import {
   rotateTopupCoverage as rotate,
   captureTopupCoverage as capture,
@@ -558,5 +562,171 @@ export async function noClosureAuthorityBeforeValidatedCaptureAndRequestVersion(
     assert.deepEqual((await capture(db, true, on)).coverage, live);
     assert.deepEqual((await capture(db, false, on)).coverage, test);
     assert.equal(await count(db, "topup_history_receipts"), 0);
+  }
+}
+
+const windowReplay = (db, f, extra = {}) => {
+  const { targetEventId: _target, ...options } = f.options;
+  return replayTopupHistoryWindow(db, f.config, f.input, { ...options, ...extra });
+};
+export async function wholeWindowSequentialMixedSameSecondAndDuplicateReplay(db) {
+  const f = await setup(db),
+    before = (await capture(db, false, on)).coverage;
+  f.disputes = [item("dispute", "under_review")];
+  const dispute = {
+      ...f.target,
+      id: "evt_dispute",
+      type: "charge.dispute.updated",
+      data: { object: f.disputes[0] },
+    },
+    charge = {
+      ...f.target,
+      id: "evt_charge",
+      type: "charge.refunded",
+      data: { object: { ...f.charge } },
+    };
+  f.pages = [[f.target, dispute], [charge]];
+  assert.deepEqual(await windowReplay(db, f), {
+    status: "handled_unproven",
+    observed: 3,
+    duplicate: 0,
+    inactive: 0,
+  });
+  assert.equal(await count(db, "topup_history_receipts"), 3);
+  assert.equal(await revision(db), 4);
+  assert.equal(f.calls.length, 11);
+  assert.equal(f.pageCalls, 2);
+  assert.deepEqual((await capture(db, false, on)).coverage, before);
+  assert.deepEqual(await balance(db), [25, 0, 0, 0]);
+  assert.deepEqual(await windowReplay(db, f), {
+    status: "handled_unproven",
+    observed: 0,
+    duplicate: 3,
+    inactive: 0,
+  });
+  assert.equal(await revision(db), 4);
+  assert.equal(await count(db, "topup_history_receipts"), 3);
+  // The old target API still admits only its explicitly selected event.
+  assert.equal((await f.run()).status, "duplicate");
+  assert.equal(await revision(db), 4);
+}
+export async function wholeWindowTerminalValidationPrecedesEveryObservation(db) {
+  for (const fault of ["duplicate", "terminal", "mode", "context", "pages"]) {
+    const f = await setup(db);
+    f.pages = [[f.target], [{ ...f.target, id: "evt_last" }]];
+    if (fault === "duplicate") f.pages[1][0].id = f.target.id;
+    if (fault === "terminal") f.pages[1][0].created = f.input.to;
+    if (fault === "mode") f.pages[1][0].livemode = true;
+    if (fault === "context") f.pages[1][0].account = "synthetic-other";
+    if (fault === "pages")
+      f.pages = Array.from({ length: 5 }, (_, i) => [{ ...f.target, id: "evt_page" + i }]);
+    assert.equal((await windowReplay(db, f)).status, "closed", fault);
+    assert.equal(f.calls.length, 0);
+    assert.equal(await count(db, "topup_history_receipts"), 0);
+    assert.equal(await revision(db), 1);
+    assert.equal(f.pageCalls, fault === "pages" ? 4 : 2);
+  }
+}
+export async function wholeWindowUnknownOrUnmatchedAfterObservationNeverSkips(db) {
+  for (const fault of ["unknown", "unmatched"]) {
+    const f = await setup(db),
+      bad = structuredClone(f.target);
+    bad.id = "evt_unresolved";
+    if (fault === "unknown") bad.type = "customer.updated";
+    else bad.data.object.payment_intent = "pi_unmatched";
+    f.pages = [[f.target, bad]];
+    assert.equal((await windowReplay(db, f)).status, "closed");
+    assert.equal(await count(db, "topup_history_receipts"), 1);
+    assert.equal(await revision(db), 2);
+    assert.deepEqual(await balance(db), [25, 0, 0, 0]);
+    assert.equal(f.calls.length, 4);
+    assert.equal((await capture(db, false, on)).coverage.health, "closed");
+  }
+}
+export async function wholeWindowCommitLossRotationAndDeadlineStopRemainingEvents(db) {
+  for (const fault of ["lost-ack", "rotate", "deadline"]) {
+    const f = await setup(db);
+    f.pages = [[f.target, { ...f.target, id: "evt_second" }, { ...f.target, id: "evt_third" }]];
+    let writes = 0;
+    const wrapped = {
+      prepare: (s) => db.prepare(s),
+      batch: async (s) => {
+        const result = await db.batch(s);
+        if (s.length === 4) {
+          writes++;
+          if (fault === "lost-ack" && writes === 2) throw Error("synthetic acknowledgement lost");
+          if (fault === "rotate")
+            await rotate(
+              db,
+              { livemode: false, schemaKey: "replacement", expected: f.input.expected },
+              on,
+            );
+          if (fault === "deadline") f.time += 10000;
+        }
+        return result;
+      },
+    };
+    assert.ok(["closed", "held"].includes((await windowReplay(wrapped, f)).status));
+    assert.equal(writes, fault === "lost-ack" ? 2 : 1);
+    assert.equal(await count(db, "topup_history_receipts"), writes);
+    assert.equal(await revision(db), writes + 1);
+    assert.deepEqual(await balance(db), [25, 0, 0, 0]);
+    if (fault === "rotate") {
+      const epoch = (await capture(db, false, on)).coverage;
+      assert.equal(epoch.schema_key, "replacement");
+      assert.equal(epoch.health, "unproven");
+    }
+  }
+}
+export async function wholeWindowEmptyAndStaleEpochRemainUnproven(db) {
+  const f = await setup(db),
+    before = (await capture(db, false, on)).coverage;
+  f.pages = [[]];
+  assert.deepEqual(await windowReplay(db, f), {
+    status: "handled_unproven",
+    observed: 0,
+    duplicate: 0,
+    inactive: 0,
+  });
+  assert.deepEqual((await capture(db, false, on)).coverage, before);
+  assert.equal(f.calls.length, 0);
+  await rotate(db, { livemode: false, schemaKey: "replacement", expected: before }, on);
+  assert.equal((await windowReplay(db, f)).status, "held");
+  assert.equal(f.pageCalls, 1);
+  assert.equal(await count(db, "topup_history_receipts"), 0);
+  assert.equal((await windowReplay(db, f, { enabled: false })).status, "disabled");
+  assert.equal((await windowReplay(db, f, { targetEventId: "evt_target" })).status, "held");
+}
+
+export async function terminalCollectionUsesExistingFourHundredEventBound(db) {
+  const f = await setup(db);
+  let pages = 0;
+  const options = {
+    enabled: true,
+    collectEvents: true,
+    clock: () => f.time,
+    readPage: async (query) => {
+      const page = pages++;
+      assert.equal(query.limit, 100);
+      assert.equal(query.starting_after, page ? `evt_${page - 1}_99` : undefined);
+      const data = Array.from({ length: 100 }, (_, i) => ({ ...f.target, id: `evt_${page}_${i}` }));
+      return new Response(
+        JSON.stringify({ object: "list", url: "/v1/events", data, has_more: page < 3 }),
+      );
+    },
+  };
+  const result = await validateTopupHistoryTraversal(db, f.input, options);
+  assert.equal(result.status, "unproven");
+  assert.equal(result.events.length, 400);
+  assert.equal(pages, 4);
+  assert.equal(await count(db, "topup_history_receipts"), 0);
+  assert.equal(await revision(db), 1);
+  for (const extra of [{ collectEvents: "1" }, { targetEventId: "evt_target" }]) {
+    const rejected = await validateTopupHistoryTraversal(db, f.input, {
+      ...options,
+      ...extra,
+      readPage: () => assert.fail("no IO"),
+    });
+    assert.equal(rejected.status, "held");
   }
 }

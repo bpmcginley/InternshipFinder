@@ -77,6 +77,7 @@ export async function validateTopupHistoryTraversal(db, input, options = {}) {
     timeoutMs,
     initial,
     targetEventId,
+    collectEvents,
     onCaptured,
     closeCoverage;
   try {
@@ -87,6 +88,7 @@ export async function validateTopupHistoryTraversal(db, input, options = {}) {
       readPage,
       timeoutMs = cap.timeoutMs,
       targetEventId,
+      collectEvents,
       onCaptured,
       closeCoverage,
     } = options);
@@ -94,6 +96,8 @@ export async function validateTopupHistoryTraversal(db, input, options = {}) {
       Object.keys(config).sort().join(",") !== "apiVersions,expected,from,livemode,schemaKey,to" ||
       (targetEventId !== undefined &&
         (typeof targetEventId !== "string" || !/^evt_[A-Za-z0-9_]{1,250}$/.test(targetEventId))) ||
+      (collectEvents !== undefined && typeof collectEvents !== "boolean") ||
+      (collectEvents === true && targetEventId !== undefined) ||
       (onCaptured !== undefined && typeof onCaptured !== "function") ||
       (closeCoverage !== undefined && typeof closeCoverage !== "function") ||
       typeof config.livemode !== "boolean" ||
@@ -234,6 +238,7 @@ export async function validateTopupHistoryTraversal(db, input, options = {}) {
     let cursor = null,
       previous = Infinity,
       selected = null;
+    const events = [];
     const seen = new Set();
     for (let page = 0; page < cap.pages; page++) {
       check();
@@ -261,7 +266,8 @@ export async function validateTopupHistoryTraversal(db, input, options = {}) {
           !/^evt_[A-Za-z0-9_]{1,250}$/.test(e.id) ||
           seen.has(e.id) ||
           e.livemode !== config.livemode ||
-          (targetEventId !== undefined && (e.account != null || e.context != null)) ||
+          ((targetEventId !== undefined || collectEvents === true) &&
+            (e.account != null || e.context != null)) ||
           !config.apiVersions.includes(e.api_version) ||
           !Number.isSafeInteger(e.created) ||
           e.created < config.from ||
@@ -278,11 +284,13 @@ export async function validateTopupHistoryTraversal(db, input, options = {}) {
         previous = e.created;
         seen.add(e.id);
         if (e.id === targetEventId) selected = e;
+        if (collectEvents === true) events.push(e);
       }
       if (!value.has_more) {
         const final = await captureTopupCoverage(db, config.livemode, on);
         check();
         if (final.status !== "captured" || !same(final.coverage, expected)) fail();
+        if (collectEvents === true) return { status: "unproven", events };
         return targetEventId === undefined
           ? { status: "unproven" }
           : { status: "unproven", event: selected };

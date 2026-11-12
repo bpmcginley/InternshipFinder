@@ -1,4 +1,4 @@
-// Dormant one-target replay. Valid pagination is not proof of continuous history coverage.
+// Dormant bounded replay. Valid pagination is not proof of continuous history coverage.
 import {
   createTopupHistoryPageReader,
   validTopupHistoryRequestVersion,
@@ -38,6 +38,12 @@ const discard = (response) => {
   } catch {}
 };
 export async function replayTopupHistoryTarget(db, env, input, options = {}) {
+  return replay(db, env, input, options, false);
+}
+export async function replayTopupHistoryWindow(db, env, input, options = {}) {
+  return replay(db, env, input, options, true);
+}
+async function replay(db, env, input, options, wholeWindow) {
   if (options.enabled !== true) return { status: "disabled" };
   let config,
     provider,
@@ -82,8 +88,9 @@ export async function replayTopupHistoryTarget(db, env, input, options = {}) {
       (provider.STRIPE_PRICE_TOPUP !== undefined &&
         typeof provider.STRIPE_PRICE_TOPUP !== "string") ||
       !validTopupHistoryRequestVersion(requestVersion) ||
-      typeof targetEventId !== "string" ||
-      !/^evt_[A-Za-z0-9_]{1,250}$/.test(targetEventId) ||
+      (wholeWindow
+        ? targetEventId !== undefined
+        : typeof targetEventId !== "string" || !/^evt_[A-Za-z0-9_]{1,250}$/.test(targetEventId)) ||
       typeof fetchImpl !== "function" ||
       typeof resolveOffer !== "function" ||
       typeof clock !== "function" ||
@@ -160,7 +167,7 @@ export async function replayTopupHistoryTarget(db, env, input, options = {}) {
       readPage,
       clock,
       timeoutMs: remaining(),
-      targetEventId,
+      ...(wholeWindow ? { collectEvents: true } : { targetEventId }),
       onCaptured: (expected) => {
         remaining();
         authorized = Object.freeze({ ...expected });
@@ -170,21 +177,29 @@ export async function replayTopupHistoryTarget(db, env, input, options = {}) {
     });
     if (traversed.status !== "unproven") return traversed;
     remaining();
-    if (!traversed.event || !(await current())) fail();
-    const observed = await observeVerifiedTopupEvent(db, provider, traversed.event, {
-      enabled: true,
-      livemode: config.livemode,
-      apiVersions: config.apiVersions,
-      fetchImpl: request,
-      resolveOffer,
-      timeoutMs: remaining(),
-      beforeObserve: current,
-    });
-    remaining();
-    if (!["observed", "duplicate", "inactive"].includes(observed.status)) fail();
-    if (!(await current())) fail();
-    return observed;
+    const events = wholeWindow ? traversed.events : traversed.event ? [traversed.event] : null;
+    if (!events || !(await current())) fail();
+    const counts = { observed: 0, duplicate: 0, inactive: 0 };
+    let result;
+    for (const [index, event] of events.entries()) {
+      if (index && !(await current())) fail();
+      result = await observeVerifiedTopupEvent(db, provider, event, {
+        enabled: true,
+        livemode: config.livemode,
+        apiVersions: config.apiVersions,
+        fetchImpl: request,
+        resolveOffer,
+        timeoutMs: remaining(),
+        beforeObserve: current,
+      });
+      remaining();
+      if (!["observed", "duplicate", "inactive"].includes(result.status)) fail();
+      if (!(await current())) fail();
+      counts[result.status]++;
+    }
+    return wholeWindow ? { status: "handled_unproven", ...counts } : result;
   }
+
   const timeout = new Promise((_, reject) => {
     timer = setTimeout(() => {
       controller.abort();
