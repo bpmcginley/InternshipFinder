@@ -5,6 +5,7 @@ import { addressOf } from "./mail.js";
 const ROLE_ID = /^[a-f0-9]{16}$/;
 const EMAIL = /^[^\s@<>,\x00-\x1f\x7f]+@[^\s@<>,\x00-\x1f\x7f]+\.[^\s@<>,\x00-\x1f\x7f]+$/;
 const FOLLOW_TOKEN = /[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}\.[a-f0-9]{64}/i;
+const ACTION_TOKEN = /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}\.[a-f0-9]{64}$/;
 const invalid = () => {
   throw new Error("Invalid follow message input");
 };
@@ -53,6 +54,15 @@ function decodedLink(value) {
   }
 }
 
+// Only body action slots may use the landing page's canonical purpose-specific fragment.
+function actionFragment(name, value, url) {
+  const purpose =
+    name === "confirmation" ? "confirm" : name === "deleteRequest" ? "delete-request" : null;
+  if (!purpose) invalid();
+  const prefix = `${url.origin}/follows/action.html#purpose=${purpose}&token=${purpose === "delete-request" ? "fd_" : ""}`;
+  if (!value.startsWith(prefix) || !ACTION_TOKEN.test(value.slice(prefix.length))) invalid();
+}
+
 function trustedLinks(origins, links) {
   if (!Array.isArray(origins) || !origins.length || !links) invalid();
   const allowed = new Set(
@@ -63,9 +73,13 @@ function trustedLinks(origins, links) {
     }),
   );
   return (name, publicLink = false) => {
-    const url = link(links[name]);
+    const value = links[name];
+    const url = link(value);
     if (!allowed.has(url.origin)) invalid();
-    if (publicLink ? FOLLOW_TOKEN.test(decodedLink(url.href)) : url.hash) invalid();
+    if (publicLink) {
+      if (FOLLOW_TOKEN.test(decodedLink(url.href))) invalid();
+    } else if (url.pathname === "/follows/action.html" || value.includes("#"))
+      actionFragment(name, value, url);
     return url.href;
   };
 }

@@ -195,3 +195,117 @@ test("follow transport calls once and hides provider message and recipient detai
     message: "Follow mail is unavailable",
   });
 });
+
+const CONFIRM_TOKEN = `20000000-0000-4000-8000-000000000002.${"b".repeat(64)}`;
+const DELETE_TOKEN = `fd_30000000-0000-4000-8000-000000000003.${"c".repeat(64)}`;
+const action = (purpose, token) => `${SITE}/follows/action.html#purpose=${purpose}&token=${token}`;
+const actionLinks = {
+  ...input.links,
+  confirmation: action("confirm", CONFIRM_TOKEN),
+  deleteRequest: action("delete-request", DELETE_TOKEN),
+};
+
+test("canonical purpose-specific action fragments appear only in confirmation body", () => {
+  const legacy = renderFollowMail("confirm", { ...input, summary: "Fixture Company" });
+  const message = renderFollowMail("confirm", {
+    ...input,
+    summary: "Fixture Company",
+    links: actionLinks,
+  });
+  assert.deepEqual(message, {
+    ...legacy,
+    text: legacy.text
+      .replace(input.links.confirmation, actionLinks.confirmation)
+      .replace(input.links.deleteRequest, actionLinks.deleteRequest),
+  });
+  assert.deepEqual(message.headers, unsubscribeHeaders);
+  assert.ok(!JSON.stringify({ ...message, text: undefined }).includes(CONFIRM_TOKEN));
+  assert.ok(!JSON.stringify({ ...message, text: undefined }).includes(DELETE_TOKEN));
+});
+
+test("action fragments reject wrong purpose, token, origin, path and noncanonical fields before send", async () => {
+  const env = { EMAIL: { send: () => assert.fail("No send for invalid action links") } };
+  for (const [name, purpose, token] of [
+    ["confirmation", "confirm", CONFIRM_TOKEN],
+    ["deleteRequest", "delete-request", DELETE_TOKEN],
+  ]) {
+    const valid = action(purpose, token);
+    const bad = [
+      action(name === "confirmation" ? "delete-request" : "confirm", token),
+      action(purpose, name === "confirmation" ? DELETE_TOKEN : CONFIRM_TOKEN),
+      action(purpose, token.toUpperCase()),
+      action(purpose, token.slice(0, -1)),
+      action(purpose, token + "0"),
+      action(purpose, token.replace(".", "%2E")),
+      action(purpose, token.replace("-", "x")),
+      valid.replace(SITE, "https://unapproved.example.test"),
+      valid.replace("https:", "http:"),
+      valid.replace("site.example.test", "user@site.example.test"),
+      valid.replace("/follows/action.html", "/follows/other.html"),
+      valid.replace("/follows/", "/follows/../follows/"),
+      valid.replace("/follows/", "/%66ollows/"),
+      valid.replace("#", "?"),
+      valid.replace("#", "?#"),
+      valid.replace("#", "?tracking=1#"),
+      valid.replace("#", "#extra=1&"),
+      valid + "&extra=1",
+      valid + "&purpose=" + purpose,
+      valid + "&token=" + token,
+      `${SITE}/follows/action.html#token=${token}&purpose=${purpose}`,
+      valid.replace("purpose=", "pur%70ose="),
+      valid.replace("&token=", "&to%6ben="),
+      valid.replace(`purpose=${purpose}`, "purpose=manage"),
+      `${SITE}/follows/action.html#`,
+      valid + "#",
+    ];
+    for (const value of bad)
+      await assert.rejects(
+        sendFollowMail(env, "confirm", {
+          ...input,
+          summary: "Fixture Company",
+          links: { ...actionLinks, [name]: value },
+        }),
+        { message: "Invalid follow message input" },
+      );
+  }
+});
+
+test("fragments remain forbidden on unsubscribe and management and tokens stay out of public links", () => {
+  for (const name of ["unsubscribe", "management"]) {
+    for (const value of [
+      actionLinks.confirmation,
+      actionLinks.deleteRequest,
+      `${input.links[name]}#`,
+    ])
+      assert.throws(
+        () => renderFollowMail("manage", { ...input, links: { ...input.links, [name]: value } }),
+        /Invalid follow message input/,
+      );
+  }
+  for (const name of ["matchingPage", "publicShare"]) {
+    for (const value of [
+      actionLinks.confirmation,
+      actionLinks.deleteRequest,
+      actionLinks.confirmation.replace(CONFIRM_TOKEN, CONFIRM_TOKEN.replace(".", "%2E")),
+    ])
+      assert.throws(
+        () =>
+          renderFollowMail("digest", {
+            ...input,
+            matches: [role(1)],
+            links: { ...input.links, [name]: value },
+          }),
+        /Invalid follow message input/,
+      );
+  }
+  assert.throws(
+    () =>
+      renderFollowMail("confirm", {
+        ...input,
+        summary: "Fixture Company",
+        links: { ...actionLinks, deleteRequest: action("delete-request", `fd_${TOKEN}`) },
+      }),
+    /Invalid follow message input/,
+    "address-wide unsubscribe token cannot become request deletion",
+  );
+});
