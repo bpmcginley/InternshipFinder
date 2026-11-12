@@ -10,6 +10,7 @@ widget/builder\.html
 widget/builder\.js
 widget/share\.css
 share-feeds\.html
+follows/action\.html
 widget/README\.md
 icon(48|128|180|192|512|-maskable512)\.png
 og-preview\.png
