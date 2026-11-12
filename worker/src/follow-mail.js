@@ -78,7 +78,7 @@ function trustedLinks(origins, links) {
     if (!allowed.has(url.origin)) invalid();
     if (publicLink) {
       if (FOLLOW_TOKEN.test(decodedLink(url.href))) invalid();
-    } else if (url.pathname === "/follows/action.html" || value.includes("#"))
+    } else if (decodedLink(url.pathname) === "/follows/action.html" || value.includes("#"))
       actionFragment(name, value, url);
     return url.href;
   };

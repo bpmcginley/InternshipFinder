@@ -309,3 +309,28 @@ test("fragments remain forbidden on unsubscribe and management and tokens stay o
     "address-wide unsubscribe token cannot become request deletion",
   );
 });
+
+test("encoded reserved action paths cannot fall through to legacy query links", () => {
+  for (const name of ["confirmation", "deleteRequest", "management", "unsubscribe"]) {
+    for (const path of ["/%66ollows/action.html", "/follows/act%69on.html"]) {
+      for (const suffix of ["", `?purpose=confirm&token=${CONFIRM_TOKEN}`]) {
+        assert.throws(
+          () =>
+            renderFollowMail(name === "management" ? "manage" : "confirm", {
+              ...input,
+              summary: "Fixture Company",
+              links: { ...input.links, [name]: SITE + path + suffix },
+            }),
+          /Invalid follow message input/,
+        );
+      }
+    }
+  }
+  const legacy = `${ACTIONS}/legacy/%66ollow?token=fixture`;
+  const message = renderFollowMail("confirm", {
+    ...input,
+    summary: "Fixture Company",
+    links: { ...input.links, confirmation: legacy },
+  });
+  assert.ok(message.text.includes(`Confirm: ${legacy}`));
+});
