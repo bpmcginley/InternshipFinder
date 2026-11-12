@@ -558,7 +558,7 @@ export function createDashboard(browser, {
     function onSaved(v) {
       if (v === "__save") { const name = (browser.prompt("Name this search") || "").trim(); if (name) keepSaved([...saved.filter(s => s.name !== name), { name, f }]); }
       else if (v.startsWith("del:")) keepSaved(saved.filter(s => s.name !== v.slice(4)));
-      else { const s = saved.find(x => x.name === v); if (s) { for (const k of ["fields", "states"]) if (Object.hasOwn(s.f, k)) followSource.correct(k, s.f[k]); setF(cur => ({ ...cur, ...s.f })); } }
+      else { const s = saved.find(x => x.name === v); if (s) { if (followSource.enabled && s.f != null) for (const k of ["fields", "states"]) if (Object.hasOwn(s.f, k)) followSource.correct(k, s.f[k]); setF(cur => ({ ...cur, ...s.f })); } }
     }
 
     const jobs = useMemo(() => {

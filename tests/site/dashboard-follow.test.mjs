@@ -305,3 +305,50 @@ test("success receipt must be empty and its read shares the absolute deadline", 
   assert.equal(cancelled, 1);
   assert.equal(body.locked, false);
 });
+
+// Execute the actual saved-search handler so legacy spread semantics stay covered.
+test("saved-search provenance is opt-in and tolerates legacy missing/null filters", () => {
+  const source = readFileSync(new URL("../../docs/js/app/dashboard.mjs", import.meta.url), "utf8");
+  const start = source.indexOf("    function onSaved(v) {");
+  const end = source.indexOf("\n    const jobs =", start);
+  assert(start > 0 && end > start);
+  const handler = new Function(
+    "saved",
+    "followSource",
+    "setF",
+    source.slice(start, end) + "\nreturn onSaved;",
+  );
+  for (const enabled of [false, true]) {
+    let state = { fields: ["swe"], states: ["MA"], q: "preserved" };
+    const corrections = [];
+    const saved = [
+      { name: "missing" },
+      { name: "null", f: null },
+      { name: "fields", f: { fields: ["finance"] } },
+      { name: "states", f: { states: ["NY"] } },
+    ];
+    const select = handler(
+      saved,
+      { enabled, correct: (...args) => corrections.push(args) },
+      (update) => {
+        state = update(state);
+      },
+    );
+    select("missing");
+    select("null");
+    assert.deepEqual(state, { fields: ["swe"], states: ["MA"], q: "preserved" });
+    assert.deepEqual(corrections, []);
+    select("fields");
+    select("states");
+    assert.deepEqual(state, { fields: ["finance"], states: ["NY"], q: "preserved" });
+    assert.deepEqual(
+      corrections,
+      enabled
+        ? [
+            ["fields", ["finance"]],
+            ["states", ["NY"]],
+          ]
+        : [],
+    );
+  }
+});

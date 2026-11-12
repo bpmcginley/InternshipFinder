@@ -324,6 +324,59 @@ async function scenario(browser, site, phase, width, theme, enabled, signedIn = 
       .waitFor();
     assert.equal(calls.length, priorCalls, "source qualification never submits");
   }
+  if (!signedIn && width === 1280 && theme === "light") {
+    const priorCalls = calls.length;
+    await page.evaluate(() =>
+      localStorage.setItem(
+        "internscout.saved.v1",
+        JSON.stringify([
+          { name: "Legacy absent" },
+          { name: "Legacy null", f: null },
+          { name: "Fields only", f: { fields: ["finance"] } },
+          { name: "States only", f: { states: ["MA"] } },
+          { name: "Malformed field", f: { fields: ["swe", "bad field"] } },
+          { name: "Unsupported state", f: { states: ["remote"] } },
+        ]),
+      ),
+    );
+    await page.goto(origin + "/?field=swe&state=MA");
+    await foot.waitFor();
+    await page.getByRole("button", { name: /^More filters/ }).click();
+    const saved = page.getByRole("combobox", { name: "Saved searches", exact: true });
+    for (const name of ["Legacy absent", "Legacy null"]) {
+      await saved.selectOption(name);
+      await foot.waitFor();
+      assert.equal(await toggle.count(), enabled ? 1 : 0, "legacy saved record preserves filters");
+      assert.equal(new URL(page.url()).searchParams.get("field"), "swe");
+      assert.equal(new URL(page.url()).searchParams.get("state"), "MA");
+    }
+    if (enabled) {
+      await page.goto(origin + "/?field=swe,bad%20field&state=bad");
+      await foot.waitFor();
+      for (const name of ["Legacy absent", "Legacy null"]) {
+        await saved.selectOption(name);
+        assert.equal(await toggle.count(), 0, "legacy record cannot clear provenance hold");
+      }
+      await saved.selectOption("Fields only");
+      assert.equal(await toggle.count(), 0, "saved Field cannot clear State hold");
+      await saved.selectOption("States only");
+      await toggle.waitFor();
+      await toggle.click();
+      await page
+        .getByText(
+          "Following: Finance; Massachusetts (MA). Other search filters are not included.",
+          { exact: true },
+        )
+        .waitFor();
+      await saved.selectOption("Malformed field");
+      assert.equal(await toggle.count(), 0, "malformed saved scope cannot mount");
+      await saved.selectOption("Fields only");
+      await toggle.waitFor();
+      await saved.selectOption("Unsupported state");
+      assert.equal(await toggle.count(), 0, "unsupported saved scope cannot mount");
+    }
+    assert.equal(calls.length, priorCalls, "saved-search qualification never submits");
+  }
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   assert.equal(external, 0);
   assert.deepEqual(errors, []);
