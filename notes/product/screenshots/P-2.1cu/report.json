@@ -1,0 +1,90 @@
+[
+  {
+    "phase": "before",
+    "width": 1280,
+    "theme": "light",
+    "broken": "",
+    "mockPosts": 0,
+    "expectedModuleErrors": 0
+  },
+  {
+    "phase": "after",
+    "width": 1280,
+    "theme": "light",
+    "broken": "",
+    "mockPosts": 3,
+    "expectedModuleErrors": 0
+  },
+  {
+    "phase": "before",
+    "width": 1280,
+    "theme": "dark",
+    "broken": "",
+    "mockPosts": 0,
+    "expectedModuleErrors": 0
+  },
+  {
+    "phase": "after",
+    "width": 1280,
+    "theme": "dark",
+    "broken": "",
+    "mockPosts": 3,
+    "expectedModuleErrors": 0
+  },
+  {
+    "phase": "before",
+    "width": 375,
+    "theme": "light",
+    "broken": "",
+    "mockPosts": 0,
+    "expectedModuleErrors": 0
+  },
+  {
+    "phase": "after",
+    "width": 375,
+    "theme": "light",
+    "broken": "",
+    "mockPosts": 3,
+    "expectedModuleErrors": 0
+  },
+  {
+    "phase": "before",
+    "width": 375,
+    "theme": "dark",
+    "broken": "",
+    "mockPosts": 0,
+    "expectedModuleErrors": 0
+  },
+  {
+    "phase": "after",
+    "width": 375,
+    "theme": "dark",
+    "broken": "",
+    "mockPosts": 3,
+    "expectedModuleErrors": 0
+  },
+  {
+    "phase": "after",
+    "width": 375,
+    "theme": "light",
+    "broken": "missing",
+    "mockPosts": 0,
+    "expectedModuleErrors": 0
+  },
+  {
+    "phase": "after",
+    "width": 375,
+    "theme": "light",
+    "broken": "old",
+    "mockPosts": 0,
+    "expectedModuleErrors": 1
+  },
+  {
+    "phase": "after",
+    "width": 375,
+    "theme": "light",
+    "broken": "setup",
+    "mockPosts": 0,
+    "expectedModuleErrors": 1
+  }
+]

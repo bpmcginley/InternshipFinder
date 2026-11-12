@@ -526,7 +526,7 @@ The golden harness now covers static assets as well as generated pages. Each sit
 
 ## Waiting for Bruce
 
-- **P-2.1cu employer-page Follow**: dormant optional source; G3, same-export publication and existing Follow release/provider gates remain. [Scope](P-2.1cu-employer-follow.md).
+- **P-2.1cu employer-page Follow**: [#575](https://github.com/bpmcginley/InternshipFinder/pull/575), qualified dormant optional source; G3, same-export publication and existing Follow release/provider gates remain. [Scope](P-2.1cu-employer-follow.md).
 
 - **P-2.1ct company Details Follow mount**: [#572](https://github.com/bpmcginley/InternshipFinder/pull/572) qualified offline; draft awaiting independent review/CI. #570 same-export identity publication and existing Follow release/provider gates remain. [Scope](P-2.1ct-company-details.md).
 
@@ -821,4 +821,4 @@ Draft needs-bruce [#443](https://github.com/bpmcginley/InternshipFinder/pull/443
 
 | Package | Owner | Branch | State |
 |---|---|---|---|
-| P-2.1cu | audit_growth_generated | `codex/product-p2.1cu-employer-follow` | Claimed draft; optional source; G3 and same-export/provider activation gates |
+| P-2.1cu | audit_growth_generated | `codex/product-p2.1cu-employer-follow` | [#575](https://github.com/bpmcginley/InternshipFinder/pull/575) draft; 477 site / 11 Edge scenarios; optional source, independent review/CI and G3/same-export/provider gates |
