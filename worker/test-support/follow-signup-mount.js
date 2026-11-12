@@ -104,6 +104,9 @@ export async function defaultAndUnqualifiedReleasePreserveTheExisting404() {
     assert.deepEqual(await result.json(), { error: "not_found", message: "No such endpoint" });
     assert.equal(request.bodyUsed, false);
   }
+  const disabledMalformed = post(shape(), { Origin: "null" }, "?");
+  assert.equal((await run(disabledMalformed, {}, supply)).status, 404);
+  assert.equal(disabledMalformed.bodyUsed, false);
   assert.equal(calls, 0);
   const delayed = post();
   let time = now;
@@ -118,6 +121,7 @@ export async function defaultAndUnqualifiedReleasePreserveTheExisting404() {
   assert.equal(result.status, 404);
   assert.equal(delayed.bodyUsed, false);
   for (const [header, settings] of [
+    ["null", enabled],
     ["https://bpmcginley.github.io", enabled],
     [site, { ...enabled, ALLOWED_ORIGINS: "https://other.example.test" }],
   ]) {
@@ -131,6 +135,10 @@ export async function defaultAndUnqualifiedReleasePreserveTheExisting404() {
     assert.equal((await run(request, enabled, supply)).status, 400);
     assert.equal(request.bodyUsed, false);
   }
+  const wrongType = post(shape(), { "Content-Type": "text/plain" });
+  assert.equal((await run(wrongType, enabled, supply)).status, 415);
+  assert.equal(wrongType.bodyUsed, false);
+  assert.equal(calls, 0);
   assert.equal(reads, 0);
 }
 
@@ -252,13 +260,17 @@ export async function oneIsolateLimitSpansRequestOwnedCatalogLoads(db) {
   const { now, policy, reply } = await fixture();
   let reached,
     release,
+    supplied = 0,
     loads = 0;
   const ready = new Promise((resolve) => (reached = resolve));
   const pending = new Promise((resolve) => (release = resolve));
   const run = (request) =>
     handle(request, { ...enabled, DB: db }, undefined, {
       now: () => new Date(now),
-      followSignupRelease: () => policy,
+      followSignupRelease: () => {
+        supplied++;
+        return policy;
+      },
       fetch: async () => {
         if (++loads === 4) reached();
         await pending;
@@ -273,6 +285,7 @@ export async function oneIsolateLimitSpansRequestOwnedCatalogLoads(db) {
     const fifth = post();
     assert.equal((await run(fifth)).status, 503);
     assert.equal(fifth.bodyUsed, false);
+    assert.equal(supplied, 4);
     assert.equal(loads, 4);
   } finally {
     release();
@@ -282,5 +295,6 @@ export async function oneIsolateLimitSpansRequestOwnedCatalogLoads(db) {
     );
   }
   assert.equal((await run(post())).status, 202);
+  assert.equal(supplied, 5);
   assert.equal(loads, 5);
 }

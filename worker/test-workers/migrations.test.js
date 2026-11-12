@@ -40,6 +40,7 @@ const migrationNames = [
   "0027_follow_management_claim.sql",
   "0028_follow_link_dispatch.sql",
   "0029_topup_history_observation.sql",
+  "0030_topup_history_coverage.sql",
 ];
 const legacySql = [...env.TEST_SCHEMA_SQL, ...env.TEST_EXTRA_SCHEMA_SQL];
 const databases = [env.LEGACY_DB, env.MIGRATION_DB];
@@ -65,6 +66,7 @@ beforeEach(async () => {
       // Wrangler can group late CREATE statements with a trigger. Reset both altered
       // tables explicitly so their migrations replay against the actual prior shape.
       [
+        "topup_history_coverage",
         "topup_history_receipts",
         "follow_management_outbox",
         "follow_confirmation_outbox",
@@ -108,7 +110,7 @@ it("migrations create the complete legacy schema, including constraints and trig
   await initialize();
   const expected = await schema(env.LEGACY_DB);
   expect(await schema(env.MIGRATION_DB)).toEqual(expected);
-  expect(expected.objects.filter((row) => row.type === "table")).toHaveLength(66);
+  expect(expected.objects.filter((row) => row.type === "table")).toHaveLength(67);
   expect(expected.objects.filter((row) => row.type === "index")).toHaveLength(39);
   expect(expected.objects.filter((row) => row.type === "trigger")).toHaveLength(16);
   expect(expected.objects.filter((row) => row.type === "view")).toHaveLength(4);
