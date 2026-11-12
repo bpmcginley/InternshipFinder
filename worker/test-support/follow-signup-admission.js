@@ -54,9 +54,23 @@ export async function disabledAndInvalidNeverWrite(db) {
     { ...request(), scope: { kind: "search", fields: [], states: ["REMOTE"] } },
   ])
     assert.deepEqual(await admitFollowSignup(forbidden, value, options()), { status: "invalid" });
-  assert.deepEqual(await admitFollowSignup(forbidden, { ...request(), link: true }, options()), {
-    status: "unsupported",
-  });
+  for (const sessionProof of [
+    undefined,
+    null,
+    {},
+    { id: "bad", user: "b".repeat(64) },
+    { id: "a".repeat(64), user: "B".repeat(64) },
+    { id: "a".repeat(64), user: "b".repeat(64), extra: true },
+  ]) {
+    assert.deepEqual(
+      await admitFollowSignup(forbidden, { ...request(), link: true }, options({ sessionProof })),
+      { status: "unsupported" },
+    );
+  }
+  assert.deepEqual(
+    await admitFollowSignup(forbidden, { ...request(), link: true, sessionProof: {} }, options()),
+    { status: "invalid" },
+  );
   for (const dailyLimit of [0, -1, true, Infinity, 1.5, undefined])
     assert.deepEqual(await admitFollowSignup(forbidden, request(), options({ dailyLimit })), {
       status: "unavailable",
@@ -244,4 +258,167 @@ export async function failedQueueBatchAndClockRolloverStayClosed(db) {
   }
   assert.equal(await count(db, "follow_subscribers"), 0);
   assert.equal((await rows(db, "rate"))[0].calls, 3);
+}
+
+const linked = (email) => ({ ...request(email), link: true });
+const current = (more = {}) => options({ clock: () => new Date(), ...more });
+const accepted = { status: "accepted" };
+const unavailable = { status: "unavailable" };
+async function session(db) {
+  const randomHash = () => crypto.randomUUID().replaceAll("-", "").repeat(2);
+  const proof = { id: randomHash(), user: randomHash() };
+  await db
+    .prepare(
+      "INSERT INTO sessions(id,user_hash,tier,provider,created,last_used,expires) " +
+        "VALUES(?,?,'free','google',datetime('now'),datetime('now'),datetime('now','+1 day'))",
+    )
+    .bind(proof.id, proof.user)
+    .run();
+  return proof;
+}
+
+export async function linkedAndAnonymousShareOneConcurrentCap(db) {
+  const sessionProof = await session(db);
+  const limit = current({ dailyLimit: 4, sessionProof });
+  assert.deepEqual(await admitFollowSignup(db, request("anonymous@example.test"), limit), accepted);
+  assert.deepEqual(await admitFollowSignup(db, linked("linked@example.test"), limit), accepted);
+  const results = await Promise.all(
+    Array.from({ length: 8 }, (_, i) =>
+      admitFollowSignup(db, (i % 2 ? linked : request)(`combined${i}@example.test`), limit),
+    ),
+  );
+  assert.equal(results.filter(({ status }) => status === "accepted").length, 2);
+  assert.equal(results.filter(({ status }) => status === "unavailable").length, 6);
+  const jobs = await rows(db, "follow_confirmation_outbox");
+  assert.equal(jobs.length, 4);
+  assert(jobs.some((row) => row.owner_user_hash === sessionProof.user));
+  assert(jobs.some((row) => row.owner_user_hash === null));
+  const rate = await rows(db, "rate");
+  assert.equal(rate.length, 1);
+  assert.equal(rate[0].user_hash, "*follow-signup");
+  assert.equal(rate[0].calls, 4);
+}
+
+export async function linkedOutcomesDoNotRevealMailboxOrScopeState(db) {
+  const sessionProof = await session(db);
+  const other = await session(db);
+  assert.deepEqual(await admitFollowSignup(db, request(), current()), accepted);
+  const before = await rows(db, "follow_confirmation_outbox");
+  assert.deepEqual(await admitFollowSignup(db, linked(), current({ sessionProof })), accepted);
+  assert.deepEqual(await rows(db, "follow_confirmation_outbox"), before);
+  const [subscription] = await rows(db, "follow_subscriptions");
+  const token = await mintFollowToken(db, subscription.subscriber_id, "confirm", {
+    scopeKey: subscription.scope_key,
+  });
+  assert.equal(await confirmFollow(db, token), true);
+  const confirmed = await rows(db, "follow_subscriptions");
+  const progress = await rows(db, "follow_scope_progress");
+  assert.deepEqual(await admitFollowSignup(db, linked(), current({ sessionProof })), accepted);
+  const pending = await rows(db, "follow_confirmation_outbox");
+  assert.equal(pending.length, 1);
+  assert.equal(pending[0].owner_user_hash, sessionProof.user);
+  assert.deepEqual(await rows(db, "follow_subscriptions"), confirmed);
+  assert.deepEqual(await rows(db, "follow_scope_progress"), progress);
+  assert.deepEqual(
+    await admitFollowSignup(db, linked(), current({ sessionProof: other })),
+    accepted,
+  );
+  assert.deepEqual(await rows(db, "follow_confirmation_outbox"), pending);
+}
+
+function afterRate(db, action) {
+  return {
+    prepare(sql) {
+      const statement = db.prepare(sql);
+      if (!sql.startsWith("INSERT INTO rate ")) return statement;
+      return {
+        bind(...params) {
+          return {
+            async run() {
+              const receipt = await statement.bind(...params).run();
+              await action();
+              return receipt;
+            },
+          };
+        },
+      };
+    },
+    batch: db.batch.bind(db),
+  };
+}
+
+export async function sessionSnapshotAndRevocationFenceHoldAcrossRateAwait(db) {
+  const sessionProof = await session(db);
+  const later = await session(db);
+  const original = { ...sessionProof };
+  const changing = afterRate(db, () => Object.assign(sessionProof, later));
+  assert.deepEqual(
+    await admitFollowSignup(changing, linked(), current({ sessionProof })),
+    accepted,
+  );
+  const pending = await rows(db, "follow_confirmation_outbox");
+  assert.equal(pending.length, 1);
+  assert.equal(pending[0].owner_user_hash, original.user);
+  assert.equal(JSON.stringify(pending).includes(original.id), false);
+  const revoked = afterRate(db, () =>
+    db.prepare("DELETE FROM sessions WHERE id=?").bind(original.id).run(),
+  );
+  assert.deepEqual(
+    await admitFollowSignup(
+      revoked,
+      linked("revoked@example.test"),
+      current({ sessionProof: original }),
+    ),
+    accepted,
+  );
+  assert.deepEqual(await rows(db, "follow_confirmation_outbox"), pending);
+  assert.equal(await count(db, "follow_subscribers"), 1);
+  assert.equal((await rows(db, "rate"))[0].calls, 2);
+}
+
+export async function linkedMalformedAcknowledgementsStayUnavailable(db) {
+  const sessionProof = await session(db);
+  const changes = [
+    (batch) => {
+      batch.at(-1).results[0] = null;
+    },
+    (batch) => {
+      delete batch.at(-1).results[0];
+    },
+    (batch) => {
+      batch.at(-1).results[0].scopeKey = "wrong";
+    },
+    (batch) => {
+      batch.at(-1).meta.changes = 1;
+    },
+    (batch) => {
+      batch[0].success = false;
+    },
+    () => {
+      throw new Error("synthetic lost acknowledgement");
+    },
+  ];
+  let attempts = 0;
+  for (const [index, alter] of changes.entries()) {
+    const wrapped = {
+      prepare: db.prepare.bind(db),
+      async batch(statements) {
+        attempts++;
+        const result = await db.batch(statements);
+        alter(result);
+        return result;
+      },
+    };
+    assert.deepEqual(
+      await admitFollowSignup(
+        wrapped,
+        linked(`linked-fault${index}@example.test`),
+        current({ sessionProof }),
+      ),
+      unavailable,
+    );
+    assert.equal(attempts, index + 1);
+    assert.equal(await count(db, "follow_confirmation_outbox"), index + 1);
+    assert.equal((await rows(db, "rate"))[0].calls, index + 1);
+  }
 }
