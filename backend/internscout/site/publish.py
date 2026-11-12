@@ -262,7 +262,9 @@ def main(argv: list[str], *, card_renderer: share_cards.Renderer | None = None) 
     from .employer_capture import require_unmarked
 
     require_unmarked(Path(site_dir))
-    state = runtime.BuildState(advisor_signup_enabled=advisor_signup)
+    state = (
+        runtime.BuildState(advisor_signup_enabled=True) if advisor_signup else runtime.BuildState()
+    )
     hooks = runtime.BuildHooks()
     if employer_postings:
         from .employer_publication import prepare
