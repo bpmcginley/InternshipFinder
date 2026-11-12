@@ -1,0 +1,34 @@
+[
+  {
+    "width": 1280,
+    "colorScheme": "light",
+    "localSyntheticPosts": 2,
+    "rollbackChecked": true,
+    "externalRequestsAllowed": 0,
+    "overflow": false
+  },
+  {
+    "width": 1280,
+    "colorScheme": "dark",
+    "localSyntheticPosts": 2,
+    "rollbackChecked": true,
+    "externalRequestsAllowed": 0,
+    "overflow": false
+  },
+  {
+    "width": 375,
+    "colorScheme": "light",
+    "localSyntheticPosts": 2,
+    "rollbackChecked": true,
+    "externalRequestsAllowed": 0,
+    "overflow": false
+  },
+  {
+    "width": 375,
+    "colorScheme": "dark",
+    "localSyntheticPosts": 2,
+    "rollbackChecked": true,
+    "externalRequestsAllowed": 0,
+    "overflow": false
+  }
+]
