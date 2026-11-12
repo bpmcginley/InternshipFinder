@@ -1,5 +1,7 @@
 // Test-only protocol rehearsal. No production entry point or selected witness provider.
 import { DurableObject } from "cloudflare:workers";
+import { createFollowCheckpointSnapshotReader } from "../src/follow-checkpoint-snapshot.js";
+import { handleFollowCheckpoint } from "../src/follow-checkpoint-http.js";
 import { createFollowCheckpointR2Slots } from "../src/follow-checkpoint-r2.js";
 import { createFollowCheckpointPayloadCodec } from "../src/follow-checkpoint-payload.js";
 import { classifyFollowCheckpointWitness as classify } from "../src/follow-checkpoint-witness.js";
@@ -150,6 +152,30 @@ export class CheckpointIntegration extends DurableObject {
     } catch {
       return null;
     }
+  }
+  readSnapshot(maxBytes = 3_000_000) {
+    return createFollowCheckpointSnapshotReader({
+      capture: () =>
+        this.ctx.storage.transactionSync(() => ({ raw: this.snapshot(), now: this.now() })),
+      readWitness: () => this.witness?.read(),
+      slots: this.slots,
+      codec,
+      maxBytes: 3_000_000,
+      maxHeaderBytes: 2000,
+      maxControlBytes: 16384,
+    })(maxBytes);
+  }
+  async fetch(request) {
+    const hash = async (text) =>
+      Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", encoder.encode(text))), (v) =>
+        v.toString(16).padStart(2, "0"),
+      ).join("");
+    return handleFollowCheckpoint(request, {
+      openStore: () => ({ read: (maxBytes) => this.readSnapshot(maxBytes) }),
+      maxBytes: 3_000_000,
+      writer: await hash("A".repeat(43)),
+      operator: await hash("B".repeat(43)),
+    });
   }
   async descriptor(raw, phase, slot) {
     const parts = await codec.split(raw, phase),
