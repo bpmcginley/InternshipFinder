@@ -38,6 +38,7 @@ const migrationNames = [
   "0025_follow_catalog_admission.sql",
   "0026_follow_management_outbox.sql",
   "0027_follow_management_claim.sql",
+  "0028_follow_link_dispatch.sql",
 ];
 const legacySql = [...env.TEST_SCHEMA_SQL, ...env.TEST_EXTRA_SCHEMA_SQL];
 const databases = [env.LEGACY_DB, env.MIGRATION_DB];
@@ -106,7 +107,7 @@ it("migrations create the complete legacy schema, including constraints and trig
   const expected = await schema(env.LEGACY_DB);
   expect(await schema(env.MIGRATION_DB)).toEqual(expected);
   expect(expected.objects.filter((row) => row.type === "table")).toHaveLength(65);
-  expect(expected.objects.filter((row) => row.type === "index")).toHaveLength(36);
+  expect(expected.objects.filter((row) => row.type === "index")).toHaveLength(38);
   expect(expected.objects.filter((row) => row.type === "trigger")).toHaveLength(16);
   expect(expected.objects.filter((row) => row.type === "view")).toHaveLength(4);
   expect(await ledger()).toEqual(migrationNames.map((name) => ({ name })));
