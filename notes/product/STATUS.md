@@ -519,6 +519,8 @@ The golden harness now covers static assets as well as generated pages. Each sit
 - **P-2.1az Follow writer process deadline** passed [exact Ubuntu Tests](https://github.com/bpmcginley/InternshipFinder/actions/runs/43179235258) and [Coverage](https://github.com/bpmcginley/InternshipFinder/actions/runs/43179235249). The qualification draft remains stacked on [#488](https://github.com/bpmcginley/InternshipFinder/pull/488) and held pending G3, production deadline sizing and coordinated writer release. [Deadline draft #501](https://github.com/bpmcginley/InternshipFinder/pull/501).
 - **P-2.1ck Follow management routes** are default closed in [#551](https://github.com/bpmcginley/InternshipFinder/pull/551). The Worker rollout and migrations are verified. Request policy, sender verification and enablement remain pending.
 - **P-2.1cm Follow signup mount** in [#555](https://github.com/bpmcginley/InternshipFinder/pull/555) remains closed. The source review and merge are complete. G3, trusted release/pin delivery and a qualified publication path are pending.
+- **P-2.1cq private delivery owner design**: audit_site, `codex/product-p2.1cq-owner-design`; [proposal](P-2.1cq-delivery-owner-design.md), needs-bruce. Three synthetic SQLite probes demonstrate the cross-instance hold/cursor gap in #560. Approve the minimum private record and conservative no-auto-reclaim policy, then resolve cursor cleanup, backup/restore and hold-release evidence before implementation. No schema, schedule or activation.
+
 
 
 P-2.1u [#341](https://github.com/bpmcginley/InternshipFinder/pull/341) remains owner-gated after archive-reader integration. Publication, scheduling and activation remain pending.
