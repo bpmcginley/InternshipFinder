@@ -168,8 +168,9 @@ test.each([false, true])(
 );
 
 test("expired reservation survives restart and cannot restart upload or extend its cutoff", async () => {
-  const { object, nonce } = await setup(DAY - 1000),
-    before = await state(object);
+  const { object, nonce } = await setup(DAY - 1000, true);
+  await restoreAdmissionClock(object);
+  const before = await state(object);
   const witness = await runInDurableObject(object, (i) => i.witness.read());
   await evictDurableObject(object);
   await expire(object);
@@ -186,8 +187,9 @@ test("expired reservation survives restart and cannot restart upload or extend i
 });
 
 test("PUT beating the stale cleanup ETag holds its exact reservation and prepared witness", async () => {
-  const { object, nonce } = await setup(DAY - 1000),
-    before = await state(object);
+  const { object, nonce } = await setup(DAY - 1000, true);
+  await restoreAdmissionClock(object);
+  const before = await state(object);
   await expire(object);
   await runInDurableObject(object, (i) => {
     const receipt = i.uploads.get(nonce),
