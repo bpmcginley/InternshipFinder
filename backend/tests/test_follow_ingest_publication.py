@@ -336,8 +336,10 @@ else:
     assert result.follow == 'disabled'
 """
     database_path = tmp_path / 'child.db'
+    root = Path(__file__).resolve().parents[2]
     env = {
         **os.environ,
+        'PYTHONPATH': os.pathsep.join([str(root), str(root / 'backend')]),
         'INTERNSCOUT_DATA': str(configured),
         'INTERNSCOUT_DB': database_path.as_posix(),
         'GIT_ALLOW_PROTOCOL': 'file',
@@ -355,6 +357,7 @@ else:
                 str(tmp_path / 'child-metrics.json'),
                 mode,
             ],
+            cwd=root,
             env=env,
             capture_output=True,
             text=True,
