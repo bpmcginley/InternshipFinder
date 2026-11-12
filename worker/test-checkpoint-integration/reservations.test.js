@@ -59,6 +59,7 @@ test("reservation precedes upload, competing reservation holds, and bytes stay o
   expect(await object.reconcileReserved(nonce)).toBe("committed");
   expect((await object.read("pending")).bytes).toEqual(raw);
   expect((await state(object)).pending.expires).toBe(before.reservation.expires);
+  expect(Object.hasOwn((await state(object)).pending, "cutoff")).toBe(false);
   expect(await object.reconcileReserved(nonce)).toBe("held");
 });
 
@@ -231,3 +232,116 @@ test.each(["missing", "malformed", "wrong nonce", "wrong digest"])(
     expect((await state(object)).pending).toBeNull();
   },
 );
+
+test.each(["uploaded", "fence", "delayed"])(
+  "captured predecessor cutoff survives retirement and physical cleanup (%s)",
+  async (mode) => {
+    const object = env.CHECKPOINT.get(env.CHECKPOINT.newUniqueId());
+    const now = await runInDurableObject(object, (i) => i.now());
+    const next = JSON.parse(golden.cases[0].checkpoint),
+      prior = JSON.parse(golden.cases[1].checkpoint);
+    for (const value of [next, prior]) {
+      value.covers_after = wire(now - 10 * DAY);
+      for (const row of value.rows) {
+        row[1] = wire(now - 9 * DAY).replace(/Z$/, "");
+        row[3] = wire(now - 9 * DAY);
+      }
+    }
+    next.prepared_at = wire(now - 1000);
+    prior.accepted_at = wire(now - 7 * DAY + 2000);
+    const oldBytes = encode(JSON.stringify(ordered(prior)));
+    next.predecessor = {
+      commit: prior.accepted_commit,
+      public_tree: prior.public_tree,
+      checkpoint_sha256: Array.from(
+        new Uint8Array(await crypto.subtle.digest("SHA-256", oldBytes)),
+        (v) => v.toString(16).padStart(2, "0"),
+      ).join(""),
+    };
+    await object.bootstrap(oldBytes);
+    const { status, nonce } = await object.reservePending(encode(JSON.stringify(ordered(next))));
+    expect(status).toBe("reserved");
+    const before = await state(object);
+    expect(before.reservation.cutoff).toBe(before.accepted.expires);
+    if (mode === "fence")
+      await runInDurableObject(object, async (i) => {
+        const saved = i.state(),
+          inconsistent = structuredClone(saved);
+        inconsistent.reservation.cutoff++;
+        i.save(inconsistent);
+        expect(await i.uploadReserved(nonce)).toBe("held");
+        expect(await i.reconcileReserved(nonce)).toBe("held");
+        i.save(saved);
+      });
+    let late;
+    if (mode === "uploaded") expect(await object.uploadReserved(nonce)).toBe("stored");
+    if (mode === "delayed") {
+      await runInDurableObject(object, (i) => {
+        i.beforeUpload = () =>
+          new Promise((resolve) => {
+            i.releaseUpload = resolve;
+          });
+      });
+      late = object.uploadReserved(nonce);
+      for (let n = 0; n < 100; n++) {
+        if (await runInDurableObject(object, (i) => Boolean(i.releaseUpload))) break;
+        await new Promise((resolve) => setTimeout(resolve, 1));
+      }
+      expect(await runInDurableObject(object, (i) => Boolean(i.releaseUpload))).toBe(true);
+    }
+    const remaining = await runInDurableObject(
+      object,
+      (i) => i.state().reservation.cutoff - i.now(),
+    );
+    await new Promise((resolve) => setTimeout(resolve, Math.max(0, remaining) + 10));
+    const expiredAt = await runInDurableObject(object, (i) => i.now());
+    expect(expiredAt).toBeGreaterThanOrEqual(before.accepted.expires);
+    expect(expiredAt).toBeLessThan(before.reservation.expires); // Pending's own 24 hours are still live.
+    expect(await object.retireExpired("accepted")).toBe("committed");
+    expect(await object.cleanupRetired()).toBe("committed");
+    const cleared = await state(object);
+    expect(cleared.accepted).toBeNull();
+    expect(cleared.retired).toBeNull();
+    expect(cleared.reservation.cutoff).toBe(before.accepted.expires);
+    expect(await object.reconcileReserved(nonce)).toBe("committed");
+    expect((await state(object)).reservation).toBeNull();
+    expect((await state(object)).pending).toBeNull();
+    const physical = await runInDurableObject(object, (i) => i.slots.read(0));
+    expect(physical.kind).toBe("tombstone");
+    if (late) {
+      await runInDurableObject(object, (i) => i.releaseUpload());
+      expect(await late).toBe("conflict");
+    }
+    expect(await object.reconcileReserved(nonce)).toBe("held");
+    expect((await env.SLOTS.head(key)).etag).toBe(physical.etag);
+  },
+);
+
+test.each([
+  "missing",
+  "null",
+  "string",
+  "fraction",
+  "after-expiry",
+  "before-start",
+  "wrong-genesis",
+])("malformed captured cutoff stays held (%s)", async (fault) => {
+  const { object, nonce } = await setup();
+  await runInDurableObject(object, (i) => {
+    const s = i.state(),
+      r = s.reservation;
+    if (fault === "missing") delete r.cutoff;
+    else if (fault === "null") r.cutoff = null;
+    else if (fault === "string") r.cutoff = String(r.cutoff);
+    else if (fault === "fraction") r.cutoff += 0.5;
+    else if (fault === "wrong-genesis") r.cutoff--;
+    else r.cutoff = fault === "after-expiry" ? r.expires + 1 : r.starts - 1;
+    i.save(s);
+  });
+  const before = await state(object),
+    etag = (await env.SLOTS.head(key)).etag;
+  expect(await object.uploadReserved(nonce)).toBe("held");
+  expect(await object.reconcileReserved(nonce)).toBe("held");
+  expect(await state(object)).toEqual(before);
+  expect((await env.SLOTS.head(key)).etag).toBe(etag);
+});
