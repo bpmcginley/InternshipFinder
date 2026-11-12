@@ -68,12 +68,16 @@ test("R2 slots reject corrupt, oversized and truncated reads and cancel the body
   const slots = createFollowCheckpointR2Slots(bucket, bounds);
   await slots.write(0, null, await slots.prepare(bytes));
   const original = bucket.values.get("follow-checkpoint-slot-0").body;
-  for (const [size, body] of [
+  const withBom = new Uint8Array(original.length + 3);
+  withBom.set([0xef, 0xbb, 0xbf]);
+  withBom.set(original, 3);
+  for (const [size, body, message] of [
     [289, original],
     [original.length - 1, original],
     [original.length + 1, original],
     [original.length, original.map((v, i) => (i === original.length - 1 ? v ^ 1 : v))],
     [3, new Uint8Array([255, 10, 0])],
+    [withBom.length, withBom, "UTF-8 BOM makes the envelope noncanonical"],
   ]) {
     const finite = createFollowCheckpointR2Slots(
       {
@@ -83,7 +87,7 @@ test("R2 slots reject corrupt, oversized and truncated reads and cancel the body
       },
       bounds,
     );
-    assert.equal((await finite.read(0)).status, "unavailable");
+    assert.equal((await finite.read(0)).status, "unavailable", message);
   }
   let cancelled = false;
   const overflow = createFollowCheckpointR2Slots(

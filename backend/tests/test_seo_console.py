@@ -1,15 +1,21 @@
 """Page-build console output keeps its workflow annotation protocol."""
 
 import json
+from functools import partial
 
-from internscout import seo_pages
+import pytest
+
+from internscout.site import publish, runtime
 from tests.seo_fixture_data import _row, _site
 from tests.test_seo_pages import _pl
+
+pytestmark = pytest.mark.without_seo_facade
 
 
 def test_json_page_build_keeps_annotations_and_omits_the_output_path(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("INTERNSCOUT_LOG_FORMAT", "json")
-    monkeypatch.setattr(seo_pages, "today_utc", lambda: "2026-09-23")
+    monkeypatch.setattr(publish, "_today_utc", lambda: "2026-09-23")
+    monkeypatch.setattr(runtime, "BuildState", partial(runtime.BuildState, near_on=False))
     site = _site(tmp_path / "site", {"MA": [_row(i) for i in range(5)] + ["bad row"]})
     placements = tmp_path / "placements.json"
     placements.write_text(
@@ -23,8 +29,8 @@ def test_json_page_build_keeps_annotations_and_omits_the_output_path(tmp_path, m
         encoding="utf-8",
     )
     # Using a directory as the report path exercises the second annotation without a remote call.
-    seo_pages.main(
-        ["seo_pages", site, "--placements", str(placements), "--placements-report", str(tmp_path)]
+    publish.main(
+        ["publish", site, "--placements", str(placements), "--placements-report", str(tmp_path)]
     )
     out = capsys.readouterr()
     annotations = out.out.splitlines()[:2]

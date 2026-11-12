@@ -1,8 +1,8 @@
 // Pure checks for a tailored resume: the model may only reword/reorder what the profile already says.
 // Anything that fails a check falls back to the original text.
 import { confirmedFacts } from "./store.js";
+import { hasUnsupportedAnchors, numbersIn as nums } from "./tailor_claims.js";
 
-const nums = (s) => String(s || "").match(/\d+(?:[.,]\d+)*/g) || [];
 export const hasNewNumbers = (text, source) => {
   const ok = new Set(nums(source));
   return nums(text).some((n) => !ok.has(n));
@@ -79,7 +79,13 @@ export function applyTailoring(store, out) {
       let text = String((b && b.text) || "")
         .replace(/\s+/g, " ")
         .trim();
-      if (!text || text.length > 400 || hasNewNumbers(text, orig[j])) text = orig[j];
+      if (
+        !text ||
+        text.length > 400 ||
+        hasNewNumbers(text, orig[j]) ||
+        hasUnsupportedAnchors(text, orig[j])
+      )
+        text = orig[j];
       if (text !== orig[j])
         diff.push({ where: e.company || e.title || "", before: orig[j], after: text });
       bullets.push(text);
@@ -99,7 +105,13 @@ export function applyTailoring(store, out) {
         String(t.description || "")
           .replace(/\s+/g, " ")
           .trim();
-    if (!text || text.length > 500 || hasNewNumbers(text, x.description) || text === x.description)
+    if (
+      !text ||
+      text.length > 500 ||
+      hasNewNumbers(text, x.description) ||
+      hasUnsupportedAnchors(text, x.description) ||
+      text === x.description
+    )
       return { ...x };
     diff.push({ where: x.name || "Project", before: x.description, after: text });
     return { ...x, description: text };
@@ -113,7 +125,16 @@ export function applyTailoring(store, out) {
   let summary = String(out.summary || "")
     .replace(/\s+/g, " ")
     .trim();
-  if (summary.length > 400 || hasNewNumbers(summary, JSON.stringify(p))) summary = "";
+  // Goals/voice and the posting are instructions, not evidence for generated factual claims.
+  const summarySources = [
+    ...p.experience.flatMap((e) => [e.company, e.title, ...(e.bullets || [])]),
+    ...p.projects.flatMap((x) => [x.name, x.description]),
+    ...p.education.flatMap((e) => [e.school, e.degree, e.major, e.minor, e.gpa, e.start, e.end]),
+    ...skills.technical,
+    ...skills.tools,
+    ...skills.soft,
+  ];
+  if (summary.length > 400 || hasUnsupportedAnchors(summary, summarySources)) summary = "";
 
   const name = [f.preferred_name || f.first_name, f.last_name].filter(Boolean).join(" ");
   const contact = [
@@ -127,5 +148,36 @@ export function applyTailoring(store, out) {
   return {
     resume: { name, contact, summary, education: p.education, experience, projects, skills },
     diff,
+  };
+}
+
+// Local cache identity only. Explicit rendering fields plus summary evidence, not the whole
+// profile/store. This projection is never put in the model request or stored as plaintext.
+export function tailoringCacheFacts(store) {
+  const { resume: r } = applyTailoring(store, {});
+  return {
+    name: r.name,
+    contact: r.contact,
+    skills: r.skills,
+    education: r.education.map((e) => [
+      e.school,
+      e.degree,
+      e.major,
+      e.minor,
+      e.gpa,
+      e.start,
+      e.end,
+      e.end || e.grad_term,
+      e.coursework,
+    ]),
+    experience: r.experience.map((e) => [
+      e.company,
+      e.title,
+      e.bullets,
+      e.start,
+      e.end,
+      e.location,
+    ]),
+    projects: r.projects.map((p) => [p.name, p.description, p.dates, p.role, p.link]),
   };
 }

@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": []
+  },
+  "include": [
+    "docs/js/**/*.js",
+    "docs/js/**/*.mjs",
+    "docs/widget/**/*.js",
+    "docs/widget/**/*.mjs"
+  ],
+  "exclude": [
+    "docs/js/app-modules",
+    "docs/js/buy-modules",
+    "docs/js/modules",
+    "docs/**/*.min.js"
+  ]
+}

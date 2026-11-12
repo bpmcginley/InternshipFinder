@@ -1,0 +1,44 @@
+[
+  {
+    "alias": "https:///internscout.org/js/count.js",
+    "resolved": "https://internscout.org/js/count.js",
+    "syntheticExecutions": 2,
+    "publisherRejected": true,
+    "externalRequestsAllowed": 0
+  },
+  {
+    "alias": "https:////internscout.org/js/count.js",
+    "resolved": "https://internscout.org/js/count.js",
+    "syntheticExecutions": 2,
+    "publisherRejected": true,
+    "externalRequestsAllowed": 0
+  },
+  {
+    "alias": "////internscout.org/js/count.js",
+    "resolved": "https://internscout.org/js/count.js",
+    "syntheticExecutions": 2,
+    "publisherRejected": true,
+    "externalRequestsAllowed": 0
+  },
+  {
+    "alias": "https://%69nternscout.org/js/count.js",
+    "resolved": "https://internscout.org/js/count.js",
+    "syntheticExecutions": 2,
+    "publisherRejected": true,
+    "externalRequestsAllowed": 0
+  },
+  {
+    "alias": "https://internscout%2eorg/js/count.js",
+    "resolved": "https://internscout.org/js/count.js",
+    "syntheticExecutions": 2,
+    "publisherRejected": true,
+    "externalRequestsAllowed": 0
+  },
+  {
+    "alias": "https://ｉnternscout.org/js/count.js",
+    "resolved": "https://internscout.org/js/count.js",
+    "syntheticExecutions": 2,
+    "publisherRejected": true,
+    "externalRequestsAllowed": 0
+  }
+]
