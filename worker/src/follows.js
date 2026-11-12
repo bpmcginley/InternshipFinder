@@ -330,6 +330,7 @@ export async function deleteLinkedFollows(db, ownerUserHash) {
 
 export function followExpiryStatements(db, now) {
   return [
+    db.prepare("DELETE FROM follow_confirmation_outbox WHERE expires_at<=?").bind(stamp(now)),
     db
       .prepare(
         "DELETE FROM follow_tokens WHERE expires_at<=? OR (purpose='confirm' AND EXISTS " +

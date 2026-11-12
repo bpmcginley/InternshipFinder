@@ -1057,7 +1057,8 @@ CREATE TABLE IF NOT EXISTS follow_confirmation_outbox (
   subscriber_id TEXT NOT NULL,
   scope_key TEXT NOT NULL,
   queued_at TEXT NOT NULL,
-  expires_at TEXT NOT NULL CHECK (expires_at > queued_at), claim_id TEXT,
+  expires_at TEXT NOT NULL CHECK (expires_at > queued_at), claim_id TEXT, owner_user_hash TEXT
+  CHECK(owner_user_hash IS NULL OR (length(owner_user_hash)=64 AND owner_user_hash NOT GLOB '*[^0-9a-f]*')),
   UNIQUE (subscriber_id, scope_key),
   FOREIGN KEY (subscriber_id, scope_key)
     REFERENCES follow_subscriptions(subscriber_id, scope_key) ON DELETE CASCADE
@@ -1070,3 +1071,6 @@ BEGIN
   DELETE FROM follow_confirmation_outbox
     WHERE subscriber_id = OLD.subscriber_id AND scope_key = OLD.scope_key;
 END;
+
+CREATE INDEX IF NOT EXISTS follow_confirmation_owner ON follow_confirmation_outbox(owner_user_hash)
+  WHERE owner_user_hash IS NOT NULL;

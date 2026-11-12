@@ -33,6 +33,7 @@ const migrationNames = [
   "0020_topup_retirement_provenance.sql",
   "0021_follow_confirmation_outbox.sql",
   "0022_follow_confirmation_claim.sql",
+  "0023_follow_scoped_link.sql",
 ];
 const legacySql = [...env.TEST_SCHEMA_SQL, ...env.TEST_EXTRA_SCHEMA_SQL];
 const databases = [env.LEGACY_DB, env.MIGRATION_DB];
@@ -96,7 +97,7 @@ it("migrations create the complete legacy schema, including constraints and trig
   const expected = await schema(env.LEGACY_DB);
   expect(await schema(env.MIGRATION_DB)).toEqual(expected);
   expect(expected.objects.filter((row) => row.type === "table")).toHaveLength(64);
-  expect(expected.objects.filter((row) => row.type === "index")).toHaveLength(34);
+  expect(expected.objects.filter((row) => row.type === "index")).toHaveLength(35);
   expect(expected.objects.filter((row) => row.type === "trigger")).toHaveLength(12);
   expect(expected.objects.filter((row) => row.type === "view")).toHaveLength(1);
   expect(await ledger()).toEqual(migrationNames.map((name) => ({ name })));
@@ -122,7 +123,7 @@ it("0022 preserves a populated pending queue without inventing a claim", async (
   const before = await job();
   expect(before?.id).toBe(confirmationJobId);
   await apply();
-  expect(await job()).toEqual({ ...before, claim_id: null });
+  expect(await job()).toEqual({ ...before, claim_id: null, owner_user_hash: null });
 });
 
 it("employer count tables accept only aggregates on fresh and upgraded local D1", async () => {
