@@ -3,9 +3,13 @@
 import re
 import xml.etree.ElementTree as ET
 
-from internscout import seo_pages
+import pytest
+
+from internscout.site import runtime
 from tests.seo_fixture_data import _row, _site
-from test_seo_pages import _tracker_site
+from test_seo_pages import _build_pages, _tracker_site
+
+pytestmark = pytest.mark.without_seo_facade
 
 
 def test_term_pay_stage_and_class_year_pages_list_only_what_their_title_says(tmp_path):
@@ -15,7 +19,7 @@ def test_term_pay_stage_and_class_year_pages_list_only_what_their_title_says(tmp
         + [_row(200 + i, term=None, years=["first_year", "sophomore"]) for i in range(26)]
         + [_row(300 + i, term="Fall 2027", stage=["research"]) for i in range(24)]
     )  # below MIN_KIND
-    pages = {p["path"]: p for p in seo_pages.build(_site(tmp_path, {"MA": rows}))}
+    pages = {p["path"]: p for p in _build_pages(_site(tmp_path, {"MA": rows}))}
     for path in (
         "/internships/summer-2027/",
         "/internships/spring-2027/",
@@ -53,9 +57,9 @@ def test_kind_descriptions_keep_eligibility_and_use_only_their_actual_employers(
         _row(i, company_name="Apollo", years=["first_year", "sophomore"], salary="$25/hr")
         for i in range(30)
     ]
-    kinds = {k["slug"]: k for k in seo_pages.kinds(rows)}
-    term = seo_pages.fit_description(
-        seo_pages.kind_description(kinds["summer-2027"], rows, "October 23, 2026")
+    kinds = {k["slug"]: k for k in runtime.kinds(rows)}
+    term = runtime.fit_description(
+        runtime.kind_description(kinds["summer-2027"], rows, "October 23, 2026")
     )
     assert term.startswith("30 open Summer 2027 student roles.")
     assert "Hiring now: Apollo." in term and "most for Summer 2027" not in term
@@ -64,8 +68,8 @@ def test_kind_descriptions_keep_eligibility_and_use_only_their_actual_employers(
         ("for-freshmen", "postings accept first-year college students"),
         ("for-sophomores", "postings accept sophomores"),
     ):
-        desc = seo_pages.fit_description(
-            seo_pages.kind_description(kinds[slug], rows, "October 23, 2026")
+        desc = runtime.fit_description(
+            runtime.kind_description(kinds[slug], rows, "October 23, 2026")
         )
         assert qualifier in desc
         assert "Apollo" in desc and "Beacon" not in desc
@@ -76,21 +80,21 @@ def test_upcoming_summers_are_the_ones_still_ahead():
     from datetime import datetime, timezone
 
     terms = ["Summer 2026", "Summer 2027", "Summer 2028", "Fall 2026", None]
-    assert seo_pages.upcoming_summers(terms, datetime(2026, 10, 7, tzinfo=timezone.utc)) == [
+    assert runtime.upcoming_summers(terms, datetime(2026, 10, 7, tzinfo=timezone.utc)) == [
         "Summer 2027",
         "Summer 2028",
     ]
     assert (
-        seo_pages.upcoming_summers(terms, datetime(2027, 3, 1, tzinfo=timezone.utc))[0]
+        runtime.upcoming_summers(terms, datetime(2027, 3, 1, tzinfo=timezone.utc))[0]
         == "Summer 2027"
     )
-    assert seo_pages.upcoming_summers(terms, datetime(2027, 6, 1, tzinfo=timezone.utc)) == [
+    assert runtime.upcoming_summers(terms, datetime(2027, 6, 1, tzinfo=timezone.utc)) == [
         "Summer 2028"
     ]
 
 
 def test_the_summer_tracker_lists_employers_newest_opened_first(tmp_path):
-    pages = {p["path"]: p for p in seo_pages.build(_tracker_site(tmp_path))}
+    pages = {p["path"]: p for p in _build_pages(_tracker_site(tmp_path))}
     path = "/internships/summer-2027/open/"
     assert path in pages and pages[path]["lastmod"] == "2026-09-22"
     html = pages[path]["html"]
@@ -130,7 +134,7 @@ def test_the_summer_tracker_lists_employers_newest_opened_first(tmp_path):
 
 def test_no_tracker_for_a_summer_that_has_passed(tmp_path):
     rows = [_row(i, term="Summer 2026") for i in range(30)]
-    pages = {p["path"]: p["html"] for p in seo_pages.build(_site(tmp_path, {"MA": rows}))}
+    pages = {p["path"]: p["html"] for p in _build_pages(_site(tmp_path, {"MA": rows}))}
     assert "/internships/summer-2026/" in pages
     assert not any(p.endswith("/open/") for p in pages)
     assert "/open/" not in pages["/internships/massachusetts/"]

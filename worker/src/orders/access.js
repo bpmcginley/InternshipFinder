@@ -1,6 +1,6 @@
 import { HttpError } from "../http.js";
 import { hex, sameHex } from "../billing.js";
-import { ORDER_ID } from "./shared.js";
+import { DAYS, FIELD_CAP, MAX_START_DAYS, ORDER_ID, PRICES, TERMS_VERSION } from "./shared.js";
 import { reviewSig } from "./templates.js";
 
 // Only the site's own pages send the order, confirm and credit choice (a browser always sets Origin).
@@ -10,6 +10,26 @@ const TOKEN = /^[A-Za-z0-9_-]{43}$/;
 export const ordersOn = (env) =>
   env.EMPLOYER_CHECKOUT === "1" && !!env.STRIPE_SECRET_KEY && !!env.STRIPE_WEBHOOK_SECRET && !!env.ADMIN_TOKEN &&
   !!env.REVIEW_TO && !!env.ORDER_FROM && !!(env.EMAIL && typeof env.EMAIL.send === "function");
+
+const notFound = () => new HttpError(404, "not_found", "No such endpoint");
+
+// ---------------------------------------------------------------- on or off
+
+export function requireOrders(env) {
+  if (!ordersOn(env)) throw notFound();
+}
+
+// GET /employer/config: what the buy page needs before it shows anything.
+export function orderConfig(env) {
+  return {
+    enabled: ordersOn(env),
+    prices: PRICES,
+    days: DAYS,
+    field_cap: FIELD_CAP,
+    max_start_days: MAX_START_DAYS,
+    terms_version: TERMS_VERSION,
+  };
+}
 
 function siteOnly(request) {
   if (!SITE.test(request.headers.get("Origin") || "")) {

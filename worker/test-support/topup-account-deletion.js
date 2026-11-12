@@ -1,5 +1,6 @@
 // Synthetic account deletion through the real helper, shared by SQLite and local D1.
 import assert from "node:assert/strict";
+import { handle } from "../src/index.js";
 import { deleteUser, cleanup } from "../src/limits.js";
 import { createSession } from "../src/session.js";
 import { recordVerifiedTopup } from "../src/topup-ledger.js";
@@ -84,7 +85,7 @@ export async function deletionBlocksUnresolved(db) {
       await session(db);
       await run(db, "INSERT INTO demand VALUES(?,'[]','fixture','fixture')", user);
       await run(db, "INSERT INTO usage VALUES(?,'2026-09','autofill',1)", user);
-      await assert.rejects(deleteUser(db, user, now), /topup_payment_pending/);
+      await assert.rejects(deleteUser(db, user, now), { status: 409, code: "topup_payment_pending" });
       for (const table of [
         "demand",
         "usage",
@@ -99,6 +100,50 @@ export async function deletionBlocksUnresolved(db) {
         existing ? [{ user_hash: user, month: "2026-10" }] : [],
       );
     }
+}
+
+export async function deletionPendingPaymentResponse(db) {
+  await reset(db);
+  const { token } = await session(db);
+  const id = await attempt(db, "open");
+  const remove = () =>
+    handle(
+      new Request("https://api.example.test/me", {
+        method: "DELETE",
+        headers: { Authorization: "Bearer " + token, Origin: "https://internscout.org" },
+      }),
+      { DB: db },
+      {},
+      { now: () => now, fetch: () => assert.fail("Account deletion must not call a provider") },
+    );
+
+  const blocked = await remove();
+  assert.equal(blocked.status, 409);
+  assert.deepEqual(await blocked.json(), {
+    error: "topup_payment_pending",
+    message: "Finish or let your pending checkout expire before deleting your data. Contact support if a billing confirmation is pending.",
+  });
+  assert.equal((await rows(db, "sessions")).length, 1);
+  assert.equal((await rows(db, "forget")).length, 0);
+  assert.equal((await rows(db, "topup_checkout_attempts"))[0].state, "open");
+
+  await run(db, "UPDATE topup_checkout_attempts SET state='expired' WHERE id=?", id);
+  const deleted = await remove();
+  assert.equal(deleted.status, 200);
+  assert.deepEqual(await deleted.json(), { ok: true });
+  assert.equal((await rows(db, "sessions")).length, 0);
+  assert.equal((await rows(db, "topup_checkout_attempts")).length, 0);
+}
+
+export async function deletionKeepsUnrelatedErrors(db) {
+  const unrelated = new Error("D1_ERROR: unrelated_topup_payment_pending: SQLITE_CONSTRAINT");
+  const brokenDb = {
+    prepare: (sql) => db.prepare(sql),
+    batch() {
+      throw unrelated;
+    },
+  };
+  await assert.rejects(deleteUser(brokenDb, user, now), (error) => error === unrelated);
 }
 
 export async function deletionUsesScopedResolvedIndex(db) {
@@ -224,7 +269,7 @@ export async function deletionReservationOrderings(db) {
     const reserve = () => reserveSessionTopupCheckout(db, user, token, capability, () => now);
     if (order === "reserve") {
       assert.equal((await reserve()).status, "pending");
-      await assert.rejects(deleteUser(db, user, now), /topup_payment_pending/);
+      await assert.rejects(deleteUser(db, user, now), { status: 409, code: "topup_payment_pending" });
     } else if (order === "delete") {
       await deleteUser(db, user, now);
       assert.deepEqual(await reserve(), { status: "auth", attempt: null });
@@ -235,7 +280,8 @@ export async function deletionReservationOrderings(db) {
       ]);
       assert.equal(reservation.status, "fulfilled");
       if (deletion.status === "rejected") {
-        assert.match(String(deletion.reason), /topup_payment_pending/);
+        assert.equal(deletion.reason.status, 409);
+        assert.equal(deletion.reason.code, "topup_payment_pending");
         assert.equal(reservation.value.status, "pending");
       } else assert.deepEqual(reservation.value, { status: "auth", attempt: null });
     }

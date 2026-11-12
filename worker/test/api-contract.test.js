@@ -36,7 +36,11 @@ test("the contract contains every exact table route, with auth and descriptive s
         }
       }
       if (node.type === "SwitchCase" && node.test?.type === "Literal") {
-        assert.doesNotMatch(String(node.test.value), /^[A-Z]+ \/.*/, "exact routes must use the table");
+        assert.doesNotMatch(
+          String(node.test.value),
+          /^[A-Z]+ \/.*/,
+          "exact routes must use the table",
+        );
       }
       if (
         node.type === "CallExpression" &&
@@ -147,14 +151,18 @@ test("webhook body bounds and placement JSON shape precede their downstream gate
   });
 });
 
-test("the original router's offline response bytes and headers stay fixed", async () => {
+test("offline routes match the original capture and signed-in cache policy", async () => {
   const fixture = JSON.parse(
     readFileSync(new URL("./fixtures/route-baseline.json", import.meta.url), "utf8"),
   );
   assert.equal(fixture.capturedFrom, "067a033785214ec63d0d67b26b6ed1d54b940e16");
   // The historical baseline stays immutable. These later routes have their own
   // offline HTTP/D1 tests; future additions must be named explicitly here.
-  const added = new Set(["POST /follows/unsubscribe", "POST /billing/topup/checkout"]);
+  const added = new Set([
+    "POST /follows/unsubscribe",
+    "GET /billing/topup/offer",
+    "POST /billing/topup/checkout",
+  ]);
   assert.equal(exactCases.length + added.size, ROUTES.length);
   assert.deepEqual(
     new Set([...exactCases.map(({ method, path }) => key(method, path)), ...added]),
@@ -163,7 +171,10 @@ test("the original router's offline response bytes and headers stay fixed", asyn
   const actual = await captureRouteResponses();
   assert.deepEqual(Object.keys(actual), Object.keys(fixture.responses));
   for (const [label, expected] of Object.entries(fixture.responses)) {
-    assert.deepEqual(actual[label], expected, label);
+    const headers = label === "me-synthetic-session"
+      ? { ...expected.headers, "cache-control": "no-store" }
+      : expected.headers;
+    assert.deepEqual(actual[label], { ...expected, headers }, label);
   }
 });
 

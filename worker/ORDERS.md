@@ -13,7 +13,7 @@ The whole feature is OFF until `EMPLOYER_CHECKOUT = "1"` and its secrets and the
 (see "Turning it on"). While off, every `/employer/*` route except `GET /employer/config` answers 404 and
 the buy page says buying on the site is not open yet.
 
-## Prices and limits (worker/src/orders.js)
+## Prices and limits (worker/src/orders/)
 
 | Package | Roles | Days each | Price | Nonprofit or public body |
 |---|---|---|---|---|

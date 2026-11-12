@@ -1,10 +1,25 @@
 import { topupRetentionBalanceSql } from "./topup-retention.js";
-// SQL fragments used only inside the funded-run transaction, never a second allocation call.
+// Shared ledger predicates for funded allocation and the signed-in balance read.
 export const purchaseFrom =
   "FROM topup_purchases p JOIN topup_claims c ON c.payment_hash=p.payment_hash LEFT JOIN topup_reconciliations r ON r.payment_hash=p.payment_hash";
 export const purchaseClear =
   "c.state='granted' AND p.held=0 AND COALESCE(r.loss,0)=0 AND COALESCE(r.full_refund,0)=0 AND json_array_length(COALESCE(r.hold_ids,'[]'))=0";
 export const purchaseSpendable = "p.available>0 AND " + purchaseClear;
+
+export async function purchasedRunsFor(db, userHash) {
+  const balance = await db
+    .prepare(
+      "SELECT COALESCE(SUM(p.available),0) AS balance " +
+        purchaseFrom +
+        " WHERE p.user_hash=? AND " +
+        purchaseSpendable,
+    )
+    .bind(userHash)
+    .first("balance");
+  if (!Number.isSafeInteger(balance) || balance < 0) throw new Error("Invalid purchased run balance");
+  return balance;
+}
+
 export function allocateGeneration(db, generation, callId) {
   return [
     db
