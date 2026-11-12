@@ -1,9 +1,5 @@
 // Dormant storage primitive only. A separate control authority must fence visibility and cleanup.
-import { classifyFollowCheckpointWitness as classify } from "./follow-checkpoint-witness.js";
-import {
-  canonicalCleanupJournal,
-  cleanupMatchesWitness,
-} from "./follow-checkpoint-cleanup-journal.js";
+import { decodeFollowCheckpointWitnessText } from "./follow-checkpoint-witness-cas.js";
 
 const KEYS = ["follow-checkpoint-slot-0", "follow-checkpoint-slot-1"];
 const WITNESS_KEYS = ["follow-checkpoint-witness"];
@@ -147,29 +143,9 @@ function createR2Records(bucket, keys, maxPayloadBytes, maxEnvelopeBytes) {
   };
 }
 
-// Reuse the witness validators. The CAS layer still owns all transition decisions.
 function witnessText(text) {
-  if (typeof text !== "string" || text.length > MAX_WITNESS_BYTES || !/^[\x20-\x7e]+$/.test(text))
-    return null;
-  const record = JSON.parse(text);
-  if (JSON.stringify(record) !== text) return null;
-  const journalVersion = record?.version === 2;
-  const witness = journalVersion ? record.witness : record;
-  const status = classify(witness, { current: witness?.current, receipt: null });
-  if (!["current", "ambiguous_predecessor", "closed"].includes(status)) return null;
-  if (journalVersion) {
-    if (Object.keys(record).join(",") !== "version,witness,cleanup") return null;
-    if (record.cleanup !== null) {
-      const journal = canonicalCleanupJournal(record.cleanup);
-      if (
-        !journal ||
-        !cleanupMatchesWitness(witness, journal) ||
-        JSON.stringify(journal) !== JSON.stringify(record.cleanup)
-      )
-        return null;
-    }
-  }
-  return { text, version: record.version, closed: status === "closed" };
+  const record = decodeFollowCheckpointWitnessText(text);
+  return record && { text, version: record.version, closed: record.value.phase === "closed" };
 }
 
 // Dormant, dedicated object. The injected bucket must provide uncached, exact R2 operations.

@@ -67,6 +67,32 @@ test("the dedicated R2 port holds missing, malformed and closed authority withou
   expect(puts).toBe(0);
 });
 
+test("both witness versions reject reordered nested position keys before a PUT", async () => {
+  const reverse = ({ epoch, revision, token }) => ({ token, revision, epoch });
+  const canonical = { version: 1, phase: "prepared", current: previous, intent };
+  let puts = 0;
+  const port = createPort(bucket(() => ++puts));
+  for (const wrap of [
+    (witness) => witness,
+    (witness) => ({ version: 2, witness, cleanup: null }),
+  ]) {
+    const valid = JSON.stringify(wrap(canonical));
+    for (const reordered of [
+      { ...canonical, current: reverse(previous) },
+      { ...canonical, intent: { ...intent, next: reverse(intent.next) } },
+    ]) {
+      const invalid = JSON.stringify(wrap(reordered));
+      const malformed = await seed(invalid);
+      expect(await port.readRecord()).toBeNull();
+      expect(await port.compareAndSwap(malformed.etag, valid)).toBe(false);
+      const good = await seed(valid);
+      expect(await port.compareAndSwap(good.etag, invalid)).toBe(false);
+      expect(await port.readRecord()).toEqual({ tag: good.etag, text: valid });
+    }
+  }
+  expect(puts).toBe(0);
+});
+
 test("identical witness text creates distinct native object nonces and ETags", async () => {
   const initial = await seed(text);
   const port = createPort(env.SLOTS);
