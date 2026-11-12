@@ -52,7 +52,7 @@ export function requestFollowConfirmation(db, email, input, catalog, now = new D
   return writeFollowRequest(db, email, input, catalog, now, true);
 }
 
-async function writeFollowRequest(db, email, input, catalog, now, queueConfirmation) {
+export function normalizeFollowEmail(email) {
   if (typeof email !== "string") invalid();
   email = email.trim().toLowerCase();
   if (
@@ -60,6 +60,11 @@ async function writeFollowRequest(db, email, input, catalog, now, queueConfirmat
     !/^[^\s@<>\x00-\x1f\x7f]+@[^\s@<>\x00-\x1f\x7f]+\.[^\s@<>\x00-\x1f\x7f]+$/.test(email)
   )
     invalid();
+  return email;
+}
+
+async function writeFollowRequest(db, email, input, catalog, now, queueConfirmation) {
+  email = normalizeFollowEmail(email);
   const scopeKey = canonicalFollow(input, catalog),
     id = crypto.randomUUID(),
     at = stamp(now),
@@ -117,6 +122,12 @@ async function writeFollowRequest(db, email, input, catalog, now, queueConfirmat
 }
 
 // Random generation + 256-bit secret; only the hash and generation enter D1.
+export async function createFollowCapability(prefix = "") {
+  const generation = crypto.randomUUID();
+  const raw = prefix + generation + "." + hex(crypto.getRandomValues(new Uint8Array(32)));
+  return { generation, raw, digest: await hash(raw) };
+}
+
 // Confirmation/management reissues invalidate previous links in the same scope. Unsubscribe links
 // remain valid until deletion, including previously delivered links after a later dispatch.
 export async function mintFollowToken(
@@ -132,9 +143,7 @@ export async function mintFollowToken(
     (purpose === "confirm" ? !scopeKey : scopeKey !== "" || ownerUserHash !== null)
   )
     invalid();
-  const generation = crypto.randomUUID(),
-    raw = generation + "." + hex(crypto.getRandomValues(new Uint8Array(32)));
-  const digest = await hash(raw);
+  const { generation, raw, digest } = await createFollowCapability();
   let expiry =
     purpose === "unsubscribe"
       ? null

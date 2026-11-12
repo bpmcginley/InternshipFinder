@@ -1057,7 +1057,7 @@ CREATE TABLE IF NOT EXISTS follow_confirmation_outbox (
   subscriber_id TEXT NOT NULL,
   scope_key TEXT NOT NULL,
   queued_at TEXT NOT NULL,
-  expires_at TEXT NOT NULL CHECK (expires_at > queued_at),
+  expires_at TEXT NOT NULL CHECK (expires_at > queued_at), claim_id TEXT,
   UNIQUE (subscriber_id, scope_key),
   FOREIGN KEY (subscriber_id, scope_key)
     REFERENCES follow_subscriptions(subscriber_id, scope_key) ON DELETE CASCADE
