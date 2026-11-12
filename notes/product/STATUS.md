@@ -540,6 +540,9 @@ The golden harness now covers static assets as well as generated pages. Each sit
 
 ## Waiting for Bruce
 
+- **P-2.1cv dormant Follow delivery owner**. Owner audit_site, `codex/product-p2.1cv-delivery-owner`, stacked on exact approved #563. Migration 0031, bounded owner/CAS and deletion-boundary cursor redaction are in progress with synthetic Node/native tests. No reset, reclaim, route, schedule or activation. Production restore authorization, shared provider capacity and hold-release evidence remain gated.
+
+
 - **P-2.1ct company Details Follow mount**: [#572](https://github.com/bpmcginley/InternshipFinder/pull/572) qualified offline; draft awaiting independent review/CI. #570 same-export identity publication and existing Follow release/provider gates remain. [Scope](P-2.1ct-company-details.md).
 
 - **Follow confirmation rollout** remains held after [#508](https://github.com/bpmcginley/InternshipFinder/pull/508) and the [#506 queue](https://github.com/bpmcginley/InternshipFinder/pull/506) merged to source. Migrations 0021–0023 are applied; dispatch and sending remain held.
