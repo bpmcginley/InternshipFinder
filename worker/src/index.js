@@ -15,6 +15,8 @@ import { cleanStates, demandCounts, dropStale, setDemand, touchSeen } from "./de
 import { countEvent, countHit } from "./visits.js";
 import { createFollowManagementHttp } from "./follow-management-http.js";
 import { createFollowManagementRequestHttp } from "./follow-management-request-http.js";
+import { loadFollowCatalog, prepareFollowCatalogRelease } from "./follow-catalog-loader.js";
+import { createFollowSignupRoute } from "./follow-signup-route.js";
 import { followTokenEndpoints } from "./follow-token-endpoint.js";
 import { followUnsubscribeEndpoint } from "./follow-unsubscribe-endpoint.js";
 import { topupCheckoutResponse, topupOfferResponse } from "./topup-checkout-http.js";
@@ -84,7 +86,8 @@ function corsHeaders(request, env) {
 // Keep concurrency per isolate while binding authority and storage to each request.
 const followManagement = createFollowManagementHttp({ enabled: true });
 const followManagementRequest = createFollowManagementRequestHttp({ enabled: true });
-const followManagementOriginAllowed = (request, env) =>
+const followSignup = createFollowSignupRoute({ enabled: true });
+const followOriginAllowed = (request, env) =>
   request.headers.get("Origin") === "https://internscout.org" &&
   !!corsHeaders(request, env)["Access-Control-Allow-Origin"];
 const followPolicyInteger = (value) => {
@@ -98,7 +101,7 @@ const manageFollow = (operation) => ({ request, env, db, d }) => {
   return followManagement[operation](request, {
     db,
     now: d.now,
-    originAllowed: (r) => followManagementOriginAllowed(r, env),
+    originAllowed: (r) => followOriginAllowed(r, env),
   });
 };
 
@@ -107,9 +110,67 @@ const requestFollowManagement = ({ request, env, db }) => {
     throw new HttpError(404, "not_found", "No such endpoint");
   return followManagementRequest(request, {
     db,
-    originAllowed: (r) => followManagementOriginAllowed(r, env),
+    originAllowed: (r) => followOriginAllowed(r, env),
     ttlMs: followPolicyInteger(env.FOLLOW_MANAGEMENT_REQUEST_TTL_MS),
     dailyLimit: followPolicyInteger(env.FOLLOW_MANAGEMENT_REQUEST_DAILY_CAP),
+  });
+};
+
+const followSignupClosed = () => json({ error: "not_found", message: "No such endpoint" }, 404);
+
+function prepareFollowSignupAdmission({ db, now, d }) {
+  let policy, dailyLimit, latest = +now;
+  const clock = () => {
+    const value = d.now(), at = +value;
+    if (
+      !(value instanceof Date) || !Number.isSafeInteger(at) || at < latest ||
+      (policy && (at < policy.release.notBefore || at >= policy.release.expiresAt))
+    ) throw new Error("Follow signup clock unavailable");
+    latest = at;
+    return new Date(at);
+  };
+  try {
+    if (!Number.isSafeInteger(latest)) return followSignupClosed();
+    const supplied = d.followSignupRelease();
+    if (
+      !supplied ||
+      typeof supplied !== "object" ||
+      Array.isArray(supplied) ||
+      Object.keys(supplied).sort().join(",") !==
+        "dailyLimit,deadlineMs,maxBytes,maxKeys,origin,previousValid,release"
+    ) {
+      void Promise.prototype.then.call(Promise.resolve(supplied), undefined, () => {});
+      return followSignupClosed();
+    }
+    ({ dailyLimit } = supplied);
+    policy = prepareFollowCatalogRelease(supplied);
+    if (!Number.isSafeInteger(dailyLimit) || dailyLimit <= 0 ||
+        !Number.isFinite(+new Date(policy.release.expiresAt))) return followSignupClosed();
+    clock();
+  } catch {
+    return followSignupClosed();
+  }
+  return {
+    db,
+    dailyLimit,
+    clock,
+    loadCatalog: async () => {
+      const result = await loadFollowCatalog({
+        ...policy, enabled: true, fetch: d.fetch, now: () => +clock(),
+      });
+      return result.status === "available"
+        ? { ...result, expiresAt: policy.release.expiresAt }
+        : result;
+    },
+  };
+}
+
+const signupFollow = ({ request, env, db, now, d }) => {
+  if (env.FOLLOW_SIGNUP_ENABLED !== "1" || typeof d.followSignupRelease !== "function")
+    return followSignupClosed();
+  return followSignup(request, {
+    originAllowed: (r) => followOriginAllowed(r, env),
+    prepareAdmission: () => prepareFollowSignupAdmission({ db, now, d }),
   });
 };
 
@@ -240,6 +301,7 @@ const safeRouteHandlers = {
   "POST /follows/manage/remove": manageFollow("remove"),
   "POST /follows/manage/delete": manageFollow("deleteAll"),
   "POST /follows/manage/request": requestFollowManagement,
+  "POST /follows/signup": signupFollow,
 
   // Stay signed in: trade a fresh provider ID token for a long-lived session token (session.js).
   // Only an ID token can start a session, so a stolen session token cannot make more of itself.
@@ -674,7 +736,7 @@ async function route(request, env, ctx, d) {
   throw new HttpError(404, "not_found", "No such endpoint");
 }
 
-// deps (tests only): { fetch, now: () => Date, config }
+// deps (tests only): { fetch, now: () => Date, config, followSignupRelease }
 export async function handle(request, env, ctx, deps = {}) {
   const d = { fetch: (...args) => fetch(...args), now: () => new Date(), config: CONFIG, ...deps };
   let res;

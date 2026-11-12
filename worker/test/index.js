@@ -43,6 +43,7 @@ import "./api-contract.test.js";
 import "./follows.test.js";
 import "./follow-signup-admission.test.js";
 import "./follow-signup-route.test.js";
+import "./follow-signup-mount.test.js";
 import "./follow-linked-request.test.js";
 import "./follow-catalog.test.js";
 import "./follow-catalog-loader.test.js";
@@ -117,6 +118,7 @@ import "./topup-retention.test.js";
 import "./topup-retirement.test.js";
 import "./topup-history-observation.test.js";
 import "./topup-history-coverage.test.js";
+import "./topup-history-traversal.test.js";
 
 import "./topup-webhook.test.js";
 import "./purchased-allowance.test.js";

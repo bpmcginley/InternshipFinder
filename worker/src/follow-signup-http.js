@@ -31,13 +31,14 @@ function hasDuplicateMembers(text) {
 // There is no default route, sender, session parser, catalog source or configuration.
 export function createFollowSignupHttp({
   enabled = false,
-  originAllowed,
+  originAllowed: defaultOriginAllowed,
   admit,
   timers = { setTimeout, clearTimeout, monotonicNow: () => performance.now() },
 } = {}) {
   let active = 0;
   return async (request, context) => {
     if (request.method !== "POST") return empty(405, { Allow: "POST" });
+    const originAllowed = context?.originAllowed ?? defaultOriginAllowed;
     if (enabled !== true || typeof originAllowed !== "function" || typeof admit !== "function")
       return unavailable();
     try {
@@ -50,7 +51,7 @@ export function createFollowSignupHttp({
         void Promise.prototype.then.call(Promise.resolve(allowed), undefined, () => {});
         return empty(403);
       }
-      if (new URL(request.url).search) return empty(400);
+      if (request.url.includes("?") || request.url.includes("#")) return empty(400);
       const contentType = request.headers.get("Content-Type")?.trim();
       if (!contentType || !JSON_TYPE.test(contentType)) return empty(415);
       const declared = request.headers.get("Content-Length");
@@ -63,6 +64,12 @@ export function createFollowSignupHttp({
       if (active >= MAX_IN_FLIGHT) return unavailable();
       active += 1;
       try {
+        // Qualify release authority only for a request that can consume a body slot.
+        if (typeof context?.prepareAdmission === "function") {
+          const prepared = context.prepareAdmission();
+          if (prepared instanceof Response) return prepared;
+          context = prepared;
+        }
         const input = await readFollowBody(request.body, MAX_BODY_BYTES, timers, (bytes) => {
           if (!bytes.length || (declared !== null && bytes.length !== Number(declared)))
             return null;
