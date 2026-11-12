@@ -38,9 +38,12 @@ export async function admitFollowSignup(db, input, options = {}) {
   if (options?.enabled !== true) return result("disabled");
   const { dailyLimit, catalog, clock = () => new Date() } = options;
   let snapshot, email, scopeKey, session;
+  const guarded = Object.hasOwn(options, "catalogExpiresAtMs"),
+    cutoff = options.catalogExpiresAtMs;
   try {
     if (!Number.isSafeInteger(dailyLimit) || dailyLimit <= 0 || typeof clock !== "function")
       return unavailable();
+    if (guarded && (!Number.isSafeInteger(cutoff) || cutoff <= 0)) return unavailable();
     snapshot = Object.fromEntries(
       ["companies", "fields", "states"].map((kind) => {
         if (!(catalog?.[kind] instanceof Set)) throw new Error();
@@ -93,10 +96,26 @@ export async function admitFollowSignup(db, input, options = {}) {
     const queueDB = {
       prepare: (sql) => db.prepare(sql),
       batch: async (statements) => {
-        const rows = await db.batch(statements);
-        if (!Array.isArray(rows) || rows.length !== statements.length) throw new Error();
-        for (let index = 0; index < statements.length; index++)
+        // Check the trusted pin at batch admission, before any queue mutation. A failed
+        // guard aborts the whole D1 batch. Once admitted, preserve its atomic completion.
+        const submitted = guarded
+          ? [
+              db
+                .prepare("INSERT INTO follow_catalog_admissions(expires_at_ms) VALUES(?)")
+                .bind(cutoff),
+              ...statements,
+            ]
+          : statements;
+        let rows = await db.batch(submitted);
+        if (!Array.isArray(rows) || rows.length !== submitted.length) throw new Error();
+        for (let index = 0; index < submitted.length; index++)
           if (!Object.hasOwn(rows, index) || rows[index]?.success !== true) throw new Error();
+        if (guarded) {
+          const guard = rows[0];
+          if (guard.meta?.changes !== 0 || !Array.isArray(guard.results) || guard.results.length)
+            throw new Error();
+          rows = rows.slice(1); // Existing queue helpers receive their unchanged receipts.
+        }
         const results = rows.at(-1).results;
         if (!Array.isArray(results) || results.length > 1) throw new Error();
         if (!results.length && session) return rows;

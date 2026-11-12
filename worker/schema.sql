@@ -1143,3 +1143,25 @@ BEGIN
     WHERE id IN (SELECT subscriber_id FROM follow_tokens WHERE token_hash=NEW.token_hash)
       AND NOT EXISTS (SELECT 1 FROM follow_subscriptions WHERE subscriber_id=follow_subscribers.id);
 END;
+
+-- Dormant trusted catalog precondition. This empty view retains no request or release data.
+CREATE VIEW IF NOT EXISTS follow_catalog_admissions AS SELECT NULL AS expires_at_ms WHERE 0;
+CREATE TRIGGER IF NOT EXISTS follow_catalog_admit
+INSTEAD OF INSERT ON follow_catalog_admissions
+BEGIN
+  SELECT CASE WHEN typeof(NEW.expires_at_ms) IN ('integer','real')
+    AND NEW.expires_at_ms>0 AND NEW.expires_at_ms<=9007199254740991
+    AND NEW.expires_at_ms=CAST(NEW.expires_at_ms AS INTEGER)
+    AND NEW.expires_at_ms>CAST(round((julianday('now')-2440587.5)*86400000) AS INTEGER)
+    THEN 1 ELSE RAISE(ABORT,'Follow catalog unavailable') END;
+END;
+
+-- Dormant existing-subscriber management requests; only an irreversible attempt claim, no raw credentials.
+CREATE TABLE IF NOT EXISTS follow_management_outbox (
+  id TEXT PRIMARY KEY NOT NULL,
+  subscriber_id TEXT NOT NULL UNIQUE REFERENCES follow_subscribers(id) ON DELETE CASCADE,
+  queued_at TEXT NOT NULL CHECK(length(queued_at)=24 AND strftime('%Y-%m-%dT%H:%M:%fZ',queued_at,'+0 days') IS queued_at),
+  expires_at TEXT NOT NULL CHECK(length(expires_at)=24 AND strftime('%Y-%m-%dT%H:%M:%fZ',expires_at,'+0 days') IS expires_at
+    AND expires_at>queued_at AND expires_at<=strftime('%Y-%m-%dT%H:%M:%fZ',queued_at,'+7 days'))
+, claim_id TEXT);
+CREATE INDEX IF NOT EXISTS follow_management_outbox_expiry ON follow_management_outbox(expires_at);

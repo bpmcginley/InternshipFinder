@@ -1,5 +1,9 @@
 // Dormant metadata authority. Initialization and provider selection are external release gates.
 import { classifyFollowCheckpointWitness as classify } from "./follow-checkpoint-witness.js";
+import {
+  canonicalCleanupJournal,
+  cleanupMatchesWitness,
+} from "./follow-checkpoint-cleanup-journal.js";
 
 const copy = (value) => structuredClone(value);
 const equal = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -14,6 +18,13 @@ const id = () =>
   Array.from(crypto.getRandomValues(new Uint8Array(16)), (v) =>
     v.toString(16).padStart(2, "0"),
   ).join("");
+
+export async function fingerprintFollowCheckpointControl(state) {
+  const bytes = new TextEncoder().encode(JSON.stringify(state));
+  return Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)), (v) =>
+    v.toString(16).padStart(2, "0"),
+  ).join("");
+}
 
 export class FollowCheckpointControl {
   constructor(storage, { witness, beforeCommit = null }) {
@@ -104,6 +115,42 @@ export class FollowCheckpointControl {
       if (!committed) return "held"; // A prepared predecessor cannot be automatically aborted.
       if ((await witness.finish(copy(position(this.state())))) !== true) return "held";
       return (await this.#admitted(witness)) ? "committed" : "held";
+    } catch {
+      return "held";
+    }
+  }
+  // The reservation engine has verified the exact committed tombstone before calling this.
+  async commitExpiredReservationCleanup(expected, observedWitness, observedJournal) {
+    try {
+      const before = copy(expected),
+        external = copy(observedWitness),
+        journal = canonicalCleanupJournal(observedJournal),
+        witness = this.witness();
+      if (
+        !before?.reservation ||
+        !journal?.forwarded ||
+        classify(external, position(before)) !== "ambiguous_predecessor" ||
+        !cleanupMatchesWitness(external, journal) ||
+        !Object.entries(journal.reservation).every(
+          ([key, value]) => before.reservation[key] === value,
+        ) ||
+        journal.beforeHash !== (await fingerprintFollowCheckpointControl(before)) ||
+        !equal(before, this.state()) ||
+        !equal(await witness?.read(), external) ||
+        !equal(await witness?.readCleanup?.(), journal)
+      )
+        return "held";
+      const committed = this.storage.transactionSync(() => {
+        const state = this.state();
+        if (!equal(state, before) || this.now() < journal.cutoff) return false;
+        const { next, nonce, previous } = journal.transition;
+        state.reservation = null;
+        state.current = next;
+        state.receipt = { nonce, previous };
+        this.#save(state);
+        return true;
+      });
+      return committed ? await this.recoverAcknowledgement() : "held";
     } catch {
       return "held";
     }
