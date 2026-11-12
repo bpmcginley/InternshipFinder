@@ -49,6 +49,8 @@ function fixture({
         assert.equal(path, "/follows/action.html");
         assert.equal(state, null);
         cleared = true;
+        context.location.hash = "";
+        context.location.search = "";
       },
     },
     document: {
@@ -78,7 +80,11 @@ function fixture({
   if (!historyFails) assert(cleared, "strip before DOM boot");
   boot();
   assert.equal(calls.length, 0);
-  return { nodes, calls, events, timers, token };
+  const navigate = (fragment, fire = true) => {
+    context.location.hash = fragment;
+    if (fire) events.hashchange();
+  };
+  return { nodes, calls, events, timers, token, navigate, location: context.location };
 }
 
 for (const purpose of ["confirm", "delete-request"])
@@ -217,4 +223,82 @@ test("page is noindex, self-contained and has no storage, analytics or implicit 
   );
   assert.match(html, /role="status" aria-live="polite" aria-atomic="true"/);
   assert(html.indexOf("history.replaceState") < html.indexOf("DOMContentLoaded"));
+});
+
+test("same-document links replace purpose and clear the new bearer without submitting", async () => {
+  const f = fixture();
+  const next = credential("delete-request");
+  f.navigate(`#purpose=delete-request&token=${next}`);
+  assert.equal(f.location.hash, "");
+  assert.equal(f.calls.length, 0);
+  assert.equal(f.nodes.action.textContent, "Delete this request");
+  await f.nodes.action.click();
+  assert.equal(f.calls.length, 1);
+  assert.equal(f.calls[0].init.body, next);
+  assert(f.calls[0].url.endsWith("/delete-request"));
+  const reopened = fixture({ fragment: "" });
+  reopened.navigate(`#purpose=confirm&token=${credential("confirm")}`);
+  assert.equal(reopened.location.hash, "");
+  assert.equal(reopened.nodes.action.textContent, "Confirm");
+  assert.equal(reopened.calls.length, 0);
+});
+
+test("late response from an old capability cannot alter the new pending action", async () => {
+  const complete = [];
+  const f = fixture({ response: () => new Promise((resolve) => complete.push(resolve)) });
+  const previous = f.nodes.action.click();
+  f.navigate(`#purpose=delete-request&token=${credential("delete-request")}`);
+  assert.equal(f.calls[0].init.signal.aborted, true);
+  const current = f.nodes.action.click();
+  complete[0]({ status: 204 });
+  await previous;
+  assert.equal(f.nodes.status.textContent, "Deleting request…");
+  assert.equal(f.nodes.action.disabled, true);
+  complete[1]({ status: 204 });
+  await current;
+  assert.match(f.nodes.status.textContent, /^If this link matched/);
+});
+
+test("skip link preserves capability while malformed new fragments retire it", async () => {
+  const f = fixture();
+  f.navigate("#main");
+  assert.equal(f.location.hash, "#main");
+  assert.equal(f.nodes.action.disabled, false);
+  f.navigate("#purpose=confirm&token=invalid");
+  assert.equal(f.location.hash, "");
+  assert.equal(f.nodes.action.hidden, true);
+  await f.nodes.action.click();
+  assert.equal(f.calls.length, 0);
+});
+
+test("a click ahead of the queued hash event refreshes the label but never posts", async () => {
+  const f = fixture();
+  f.navigate(`#purpose=delete-request&token=${credential("delete-request")}`, false);
+  await f.nodes.action.click();
+  assert.equal(f.calls.length, 0);
+  assert.equal(f.location.hash, "");
+  assert.equal(f.nodes.action.textContent, "Delete this request");
+  f.events.hashchange();
+  assert.equal(f.nodes.action.disabled, false);
+  await f.nodes.action.click();
+  assert.equal(f.calls.length, 1);
+});
+
+test("a settled response ahead of hashchange cannot release stale success", async () => {
+  let resolve;
+  const f = fixture({
+    response: () =>
+      new Promise((r) => {
+        resolve = r;
+      }),
+  });
+  const old = f.nodes.action.click();
+  f.navigate(`#purpose=delete-request&token=${credential("delete-request")}`, false);
+  resolve({ status: 204 });
+  await old;
+  assert.equal(f.location.hash, "");
+  assert.equal(f.nodes.action.textContent, "Delete this request");
+  assert.equal(f.nodes.action.disabled, false);
+  assert.equal(f.nodes.status.textContent, "");
+  assert.equal(f.calls.length, 1);
 });

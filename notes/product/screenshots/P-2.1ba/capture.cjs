@@ -29,6 +29,8 @@ async function check(browser, site, phase, width, colorScheme, purpose) {
     "." +
     randomBytes(32).toString("hex");
   const errors = [];
+  let expectedToken = token,
+    expectedPurpose = purpose;
   let posts = 0,
     blocked = 0,
     result = 204;
@@ -38,9 +40,9 @@ async function check(browser, site, phase, width, colorScheme, purpose) {
     assert.equal(url.hash, "");
     if (url.origin === api && phase === "after") {
       assert.equal(request.method(), "POST");
-      assert.equal(url.pathname, "/follows/" + purpose);
+      assert.equal(url.pathname, "/follows/" + expectedPurpose);
       assert.equal(url.search, "");
-      assert.equal(request.postData(), token);
+      assert.equal(request.postData(), expectedToken);
       assert.equal(request.headers().referer, undefined);
       assert.equal(request.headers().cookie, undefined);
       posts++;
@@ -135,6 +137,51 @@ async function check(browser, site, phase, width, colorScheme, purpose) {
         .getByText(/^This link has expired/)
         .waitFor();
       assert.equal(posts, 3);
+      await page.evaluate((hash) => {
+        location.hash = hash;
+      }, `purpose=confirm&token=${token}`);
+      await page.waitForFunction(() => !location.hash);
+      assert(await page.getByRole("button", { name: "Confirm", exact: true }).isEnabled());
+      expectedPurpose = "delete-request";
+      expectedToken = "fd_" + randomUUID() + "." + randomBytes(32).toString("hex");
+      result = 204;
+      await page.evaluate((hash) => {
+        location.hash = hash;
+      }, `purpose=${expectedPurpose}&token=${expectedToken}`);
+      await page.waitForFunction(() => !location.hash);
+      const replacement = page.getByRole("button", { name: "Delete this request", exact: true });
+      await replacement.waitFor();
+      assert.equal(posts, 3);
+      await page.locator(".skip").focus();
+      await page.keyboard.press("Enter");
+      await page.waitForFunction(() => location.hash === "#main");
+      assert(await replacement.isEnabled());
+      await replacement.click();
+      await page
+        .getByRole("status")
+        .getByText(/^If this link matched/)
+        .waitFor();
+      assert.equal(posts, 4);
+      await page.reload();
+      await page
+        .getByRole("status")
+        .getByText(/^This link is invalid/)
+        .waitFor();
+      expectedPurpose = "confirm";
+      expectedToken = randomUUID() + "." + randomBytes(32).toString("hex");
+      await page.evaluate((hash) => {
+        location.hash = hash;
+      }, `purpose=${expectedPurpose}&token=${expectedToken}`);
+      await page.waitForFunction(() => !location.hash);
+      const reopened = page.getByRole("button", { name: "Confirm", exact: true });
+      await reopened.waitFor();
+      assert.equal(posts, 4);
+      await reopened.click();
+      await page
+        .getByRole("status")
+        .getByText("Your follows are active.", { exact: true })
+        .waitFor();
+      assert.equal(posts, 5);
     }
     assert.deepEqual(errors, []);
     console.log(
