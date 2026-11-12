@@ -188,14 +188,14 @@ export function mountCompanyFollow(browser, root, { request } = {}) {
 
 // BFCache restores a new empty form, never a saved input or an old request continuation.
 export function mountCompanyFollowPage(browser, options = {}) {
-  const entries = [...browser.document.querySelectorAll("[data-follow-company-key]")].map(
-    (root) => ({
+  const entries = [...browser.document.querySelectorAll("[data-follow-company-key]")]
+    .map((root) => ({
       root,
       key: root.getAttribute("data-follow-company-key"),
       label: root.getAttribute("data-follow-company-label"),
       control: mountCompanyFollow(browser, root, options),
-    }),
-  );
+    }))
+    .filter((entry) => entry.control !== null);
   const restore = (event) => {
     if (event.persisted !== true) return;
     for (const entry of entries) {

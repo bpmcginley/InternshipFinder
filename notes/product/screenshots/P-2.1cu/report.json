@@ -97,5 +97,14 @@
     "mockPosts": 0,
     "expectedModuleErrors": 1,
     "actualPersistedReturn": false
+  },
+  {
+    "phase": "after",
+    "width": 375,
+    "theme": "light",
+    "broken": "prepopulated",
+    "mockPosts": 0,
+    "expectedModuleErrors": 0,
+    "actualPersistedReturn": false
   }
 ]

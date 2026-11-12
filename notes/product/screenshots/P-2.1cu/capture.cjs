@@ -60,6 +60,16 @@ async function run(browser, phase, width, theme, broken = "") {
     if (u.pathname === routePath) {
       assert.equal(req.method(), "GET");
       assert.equal(u.search, "");
+      if (broken === "prepopulated")
+        return route.fulfill({
+          body: fs
+            .readFileSync(path.join(fixture, phase + ".html"), "utf8")
+            .replace(
+              'data-follow-company-label="Fixture Labs"></section>',
+              'data-follow-company-label="Fixture Labs"><span>Existing fixture</span></section>',
+            ),
+          contentType: "text/html",
+        });
       return route.fulfill({ path: path.join(fixture, phase + ".html"), contentType: "text/html" });
     }
     if (broken === "missing" && u.pathname === "/js/follow-company.mjs")
@@ -97,6 +107,16 @@ async function run(browser, phase, width, theme, broken = "") {
     assert.equal(await page.locator("input").count(), 0);
     assert.equal(await toggle.count(), 0);
     if (phase === "before") assert(!requests.includes("/js/follow-company.mjs"));
+    if (broken === "prepopulated") {
+      assert.equal(await page.getByText("Existing fixture", { exact: true }).count(), 1);
+      await page.evaluate(() => {
+        document.querySelector("[data-follow-company-key]").replaceChildren();
+        window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: true }));
+      });
+      assert.equal(await page.locator("input").count(), 0);
+      assert.equal(await toggle.count(), 0);
+      assert.equal(calls.length, 0);
+    }
   } else {
     await toggle.waitFor();
     await toggle.focus();
@@ -233,7 +253,7 @@ async function run(browser, phase, width, theme, broken = "") {
         await run(browser, "before", width, theme);
         await run(browser, "after", width, theme);
       }
-    for (const broken of ["missing", "old", "setup"])
+    for (const broken of ["missing", "old", "setup", "prepopulated"])
       await run(browser, "after", 375, "light", broken);
     fs.writeFileSync(path.join(__dirname, "report.json"), JSON.stringify(reports, null, 2) + "\n");
     console.log(JSON.stringify({ scenarios: reports.length, screenshots: 8, externalRequests: 0 }));

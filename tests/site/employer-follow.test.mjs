@@ -79,6 +79,7 @@ function fixture(options = {}) {
       return new Response(null, { status: 202 });
     },
   };
+  if (options.prepopulated) root.append(new Element("span"));
   doc.querySelectorAll = () => [root];
   const control = options.page
     ? mountCompanyFollowPage(browser, options)
@@ -227,6 +228,20 @@ test("persisted pageshow remounts empty and stale accepted receipt cannot update
   assert.equal(count, 2);
   f.hide();
   f.root.setAttribute("data-follow-company-key", "unapproved");
+  f.show();
+  assert.equal(f.root.childNodes.length, 0);
+});
+
+test("an initially rejected pre-populated host cannot gain a form on persisted restore", () => {
+  const f = fixture({ page: true, prepopulated: true });
+  assert.equal(f.root.childNodes.length, 1);
+  assert.equal(f.root.childNodes[0].tag, "span");
+  assert.equal(f.calls.length, 0);
+  f.root.replaceChildren();
+  f.hide();
+  f.show();
+  assert.equal(f.root.childNodes.length, 0);
+  assert.equal(f.calls.length, 0);
   f.show();
   assert.equal(f.root.childNodes.length, 0);
 });

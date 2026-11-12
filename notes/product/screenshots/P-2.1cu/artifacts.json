@@ -9,8 +9,11 @@
   "nativeGraphMovedPaths": 14,
   "onlyChangedNativeBody": "follow-form.mjs",
   "defaultEmployerHTML": "byte-identical; no script/control/request",
-  "archiveSHA256": "fb04981523fe83fcefa95f5141a0b6e9a0f39187be2e24ca93a379f76b378178",
+  "archiveSHA256": "50201364c9f9aeb6e91410a35f8c9391fd67fcb03fb85ffdb6742ace2f7dccf7",
   "correctionDeltaFromBe634d5f": [
+    "js/follow-company.mjs"
+  ],
+  "correctionDeltaFrom4b66f86a": [
     "js/follow-company.mjs"
   ]
 }
