@@ -464,6 +464,8 @@ The golden harness now covers static assets as well as generated pages. Each sit
 
 ## Waiting for Bruce
 
+- **Follow management page** awaits review of [exact wording and the first-party link](P-2.1ce-follow-management-page.md). The draft covers the existing workflow and adds no page, routing, storage or sending.
+
 - **Follow action-page wording** is awaiting approval. The [exact copy inventory](https://github.com/bpmcginley/InternshipFinder/blob/20ee1571f45be56d517b6b986d013b4e011d444f/notes/product/P-2.1ba-follow-landing.md#exact-newly-presented-text) lists the new wording in [#503](https://github.com/bpmcginley/InternshipFinder/pull/503). Production publication and activation are separately gated.
 - **Follow confirmation rollout** remains held after [#508](https://github.com/bpmcginley/InternshipFinder/pull/508) and the [#506 queue](https://github.com/bpmcginley/InternshipFinder/pull/506) merged to source. Migrations 0021–0023 are applied; dispatch and sending remain held.
 
