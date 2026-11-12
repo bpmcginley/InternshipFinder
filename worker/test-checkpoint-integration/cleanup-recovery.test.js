@@ -107,7 +107,10 @@ test.each(["lost-write", "before-sql"])(
           expect((await write(...args)).status).toBe("stored");
           return { status: "uncertain" };
         };
-      } else i.beforeCommit = () => { throw new Error("stop"); };
+      } else
+        i.beforeCommit = () => {
+          throw new Error("stop");
+        };
     });
     expect(await object.reconcileReserved(reserved.nonce)).toBe("held");
     const retained = await restart(object);
@@ -118,7 +121,9 @@ test.each(["lost-write", "before-sql"])(
     expect(retained.cleanup.reservation).not.toHaveProperty("predecessorExpires");
     const etag = (await env.SLOTS.head(key)).etag;
     await runInDurableObject(object, (i) => {
-      i.slots.write = () => { throw new Error("no replay"); };
+      i.slots.write = () => {
+        throw new Error("no replay");
+      };
     });
     expect(await object.recoverCleanup()).toBe("recovered");
     expect(await runInDurableObject(object, (i) => i.now())).toBeLessThan(originalPendingExpiry);

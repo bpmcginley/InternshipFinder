@@ -342,6 +342,7 @@ export class CheckpointIntegration extends DurableObject {
         r = before?.reservation;
       if (
         !r ||
+        !validCutoff(before, r) ||
         classify(external, position(before)) !== "ambiguous_predecessor" ||
         journal?.version !== 1 ||
         journal.kind !== "expired-reservation" ||
