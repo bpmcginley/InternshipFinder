@@ -16,14 +16,15 @@ const json = (value) =>
 
 // No route, origin, sender or capability issuance is supplied by default.
 export function createFollowManagementHttp({
-  db,
+  db: defaultDb,
   enabled = false,
-  originAllowed,
-  now = () => new Date(),
+  originAllowed: defaultOriginAllowed,
+  now: defaultNow = () => new Date(),
   timers = { setTimeout, clearTimeout, monotonicNow: () => performance.now() },
 } = {}) {
   let active = 0;
-  const handler = (kind) => async (request) => {
+  const handler = (kind) => async (request, context = {}) => {
+    const { db = defaultDb, originAllowed = defaultOriginAllowed, now = defaultNow } = context;
     if (request.method !== "POST") return empty(405, { Allow: "POST" });
     if (enabled !== true || !db || typeof originAllowed !== "function" || typeof now !== "function")
       return unavailable();

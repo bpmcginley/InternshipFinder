@@ -37,6 +37,38 @@ export const ROUTES = Object.freeze([
     "none; deletion remains available when signup or sending is off",
   ),
   route(
+    "POST",
+    "/follows/manage/list",
+    "follow-management-token + site-origin",
+    "UTF-8 JSON [managementToken, null or cursor]. No query or fragment. Up to 16 KiB and five seconds to read.",
+    "No-store JSON {scopes: [{scope_key, created, confirmed_at}], next} 200; empty 410 unavailable capability; 400 malformed, 403 Origin, 415 media type, 503 retryable; 404 when disabled.",
+    "FOLLOW_MANAGEMENT_ENABLED",
+  ),
+  route(
+    "POST",
+    "/follows/manage/remove",
+    "follow-management-token + site-origin",
+    "UTF-8 JSON [managementToken, scopeKey]. No query or fragment. Up to 16 KiB and five seconds to read.",
+    "No-store JSON {removed} 200; empty 400 malformed, 403 Origin, 415 media type, 503 retryable; 404 when disabled.",
+    "FOLLOW_MANAGEMENT_ENABLED",
+  ),
+  route(
+    "POST",
+    "/follows/manage/delete",
+    "follow-management-token + site-origin",
+    "UTF-8 JSON [managementToken]. No query or fragment. Up to 16 KiB and five seconds to read.",
+    "No-store JSON {deleted} 200; empty 400 malformed, 403 Origin, 415 media type, 503 retryable; 404 when disabled.",
+    "FOLLOW_MANAGEMENT_ENABLED",
+  ),
+  route(
+    "POST",
+    "/follows/manage/request",
+    "site-origin",
+    "UTF-8 JSON {email}. No query or fragment. Up to 16 KiB and five seconds to read. Requires explicit TTL and daily cap.",
+    "Empty no-store 202 for accepted, unknown or duplicate requests; 400 malformed, 403 Origin, 415 media type, 503 retryable; 404 when disabled.",
+    "FOLLOW_MANAGEMENT_ENABLED and FOLLOW_MANAGEMENT_REQUEST_ENABLED",
+  ),
+  route(
     "GET",
     "/config",
     "public",
@@ -370,6 +402,8 @@ export const SPECIAL_ROUTES = Object.freeze([
 
 export const AUTH = Object.freeze({
   "follow-action-token": "Purpose-specific follow bearer in the POST body, checked against its stored hash.",
+  "follow-management-token":
+    "Purpose-specific management bearer in the JSON POST body, checked against its stored hash. Management routes require the exact https://internscout.org Origin and existing CORS permission.",
   "follow-unsubscribe-token":
     "Existing hashed, deletion-only follow token in the HTTPS URL query; never a confirmation, management or request-only deletion capability.",
   public: "No sign-in required; route-specific validation still applies.",
