@@ -17,7 +17,9 @@
 //      sections the profile has no slot for (Leadership, Awards, Activities).
 import { callAI, jsonOf } from "./claude.js";
 import { NEEDS_YOU_CODES } from "./gemini.js";
-import { modelFor } from "../lib/store.js";
+import { isWorker, modelFor } from "../lib/store.js";
+import { getToken, isSessionToken } from "../lib/auth.js";
+import { throwIfAborted } from "./abort.js";
 import { renderResume, toB64 } from "../lib/pdf.js";
 // was: import { renderLayoutFit } from "../lib/pdf_layout.js";
 import { lossless, renderLayoutFit, sameLink, siteOf, urisIn } from "../lib/pdf_layout.js";
@@ -137,7 +139,7 @@ const BUILD = "facts-4";
 // same PDF re-read into a different layout, shared one key, and the student who uploaded a new file
 // was handed the tailored copy of the old one. `salt` carries what the file is (see the callers); it
 // goes into the key and not into the prompt.
-async function tailorWith(store, job, system, prompt, build, extra, salt = "") {
+async function tailorWith(store, job, system, prompt, build, extra, salt = "", request = {}) {
   const model = modelFor(store, "tailor");
   const key = await tailorKey(
     model,
@@ -145,8 +147,10 @@ async function tailorWith(store, job, system, prompt, build, extra, salt = "") {
     `${prompt}\n${BUILD}\n${salt}\nLOCAL_FACTS:${baseName(store)}`,
   );
   const hit = await readTailored(key);
+  throwIfAborted(request.signal);
   if (hit) return { ...hit, cost_usd: 0, reused: true };
   const resp = await callAI({
+    ...request,
     ai: store.ai,
     model,
     kind: "tailor",
@@ -219,8 +223,7 @@ async function fingerprint(file) {
 // for good as well; with no reason attached it is now tried again after an hour. A refusal with a
 // reason (columns, graphics) is a fact about the file and is kept.
 const LAYOUT_RETRY_MS = 60 * 60 * 1000;
-async function layoutOf(store, job, orig) {
-  const fp = await fingerprint(orig);
+async function savedLayout(fp) {
   let saved = null;
   try {
     saved = (await chrome.storage.local.get(LAYOUT_KEY))[LAYOUT_KEY];
@@ -233,11 +236,15 @@ async function layoutOf(store, job, orig) {
     saved.fp === fp &&
     (saved.doc || saved.why || Date.now() - (saved.created || 0) < LAYOUT_RETRY_MS)
   ) {
-    if (saved.doc && !layoutMatchesProfile(saved.doc, store))
-      return { doc: null, why: MISMATCH, cost_usd: 0 };
     return { doc: saved.doc, why: saved.why || (saved.doc ? "" : UNREAD), cost_usd: 0 };
   }
+  return null;
+}
+
+async function readLayout(store, job, orig, fp, request) {
+  throwIfAborted(request.signal);
   const resp = await callAI({
+    ...request,
     ai: store.ai,
     model: modelFor(store, "tailor"),
     kind: "tailor",
@@ -274,9 +281,75 @@ async function layoutOf(store, job, orig) {
   } catch {
     /* costs a call next time, nothing else */
   }
-  if (doc && !layoutMatchesProfile(doc, store))
-    return { doc: null, why: MISMATCH, cost_usd: resp.cost_usd || 0 };
   return { doc, why: why || (doc ? "" : UNREAD), cost_usd: resp.cost_usd || 0 };
+}
+
+// Active Worker reads are scoped to the exact PDF and live session. The persistent cache is unchanged.
+const layoutFlights = new Map();
+
+function waitForLayout(key, flight, signal) {
+  flight.readers++;
+  let cancel;
+  const waiting = signal
+    ? new Promise((resolve, reject) => {
+        cancel = () =>
+          reject(signal.reason || new DOMException("The request was canceled.", "AbortError"));
+        signal.addEventListener("abort", cancel, { once: true });
+        flight.result.then(resolve, reject);
+        if (signal.aborted) cancel();
+      })
+    : flight.result;
+  return waiting.finally(() => {
+    signal?.removeEventListener("abort", cancel);
+    if (--flight.readers === 0 && layoutFlights.get(key) === flight) flight.controller.abort();
+  });
+}
+
+async function sharedLayout(store, job, orig, fp, { signal, workerSession }) {
+  const key = await tailorKey(modelFor(store, "tailor"), fp, workerSession);
+  for (;;) {
+    throwIfAborted(signal);
+    const current = layoutFlights.get(key);
+    if (current && !current.controller.signal.aborted) {
+      try {
+        return await waitForLayout(key, current, signal);
+      } catch {
+        throwIfAborted(signal);
+        // A failed request belongs to its own run. The remaining jobs can still elect a new reader.
+        continue;
+      }
+    }
+    const controller = new AbortController();
+    const flight = { controller, readers: 0 };
+    flight.result = (async () => {
+      // Another flight may have saved the reading while this caller was computing its key.
+      return (
+        (await savedLayout(fp)) ||
+        readLayout(store, job, orig, fp, {
+          signal: controller.signal,
+          workerSession,
+        })
+      );
+    })().finally(() => {
+      if (layoutFlights.get(key) === flight) layoutFlights.delete(key);
+    });
+    layoutFlights.set(key, flight);
+    return waitForLayout(key, flight, signal);
+  }
+}
+
+async function layoutOf(store, job, orig, request) {
+  const fp = await fingerprint(orig);
+  const layout =
+    (await savedLayout(fp)) ||
+    (await (request.workerSession
+      ? sharedLayout(store, job, orig, fp, request)
+      : readLayout(store, job, orig, fp, request)));
+  throwIfAborted(request.signal);
+  // Each job matches the reading to its own profile, including when it joined a shared request.
+  if (layout.doc && !layoutMatchesProfile(layout.doc, store))
+    return { doc: null, why: MISMATCH, cost_usd: layout.cost_usd };
+  return layout;
 }
 const MISMATCH =
   "what was read from it does not match the name, employers and schools in your profile";
@@ -284,10 +357,10 @@ const UNREAD = "its layout could not be read";
 
 const PDF_NOTE =
   "Rebuilt to match your PDF's layout. Preview it and check names and dates before using it.";
-async function tailorPdf(store, job, orig) {
+async function tailorPdf(store, job, orig, request) {
   // was: if (orig.b64.length > MAX_PDF_B64) return null;
   if (orig.b64.length > MAX_PDF_B64) return { why: "the file is too large to read" };
-  const { doc: read, why, cost_usd } = await layoutOf(store, job, orig);
+  const { doc: read, why, cost_usd } = await layoutOf(store, job, orig, request);
   // was: if (!doc) return cost_usd ? { fallthrough_cost: cost_usd } : null;
   if (!read) return { fallthrough_cost: cost_usd, why };
   // The eight built-in PDF fonts draw Western European text only. A name or a word in any other
@@ -321,6 +394,7 @@ async function tailorPdf(store, job, orig) {
     },
     { format: "pdf_layout", note: PDF_NOTE },
     `${await fingerprint(orig)}\n${JSON.stringify(doc)}`,
+    request,
   );
   return made
     ? { ...made, cost_usd: (made.cost_usd || 0) + cost_usd }
@@ -328,7 +402,7 @@ async function tailorPdf(store, job, orig) {
 }
 
 // ---------- 3. The fixed template, from the profile (the original path, unchanged) ----------
-async function tailorFromProfile(store, job) {
+async function tailorFromProfile(store, job, request) {
   const model = modelFor(store, "tailor");
   const prompt = `JOB\n${job.company} - ${job.title}\n${String(job.description).slice(0, 6000)}\n\nPROFILE (JSON)\n${JSON.stringify(tailorInput(store))}`;
   const key = await tailorKey(
@@ -337,9 +411,11 @@ async function tailorFromProfile(store, job) {
     `${prompt}\n${BUILD}\nLOCAL_FACTS:${JSON.stringify([baseName(store), tailoringCacheFacts(store)])}`,
   );
   const hit = await readTailored(key);
+  throwIfAborted(request?.signal);
   if (hit) return { ...hit, cost_usd: 0, reused: true };
 
   const resp = await callAI({
+    ...request,
     ai: store.ai,
     model,
     kind: "tailor",
@@ -373,25 +449,33 @@ async function tailorFromProfile(store, job) {
   return { ...tailored, cost_usd: resp.cost_usd || 0 };
 }
 
-export async function tailorResume(store, job) {
+export async function tailorResume(store, job, { signal } = {}) {
+  throwIfAborted(signal);
   const orig = store.files && store.files.resume;
   let spent = 0,
     why = "",
-    keeps = false;
+    keeps = false,
+    request;
   if (orig && orig.b64) {
     const isDocx = /\.docx$/i.test(orig.name || "") || orig.type === DOCX_TYPE;
     const isPdf = orig.type === "application/pdf" || /\.pdf$/i.test(orig.name || "");
     keeps = isDocx || isPdf;
+    if (!isDocx && isPdf && isWorker(store.ai)) {
+      const token = await getToken().catch(() => null);
+      request = { signal, workerSession: isSessionToken(token) ? token : undefined };
+      throwIfAborted(signal);
+    }
     try {
       const made = isDocx
         ? await tailorDocx(store, job, orig)
         : isPdf
-          ? await tailorPdf(store, job, orig)
+          ? await tailorPdf(store, job, orig, request || {})
           : null;
       if (made && made.file) return made;
       if (made && made.fallthrough_cost) spent = made.fallthrough_cost;
       why = (made && made.why) || (made === null ? "the reply could not be used" : "");
     } catch (e) {
+      throwIfAborted(request?.signal);
       if (isAccountError(e)) throw e;
       // A file we could not read is not a reason to go without a tailored resume: use the template.
       // (Still true in review mode. In automatic mode, see below.)
@@ -409,7 +493,7 @@ export async function tailorResume(store, job) {
     e.cost_usd = spent;
     throw e;
   }
-  const made = await tailorFromProfile(store, job);
+  const made = await tailorFromProfile(store, job, request);
   // was: return { ...made, cost_usd: (made.cost_usd || 0) + spent };
   const note = keeps
     ? `We could not keep your own file's format for this one (${why || "the file could not be read"}). This version uses InternScout's standard layout, not yours, and is built from your profile. Use it only if you are happy with how it looks.`
