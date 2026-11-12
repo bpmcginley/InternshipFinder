@@ -51,9 +51,11 @@ import "./follow-management-http.test.js";
 import "./follow-management-request.test.js";
 import "./follow-management-claim.test.js";
 import "./follow-management-delivery.test.js";
+import "./follow-link-dispatch.test.js";
 import "./follow-outbox.test.js";
 import "./follow-retention.test.js";
 import "./follow-management-request-http.test.js";
+import "./follow-management-route.test.js";
 import "./follow-unsubscribe.test.js";
 import "./follow-unsubscribe-endpoint.test.js";
 import "./follow-token-endpoint.test.js";
@@ -111,6 +113,7 @@ import "./ai-lifecycle.test.js";
 
 import "./topup-retention.test.js";
 import "./topup-retirement.test.js";
+import "./topup-history-observation.test.js";
 
 import "./topup-webhook.test.js";
 import "./purchased-allowance.test.js";
