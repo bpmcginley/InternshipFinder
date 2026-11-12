@@ -52,7 +52,7 @@ export function requestFollowConfirmation(db, email, input, catalog, now = new D
   return writeFollowRequest(db, email, input, catalog, now, true);
 }
 
-async function writeFollowRequest(db, email, input, catalog, now, queueConfirmation) {
+export function normalizeFollowEmail(email) {
   if (typeof email !== "string") invalid();
   email = email.trim().toLowerCase();
   if (
@@ -60,6 +60,11 @@ async function writeFollowRequest(db, email, input, catalog, now, queueConfirmat
     !/^[^\s@<>\x00-\x1f\x7f]+@[^\s@<>\x00-\x1f\x7f]+\.[^\s@<>\x00-\x1f\x7f]+$/.test(email)
   )
     invalid();
+  return email;
+}
+
+async function writeFollowRequest(db, email, input, catalog, now, queueConfirmation) {
+  email = normalizeFollowEmail(email);
   const scopeKey = canonicalFollow(input, catalog),
     id = crypto.randomUUID(),
     at = stamp(now),
