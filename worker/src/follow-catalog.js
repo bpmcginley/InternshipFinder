@@ -17,6 +17,7 @@ const key = (value, kind) =>
   text(value, 200) &&
   (kind !== "fields" || /^[a-z_]{2,32}$/.test(value)) &&
   (kind !== "states" || /^[A-Z]{2}$/.test(value));
+export { key as validFollowCatalogKey };
 const invalid = () => {
   throw new Error("Follow catalog unavailable");
 };
