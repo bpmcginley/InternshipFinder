@@ -30,6 +30,7 @@ function closed(status) {
 
 export default {
   async fetch(request, env) {
+    if (env?.FOLLOW_CHECKPOINT_ENABLED !== "1") return closed(503);
     const origin = privateOrigin(env.FOLLOW_CHECKPOINT_ORIGIN);
     const bound = env.FOLLOW_CHECKPOINT_MAX_BYTES;
     const writer = env.FOLLOW_CHECKPOINT_WRITER_SHA256;
