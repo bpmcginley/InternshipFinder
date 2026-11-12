@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Follow email link | InternScout</title>
+<script>
+(() => {
+  "use strict";
+  let token = "", purpose = "", dormant = false;
+  let reinitialize = () => {};
+  const shape = /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}\.[a-f0-9]{64}$/;
+  function consumeFragment() {
+    const raw = location.hash, hasQuery = !!location.search;
+    token = ""; purpose = "";
+    let cleared = false;
+    try { history.replaceState(null, "", location.pathname); cleared = true; } catch {}
+    if (!dormant && cleared && !hasQuery && raw.length <= 180) {
+      const params = new URLSearchParams(raw.slice(1));
+      const keys = [...params.keys()];
+      const candidate = params.get("token") || "";
+      const action = params.get("purpose");
+      if (keys.length === 2 && keys.includes("purpose") && keys.includes("token") &&
+          ((action === "confirm" && shape.test(candidate)) ||
+           (action === "delete-request" && candidate.startsWith("fd_") && shape.test(candidate.slice(3))))) {
+        token = candidate; purpose = action;
+      }
+    }
+  }
+  consumeFragment();
+  function receiveFragment() {
+    if (!location.hash || location.hash === "#main") return false;
+    consumeFragment(); reinitialize(); return true;
+  }
+  addEventListener("hashchange", receiveFragment);
+  document.addEventListener("DOMContentLoaded", () => {
+    const title = document.getElementById("action-title");
+    const explanation = document.getElementById("explanation");
+    const button = document.getElementById("action");
+    const status = document.getElementById("status");
+    const invalid = "This link is invalid. Open the link in your email again.";
+    const unavailable = "Email follows are unavailable. Please try again later.";
+    let busy = false, revision = 0;
+    let controller;
+    const invalidate = () => { token = ""; button.disabled = true; };
+    const retire = () => {
+      dormant = true; revision++; invalidate(); purpose = ""; controller?.abort();
+      if (location.hash && location.hash !== "#main") consumeFragment();
+    };
+    addEventListener("pagehide", retire);
+    addEventListener("pageshow", event => {
+      if (event.persisted) { retire(); reinitialize(); dormant = false; }
+    });
+    reinitialize = () => {
+      revision++; controller?.abort(); busy = false;
+      button.hidden = true; button.disabled = true;
+      title.textContent = "Follow email link";
+      explanation.textContent = "Nothing changes until you choose an action.";
+      status.textContent = "";
+      if (!token) { status.textContent = invalid; return; }
+      const deleting = purpose === "delete-request";
+      title.textContent = deleting ? "Delete this request" : "Confirm these follows";
+      explanation.textContent = deleting
+        ? "Remove the pending follow request from this email."
+        : "Press Confirm to activate the follows requested in this email.";
+      button.textContent = deleting ? "Delete this request" : "Confirm";
+      button.hidden = false; button.disabled = false;
+    };
+    reinitialize();
+    button.addEventListener("click", async () => {
+      // A queued hashchange must not let an old label submit a newly arrived capability.
+      if (dormant || receiveFragment() || busy || !token) return;
+      const current = revision, deleting = purpose === "delete-request";
+      busy = true; button.disabled = true;
+      status.textContent = deleting ? "Deleting request…" : "Confirming…";
+      const requestController = new AbortController();
+      controller = requestController;
+      const timeout = setTimeout(() => requestController.abort(), 12000);
+      try {
+        const response = await fetch(deleting
+          ? "https://internscout-api.bpmcginley.workers.dev/follows/delete-request"
+          : "https://internscout-api.bpmcginley.workers.dev/follows/confirm", {
+          method: "POST", headers: { "Content-Type": "text/plain" }, body: token,
+          credentials: "omit", cache: "no-store", redirect: "error", mode: "cors",
+          referrerPolicy: "no-referrer", signal: requestController.signal,
+        });
+        if (current !== revision || !token || dormant || receiveFragment()) return;
+        if (response.status === 204) {
+          status.textContent = deleting
+            ? "If this link matched a pending request, that request has been deleted."
+            : "Your follows are active.";
+          invalidate();
+        } else if (response.status === 410 && !deleting) {
+          status.textContent = "This link can no longer be used. Request a new link.";
+          invalidate();
+        } else if (response.status === 400) {
+          status.textContent = invalid; invalidate();
+        } else { status.textContent = unavailable; }
+      } catch { if (current === revision && token && !dormant && !receiveFragment()) status.textContent = unavailable; }
+      finally {
+        clearTimeout(timeout);
+        if (current === revision) { busy = false; button.disabled = !token; }
+      }
+    });
+  }, { once: true });
+})();
+</script>
+<style>
+:root{color-scheme:light dark;--bg:#f7f5f0;--panel:#fff;--ink:#172b35;--muted:#52626a;--line:#c3c9c6;--accent:#00695d;--button:#fff}
+@media(prefers-color-scheme:dark){:root{--bg:#121617;--panel:#1b2021;--ink:#f0f2ed;--muted:#b6c2c1;--line:#5c6c6a;--accent:#85d9c9;--button:#102b26}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:18px/1.6 system-ui,sans-serif}a{color:var(--accent)}header,main,footer{width:min(100% - 40px,680px);margin-inline:auto}header{padding-block:28px}.brand{font-weight:750;text-decoration:none;font-size:22px}main{margin-top:36px;padding:32px;border:1px solid var(--line);border-radius:14px;background:var(--panel)}h1{font-size:clamp(28px,5vw,38px);line-height:1.2;margin:0 0 20px}p{margin:16px 0}.eyebrow{color:var(--muted);font-size:15px;margin:0 0 12px}button{font:inherit;font-weight:650;min-height:48px;padding:10px 24px;border:1px solid var(--accent);border-radius:7px;color:var(--button);background:var(--accent);cursor:pointer}button:disabled{opacity:.65;cursor:default}[hidden]{display:none!important}:focus-visible{outline:3px solid var(--accent);outline-offset:4px}#status{min-height:2em}footer{padding-block:28px;font-size:16px}.skip{position:absolute;left:20px;top:-80px;background:var(--panel);padding:8px}.skip:focus{top:4px}@media(max-width:500px){main{margin-top:16px;padding:24px}button{width:100%}}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header><a class="brand" href="/">InternScout</a></header>
+<main id="main" tabindex="-1">
+<p class="eyebrow">Email follows</p>
+<h1 id="action-title">Follow email link</h1>
+<p id="explanation">Nothing changes until you choose an action.</p>
+<button id="action" type="button" hidden disabled>Continue</button>
+<p id="status" role="status" aria-live="polite" aria-atomic="true"></p>
+<noscript><p>JavaScript is needed to use this email link. No action has been taken.</p></noscript>
+</main>
+<footer><a href="/">Find internships</a> · <a href="/privacy.html">Privacy</a></footer>
+</body>
+</html>
