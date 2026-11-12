@@ -134,7 +134,7 @@ async function check(browser, site, phase, width, colorScheme, purpose) {
       await page.getByRole("button", { name: "Confirm", exact: true }).click();
       await page
         .getByRole("status")
-        .getByText(/^This link has expired/)
+        .getByText(/^This link can no longer be used/)
         .waitFor();
       assert.equal(posts, 3);
       await page.evaluate((hash) => {

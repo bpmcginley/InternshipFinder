@@ -91,6 +91,12 @@ for (const purpose of ["confirm", "delete-request"])
   test(`${purpose} only posts the exact bearer after explicit action`, async () => {
     const { nodes, calls, token, timers } = fixture({ purpose });
     assert.equal(nodes.action.hidden, false);
+    assert.equal(
+      nodes.explanation.textContent,
+      purpose === "confirm"
+        ? "Press Confirm to activate the follows requested in this email."
+        : "Remove the pending follow request from this email.",
+    );
     await nodes.action.click();
     assert.equal(calls.length, 1);
     const { url, init } = calls[0];
@@ -108,7 +114,7 @@ for (const purpose of ["confirm", "delete-request"])
       nodes.status.textContent,
       purpose === "confirm"
         ? /^Your follows are active\.$/
-        : /^If this link matched a pending request/,
+        : /^If this link matched a pending request, that request has been deleted\.$/,
     );
     await nodes.action.click();
     assert.equal(calls.length, 1);
@@ -176,7 +182,9 @@ test("expiry and malformed outcomes do not expose a response body or repeat acti
     assert.equal(f.nodes.action.disabled, true);
     assert.match(
       f.nodes.status.textContent,
-      status === 410 ? /^This link has expired/ : /^This link is invalid/,
+      status === 410
+        ? /^This link can no longer be used\. Request a new link\.$/
+        : /^This link is invalid/,
     );
   }
 });

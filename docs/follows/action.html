@@ -63,7 +63,7 @@
       const deleting = purpose === "delete-request";
       title.textContent = deleting ? "Delete this request" : "Confirm these follows";
       explanation.textContent = deleting
-        ? "Remove the pending follow request from this email. Active follows are unchanged."
+        ? "Remove the pending follow request from this email."
         : "Press Confirm to activate the follows requested in this email.";
       button.textContent = deleting ? "Delete this request" : "Confirm";
       button.hidden = false; button.disabled = false;
@@ -87,11 +87,11 @@
         if (current !== revision || !token || dormant || receiveFragment()) return;
         if (response.status === 204) {
           status.textContent = deleting
-            ? "If this link matched a pending request, it has been deleted. Active follows are unchanged."
+            ? "If this link matched a pending request, that request has been deleted."
             : "Your follows are active.";
           invalidate();
         } else if (response.status === 410 && !deleting) {
-          status.textContent = "This link has expired. Request a new link.";
+          status.textContent = "This link can no longer be used. Request a new link.";
           invalidate();
         } else if (response.status === 400) {
           status.textContent = invalid; invalidate();
