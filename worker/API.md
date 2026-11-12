@@ -6,13 +6,13 @@ This describes checked-in code, not deployed feature configuration. Shapes are d
 
 ## Route contract
 
-The router trims trailing slashes before exact matching. Global OPTIONS is handled first; the media prefix delegates validation and unsupported methods to social-video.js. Other unknown method/path pairs return 404. Common errors and CORS behavior remain documented below.
+The router trims trailing slashes before exact matching. Global OPTIONS is handled first; the media prefix delegates validation and unsupported methods to social-video.js. The attached top-up recovery route returns 405 for other methods. Other unknown method/path pairs return 404. Common errors and CORS behavior remain documented below.
 
 | Method and path | Authentication | Feature gate | Request shape | Response shape |
 |---|---|---|---|---|
 | `POST /follows/unsubscribe` | follow-unsubscribe-token | none; deletion remains available when signup or sending is off | Exactly one query parameter token=deletion-only UUID.secret; URL-encoded or multipart List-Unsubscribe=One-Click, at most 4,096 bytes with an absolute 5-second body-read deadline; no login, cookies or Origin required | Empty no-store 204 for deletion/replay/unknown/wrong-purpose; malformed 400; body timeout/capacity/storage 503 with Retry-After: 60; GET/HEAD fall through to 404 without mutation |
 | `GET /config` | public | none | none | JSON {providers: Provider[], allowance: PlanAllowances, payments: {enabled, plans}, topups?: true, paused: boolean, invite: {bonus, max}, sessions: true, sync: boolean} |
-| `GET /me` | user | none | none | JSON {month, plan, plan_renews, can_upgrade, upgrade_offer, can_manage, tier, paused, allowance: {task: {used, limit, bonus?}}} |
+| `GET /me` | user | none | none | JSON {month, plan, plan_renews, can_upgrade, upgrade_offer, can_manage, can_recover_topup?: true, tier, paused, allowance: {task: {used, limit, bonus?, purchased?}}} |
 | `POST /session` | provider-id | none | Authorization: Bearer provider ID token; no body | JSON {session, account, email, provider, tier, expires} |
 | `GET /session` | session | none | Authorization: Bearer session token | JSON {account, provider, tier, expires, copyable: boolean} |
 | `POST /session/copy` | session | none | Authorization: Bearer session token; no body | JSON {session, account, provider, tier, expires} |
@@ -24,6 +24,7 @@ The router trims trailing slashes before exact matching. Global OPTIONS is handl
 | `POST /billing/checkout` | user | payments | Optional JSON {plan?: string} | JSON {url: string} |
 | `GET /billing/topup/offer` | session + site-origin | TOPUPS_ENABLED and existing payment configuration | First-party dashboard Origin and current session bearer. The server verifies the configured Price. | No-store JSON {enabled: true, offer: {amount, currency, units}} 200, auth 401, disallowed Origin 403, disabled or unavailable 503 |
 | `POST /billing/topup/checkout` | session + site-origin | TOPUPS_ENABLED and existing payment configuration | First-party dashboard Origin and current session bearer. The server owns the offer and return URLs. | No-store JSON {status: open, url} 200, {status: pending} 202, auth 401, disallowed Origin 403, disabled or unavailable 503 |
+| `POST /billing/topup/recover` | session + site-origin | Historical top-up recovery configuration independent of sales | Current session bearer, first-party dashboard Origin, no body or query | No-store JSON {status: open, url} or {status: settled\|expired\|inactive} 200; pending 202, invalid 400, auth 401, disallowed Origin 403, wrong method 405, limited 429, disabled or unavailable 503 |
 | `POST /billing/portal` | user | payments | none | JSON {url: string} |
 | `POST /billing/webhook` | stripe-signature | payments-or-orders-or-historical-topups | Raw signed event body; Stripe-Signature header | JSON {ok: true, repeat?: true}; event-specific effects stay in existing handlers |
 | `POST /ai` | user | none | JSON {task, run_id?, request: GeminiRequest}; optional query stream=1 | Gemini JSON or SSE passthrough; X-InternScout-Model and X-InternScout-Remaining headers |
@@ -255,6 +256,10 @@ The authenticated response is served with `Cache-Control: no-store`.
   The count stays visible when sales or funded creation are off. When funded purchased creation is
   ready and the Auto-Apply allowance is enabled and finite, these runs are already included in
   `limit - used`. Clients can show the separate balance without adding it to that remainder again.
+
+- **`can_recover_topup`** is present and true only when historical recovery is configured
+  and the current signed-in session owns an attached open Checkout. It carries no Checkout
+  identifier or payment information and requires no provider request.
 
 ### `GET /invite` (auth)
 The student's own invite link, made on first ask:
@@ -764,6 +769,26 @@ Responses use `Cache-Control: no-store`. A verified open checkout returns 200 wi
 `{status: "open", url}`. An unresolved attempt returns 202 with `{status: "pending"}`.
 Missing or invalid sessions return 401, disallowed Origins return 403, and disabled or
 unavailable checkout returns 503. Checkout does not itself grant purchased runs.
+
+### Attached checkout recovery
+
+`POST /billing/topup/recover` takes an existing session bearer and an allowed dashboard
+Origin. Send an empty request without a query. Historical recovery needs the server's
+historical Stripe configuration and the configured first-party dashboard root. The
+sales switches do not gate it. The existing attempt is selected by account.
+
+The no-store response returns 200 with `{status: "open", url}` only for a verified
+unexpired hosted Checkout. The exact attempt, revision and session are checked again.
+A verified terminal attempt returns 200 with `{status: "settled"}` or `{status: "expired"}`.
+No active attempt returns 200 with `{status: "inactive"}`. Uncertain evidence or an
+attempt with no attached Checkout returns 202 with `{status: "pending"}`.
+
+A malformed request returns 400, confirmed invalid auth returns 401, and a disallowed
+Origin returns 403. Unsupported methods return 405, except the common OPTIONS preflight.
+Missing recovery configuration returns 503 with `{status: "disabled"}`. A recovery
+budget of three requests per account and 30 globally per UTC minute returns 429 with
+`Retry-After: 60` when exhausted. Recovery only reads from Stripe and never creates a
+checkout. Refresh `GET /me` after recovery for the current spendable balance.
 
 ## Paid plans (optional, off by default)
 

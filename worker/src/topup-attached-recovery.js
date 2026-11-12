@@ -10,6 +10,23 @@ import {
 
 const pending = () => ({ status: "pending" });
 
+export async function canRecoverAttachedTopup(db, user, token) {
+  try {
+    const id = await sessionTokenHash(token);
+    const attempt = await db
+      .prepare(
+        "SELECT a.checkout_id FROM topup_checkout_attempts a JOIN sessions s ON s.id=? " +
+          "AND s.user_hash=a.user_hash AND julianday(s.expires)>julianday('now') " +
+          "WHERE a.user_hash=? AND a.state IN ('creating','open') AND a.state='open'",
+      )
+      .bind(id, user)
+      .first();
+    return validTopupCheckoutId(attempt?.checkout_id);
+  } catch {
+    return false;
+  }
+}
+
 export async function recoverAttachedTopup(
   db,
   env,

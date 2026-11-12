@@ -176,6 +176,10 @@ The authenticated response is served with `Cache-Control: no-store`.
   ready and the Auto-Apply allowance is enabled and finite, these runs are already included in
   `limit - used`. Clients can show the separate balance without adding it to that remainder again.
 
+- **`can_recover_topup`** is present and true only when historical recovery is configured
+  and the current signed-in session owns an attached open Checkout. It carries no Checkout
+  identifier or payment information and requires no provider request.
+
 ### `GET /invite` (auth)
 The student's own invite link, made on first ask:
 ```json
@@ -684,6 +688,26 @@ Responses use `Cache-Control: no-store`. A verified open checkout returns 200 wi
 `{status: "open", url}`. An unresolved attempt returns 202 with `{status: "pending"}`.
 Missing or invalid sessions return 401, disallowed Origins return 403, and disabled or
 unavailable checkout returns 503. Checkout does not itself grant purchased runs.
+
+### Attached checkout recovery
+
+`POST /billing/topup/recover` takes an existing session bearer and an allowed dashboard
+Origin. Send an empty request without a query. Historical recovery needs the server's
+historical Stripe configuration and the configured first-party dashboard root. The
+sales switches do not gate it. The existing attempt is selected by account.
+
+The no-store response returns 200 with `{status: "open", url}` only for a verified
+unexpired hosted Checkout. The exact attempt, revision and session are checked again.
+A verified terminal attempt returns 200 with `{status: "settled"}` or `{status: "expired"}`.
+No active attempt returns 200 with `{status: "inactive"}`. Uncertain evidence or an
+attempt with no attached Checkout returns 202 with `{status: "pending"}`.
+
+A malformed request returns 400, confirmed invalid auth returns 401, and a disallowed
+Origin returns 403. Unsupported methods return 405, except the common OPTIONS preflight.
+Missing recovery configuration returns 503 with `{status: "disabled"}`. A recovery
+budget of three requests per account and 30 globally per UTC minute returns 429 with
+`Retry-After: 60` when exhausted. Recovery only reads from Stripe and never creates a
+checkout. Refresh `GET /me` after recovery for the current spendable balance.
 
 ## Paid plans (optional, off by default)
 
