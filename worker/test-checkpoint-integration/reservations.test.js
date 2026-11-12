@@ -91,6 +91,7 @@ test("lost upload reply reconciles after actual eviction only with an explicitly
   expect((await state(object)).pending.expires).toBe(before.reservation.expires);
 });
 
+// Qualify admission before testing a delayed native PUT across its original cutoff.
 test.each([false, true])(
   "a delayed PUT across expiry cannot expose bytes (cleanup first: %s)",
   async (cleanupFirst) => {
