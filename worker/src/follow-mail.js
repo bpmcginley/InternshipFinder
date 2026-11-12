@@ -6,8 +6,9 @@ const ROLE_ID = /^[a-f0-9]{16}$/;
 const EMAIL = /^[^\s@<>,\x00-\x1f\x7f]+@[^\s@<>,\x00-\x1f\x7f]+\.[^\s@<>,\x00-\x1f\x7f]+$/;
 const FOLLOW_TOKEN = /[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}\.[a-f0-9]{64}/i;
 const ACTION_TOKEN = /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}\.[a-f0-9]{64}$/;
+const MANAGEMENT_ORIGIN = "https://internscout.org";
 const MANAGEMENT_PATH = "/follows/manage.html";
-const MANAGEMENT_PREFIX = `https://internscout.org${MANAGEMENT_PATH}#token=`;
+const MANAGEMENT_PREFIX = `${MANAGEMENT_ORIGIN}${MANAGEMENT_PATH}#token=`;
 const invalid = () => {
   throw new Error("Invalid follow message input");
 };
@@ -82,7 +83,10 @@ function trustedLinks(origins, links) {
       if (FOLLOW_TOKEN.test(decodedLink(url.href))) invalid();
     } else {
       const path = decodedLink(url.pathname);
-      if (path === MANAGEMENT_PATH || (name === "management" && value.includes("#"))) {
+      if (
+        path === MANAGEMENT_PATH ||
+        (name === "management" && (url.origin === MANAGEMENT_ORIGIN || value.includes("#")))
+      ) {
         if (
           name !== "management" ||
           !value.startsWith(MANAGEMENT_PREFIX) ||

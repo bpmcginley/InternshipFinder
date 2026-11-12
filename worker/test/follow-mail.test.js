@@ -352,6 +352,8 @@ test("management links reject normalized variants and stay out of every other li
     MANAGEMENT_LINK.replace("manage.html", "man%61ge.html"),
     MANAGEMENT_LINK.replace("manage.html", "other.html"),
     MANAGEMENT_LINK.replace("#", "?"),
+    MANAGEMENT_LINK.replace("manage.html#", "other.html?"),
+    MANAGEMENT_LINK.replace("manage.html#", "manage.html/?"),
     MANAGEMENT_LINK.replace("#", "?tracking=1#"),
     MANAGEMENT_LINK.replace("token=", "to%6ben="),
     MANAGEMENT_LINK.replace(MANAGEMENT_TOKEN, MANAGEMENT_TOKEN.toUpperCase()),
