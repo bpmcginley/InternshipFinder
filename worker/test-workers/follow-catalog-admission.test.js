@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 import { applyD1Migrations } from "cloudflare:test";
 import { expect, it } from "vitest";
+import { createFollowSignupRoute } from "../src/follow-signup-route.js";
 import { admitFollowSignup } from "../src/follow-signup-admission.js";
 import { createSession, sessionTokenHash } from "../src/session.js";
 
@@ -271,3 +272,48 @@ it("later queue failure rolls back the admitted writes and leaves the cap spent"
     await db.prepare("DROP TRIGGER fixture_reject_queue").run();
   }
 });
+
+for (const kind of ["legacy", "migrations"])
+  it(`${kind}: actual HTTP composition cannot queue after expiry during database scheduling`, async () => {
+    const db = await boot(kind);
+    const { token } = await createSession(
+      db,
+      { user: "b".repeat(64), tier: "general", provider: "google" },
+      new Date(),
+    );
+    for (const link of [false, true]) {
+      let cutoff;
+      const wrapped = {
+        prepare: (sql) => db.prepare(sql),
+        batch: async (statements) => {
+          while (Date.now() <= cutoff) await new Promise((resolve) => setTimeout(resolve, 5));
+          return db.batch(statements);
+        },
+      };
+      const handle = createFollowSignupRoute({
+        enabled: true,
+        dailyLimit: 100,
+        originAllowed: (r) => r.headers.get("Origin") === "https://example.test",
+        loadCatalog: async () => {
+          cutoff = Date.now() + 1000;
+          return { status: "available", catalog: { signup: catalog }, expiresAt: cutoff };
+        },
+      });
+      const result = await handle(
+        new Request("https://api.example.test/unmounted", {
+          method: "POST",
+          headers: {
+            Origin: "https://example.test",
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(input(link)),
+        }),
+        { db: wrapped },
+      );
+      expect(result.status).toBe(503);
+      expect(await result.text()).toBe("");
+      expect(await state(db)).toEqual([[], [], [], []]);
+    }
+    expect(await db.prepare("SELECT calls FROM rate").first("calls")).toBe(2);
+  }, 15000);
