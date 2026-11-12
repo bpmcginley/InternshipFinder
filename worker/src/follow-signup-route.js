@@ -19,9 +19,9 @@ const shape = Object.fromEntries(
 export function createFollowSignupRoute({
   enabled = false,
   originAllowed,
-  loadCatalog,
-  dailyLimit,
-  clock = () => new Date(),
+  loadCatalog: defaultLoadCatalog,
+  dailyLimit: defaultDailyLimit,
+  clock: defaultClock = () => new Date(),
   timers,
 } = {}) {
   return createFollowSignupHttp({
@@ -29,7 +29,12 @@ export function createFollowSignupRoute({
     originAllowed,
     timers,
     admit: async (input, request, context) => {
-      const db = context?.db;
+      const {
+        db,
+        loadCatalog = defaultLoadCatalog,
+        dailyLimit = defaultDailyLimit,
+        clock = defaultClock,
+      } = context ?? {};
       if (
         !db ||
         typeof loadCatalog !== "function" ||

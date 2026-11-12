@@ -8,6 +8,41 @@ const fail = () => {
   throw new Error("Follow catalog unavailable");
 };
 
+// Copy the same release authority before an HTTP caller admits the request body.
+export function prepareFollowCatalogRelease(options) {
+  const { origin, maxBytes, maxKeys, deadlineMs } = options;
+  const release = { ...options.release };
+  const allowed = new URL(origin),
+    target = new URL(release.url);
+  if (
+    typeof origin !== "string" ||
+    allowed.protocol !== "https:" ||
+    allowed.origin !== origin ||
+    typeof release.url !== "string" ||
+    release.url.includes("?") ||
+    release.url.includes("#") ||
+    target.href !== release.url ||
+    target.origin !== origin ||
+    target.username ||
+    target.password ||
+    target.search ||
+    target.hash ||
+    Object.keys(release).sort().join(",") !==
+      "catalogSha256,expiresAt,notBefore,sourceSha256,url" ||
+    !digest(release.sourceSha256) ||
+    !digest(release.catalogSha256) ||
+    !Number.isSafeInteger(release.notBefore) ||
+    release.notBefore < 0 ||
+    !positive(release.expiresAt) ||
+    release.notBefore >= release.expiresAt ||
+    ![maxBytes, maxKeys, deadlineMs].every(positive) ||
+    deadlineMs > 2147483647
+  )
+    fail();
+  const previousValid = copyFollowCatalogPrevious(options.previousValid, maxKeys);
+  return { origin, release, maxBytes, maxKeys, deadlineMs, previousValid };
+}
+
 export async function loadFollowCatalog(options = {}) {
   if (options?.enabled !== true) return { status: "disabled" };
   let controller,
@@ -37,37 +72,9 @@ export async function loadFollowCatalog(options = {}) {
     releaseReader();
   };
   try {
-    const { origin, maxBytes, maxKeys, deadlineMs } = options;
-    const release = { ...options.release };
-    const allowed = new URL(origin),
-      target = new URL(release.url);
-    if (
-      typeof origin !== "string" ||
-      allowed.protocol !== "https:" ||
-      allowed.origin !== origin ||
-      typeof release.url !== "string" ||
-      release.url.includes("?") ||
-      release.url.includes("#") ||
-      target.href !== release.url ||
-      target.origin !== origin ||
-      target.username ||
-      target.password ||
-      target.search ||
-      target.hash ||
-      Object.keys(release).sort().join(",") !==
-        "catalogSha256,expiresAt,notBefore,sourceSha256,url" ||
-      !digest(release.sourceSha256) ||
-      !digest(release.catalogSha256) ||
-      !Number.isSafeInteger(release.notBefore) ||
-      release.notBefore < 0 ||
-      !positive(release.expiresAt) ||
-      release.notBefore >= release.expiresAt ||
-      ![maxBytes, maxKeys, deadlineMs].every(positive) ||
-      deadlineMs > 2147483647 ||
-      [get, now, schedule, cancel].some((value) => typeof value !== "function")
-    )
-      fail();
-    const previousValid = copyFollowCatalogPrevious(options.previousValid, maxKeys);
+    const { release, maxBytes, maxKeys, deadlineMs, previousValid } =
+      prepareFollowCatalogRelease(options);
+    if ([get, now, schedule, cancel].some((value) => typeof value !== "function")) fail();
     let last = -Infinity;
     const clock = () => {
       const at = now();
@@ -94,7 +101,7 @@ export async function loadFollowCatalog(options = {}) {
     });
     const operation = async () => {
       check();
-      response = await get(target.href, {
+      response = await get(release.url, {
         method: "GET",
         redirect: "manual",
         credentials: "omit",
@@ -106,7 +113,7 @@ export async function loadFollowCatalog(options = {}) {
         !(response instanceof Response) ||
         response.status !== 200 ||
         response.redirected ||
-        response.url !== target.href ||
+        response.url !== release.url ||
         !response.body
       )
         fail();
