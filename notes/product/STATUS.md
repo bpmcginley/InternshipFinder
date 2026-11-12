@@ -369,7 +369,7 @@ The golden harness now covers static assets as well as generated pages. Each sit
 | C | P-2.3w optional employer capture publisher | audit_growth_generated | `codex/product-p2.3w-publisher-capture` | [#453](https://github.com/bpmcginley/InternshipFinder/pull/453) | Draft needs-bruce; reviewed source preserved in normal integration | Exact `e0ba2164` independent native/golden review passed. Integrated published `bc7af80e`; all 37 non-tracker package blobs unchanged. Fresh hosted checks and integration review pending; publication and activation remain separate. |
 | C | P-2.3x employer Pages mode | audit_growth_generated | `codex/product-p2.3x-pages-mode` | [#465](https://github.com/bpmcginley/InternshipFinder/pull/465) | Draft; local qualification complete; independent review/CI pending | Strict default-off Pages mode; 23 actual Bash cases, 62 publisher/data checks and two unchanged golden checks pass. No variables, dispatch or activation. |
 
-| E | P-4.4d paired advisor artifact | audit_growth_generated | `codex/product-p4.4d-advisor-artifact` | Draft claim | In progress; needs-bruce | Same existing opt-in flag couples approved privacy wording with weekly forms. Default output unchanged; no workflow/provider activation. Held for G3 and provider release. |
+| E | P-4.4d paired advisor artifact | audit_growth_generated | `codex/product-p4.4d-advisor-artifact` | [#486](https://github.com/bpmcginley/InternshipFinder/pull/486) | Draft; local qualification passed; review/CI pending | Same existing flag pairs exact approved privacy with weekly forms. 85 advisor/widget/golden checks and 16 new paired screenshots pass. Fresh rollback qualified; G3/provider release remain open. |
 
 ## Waiting for Bruce
 
@@ -386,7 +386,7 @@ Dates are when the item was recorded, not a claim that a separate message was se
 
 | Recorded | Item | Ready artifact / next action | Done |
 |---|---|---|---|
-| 2026-11-12 | P-4.4d paired advisor artifact | Draft on exact #479; approved #328 wording only, default-off artifact qualification. | G3, provider Tags/no automation, review and coordinated publication remain open. |
+| 2026-11-12 | P-4.4d paired advisor artifact | [#486](https://github.com/bpmcginley/InternshipFinder/pull/486) on exact #479; approved #328 wording only, default-off artifact qualification. | G3, provider Tags/no automation, review and coordinated publication remain open. |
 | 2026-11-11 | Chrome 0.6.0 verified final-review handoff | [#455](https://github.com/bpmcginley/InternshipFinder/pull/455) normally refreshed on exact #440 69eb5e9c. All reviewed source, tests and screenshot bytes match 393a1ff0. Fresh Node 22 qualification passed 122 focused tests and scoped ESLint passed. Prior Node 22 qualification on the byte-identical extension tree passed 381 tests. Synthetic Chrome evidence is in [the package note](P-0.6.0-final-review.md). Fresh hosted checks, independent integration review and owner release remain pending. | Draft needs-bruce |
 | 2026-11-11 | P-2.2an dashboard session freshness | [#466](https://github.com/bpmcginley/InternshipFinder/pull/466) published reviewed stale-auth fencing with both-width evidence and exact Pages and Tests. | Exact production publication verified. |
 | 2026-11-11 | P-2.2ao checkout recovery route and P-2.2ap dashboard controls | The [route #472](https://github.com/bpmcginley/InternshipFinder/pull/472) is live with sales off. The [native dashboard #475](https://github.com/bpmcginley/InternshipFinder/pull/475) is qualifying independently. | Dashboard draft. |

@@ -1,0 +1,12 @@
+{
+  "parent": "22ea559330c5f919116cfbbc4ce221bebd2aaaaf",
+  "synthetic": true,
+  "same_normal_entry_and_asset_stamping": true,
+  "changed_paths": [
+    "privacy.html"
+  ],
+  "unchanged_weekly_sha256": {
+    "internships/for/computer-science-majors/weekly/index.html": "26a8c1bfade40ab780b7180c30021581b20cc8fe3d23933c3dc3230942409143",
+    "internships/for/undeclared-majors/weekly/index.html": "1d628a1eaabba2df08a979b10364c00c6b055d3618ddfcf0bb2eb89767da20e2"
+  }
+}

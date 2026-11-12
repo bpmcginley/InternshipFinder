@@ -207,6 +207,28 @@ def _held_paths(listing: str) -> frozenset[str]:
         return frozenset()
 
 
+def _advisor_privacy(site_dir: str) -> bytes:
+    """Prepare the approved disclosure without rewriting surrounding staged bytes."""
+    raw = (Path(site_dir) / "privacy.html").read_bytes()
+    raw.decode("utf-8")
+    heading = b'<h2 id="digest">'
+    anchor = b"      <li><strong>Buttondown holds your address, not us.</strong>"
+    disclosure = (
+        b"If you choose Subscribe as an advisor, your email address and an advisor tag go "
+        b"directly to Buttondown. Buttondown stores the tag to identify subscribers who "
+        b"advise students."
+    )
+    if raw.count(heading) != 1 or raw.count(anchor) != 1 or b"Subscribe as an advisor" in raw:
+        raise ValueError("Advisor publication requires one unmodified privacy insertion point")
+    section = raw.split(heading, 1)[1].split(b"<h2 ", 1)[0]
+    lines = [line for line in section.splitlines(keepends=True) if line.startswith(anchor)]
+    if len(lines) != 1 or not lines[0].rstrip(b"\r\n").endswith(b"</li>"):
+        raise ValueError("Advisor privacy insertion point must be in the weekly email section")
+    line = lines[0]
+    ending = b"\r\n" if line.endswith(b"\r\n") else b"\n"
+    return raw.replace(line, line + b"      <li>" + disclosure + b"</li>" + ending, 1)
+
+
 def main(argv: list[str], *, card_renderer: share_cards.Renderer | None = None) -> None:
     """python -m internscout.site.publish SITE_DIR [LIVE_SITEMAP [LIVE_NOINDEX_LIST]] [--placements PATH]
     [--placements-report PATH] [--employer-postings] [--employer-posting-capture] [--advisor-signup]
@@ -226,11 +248,10 @@ def main(argv: list[str], *, card_renderer: share_cards.Renderer | None = None) 
     not enable browser capture or Worker collection. Use a fresh staged export for each build.
     --employer-posting-capture additionally marks supported count scripts, only with that staging.
     It does not configure Worker intake or change any production workflow.
-    --advisor-signup passes the existing valid Buttondown form only to weekly advisor pages.
-    Absent means off. Account Tags/automation and conditional privacy publication require
-    separate operator verification; this option does not perform or imply those checks."""
-    # This explicit build option is not an account/privacy approval check. Operators must
-    # qualify those gates before using it in publication; no workflow enables it by default.
+    --advisor-signup pairs weekly advisor forms with approved privacy text in a fresh staged
+    artifact. Absent means off. Account Tags/automation still require separate operator
+    verification; this option does not perform or imply those checks."""
+    # No workflow enables this by default. Rollback uses a fresh complete staged artifact.
     argv = list(argv)
     advisor_options = [arg for arg in argv if arg.startswith("--advisor-signup")]
     if advisor_options not in ([], ["--advisor-signup"]):
@@ -259,6 +280,7 @@ def main(argv: list[str], *, card_renderer: share_cards.Renderer | None = None) 
         placements_path = argv[i + 1] if i + 1 < len(argv) else ""
         del argv[i : i + 2]
     site_dir = argv[1] if len(argv) > 1 else "docs"
+    advisor_privacy = _advisor_privacy(site_dir) if advisor_signup else None
     from .employer_capture import require_unmarked
 
     require_unmarked(Path(site_dir))
@@ -305,6 +327,8 @@ def main(argv: list[str], *, card_renderer: share_cards.Renderer | None = None) 
     if card_renderer is not None:
         pages = share_cards.publish(Path(site_dir), pages, state.site, card_renderer)
         share_views = share_cards.dashboard_views(pages)
+    if advisor_privacy is not None:
+        (Path(site_dir) / "privacy.html").write_bytes(advisor_privacy)
     _write_site(site_dir, pages, state, hooks, share_views=share_views)
     # The role index the employer buy page searches and the Worker checks orders against (2026-10-19,
     # role_index). Here and not in build(), which writes nothing: growth/report.py calls build() on docs/.

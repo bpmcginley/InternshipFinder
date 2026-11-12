@@ -16,6 +16,9 @@ MAJORS = [{"name": "Computer Science", "tags": ["swe"]}, {"name": "Undeclared", 
 
 def fixture(root, action=ACTION):
     site = Path(_site(root, {"MA": [_row(i) for i in range(30)]}, MAJORS))
+    (site / "privacy.html").write_bytes(
+        (Path(__file__).resolve().parents[2] / "docs" / "privacy.html").read_bytes()
+    )
     (site / "index.html").write_text(
         f'<!-- browse:start --><!-- browse:end -->\ndigest: {{formAction: "{action}"}},\n',
         encoding="utf-8",
@@ -83,7 +86,7 @@ def test_actual_publisher_option_changes_only_weekly_html_and_its_content_dates(
         "internships/for/computer-science-majors/weekly/index.html",
         "internships/for/undeclared-majors/weekly/index.html",
     }
-    assert changed == weekly | {"data/page-content-dates.json"}
+    assert changed == weekly | {"data/page-content-dates.json", "privacy.html"}
     old_dates, new_dates = (
         json.loads(off["data/page-content-dates.json"]),
         json.loads(on["data/page-content-dates.json"]),
