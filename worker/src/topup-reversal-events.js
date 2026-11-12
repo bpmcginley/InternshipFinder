@@ -13,6 +13,7 @@ const eventObjects = new Map([
     "dispute",
   ]),
 ]);
+export const topupReversalObject = (type) => eventObjects.get(type);
 const validId = (value, prefix) =>
   typeof value === "string" && new RegExp("^" + prefix + "_[A-Za-z0-9_]{1,250}$").test(value);
 const pending = () => ({ status: "pending" });
@@ -26,7 +27,7 @@ export async function recoverVerifiedTopupReversalEvent({
   resolveOffer,
   fetchImpl,
 } = {}) {
-  const expected = eventObjects.get(event?.type);
+  const expected = topupReversalObject(event?.type);
   if (!expected) return { status: "unclassified" };
   const object = event.data?.object;
   const livemode = event.livemode;
