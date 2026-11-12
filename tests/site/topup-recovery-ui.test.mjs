@@ -11,7 +11,8 @@ import {
 } from "../../docs/js/app/allowance.mjs";
 
 const base = "https://worker.test",
-  stripe = "https://checkout.stripe.com/c/pay/cs_test_synthetic";
+  stripe = "https://checkout.stripe.com/c/pay/cs_test_synthetic",
+  profileKey = "internscout.profile.v1";
 function reply(url, data, status = 200, headers = {}) {
   const response = new Response(typeof data === "string" ? data : JSON.stringify(data), {
     status,
@@ -250,7 +251,7 @@ function core(response) {
     console,
   };
   const IS = installCore(browser);
-  for (const key of [IS.SESSION_KEY, IS.PROFILE_KEY, "internscout.appstate.v1"])
+  for (const key of [IS.SESSION_KEY, profileKey, "internscout.appstate.v1"])
     browser.localStorage.setItem(key, "synthetic");
   browser.sessionStorage.setItem("internscout.idtoken", "synthetic");
   return { browser, IS };
@@ -291,6 +292,36 @@ test("a delayed deletion success cannot clear a replacement browser session", as
   assert.deepEqual([...h.browser.localStorage.m], before);
   assert.deepEqual([...h.browser.sessionStorage.m], session);
 });
+test("a deletion response cannot clear or report on a session replaced by another tab", async () => {
+  for (const status of [200, 409]) {
+    let release;
+    const response = new Promise((resolve) => { release = resolve; });
+    const h = core(response);
+    h.IS.ls.set(h.IS.SESSION_KEY, { token: "iss_synthetic" });
+    const pending = h.IS.deleteMyData("iss_synthetic");
+    h.IS.ls.set(h.IS.SESSION_KEY, { token: "iss_second_tab" });
+    h.IS.ls.set(profileKey, { v: 1, field: "synthetic replacement" });
+    const before = [...h.browser.localStorage.m], session = [...h.browser.sessionStorage.m];
+    release(reply(base + "/me", { error: "topup_payment_pending" }, status));
+    assert.deepEqual(await pending, { server: status === 200, stale: true });
+    assert.deepEqual([...h.browser.localStorage.m], before);
+    assert.deepEqual([...h.browser.sessionStorage.m], session);
+    h.browser.fetch = () => assert.fail("must not dispatch deletion for the stale tab");
+    assert.deepEqual(await h.IS.deleteMyData("iss_synthetic"), { server: null, stale: true });
+  }
+});
+test("a shared session expiry update does not block deletion for the same token", async () => {
+  let release;
+  const response = new Promise((resolve) => { release = resolve; });
+  const h = core(response);
+  h.IS.ls.set(h.IS.SESSION_KEY, { token: "iss_synthetic", expires: 100 });
+  const pending = h.IS.deleteMyData("iss_synthetic");
+  h.IS.ls.set(h.IS.SESSION_KEY, { token: "iss_synthetic", expires: 200 });
+  release(reply(base + "/me", { ok: true }));
+  assert.deepEqual(await pending, { server: true });
+  assert.equal(h.browser.localStorage.getItem(h.IS.SESSION_KEY), null);
+  assert.equal(h.browser.localStorage.getItem(profileKey), null);
+});
 test("dashboard deletion outcomes only update the current account", async () => {
   const source = readFileSync(new URL("../../docs/js/app/dashboard.mjs", import.meta.url), "utf8"),
     start = source.indexOf("async function deleteData() {");
@@ -303,8 +334,9 @@ test("dashboard deletion outcomes only update the current account", async () => 
     { reason: "topup_payment_pending", accountChanged: "iss_other" },
     { reason: "topup_payment_pending", accountChanged: "iss_synthetic" },
     { accountChanged: "iss_other", success: true },
+    { stale: true },
   ];
-  for (const { reason, accountChanged, success } of cases) {
+  for (const { reason, accountChanged, success, stale } of cases) {
     let note, release;
     const auth = { token: "iss_synthetic", source: "page" };
     const authRef = { current: auth }, authGeneration = { current: 0 };
@@ -317,7 +349,7 @@ test("dashboard deletion outcomes only update the current account", async () => 
         return new Promise((resolve) => {
           release = () => {
             assert.equal(currentAccount(), !accountChanged);
-            resolve(success ? { server: true } : { blocked: true, reason });
+            resolve(stale ? { server: true, stale: true } : success ? { server: true } : { blocked: true, reason });
           };
         });
       } },
@@ -335,7 +367,7 @@ test("dashboard deletion outcomes only update the current account", async () => 
     await deletion;
     assert.equal(
       note,
-      accountChanged ? undefined : reason === "topup_payment_pending"
+      accountChanged || stale ? undefined : reason === "topup_payment_pending"
         ? PENDING_TOPUP_DELETION
         : "Cancel your Supporter plan first (Manage plan), then delete. Nothing was deleted.",
     );

@@ -495,7 +495,7 @@ export function createDashboard(browser, {
       const msg = "Delete your InternScout profile from this browser" + (auth.token ? " and, from our server, your chosen states, past usage and the Deep Dive saved to your account, and sign you out everywhere (this month's counts go when the month ends)" : "") + "? This can't be undone.";
       if (!browser.confirm(msg)) return;
       const r = await IS.deleteMyData(token, currentAccount);
-      if (!currentAccount()) return;
+      if (r.stale || !currentAccount()) return;
       if (r.blocked) {
         setNote(r.reason === "topup_payment_pending" ? PENDING_TOPUP_DELETION : "Cancel your Supporter plan first (Manage plan), then delete. Nothing was deleted.");
         return;

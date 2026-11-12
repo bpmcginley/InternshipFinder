@@ -370,7 +370,12 @@ export function createAccount(browser, { C, ls, ss, DAY, demandStates, PROFILE_K
 
   // "Delete my data": server rows (if signed in), then everything this page keeps in the browser.
   async function deleteMyData(token, currentAccount = () => true) {
-    let server = null, blocked = false;
+    const sharedToken = () => storedSession()?.token ?? null;
+    const initialSharedToken = sharedToken();
+    // Another tab can replace this browser's session while the dashboard still holds its old token.
+    if (initialSharedToken && initialSharedToken !== token) return { server: null, stale: true };
+    const stillCurrent = () => currentAccount() && sharedToken() === initialSharedToken;
+    let server = null;
     if (workerOn() && token) {
       try {
         const r = await browser.fetch(C.workerUrl.replace(/\/$/, "") + "/me", { method: "DELETE", headers: { Authorization: "Bearer " + token } });
@@ -379,11 +384,12 @@ export function createAccount(browser, { C, ls, ss, DAY, demandStates, PROFILE_K
         // Worker refuses until it is cancelled. Leave the browser copy alone and say so.
         if (r.status === 409) {
           const reason = await pendingDeletionReason(browser, r);
+          if (!stillCurrent()) return { server: false, stale: true };
           return { server: false, blocked: true, ...(reason ? { reason } : {}) };
         }
       } catch (e) { server = false; }
     }
-    if (!currentAccount()) return { server };
+    if (!stillCurrent()) return { server, stale: true };
     ls.del(PROFILE_KEY); ls.del("internscout.demand.sent"); ls.del(INVITE_KEY); ls.del(DIGEST_NUDGE_KEY); ls.set(DELETED_KEY, true);
     // was: ss.del(TOKEN_KEY);
     // The invite check now keeps the account's sub for the session; it comes from the token and goes with it.
