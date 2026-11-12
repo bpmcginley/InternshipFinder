@@ -5,6 +5,8 @@ import { recoverVerifiedTopupCheckoutEvent } from "../src/topup-checkout-events.
 import { recoverTopupAttempt as recover } from "../src/topup-attempt-recovery.js";
 import { captureTopupSettlement } from "../src/topup-first-settlement.js";
 import { deleteUser } from "../src/limits.js";
+import { createSession, sessionTokenHash } from "../src/session.js";
+import { recoverAttachedTopup } from "../src/topup-attached-recovery.js";
 import { attempt, session } from "./topup-stripe.js";
 const env = { STRIPE_SECRET_KEY: "fixture-not-a-key", TOPUPS_ENABLED: "0", PAYMENTS_ENABLED: "0" };
 const offer = {
@@ -175,7 +177,10 @@ export async function recoveryExpiryAndUnknownCreation(db) {
   const f = await setup(db, "creating");
   assert.deepEqual(await f.run(), { status: "pending" });
   assert.equal(f.calls.length, 0);
-  await assert.rejects(deleteUser(db, f.a.user_hash, now), { status: 409, code: "topup_payment_pending" });
+  await assert.rejects(deleteUser(db, f.a.user_hash, now), {
+    status: 409,
+    code: "topup_payment_pending",
+  });
   f.checkout.status = "expired";
   f.checkout.payment_status = "unpaid";
   f.checkout.payment_intent = null;
@@ -456,4 +461,213 @@ export async function verifiedCheckoutRefreshesOnlyConfiguredModeAndCurrentAttem
   assert.deepEqual(await webhook(db, f, event), { status: "pending" });
   await noGrant(db);
   assert.deepEqual(await webhook(db, f, event), { status: "settled" });
+}
+
+const attachedEnv = { ...env, STRIPE_PRICE_TOPUP: offer.priceId };
+async function signedIn(db, user) {
+  return (await createSession(db, { user, tier: "free", provider: "google" }, new Date())).token;
+}
+
+export async function attachedRecoveryWithSalesDisabled(db) {
+  for (const state of ["paid", "expired", "uncertain"]) {
+    const f = await setup(db);
+    const token = await signedIn(db, f.a.user_hash);
+    if (state !== "paid") {
+      f.checkout.status = state === "expired" ? "expired" : "open";
+      f.checkout.payment_status = "unpaid";
+      f.checkout.payment_intent = null;
+    }
+    // Discover mode only from the associated stored Checkout. Historical Price is inactive.
+    f.checkout.livemode = true;
+    f.intent.livemode = true;
+    f.charge.livemode = true;
+    const result = await recoverAttachedTopup(db, attachedEnv, token, f.fetch, clock);
+    assert.deepEqual(result, {
+      status: { paid: "settled", expired: "expired", uncertain: "pending" }[state],
+    });
+    assert.equal(
+      (await rows(db, "topup_checkout_attempts"))[0].state,
+      { paid: "settled", expired: "expired", uncertain: "open" }[state],
+    );
+    assert.equal(f.calls.length, state === "paid" ? 10 : 2);
+    if (state === "paid") {
+      assert.equal((await rows(db, "topup_purchases"))[0].available, 25);
+    } else await noGrant(db);
+  }
+}
+
+export async function attachedRecoveryRejectsUnassociatedOrUnattached(db) {
+  const f = await setup(db);
+  const owner = await signedIn(db, f.a.user_hash);
+  const outsider = await signedIn(db, "b".repeat(64));
+  const call = (token) => recoverAttachedTopup(db, attachedEnv, token, f.fetch, clock);
+  assert.deepEqual(await call("bad-token"), { status: "auth" });
+  assert.deepEqual(await call(outsider), { status: "inactive" });
+  assert.equal(f.calls.length, 0);
+  f.checkout.metadata.user_hash = "b".repeat(64);
+  assert.deepEqual(await call(owner), { status: "pending" });
+  assert.equal(f.calls.length, 1);
+  assert.equal((await rows(db, "topup_attempt_revisions")).length, 0);
+  const creating = await setup(db, "creating");
+  assert.deepEqual(await recoverAttachedTopup(db, attachedEnv, owner, creating.fetch, clock), {
+    status: "pending",
+  });
+  assert.equal(creating.calls.length, 0);
+  await noGrant(db);
+}
+
+export async function attachedRecoveryChecksSessionDuringProviderReads(db) {
+  for (const boundary of ["discovery", "expiry", "settlement"]) {
+    const f = await setup(db);
+    const token = await signedIn(db, f.a.user_hash);
+    if (boundary === "expiry") {
+      f.checkout.status = "expired";
+      f.checkout.payment_status = "unpaid";
+      f.checkout.payment_intent = null;
+    }
+    f.before = async () => {
+      if (f.calls.length === { discovery: 1, expiry: 2, settlement: 10 }[boundary])
+        await db.prepare("DELETE FROM sessions WHERE user_hash=?").bind(f.a.user_hash).run();
+    };
+    assert.deepEqual(await recoverAttachedTopup(db, attachedEnv, token, f.fetch, clock), {
+      status: "auth",
+    });
+    assert.equal(f.calls.length, { discovery: 1, expiry: 2, settlement: 10 }[boundary]);
+    assert.equal((await rows(db, "topup_checkout_attempts"))[0].state, "open");
+    await noGrant(db);
+  }
+}
+
+export async function attachedRecoveryKeepsAmbiguousHistoricalEvidencePending(db) {
+  for (const scenario of [
+    "missing historical Price",
+    "mode changed",
+    "expiry reached during read",
+  ]) {
+    const f = await setup(db);
+    const token = await signedIn(db, f.a.user_hash);
+    let at = now;
+    const config = { ...attachedEnv };
+    if (scenario === "missing historical Price") config.STRIPE_PRICE_TOPUP = "price_mismatch";
+    f.before = async () => {
+      if (scenario === "mode changed" && f.calls.length === 2) f.checkout.livemode = true;
+      if (scenario === "expiry reached during read" && f.calls.length === 1) {
+        at = new Date(+now + 60_000);
+        await db
+          .prepare("UPDATE sessions SET expires=? WHERE user_hash=?")
+          .bind(at.toISOString(), f.a.user_hash)
+          .run();
+      }
+    };
+    assert.deepEqual(await recoverAttachedTopup(db, config, token, f.fetch, () => at), {
+      status: scenario === "expiry reached during read" ? "auth" : "pending",
+    });
+    assert.equal(f.calls.length, scenario === "expiry reached during read" ? 1 : 2);
+    assert.equal((await rows(db, "topup_checkout_attempts"))[0].state, "open");
+    await noGrant(db);
+  }
+}
+
+export async function attachedRecoveryFencesEachFirstMutation(db) {
+  const prefixes = {
+    capture: "INSERT INTO topup_attempt_revisions",
+    settlement: "INSERT INTO topup_claims",
+    expiry: "UPDATE topup_checkout_attempts SET checkout_id=?,state='expired'",
+  };
+  for (const kind of ["revoked", "expired"]) {
+    for (const [boundary, prefix] of Object.entries(prefixes)) {
+      const f = await setup(db);
+      const token = await signedIn(db, f.a.user_hash);
+      const id = await sessionTokenHash(token);
+      // A different valid session for the same account cannot authorize this request.
+      await signedIn(db, f.a.user_hash);
+      const { at } = await db.prepare("SELECT strftime('%Y-%m-%dT%H:%M:%fZ','now') AS at").first();
+      const workerClock = () => new Date(Date.parse(at) - 60000);
+      if (boundary === "expiry") {
+        f.checkout.status = "expired";
+        f.checkout.payment_status = "unpaid";
+        f.checkout.payment_intent = null;
+      }
+      let hit = false;
+      const sqlByStatement = new WeakMap();
+      const guarded = {
+        prepare(sql) {
+          const statement = db.prepare(sql);
+          return {
+            bind(...values) {
+              const bound = statement.bind(...values);
+              sqlByStatement.set(bound, sql);
+              return bound;
+            },
+          };
+        },
+        async batch(statements) {
+          if (!hit && sqlByStatement.get(statements[0])?.startsWith(prefix)) {
+            hit = true;
+            const cut =
+              kind === "revoked"
+                ? "DELETE FROM sessions WHERE id=?"
+                : "UPDATE sessions SET expires=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?";
+            await db.prepare(cut).bind(id).run();
+          }
+          return db.batch(statements);
+        },
+      };
+      assert.deepEqual(
+        await recoverAttachedTopup(guarded, attachedEnv, token, f.fetch, workerClock),
+        {
+          status: kind === "revoked" ? "auth" : "pending",
+        },
+      );
+      assert.equal(hit, true);
+      assert.equal(f.calls.length, { capture: 1, expiry: 2, settlement: 10 }[boundary]);
+      assert.equal((await rows(db, "topup_checkout_attempts"))[0].state, "open");
+      const revisions = await rows(db, "topup_attempt_revisions");
+      assert.deepEqual(
+        revisions.map(({ revision }) => revision),
+        boundary === "capture" ? [] : [1],
+      );
+      await noGrant(db);
+      assert.equal((await rows(db, "topup_retention")).length, 0);
+    }
+  }
+}
+
+export async function attachedRecoveryDistinguishesUncertainSessionLookups(db) {
+  for (const failure of ["initial database lookup", "later database lookup", "invalid clock"]) {
+    const f = await setup(db);
+    const token = await signedIn(db, f.a.user_hash);
+    let read = 0;
+    const unreliable = {
+      batch: (statements) => db.batch(statements),
+      prepare(sql) {
+        const statement = db.prepare(sql);
+        if (!sql.includes("FROM sessions WHERE id = ?")) return statement;
+        return {
+          bind(...values) {
+            const bound = statement.bind(...values);
+            return {
+              first() {
+                read++;
+                if (
+                  failure === "initial database lookup" ||
+                  (failure === "later database lookup" && read === 2)
+                )
+                  return Promise.reject(new Error("Synthetic session storage error"));
+                return bound.first();
+              },
+            };
+          },
+        };
+      },
+    };
+    const testClock = () => (failure === "invalid clock" && read > 0 ? new Date(NaN) : now);
+    assert.deepEqual(
+      await recoverAttachedTopup(unreliable, attachedEnv, token, f.fetch, testClock),
+      { status: "pending" },
+    );
+    assert.equal(f.calls.length, 0);
+    assert.deepEqual(await rows(db, "topup_attempt_revisions"), []);
+    await noGrant(db);
+  }
 }

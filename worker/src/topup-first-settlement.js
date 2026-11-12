@@ -1,5 +1,6 @@
 // Dormant trusted-storage boundary: no provider, route, expiry or deletion integration.
 import { referenceHash, validTopupCheckoutId, validTopupOfferVersion } from "./topup-ledger.js";
+import { sessionWriteFence } from "./session.js";
 import { decideTopup } from "./topup-decisions.js";
 import {
   topupFinanciallyResolved,
@@ -16,17 +17,18 @@ const revision = (n) => Number.isSafeInteger(n) && n > 0;
 
 // Call BEFORE both authoritative reads. A later capture invalidates earlier evidence even
 // if that later reader fails. Never reuse evidence after capturing a different revision.
-export async function captureTopupSettlement(db, attemptId) {
+export async function captureTopupSettlement(db, attemptId, session) {
   if (!uuid(attemptId)) return null;
+  const fence = sessionWriteFence(session, "a.user_hash");
   const [, selected] = await db.batch([
     db
       .prepare(
         "INSERT INTO topup_attempt_revisions(attempt_id,revision) " +
-          `SELECT id,1 FROM topup_checkout_attempts a WHERE id=? AND ${active} ` +
+          `SELECT id,1 FROM topup_checkout_attempts a WHERE id=? AND ${active}${fence.sql} ` +
           "ON CONFLICT(attempt_id) DO UPDATE SET revision=topup_attempt_revisions.revision+1 " +
           "WHERE topup_attempt_revisions.revision<9007199254740991",
       )
-      .bind(attemptId),
+      .bind(attemptId, ...fence.args),
     db
       .prepare(
         "SELECT a.*,r.revision FROM topup_checkout_attempts a " +
@@ -40,7 +42,7 @@ export async function captureTopupSettlement(db, attemptId) {
 // Inputs must come from the authenticated payment/reversal readers, never HTTP claims or
 // redirects. Decision prior state is initial ONLY because the guarded insert must win a
 // new durable claim. Existing/deleted/retired claims cannot enter this path.
-export async function settleFirstTopup(db, capture, payment, reversals, now = new Date()) {
+export async function settleFirstTopup(db, capture, payment, reversals, now = new Date(), session) {
   // Validate original JSON types before structuredClone can erase custom prototypes.
   const hashing = financialEvidenceDigest(reversals);
   let a, p, r;
@@ -107,6 +109,7 @@ export async function settleFirstTopup(db, capture, payment, reversals, now = ne
   // Every state/identity/generation guard is on the FIRST mutation. The subsequent writes
   // are deterministic, chained through changes(), with no interleaving inside this batch.
   // Any constraint failure aborts the entire batch, including the initial replay claim.
+  const fence = sessionWriteFence(session, "a.user_hash");
   const results = await db.batch([
     db
       .prepare(
@@ -114,7 +117,9 @@ export async function settleFirstTopup(db, capture, payment, reversals, now = ne
           "SELECT ?,?,'granted' WHERE EXISTS (SELECT 1 FROM topup_checkout_attempts a " +
           "JOIN topup_attempt_revisions r ON r.attempt_id=a.id WHERE a.id=? AND r.revision=? " +
           `AND ${active} AND a.state=? AND a.checkout_id IS ? AND a.user_hash=? ` +
-          "AND a.offer_version=? AND a.amount=? AND a.currency=? AND a.units=? AND a.created=?) " +
+          "AND a.offer_version=? AND a.amount=? AND a.currency=? AND a.units=? AND a.created=?" +
+          fence.sql +
+          ") " +
           "ON CONFLICT DO NOTHING",
       )
       .bind(
@@ -130,6 +135,7 @@ export async function settleFirstTopup(db, capture, payment, reversals, now = ne
         a.currency,
         a.units,
         a.created,
+        ...fence.args,
       ),
     db
       .prepare(

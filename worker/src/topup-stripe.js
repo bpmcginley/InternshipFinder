@@ -27,9 +27,11 @@ export async function readTopupAssociation(env, kind, id, fetchImpl) {
   const prefix = { charges: "ch", payment_intents: "pi" }[kind];
   if (
     !topupRecoveryConfigured(env) ||
-    !prefix ||
-    typeof id !== "string" ||
-    !new RegExp("^" + prefix + "_[A-Za-z0-9_]{1,250}$").test(id) ||
+    !(kind === "checkout/sessions"
+      ? validTopupCheckoutId(id)
+      : prefix &&
+        typeof id === "string" &&
+        new RegExp("^" + prefix + "_[A-Za-z0-9_]{1,250}$").test(id)) ||
     typeof fetchImpl !== "function"
   )
     throw unavailable();
