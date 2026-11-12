@@ -20,3 +20,5 @@ Reproduce with `node capture.cjs BEFORE_STAMPED_SITE AFTER_STAMPED_SITE` using t
 | delete-request, 375 dark | [Before](before-delete-request-375-dark.png) | [After](after-delete-request-375-dark.png) |
 
 After the same-document correction, all sixteen captures were regenerated and verified byte-identical to their `7b63f432` versions. No copy or styling changed.
+
+The harness also runs two native Edge cases with **forced synthetic** lifecycle ordering: a pending hash, pagehide, obsolete fetch success/rejection and persisted pageshow. Both restore visibly inert with the bearer removed and no additional POST; only a later new link restores an explicit action. This qualifies the defensive boundary without claiming that natural BFCache scheduling has this order. All sixteen screenshots were regenerated again after this correction and remain byte-identical.

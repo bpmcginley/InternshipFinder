@@ -9,7 +9,7 @@
 <script>
 (() => {
   "use strict";
-  let token = "", purpose = "";
+  let token = "", purpose = "", dormant = false;
   let reinitialize = () => {};
   const shape = /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}\.[a-f0-9]{64}$/;
   function consumeFragment() {
@@ -17,7 +17,7 @@
     token = ""; purpose = "";
     let cleared = false;
     try { history.replaceState(null, "", location.pathname); cleared = true; } catch {}
-    if (cleared && !hasQuery && raw.length <= 180) {
+    if (!dormant && cleared && !hasQuery && raw.length <= 180) {
       const params = new URLSearchParams(raw.slice(1));
       const keys = [...params.keys()];
       const candidate = params.get("token") || "";
@@ -45,8 +45,14 @@
     let busy = false, revision = 0;
     let controller;
     const invalidate = () => { token = ""; button.disabled = true; };
-    addEventListener("pagehide", () => { revision++; invalidate(); controller?.abort(); });
-    addEventListener("pageshow", event => { if (event.persisted) status.textContent = invalid; });
+    const retire = () => {
+      dormant = true; revision++; invalidate(); purpose = ""; controller?.abort();
+      if (location.hash && location.hash !== "#main") consumeFragment();
+    };
+    addEventListener("pagehide", retire);
+    addEventListener("pageshow", event => {
+      if (event.persisted) { retire(); reinitialize(); dormant = false; }
+    });
     reinitialize = () => {
       revision++; controller?.abort(); busy = false;
       button.hidden = true; button.disabled = true;
@@ -65,7 +71,7 @@
     reinitialize();
     button.addEventListener("click", async () => {
       // A queued hashchange must not let an old label submit a newly arrived capability.
-      if (receiveFragment() || busy || !token) return;
+      if (dormant || receiveFragment() || busy || !token) return;
       const current = revision, action = purpose, deleting = action === "delete-request";
       busy = true; button.disabled = true;
       status.textContent = deleting ? "Deleting request…" : "Confirming…";
@@ -78,7 +84,7 @@
           credentials: "omit", cache: "no-store", redirect: "error", mode: "cors",
           referrerPolicy: "no-referrer", signal: requestController.signal,
         });
-        if (receiveFragment() || current !== revision || !token) return;
+        if (current !== revision || !token || dormant || receiveFragment()) return;
         if (response.status === 204) {
           status.textContent = deleting
             ? "If this link matched a pending request, it has been deleted. Active follows are unchanged."
@@ -90,7 +96,7 @@
         } else if (response.status === 400) {
           status.textContent = invalid; invalidate();
         } else { status.textContent = unavailable; }
-      } catch { if (!receiveFragment() && current === revision && token) status.textContent = unavailable; }
+      } catch { if (current === revision && token && !dormant && !receiveFragment()) status.textContent = unavailable; }
       finally {
         clearTimeout(timeout);
         if (current === revision) { busy = false; button.disabled = !token; }

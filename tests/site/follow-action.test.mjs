@@ -302,3 +302,41 @@ test("a settled response ahead of hashchange cannot release stale success", asyn
   assert.equal(f.nodes.status.textContent, "");
   assert.equal(f.calls.length, 1);
 });
+
+for (const rejected of [false, true])
+  test(`pagehide and persisted restore reject stale ${rejected ? "failure" : "success"} before fragment admission`, async () => {
+    let resolve, reject;
+    const f = fixture({
+      response: () =>
+        new Promise((ok, fail) => {
+          resolve = ok;
+          reject = fail;
+        }),
+    });
+    const old = f.nodes.action.click();
+    const fragment = `#purpose=delete-request&token=${credential("delete-request")}`;
+    f.navigate(fragment, false);
+    f.events.pagehide();
+    assert.equal(f.location.hash, "");
+    assert.equal(f.calls[0].init.signal.aborted, true);
+    // A queued fragment arriving while the document is dormant must also be cleared, not admitted.
+    f.navigate(fragment, false);
+    if (rejected) reject(new Error("synthetic delayed failure"));
+    else resolve({ status: 204 });
+    await old;
+    assert.equal(f.nodes.action.disabled, true);
+    f.events.hashchange();
+    assert.equal(f.location.hash, "");
+    f.events.pageshow({ persisted: true });
+    assert.equal(f.nodes.action.hidden, true);
+    assert.equal(f.nodes.action.disabled, true);
+    assert.match(f.nodes.status.textContent, /^This link is invalid/);
+    await f.nodes.action.click();
+    assert.equal(f.calls.length, 1);
+    // Only a later, explicit new link can initialize the restored page.
+    f.navigate(fragment);
+    assert.equal(f.location.hash, "");
+    assert.equal(f.nodes.action.textContent, "Delete this request");
+    assert.equal(f.nodes.action.disabled, false);
+    assert.equal(f.calls.length, 1);
+  });

@@ -199,6 +199,80 @@ async function check(browser, site, phase, width, colorScheme, purpose) {
     await context.close();
   }
 }
+async function lifecycleOrder(browser, site) {
+  for (const rejected of [false, true]) {
+    const context = await browser.newContext();
+    try {
+      await context.route("**/*", (route) => {
+        if (route.request().url() === origin + "/follows/action.html")
+          return route.fulfill({
+            path: path.join(site, "follows/action.html"),
+            contentType: "text/html",
+          });
+        return route.abort();
+      });
+      await context.addInitScript(() => {
+        window.syntheticCalls = [];
+        window.fetch = (url, init) =>
+          new Promise((resolve, reject) => {
+            window.syntheticCalls.push({
+              url,
+              signal: init.signal,
+              settle: () => resolve({ status: 204 }),
+              fail: () => reject(new Error("synthetic failure")),
+            });
+          });
+      });
+      const page = await context.newPage();
+      const first = randomUUID() + "." + randomBytes(32).toString("hex");
+      const next = "fd_" + randomUUID() + "." + randomBytes(32).toString("hex");
+      await page.goto(origin + `/follows/action.html#purpose=confirm&token=${first}`);
+      await page.getByRole("button", { name: "Confirm", exact: true }).click();
+      // Forced lifecycle ordering, not a claim about natural BFCache scheduling.
+      await page.evaluate(
+        ({ fragment, rejected }) => {
+          location.hash = fragment;
+          dispatchEvent(new PageTransitionEvent("pagehide", { persisted: true }));
+          if (rejected) syntheticCalls[0].fail();
+          else syntheticCalls[0].settle();
+          queueMicrotask(() =>
+            dispatchEvent(new PageTransitionEvent("pageshow", { persisted: true })),
+          );
+        },
+        { fragment: `purpose=delete-request&token=${next}`, rejected },
+      );
+      await page
+        .getByRole("status")
+        .getByText(/^This link is invalid/)
+        .waitFor();
+      assert.equal(page.url(), origin + "/follows/action.html");
+      assert(await page.locator("#action").isHidden());
+      assert(await page.locator("#action").isDisabled());
+      assert.equal(await page.evaluate(() => syntheticCalls.length), 1);
+      assert(await page.evaluate(() => syntheticCalls[0].signal.aborted));
+      await page.locator("#action").evaluate((button) => button.click());
+      assert.equal(await page.evaluate(() => syntheticCalls.length), 1);
+      await page.evaluate((fragment) => {
+        location.hash = fragment;
+      }, `purpose=delete-request&token=${next}`);
+      const action = page.getByRole("button", { name: "Delete this request", exact: true });
+      await action.waitFor();
+      assert.equal(await page.evaluate(() => syntheticCalls.length), 1);
+      await action.click();
+      assert.equal(await page.evaluate(() => syntheticCalls.length), 2);
+      console.log(
+        JSON.stringify({
+          syntheticLifecycleOrder: true,
+          rejected,
+          inertRestore: true,
+          automaticPosts: 0,
+        }),
+      );
+    } finally {
+      await context.close();
+    }
+  }
+}
 (async () => {
   assert(before && after);
   const browser = await chromium.launch({
@@ -206,6 +280,7 @@ async function check(browser, site, phase, width, colorScheme, purpose) {
     headless: true,
   });
   try {
+    await lifecycleOrder(browser, after);
     for (const width of [1280, 375])
       for (const colorScheme of ["light", "dark"])
         for (const purpose of ["confirm", "delete-request"]) {
