@@ -64,6 +64,7 @@ async function fixture({ fragment, query = "", historyFails = false, transport, 
       new Node(["load", "more", "delete", "request-button"].includes(id) ? "button" : id),
     ]),
   );
+  for (const id of ["load", "more", "delete", "request-button", "email"]) nodes[id].disabled = true;
   const document = {
     getElementById: (id) => nodes[id],
     createElement: (tag) => new Node(tag),
@@ -164,7 +165,7 @@ test("malformed/query/duplicate/wrong-purpose fragments and failed stripping nev
   ]) {
     const f = await fixture(options);
     assert.equal(f.nodes.load.disabled, true);
-    assert.equal(f.lifecycle.read().token, "");
+    assert.equal(f.lifecycle?.read().token ?? "", "");
   }
 });
 test("pagination sends exact cursor and renders facts as plain text, then removes with focus", async () => {
@@ -214,7 +215,7 @@ test("false or uncertain mutations never claim deletion; exact true clears capab
     await f.click("load");
     await f.click("delete");
     assert.equal(f.nodes.status.textContent.includes("have been deleted"), result.deleted === true);
-    if (result.deleted === true) assert.equal(f.lifecycle.read().token, "");
+    if (result.deleted === true) assert.equal(f.lifecycle?.read().token ?? "", "");
   }
 });
 test("management request validates email and treats empty 202 generically", async () => {
@@ -268,7 +269,7 @@ test("pagehide and persisted restore stay inert even with queued hash and stale 
   resolve(json({ scopes: [row("old")], next: null }));
   await tick();
   f.events.pageshow({ persisted: true });
-  assert.equal(f.lifecycle.read().token, "");
+  assert.equal(f.lifecycle?.read().token ?? "", "");
   assert.equal(f.location.hash, "");
   assert.equal(f.nodes.load.disabled, true);
   assert.equal(f.nodes.scopes.children.length, 0);
@@ -340,4 +341,39 @@ test("an in-flight explicit request cannot be submitted twice", async () => {
   await tick();
   assert.match(f.nodes.status.textContent, /unavailable/);
   assert.equal(f.nodes.load.disabled, false);
+});
+
+test("200 JSON cannot impersonate request202 or capability410", async () => {
+  const request = await fixture({ transport: async () => json({ accepted: true }) });
+  request.nodes.email.value = "reader@example.test";
+  await request.submit();
+  assert.match(request.nodes.status.textContent, /unavailable/);
+  assert.equal(request.nodes.email.value, "reader@example.test");
+  const list = await fixture({ transport: async () => json({ invalid: true }) });
+  await list.click("load");
+  assert.match(list.nodes.status.textContent, /unavailable/);
+  assert.equal(list.lifecycle.read().token, list.credential);
+  assert.equal(list.nodes.load.disabled, false);
+});
+test("empty search dimensions use the approved All fields and Anywhere labels", () => {
+  assert.equal(
+    scopeFacts(JSON.stringify({ kind: "search", fields: [], states: ["NY"] })),
+    "Following: All fields; NY. Other search filters are not included.",
+  );
+  assert.equal(
+    scopeFacts(JSON.stringify({ kind: "search", fields: ["engineering"], states: [] })),
+    "Following: engineering; Anywhere. Other search filters are not included.",
+  );
+});
+
+test("failed initial fragment scrubbing loads no module or transport and leaves controls inert", async () => {
+  const f = await fixture({
+    historyFails: true,
+    transport: async () => json({ scopes: [], next: null }),
+  });
+  assert.equal(f.lifecycle, undefined);
+  assert.equal(f.calls.length, 0);
+  assert.match(f.nodes.status.textContent, /unavailable/);
+  for (const id of ["load", "more", "delete", "request-button", "email"])
+    assert.equal(f.nodes[id].disabled, true);
 });

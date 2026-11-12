@@ -4,6 +4,8 @@ const COPY = {
   empty: "You have no follows to manage.",
   receipt: "If this address can receive email, a management link is on its way.",
 };
+const LINK_INVALID = Symbol("invalid management link");
+const REQUEST_ACCEPTED = Symbol("management request accepted");
 const encoder = new TextEncoder();
 const boundedKey = (value) =>
   typeof value === "string" &&
@@ -24,7 +26,7 @@ export function scopeFacts(key) {
     Array.isArray(scope.states) &&
     scope.fields.concat(scope.states).every((value) => typeof value === "string" && value)
   )
-    return `Following: ${scope.fields.join(", ")}; ${scope.states.join(", ")}. Other search filters are not included.`;
+    return `Following: ${scope.fields.join(", ") || "All fields"}; ${scope.states.join(", ") || "Anywhere"}. Other search filters are not included.`;
   throw new Error("scope");
 }
 
@@ -129,8 +131,11 @@ export function mountManagementPage({
         if (typeof transport !== "function") throw new Error("unavailable");
         const response = await transport(kind, body, { signal: abort.signal });
         if (!current() || lifecycle.receive() || abort.signal.aborted) return;
-        if (kind === "request" && response.status === 202) return { accepted: true };
-        if (response.status === 410 && kind === "list") return { invalid: true };
+        if (kind === "request") {
+          if (response.status !== 202) throw new Error("unavailable");
+          return REQUEST_ACCEPTED;
+        }
+        if (response.status === 410 && kind === "list") return LINK_INVALID;
         if (response.status !== 200) throw new Error("unavailable");
         const raw = await replyBody(response, abort.signal);
         return JSON.parse(raw);
@@ -145,7 +150,7 @@ export function mountManagementPage({
         }),
       ]);
       if (!current() || lifecycle.receive() || abort.signal.aborted) return;
-      if (result?.invalid === true) {
+      if (result === LINK_INVALID) {
         lifecycle.forget();
         status.focus();
         return;
@@ -265,7 +270,7 @@ export function mountManagementPage({
       return;
     }
     void act("request", { email: value }, (result) => {
-      if (result?.accepted !== true) throw new Error("unavailable");
+      if (result !== REQUEST_ACCEPTED) throw new Error("unavailable");
       email.value = "";
       tell(COPY.receipt);
       status.focus();

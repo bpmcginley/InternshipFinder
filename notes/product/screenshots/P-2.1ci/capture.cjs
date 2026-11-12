@@ -20,6 +20,7 @@ export function mountManagementPage(args) {
    fixture.calls.push({kind,body,signal});
    if(fixture.hold) await new Promise(r=>{fixture.release=r});
    if(fixture.status!==200) return new Response(null,{status:fixture.status});
+   if(fixture.response) return Response.json(fixture.response);
    if(kind==='request') return new Response(null,{status:202});
    if(kind==='remove') return Response.json({removed:fixture.removed});
    if(kind==='deleteAll') return Response.json({deleted:fixture.deleted});
@@ -173,8 +174,25 @@ export function mountManagementPage(args) {
           document.querySelector("#status").textContent.includes("have been deleted"),
         );
         assert.equal(await page.locator("#load").isDisabled(), true);
+        await page.evaluate((t) => {
+          location.hash = "#token=" + t;
+          fixture.response = { invalid: true };
+        }, credential());
+        await page.waitForFunction(() => !location.hash);
+        await page.locator("#load").click();
+        await page.waitForFunction(() =>
+          document.querySelector("#status").textContent.includes("unavailable"),
+        );
+        assert.equal(await page.locator("#load").isDisabled(), false);
+        await page.evaluate(() => (fixture.response = { accepted: true }));
+        await page.locator("#email").fill("reader@example.test");
+        await page.locator("#request-button").click();
+        await page.waitForFunction(() =>
+          document.querySelector("#status").textContent.includes("unavailable"),
+        );
+        assert.equal(await page.locator("#email").inputValue(), "reader@example.test");
         assert.deepEqual(errors, []);
-        cases += 10;
+        cases += 12;
         results.push({
           width,
           theme,
@@ -203,6 +221,27 @@ export function mountManagementPage(args) {
     assert.equal(await page.evaluate(() => fixture.calls.length), 0);
     cases++;
     await context.close();
+    const blocked = await browser.newContext();
+    await blocked.addInitScript(() => {
+      history.replaceState = () => {
+        throw new Error("Synthetic history refusal");
+      };
+    });
+    const blockedPage = await blocked.newPage();
+    const modules = [];
+    blockedPage.on("request", (request) => {
+      if (request.url().includes(".mjs")) modules.push(request.url());
+    });
+    await blockedPage.goto(base + "/follows/manage.html#token=" + credential());
+    await blockedPage.waitForFunction(() =>
+      document.querySelector("#status").textContent.includes("unavailable"),
+    );
+    assert.deepEqual(modules, []);
+    assert.equal(await blockedPage.evaluate(() => typeof window.fixture), "undefined");
+    assert.equal(await blockedPage.locator("#load").isDisabled(), true);
+    assert.equal(await blockedPage.locator("#email").isDisabled(), true);
+    cases++;
+    await blocked.close();
     console.log(
       JSON.stringify({
         cases,
