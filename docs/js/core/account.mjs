@@ -377,7 +377,10 @@ export function createAccount(browser, { C, ls, ss, DAY, demandStates, PROFILE_K
         server = r.ok;
         // A live subscription would keep billing a card for an account we'd just erased, so the
         // Worker refuses until it is cancelled. Leave the browser copy alone and say so.
-        if (r.status === 409) return { server: false, blocked: true };
+        if (r.status === 409) {
+          const reason = await pendingDeletionReason(browser, r);
+          return { server: false, blocked: true, ...(reason ? { reason } : {}) };
+        }
       } catch (e) { server = false; }
     }
     ls.del(PROFILE_KEY); ls.del("internscout.demand.sent"); ls.del(INVITE_KEY); ls.del(DIGEST_NUDGE_KEY); ls.set(DELETED_KEY, true);
@@ -417,4 +420,30 @@ export function createAccount(browser, { C, ls, ss, DAY, demandStates, PROFILE_K
     PLANS_BANNER_KEY, PLANS_BANNER_ID, plansBanner, REVIEW_LINE_KEY, REVIEWS_URL,
     reviewLineDue, leftOf, allowanceText, billingUrl, deleteMyData, reportUrl, digestArchive,
   };
+}
+
+// A bounded classification only; never show arbitrary server text or clear local data on 409.
+async function pendingDeletionReason(browser, response) {
+  let reader, timer;
+  const started = browser.Date.now();
+  try {
+    if (!Number.isFinite(started) || !response.body || Number(response.headers.get("content-length")) > 4096) return;
+    reader = response.body.getReader();
+    const read = async () => {
+      let size = 0, text = "", last = started;
+      const decoder = new TextDecoder("utf-8", { fatal: true });
+      while (true) {
+        const part = await reader.read(), now = browser.Date.now();
+        if (now < last || !Number.isFinite(now) || now - started >= 8000) return;
+        last = now;
+        if (part.done) break;
+        size += part.value.byteLength; if (size > 4096) return;
+        text += decoder.decode(part.value, { stream: true });
+      }
+      const data = JSON.parse(text + decoder.decode());
+      return data?.error === "topup_payment_pending" ? "topup_payment_pending" : undefined;
+    };
+    return await Promise.race([read(), new Promise(resolve => { timer = browser.setTimeout(resolve, 8000); })]);
+  } catch { /* Every 409 still preserves the profile and session. */ }
+  finally { browser.clearTimeout(timer); if (reader) void reader.cancel().catch(() => {}); }
 }

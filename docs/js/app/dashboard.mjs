@@ -1,5 +1,5 @@
 // Dashboard state, effects and React controller.
-import { createAskExtension, createLoadMe, watchAllowanceReturns, openInviteAction, copyInviteAction, billingAction, topupEligible, createTopupActions } from "./allowance.mjs";
+import { createAskExtension, createLoadMe, watchAllowanceReturns, openInviteAction, copyInviteAction, billingAction, topupEligible, createTopupActions, recoveryEligible, createRecoveryActions, PENDING_TOPUP_DELETION } from "./allowance.mjs";
 import { saveProfileAction, saveQuickProfileAction, finishQuickProfileAction } from "./setup.mjs";
 import { clearTrackerAction, createSetAppState, createToggleSaved, useManualAppState, showMyListAction } from "./tracker.mjs";
 import { useDigestPrompt } from "./navigation.mjs";
@@ -491,7 +491,7 @@ export function createDashboard(browser, {
       const msg = "Delete your InternScout profile from this browser" + (auth.token ? " and, from our server, your chosen states, past usage and the Deep Dive saved to your account, and sign you out everywhere (this month's counts go when the month ends)" : "") + "? This can't be undone.";
       if (!browser.confirm(msg)) return;
       const r = await IS.deleteMyData(auth.source === "page" ? auth.token : auth.token);
-      if (r.blocked) { setNote("Cancel your Supporter plan first (Manage plan), then delete. Nothing was deleted."); return; }
+      if (r.blocked) { setNote(r.reason === "topup_payment_pending" ? PENDING_TOPUP_DELETION : "Cancel your Supporter plan first (Manage plan), then delete. Nothing was deleted."); return; }
       setDigestNudge(false);
       // Statuses and saved searches are the student's own tracker, so they go only if they say so.
       if ((Object.keys(appStates).length || saved.length || ghToken || Object.keys(roleBook.roles).length || previousVisit || visitStart) && browser.confirm("Also delete your application statuses, saved roles, saved searches and last-visit timestamp from this browser? Cancel keeps them.")) {
@@ -823,6 +823,23 @@ export function createDashboard(browser, {
       return () => topupActions.current.cancel();
     }, [eligibleTopup, auth.token, authGeneration.current]);
     const topup = eligibleTopup && topupState ? { ...topupState, buy: topupActions.current.buy, retry: topupActions.current.load } : null;
+    const canRecover = recoveryEligible(me, meStatus, auth.token);
+    const recoveryContext = useRef(null), recoveryActions = useRef(null);
+    const [recoveryState, setRecoveryState] = useState(null);
+    recoveryContext.current = { eligible: canRecover, workerUrl: C.workerUrl };
+    if (!recoveryActions.current) recoveryActions.current = createRecoveryActions(browser, {
+      context: () => ({ ...recoveryContext.current, token: authRef.current.token, generation: authGeneration.current }),
+      update: state => {
+        const restore = state.status === "terminal" && browser.document.activeElement?.id === "checkout-recovery-action";
+        setRecoveryState(state);
+        if (restore) browser.setTimeout(() => { if (browser.document.activeElement === browser.document.body) browser.document.getElementById("checkout-recovery-status")?.focus(); }, 0);
+      }, lock: checkoutLock, refresh: () => loadMe(),
+    });
+    useEffect(() => {
+      recoveryActions.current.cancel(); setRecoveryState(null);
+      return () => recoveryActions.current.cancel();
+    }, [auth.token, authGeneration.current]);
+    const recovering = recoveryState?.status === "checking";
     const arrivalFocused = useRef(false);
     const arrivalInserted = useRef(false), arrivalAnchor = useRef(null);
     if (showAllowance && !arrivalInserted.current) arrivalAnchor.current = visibleFocusAnchor();
@@ -1151,6 +1168,7 @@ export function createDashboard(browser, {
             resetDay: auth.token && me && me.allowance ? resetDay : null,
             spendText: info.spend && info.spend.calls > 0 ? `Estimated AI cost: $${info.spend.month_usd.toFixed(2)}${info.spend.budget ? ` of $${info.spend.budget}` : ""}` : null,
             items: [
+              canRecover && { key: "recover", group: "plan", label: "Check or resume checkout", onClick: () => { browser.document.querySelector(".acct-btn")?.focus(); void recoveryActions.current.recover(); }, disabled: !!busy || recovering || topup?.status === "opening", desc: "Check your existing checkout. No new checkout is created." },
               auth.token && inviteOffer && { key: "invite", group: "share", label: invite ? "Hide your invite link" : "Invite classmates", onClick: openInvite,
                 desc: "New .edu classmates can earn extra AI use. Check your reward eligibility." },
               ...(auth.token ? upgrades.map(pl => ({ key: pl.plan, group: "plan", label: `${pl.label}${pl.price ? ` · ${pl.price}` : ""}`, onClick: () => billing("checkout", pl.plan),
@@ -1200,7 +1218,7 @@ export function createDashboard(browser, {
       h("main", { id: "main" },
       h("div", { id: "allowance-announcement", className: "sr", role: "status", "aria-live": "polite", "aria-atomic": true }, showAllowance ? "Auto-Apply allowance options are open." : ""),
       showAllowance && h(AllowancePanel, { signedIn: !!auth.token, me, status: meStatus, cfgStatus, allowance, resetDay,
-        plans: [...upgrades].sort((a, b) => Number(b.plan === arrivalRoute.plan) - Number(a.plan === arrivalRoute.plan)), busy: busy || (topup?.status === "opening"), topup, signIn: signInProviders,
+        plans: [...upgrades].sort((a, b) => Number(b.plan === arrivalRoute.plan) - Number(a.plan === arrivalRoute.plan)), busy: busy || (topup?.status === "opening") || recovering, topup, recovery: canRecover ? recoveryActions.current.recover : null, signIn: signInProviders,
         inviteBlock: inviteOffer && h(InviteBlock, { invite, status: inviteStatus, note: inviteNote, onLoad: () => { countArrival("out_of_runs_invite"); openInvite(true); }, onCopy: () => { countArrival("out_of_runs_invite"); copyInvite(); } }),
         onRetry: () => loadMe(), onConfigRetry: loadConfig, onCheckout: plan => billing("checkout", plan, true), onClose: () => { topupActions.current.cancel(); dismissArrival(); } }),
       // D2.3 (2026-10-05 audit): on a first visit the setup wizard greeted the student before the
@@ -1216,6 +1234,7 @@ export function createDashboard(browser, {
       topNotice,
       info.stale && h("div", { className: "notice" }, h("b", null, "The extension was reloaded or updated. "), h("a", { href: "#", onClick: prevent(() => browser.location.reload()) }, "Reload this page"), " to reconnect Auto-Apply."),
       // was: info.installed && !info.onboarded && h("div", { className: "notice" }, h("b", null, "One step left: "), ...): topNotice above.
+      h("div", { id: "checkout-recovery-status", tabIndex: -1, className: recoveryState?.message ? "notice" : "sr", role: "status", "aria-live": "polite", "aria-atomic": true }, recoveryState?.message || ""),
       note && h("div", { className: "notice", role: "status" }, note),
       // Always in the page, so a screen reader hears the message when it appears inside.
       h("div", { role: "status" }, selNote && h("div", { className: "selnote" }, h("span", null, selNote),

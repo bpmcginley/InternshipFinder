@@ -326,7 +326,7 @@ The golden harness now covers static assets as well as generated pages. Each sit
 
 ## Waiting for Bruce
 
-- **P-2.2ap native checkout recovery UI**: draft claim on published `82c3c429`, `codex/product-p2.2ap-recovery-ui`, audit_site. Optional verified recovery action and pending-checkout deletion guidance; needs-bruce, synthetic validation and independent review pending. No checkout creation, deployment or activation.
+- **P-2.2ap native checkout recovery UI [#475](https://github.com/bpmcginley/InternshipFinder/pull/475)**: audit_site, `codex/product-p2.2ap-recovery-ui`, on published `82c3c429`. Draft needs-bruce; conditional Account/allowance recovery and exact pending-checkout deletion guidance implemented. 12 focused and 396 site tests, two golden tests, 24 paired synthetic screenshots; independent review and fresh CI pending. Optional server capability depends on #472 integration/deployment. No checkout creation or activation; owner merge/publication remain gated.
 
 
 P-2.1u [#341](https://github.com/bpmcginley/InternshipFinder/pull/341) remains owner-gated after archive-reader integration. Publication, scheduling and activation remain pending.
