@@ -11,15 +11,21 @@ const unavailable = () => empty(503, { "Retry-After": "60" });
 
 // Create once per isolate. No default route, origin, request policy or sender.
 export function createFollowManagementRequestHttp({
-  db,
+  db: defaultDb,
   enabled = false,
-  originAllowed,
-  ttlMs,
-  dailyLimit,
+  originAllowed: defaultOriginAllowed,
+  ttlMs: defaultTtlMs,
+  dailyLimit: defaultDailyLimit,
   timers = { setTimeout, clearTimeout, monotonicNow: () => performance.now() },
 } = {}) {
   let active = 0;
-  return async (request) => {
+  return async (request, context = {}) => {
+    const {
+      db = defaultDb,
+      originAllowed = defaultOriginAllowed,
+      ttlMs = defaultTtlMs,
+      dailyLimit = defaultDailyLimit,
+    } = context;
     if (request.method !== "POST") return empty(405, { Allow: "POST" });
     if (
       enabled !== true ||

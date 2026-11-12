@@ -13,6 +13,8 @@ import { purchasedRunsFor } from "./funded-purchase.js";
 import { bonusFor, claim, inviteInfo, noteAccount } from "./referral.js";
 import { cleanStates, demandCounts, dropStale, setDemand, touchSeen } from "./demand.js";
 import { countEvent, countHit } from "./visits.js";
+import { createFollowManagementHttp } from "./follow-management-http.js";
+import { createFollowManagementRequestHttp } from "./follow-management-request-http.js";
 import { followTokenEndpoints } from "./follow-token-endpoint.js";
 import { followUnsubscribeEndpoint } from "./follow-unsubscribe-endpoint.js";
 import { topupCheckoutResponse, topupOfferResponse } from "./topup-checkout-http.js";
@@ -78,6 +80,38 @@ function corsHeaders(request, env) {
     Vary: "Origin",
   };
 }
+
+// Keep concurrency per isolate while binding authority and storage to each request.
+const followManagement = createFollowManagementHttp({ enabled: true });
+const followManagementRequest = createFollowManagementRequestHttp({ enabled: true });
+const followManagementOriginAllowed = (request, env) =>
+  request.headers.get("Origin") === "https://internscout.org" &&
+  !!corsHeaders(request, env)["Access-Control-Allow-Origin"];
+const followPolicyInteger = (value) => {
+  const parsed = typeof value === "string" ? Number(value) : NaN;
+  return String(parsed) === value ? parsed : NaN;
+};
+
+const manageFollow = (operation) => ({ request, env, db, d }) => {
+  if (env.FOLLOW_MANAGEMENT_ENABLED !== "1")
+    throw new HttpError(404, "not_found", "No such endpoint");
+  return followManagement[operation](request, {
+    db,
+    now: d.now,
+    originAllowed: (r) => followManagementOriginAllowed(r, env),
+  });
+};
+
+const requestFollowManagement = ({ request, env, db }) => {
+  if (env.FOLLOW_MANAGEMENT_ENABLED !== "1" || env.FOLLOW_MANAGEMENT_REQUEST_ENABLED !== "1")
+    throw new HttpError(404, "not_found", "No such endpoint");
+  return followManagementRequest(request, {
+    db,
+    originAllowed: (r) => followManagementOriginAllowed(r, env),
+    ttlMs: followPolicyInteger(env.FOLLOW_MANAGEMENT_REQUEST_TTL_MS),
+    dailyLimit: followPolicyInteger(env.FOLLOW_MANAGEMENT_REQUEST_DAILY_CAP),
+  });
+};
 
 const topupOriginAllowed = (request, env) =>
   DASHBOARD_ORIGINS.includes(request.headers.get("Origin")) &&
@@ -202,6 +236,10 @@ const safeRouteHandlers = {
   "POST /follows/unsubscribe": async ({ request, db, now }) => followUnsubscribeEndpoint(request, db, now),
   "POST /follows/confirm": async ({ request, db, d }) => followTokenEndpoints.confirm(request, db, d.now),
   "POST /follows/delete-request": async ({ request, db, d }) => followTokenEndpoints.deleteRequest(request, db, d.now),
+  "POST /follows/manage/list": manageFollow("list"),
+  "POST /follows/manage/remove": manageFollow("remove"),
+  "POST /follows/manage/delete": manageFollow("deleteAll"),
+  "POST /follows/manage/request": requestFollowManagement,
 
   // Stay signed in: trade a fresh provider ID token for a long-lived session token (session.js).
   // Only an ID token can start a session, so a stolen session token cannot make more of itself.
