@@ -480,6 +480,6 @@ test("MAX_TOKENS and a blocked prompt come through a stream unchanged", async ()
 
 test("stitchChunks and readSSE on their own", async () => {
   assert.deepEqual(stitchChunks([]), { candidates: [], complete: false });
-  const got = await readSSE({ text: async () => "event: x" + "\n" + "data: {\"a\":1}" + "\n\n" + "data: [DONE]" + "\n" });
+  const got = await readSSE(new Response("event: x" + "\n" + "data: {\"a\":1}" + "\n\n" + "data: [DONE]" + "\n"));
   assert.deepEqual(got, [{ a: 1 }]);
 });
