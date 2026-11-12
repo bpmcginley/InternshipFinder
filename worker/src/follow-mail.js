@@ -147,11 +147,10 @@ function roleLines(roles, seen, limit = Infinity) {
 }
 
 function rejectManagementInRoleLinks(lines, managementToken) {
-  if (!managementToken) return;
   for (let i = 1; i < lines.length; i += 2) {
     const url = new URL(lines[i]);
     if (
-      normalizedLinkAscii(url.href).includes(managementToken) ||
+      (managementToken && normalizedLinkAscii(url.href).includes(managementToken)) ||
       (url.origin === MANAGEMENT_ORIGIN && normalizedLinkAscii(url.pathname) === MANAGEMENT_PATH)
     )
       invalid();

@@ -403,6 +403,14 @@ test("management links reject normalized variants and stay out of every other li
         invalid,
       );
   }
+  await assert.rejects(
+    sendFollowMail(env, "digest", {
+      ...managementInput,
+      links: { ...managementInput.links, management: input.links.management },
+      matches: [role(1, { apply_url: MANAGEMENT_LINK.replace(MANAGEMENT_TOKEN, TOKEN) })],
+    }),
+    invalid,
+  );
   assert.equal(sends, 0);
 });
 
