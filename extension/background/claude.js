@@ -3,7 +3,7 @@
 import { callGemini, callWorker, taskFor, workerError } from "./gemini.js";
 import { recordUsage } from "../lib/usage.js";
 import { WORKER_URL } from "../lib/config.js";
-import { ensureToken, getToken, refreshAfter401 } from "../lib/auth.js";
+import { ensureToken, getSession, refreshAfter401 } from "../lib/auth.js";
 import { abortableSleep as sleep, throwIfAborted } from "./abort.js";
 
 const URL = "https://api.anthropic.com/v1/messages";
@@ -15,17 +15,21 @@ const URL = "https://api.anthropic.com/v1/messages";
 // Every own-key call is priced and added to the monthly total; the cost comes back as resp.cost_usd.
 export async function callAI({ ai, model, kind, task, run_id, workerSession, ...opts }) {
   if (ai && ai.provider === "internscout") {
-    // A shared PDF reading binds later requests to the same live session.
-    const token = workerSession ? await getToken() : await ensureToken();
-    if (workerSession && token !== workerSession) throw workerError(401, { error: "auth" });
+    // Check only the exact live session before every attempt of a bound PDF request.
+    const verifySession = workerSession
+      ? async () => {
+          if ((await getSession())?.token !== workerSession) throw workerError(401, { error: "auth" });
+        }
+      : undefined;
     // was: refreshToken: ensureToken. A 401 on a session token now drops that session (lib/auth.js).
     const resp = await callWorker({
       url: WORKER_URL,
-      token,
+      token: workerSession || (await ensureToken()),
       refreshToken: refreshAfter401,
       task: task || taskFor(kind),
       run_id,
       ...opts,
+      verifySession,
     });
     resp.cost_usd = 0;
     return resp;

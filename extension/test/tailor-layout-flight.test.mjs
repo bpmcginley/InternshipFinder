@@ -360,3 +360,98 @@ for (const separate of ["resume", "account", "own key"]) {
     },
   );
 }
+
+test(
+  "a bound edit checks the live session without waiting on legacy auth",
+  { timeout: 5000 },
+  async (t) => {
+    const gate = heldReply();
+    const { requests, local } = harness(t, gate.hold);
+    const reading = Promise.withResolvers(),
+      release = Promise.withResolvers();
+    const getLocal = chrome.storage.local.get;
+    let holdSession = false,
+      legacyReads = 0;
+    t.mock.method(chrome.storage.local, "get", async (keys) => {
+      if (holdSession && keys === SESSION_KEY) {
+        holdSession = false;
+        reading.resolve();
+        await release.promise;
+      }
+      return getLocal(keys);
+    });
+    t.mock.method(chrome.storage.session, "get", async () => {
+      legacyReads++;
+      return {};
+    });
+    const tailoring = tailorResume(storeOf(), JOBS[0]);
+    const rejected = assert.rejects(tailoring, { code: "auth" });
+    await gate.reached;
+    holdSession = true;
+    gate.finish();
+    await reading.promise;
+    local[SESSION_KEY] = session("b");
+    release.resolve();
+    await rejected;
+    assert.equal(legacyReads, 0);
+    assert.deepEqual(
+      requests.map(({ kind }) => kind),
+      ["layout"],
+    );
+  },
+);
+
+for (const replaced of [false, true]) {
+  test(
+    "a bound rate retry " +
+      (replaced ? "stops after session replacement" : "continues with the same live session"),
+    { timeout: 5000 },
+    async (t) => {
+      const gate = heldReply();
+      let reads = 0;
+      const { requests, local } = harness(t, (request) =>
+        ++reads === 1 ? gate.hold(request) : layout,
+      );
+      const tailoring = tailorResume(storeOf(), JOBS[0]);
+      const outcome = replaced
+        ? assert.rejects(tailoring, { code: "auth" })
+        : tailoring.then(assertValid);
+      const initial = await gate.reached;
+      if (replaced) local[SESSION_KEY] = session("b");
+      gate.finish(Response.json({ error: "rate", retry_after: 0.001 }, { status: 429 }));
+      await outcome;
+      assert.deepEqual(
+        requests.map(({ kind }) => kind),
+        replaced ? ["layout"] : ["layout", "layout", "edit"],
+      );
+      assert.ok(requests.every(({ authorization }) => authorization === initial.authorization));
+    },
+  );
+}
+
+test(
+  "legacy auth keeps its original unbound layout behavior when the job is paused",
+  { timeout: 5000 },
+  async (t) => {
+    const gate = heldReply();
+    const { requests, local } = harness(t, gate.hold);
+    delete local[SESSION_KEY];
+    const payload = Buffer.from(JSON.stringify({ exp: 4102444800 })).toString("base64url");
+    const legacy = "fixture." + payload + ".fixture";
+    t.mock.method(chrome.storage.session, "get", async (key) => ({ [key]: { token: legacy } }));
+    const controller = new AbortController();
+    const tailoring = tailorResume(storeOf(), JOBS[0], { signal: controller.signal });
+    const original = await gate.reached;
+    assert.equal(original.signal, undefined);
+    controller.abort();
+    gate.finish();
+    assertValid(await tailoring);
+    assert.deepEqual(
+      requests.map(({ kind, authorization }) => [kind, authorization]),
+      [
+        ["layout", "Bearer " + legacy],
+        ["edit", "Bearer " + legacy],
+      ],
+    );
+  },
+);

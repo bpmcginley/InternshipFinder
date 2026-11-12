@@ -18,7 +18,7 @@
 import { callAI, jsonOf } from "./claude.js";
 import { NEEDS_YOU_CODES } from "./gemini.js";
 import { isWorker, modelFor } from "../lib/store.js";
-import { getToken, isSessionToken } from "../lib/auth.js";
+import { getSession } from "../lib/auth.js";
 import { throwIfAborted } from "./abort.js";
 import { renderResume, toB64 } from "../lib/pdf.js";
 // was: import { renderLayoutFit } from "../lib/pdf_layout.js";
@@ -450,7 +450,6 @@ async function tailorFromProfile(store, job, request) {
 }
 
 export async function tailorResume(store, job, { signal } = {}) {
-  throwIfAborted(signal);
   const orig = store.files && store.files.resume;
   let spent = 0,
     why = "",
@@ -461,9 +460,11 @@ export async function tailorResume(store, job, { signal } = {}) {
     const isPdf = orig.type === "application/pdf" || /\.pdf$/i.test(orig.name || "");
     keeps = isDocx || isPdf;
     if (!isDocx && isPdf && isWorker(store.ai)) {
-      const token = await getToken().catch(() => null);
-      request = { signal, workerSession: isSessionToken(token) ? token : undefined };
-      throwIfAborted(signal);
+      const session = await getSession().catch(() => null);
+      if (session) {
+        throwIfAborted(signal);
+        request = { signal, workerSession: session.token };
+      }
     }
     try {
       const made = isDocx
