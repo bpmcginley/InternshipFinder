@@ -131,8 +131,11 @@ export function createLoadMe({
     if (!token || token !== authRef.current.token) return null;
     const seq = ++meRequest.current, generation = authGeneration.current;
     setMeResult(previous => ({ token, generation, data: previous && previous.token === token && previous.generation === generation ? previous.data : null, status: "loading" }));
-    const data = await bounded(IS.fetchMe(token));
-    if (token !== authRef.current.token || generation !== authGeneration.current || seq !== meRequest.current) return null;
+    const current = () => token === authRef.current.token && generation === authGeneration.current && seq === meRequest.current;
+    let active = true, data;
+    try { data = await bounded(IS.fetchMe(token, () => active && current())); }
+    finally { active = false; } // A late response after timeout must not mutate Core auth.
+    if (!current()) return null;
     setMeResult({ token, generation, data, status: runAllowance(data) ? "ready" : "error" });
     if (!data && !IS.authOk(authRef.current.who)) dropToken();
     return data;
