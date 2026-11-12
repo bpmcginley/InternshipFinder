@@ -30,7 +30,7 @@ function copy(value) {
 }
 // JSON.parse validates grammar first; this iterative pass rejects ambiguous decoded keys.
 // The streamed byte cap bounds both passes, including nesting and key sets.
-function uniqueJson(text) {
+export function uniqueJson(text) {
   const value = JSON.parse(text),
     stack = [];
   for (let i = 0; i < text.length; i++) {

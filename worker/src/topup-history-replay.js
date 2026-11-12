@@ -53,6 +53,7 @@ async function replay(db, env, input, options, wholeWindow) {
     resolveOffer,
     clock,
     timeoutMs,
+    excludeEmployerPayments,
     initial;
   try {
     ({
@@ -62,6 +63,7 @@ async function replay(db, env, input, options, wholeWindow) {
       resolveOffer,
       clock = Date.now,
       timeoutMs,
+      excludeEmployerPayments = false,
     } = options);
     config = record(input);
     config.expected = record(config.expected);
@@ -88,6 +90,8 @@ async function replay(db, env, input, options, wholeWindow) {
       (provider.STRIPE_PRICE_TOPUP !== undefined &&
         typeof provider.STRIPE_PRICE_TOPUP !== "string") ||
       !validTopupHistoryRequestVersion(requestVersion) ||
+      typeof excludeEmployerPayments !== "boolean" ||
+      (!wholeWindow && excludeEmployerPayments) ||
       (wholeWindow
         ? targetEventId !== undefined
         : typeof targetEventId !== "string" || !/^evt_[A-Za-z0-9_]{1,250}$/.test(targetEventId)) ||
@@ -180,6 +184,7 @@ async function replay(db, env, input, options, wholeWindow) {
     const events = wholeWindow ? traversed.events : traversed.event ? [traversed.event] : null;
     if (!events || !(await current())) fail();
     const counts = { observed: 0, duplicate: 0, inactive: 0 };
+    if (excludeEmployerPayments) counts.excluded = 0;
     let result;
     for (const [index, event] of events.entries()) {
       if (index && !(await current())) fail();
@@ -191,9 +196,18 @@ async function replay(db, env, input, options, wholeWindow) {
         resolveOffer,
         timeoutMs: remaining(),
         beforeObserve: current,
+        excludeEmployerPayments,
       });
       remaining();
-      if (!["observed", "duplicate", "inactive"].includes(result.status)) fail();
+      if (
+        ![
+          "observed",
+          "duplicate",
+          "inactive",
+          ...(excludeEmployerPayments ? ["excluded"] : []),
+        ].includes(result.status)
+      )
+        fail();
       if (!(await current())) fail();
       counts[result.status]++;
     }

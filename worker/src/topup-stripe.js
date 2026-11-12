@@ -1,6 +1,7 @@
 // Trusted checkout adapter with explicit injected fetch.
 import { stripe, siteUrl, paymentsOn, managedPayments } from "./billing.js";
 import { validTopupCheckoutId } from "./topup-ledger.js";
+import { uniqueJson } from "./topup-history-traversal.js";
 const OFFER = Object.freeze({
   verified: true,
   version: "topup-v1",
@@ -76,6 +77,40 @@ export async function readHistoricalTopupTarget(env, kind, id, fetchImpl) {
   );
 }
 
+// History-only positive employer proof. Fixed GET paths, no current sales configuration.
+export async function readEmployerHistoryObject(env, kind, id, fetchImpl) {
+  const prefix = new Map([
+    ["charges", "ch"],
+    ["payment_intents", "pi"],
+    ["refunds", "re"],
+    ["disputes", "du"],
+  ]).get(kind);
+  if (
+    typeof env?.STRIPE_SECRET_KEY !== "string" ||
+    !env.STRIPE_SECRET_KEY ||
+    typeof fetchImpl !== "function" ||
+    !(kind === "checkout/sessions"
+      ? validTopupCheckoutId(id)
+      : prefix &&
+        typeof id === "string" &&
+        new RegExp("^" + prefix + "_[A-Za-z0-9_]{1,250}$").test(id))
+  )
+    throw unavailable();
+  return boundedRequest(
+    { STRIPE_SECRET_KEY: env.STRIPE_SECRET_KEY },
+    kind +
+      "/" +
+      encodeURIComponent(id) +
+      (kind === "checkout/sessions" ? "?expand[]=line_items" : ""),
+    {},
+    fetchImpl,
+    null,
+    "GET",
+    TOPUP_CHECKOUT_BOUNDS.timeoutMs,
+    true,
+  );
+}
+
 export function topupConfigured(env) {
   return (
     env?.TOPUPS_ENABLED === "1" &&
@@ -127,7 +162,16 @@ export function checkoutUrl(value, id) {
 export const TOPUP_CHECKOUT_BOUNDS = Object.freeze({ timeoutMs: 10000, bodyBytes: 262144 });
 
 // One request per operation. A timed-out POST is ambiguous, never retried here.
-async function boundedRequest(config, path, form, fetchImpl, key, method, timeoutMs) {
+async function boundedRequest(
+  config,
+  path,
+  form,
+  fetchImpl,
+  key,
+  method,
+  timeoutMs,
+  strictJson = false,
+) {
   const controller = new AbortController(),
     deadline = performance.now() + timeoutMs;
   let stopped = false,
@@ -157,8 +201,8 @@ async function boundedRequest(config, path, form, fetchImpl, key, method, timeou
     controller.signal.addEventListener("abort", abort, { once: true });
     let bytes = 0,
       text = "";
-    // Match Response.text's UTF-8 decoding, including replacement of malformed bytes.
-    const decoder = new TextDecoder();
+    // Legacy reads retain Response.text decoding. Positive exclusion rejects malformed bytes.
+    const decoder = new TextDecoder("utf-8", { fatal: strictJson });
     try {
       for (;;) {
         live();
@@ -170,7 +214,13 @@ async function boundedRequest(config, path, form, fetchImpl, key, method, timeou
         if (bytes > TOPUP_CHECKOUT_BOUNDS.bodyBytes) throw unavailable();
         text += decoder.decode(chunk.value, { stream: true });
       }
-      return text + decoder.decode();
+      text += decoder.decode();
+      if (strictJson) {
+        if (length != null && bytes !== Number(length)) throw unavailable();
+        uniqueJson(text);
+        live();
+      }
+      return text;
     } finally {
       abort();
       controller.signal.removeEventListener("abort", abort);
