@@ -179,7 +179,15 @@ export async function rollbackKeepsExpiredJobAndSpentBudget(db) {
 
 export async function ambiguousCommittedReceiptsNeverRetryOrRevealInbox(db) {
   await seed(db);
-  for (const fault of ["missing", "false", "changes", "results", "hole", "duplicate"]) {
+  for (const fault of [
+    "missing",
+    "false",
+    "changes",
+    "results",
+    "hole",
+    "duplicate",
+    "returnHole",
+  ]) {
     await db.prepare("DELETE FROM follow_management_outbox").run();
     let calls = 0;
     const wrapped = {
@@ -192,6 +200,7 @@ export async function ambiguousCommittedReceiptsNeverRetryOrRevealInbox(db) {
           if (fault === "changes") r[0].results[0].changed = 2;
           if (fault === "results") delete r[0].results;
           if (fault === "hole") delete r[0];
+          if (fault === "returnHole") delete r[0].results[0];
           if (fault === "duplicate") r[1].results.push(r[1].results[0]);
         }
         return r;
@@ -201,7 +210,7 @@ export async function ambiguousCommittedReceiptsNeverRetryOrRevealInbox(db) {
     assert.equal(calls, 2);
     assert.equal((await jobs(db)).length, 1);
   }
-  assert.equal((await rate(db))[0].calls, 6);
+  assert.equal((await rate(db))[0].calls, 7);
 }
 
 export async function uncertainRateNeverQueuesOrRefunds(db) {

@@ -3,8 +3,16 @@ import { createFollowLinkRuntime } from "./follow-link-runtime.js";
 import { acquireFollowDeliveryOwner, finishFollowDeliveryOwner } from "./follow-delivery-owner.js";
 
 export function createOwnedFollowLinkRuntime(options = {}) {
-  const { enabled = false, db } = options;
-  const runtime = createFollowLinkRuntime(options);
+  // Capture once: ownership and dispatch must never observe different DB/config getters.
+  const { enabled = false, db, email, policy, clock, transportTimeoutMs } = options;
+  const runtime = createFollowLinkRuntime({
+    enabled,
+    db,
+    email,
+    policy,
+    clock,
+    transportTimeoutMs,
+  });
   return async (input = {}) => {
     if (enabled !== true) return { status: "disabled" };
     let maxCandidates, maxExpired;

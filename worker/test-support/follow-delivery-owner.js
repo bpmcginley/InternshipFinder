@@ -110,6 +110,51 @@ export async function independentInstancesShareOneTransportOwner(db) {
   assert.equal(sends, 1);
   assert.equal((await row(db)).phase, "ready");
 }
+
+export async function optionAccessorsCannotSplitOwnershipFromDispatch(db) {
+  await seed(db, "confirmation");
+  const reads = {},
+    p = policy(db);
+  let forbidden = 0,
+    sends = 0;
+  const differentDb = {
+    prepare() {
+      forbidden++;
+      throw Error("wrong database");
+    },
+    batch() {
+      forbidden++;
+      throw Error("wrong database");
+    },
+  };
+  const values = {
+    enabled: true,
+    db,
+    email: email(async () => {
+      sends++;
+      return { messageId: "synthetic" };
+    }),
+    policy: () => p,
+    clock: () => new Date(),
+    transportTimeoutMs: 10000,
+  };
+  const options = {};
+  for (const [key, value] of Object.entries(values))
+    Object.defineProperty(options, key, {
+      enumerable: true,
+      get() {
+        reads[key] = (reads[key] || 0) + 1;
+        return key === "db" && reads[key] > 1 ? differentDb : value;
+      },
+    });
+  const result = await create(options)(limits);
+  assert.equal(result.status, "processed");
+  assert.equal(result.dispatch.counts.accepted, 1);
+  assert.equal(sends, 1);
+  assert.equal(forbidden, 0);
+  assert.deepEqual(reads, Object.fromEntries(Object.keys(values).map((key) => [key, 1])));
+  assert.equal((await row(db)).phase, "ready");
+}
 export async function concurrentCasAcknowledgesOnlyOneGeneration(db) {
   const results = await Promise.all([acquire(db), acquire(db)]);
   assert.equal(results.filter((r) => r.status === "acquired").length, 1);
@@ -448,6 +493,24 @@ export async function corruptLegacyCursorFailsBeforeAcquisition(db) {
   const before = await row(db);
   assert.equal((await acquire(db)).status, "unavailable");
   assert.deepEqual(await row(db), before);
+}
+
+export async function malformedPresenceScalarLeavesOwnerClosed(db) {
+  const id = await seed(db, "confirmation");
+  await reference(db, "confirmation", id);
+  for (const bad of [undefined, "1", true, false, 0, 2, {}]) {
+    await db
+      .prepare(
+        "UPDATE follow_delivery_owner SET phase='ready',generation=lower(hex(randomblob(16)))",
+      )
+      .run();
+    const wrapped = observe(db, async (sql, result) =>
+      sql.startsWith("SELECT 1 AS present") ? bad : result,
+    );
+    assert.equal((await acquire(wrapped)).status, "unavailable");
+    assert.equal((await row(db)).phase, "running");
+    assert.equal((await acquire(db)).status, "held");
+  }
 }
 
 export async function completionRollbackPreservesRunningAndConsumesTicket(db) {

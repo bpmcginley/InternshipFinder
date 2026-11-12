@@ -117,16 +117,16 @@ export async function acquireFollowDeliveryOwner(db) {
     if (row.generation !== generation) fail();
     // Logical expiry uses DB time, never the caller's clock. Validate stored values first.
     for (const kind of ["confirmation", "management"]) {
-      if (
-        resume[kind] &&
-        !(await db
+      if (resume[kind]) {
+        const present = await db
           .prepare(
             `SELECT 1 AS present FROM follow_${kind}_outbox WHERE id=? AND expires_at=? AND expires_at>${NOW}`,
           )
           .bind(resume[kind].id, resume[kind].expires_at)
-          .first("present"))
-      )
-        resume[kind] = null;
+          .first("present");
+        if (present === null) resume[kind] = null;
+        else if (present !== 1) fail();
+      }
     }
     const ticket = Object.freeze(Object.create(null));
     tickets.set(ticket, { db, generation });

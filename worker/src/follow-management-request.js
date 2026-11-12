@@ -116,9 +116,12 @@ export async function enqueueFollowManagementRequest(db, input, options = {}) {
       !Array.isArray(write.results) ||
       write.results.length > 1 ||
       write.meta.changes < write.results.length ||
-      write.results.some(
-        (r) => !r || Array.isArray(r) || Object.keys(r).join(",") !== "changed" || r.changed !== 1,
-      )
+      (write.results.length === 1 &&
+        (!Object.hasOwn(write.results, 0) ||
+          !write.results[0] ||
+          Array.isArray(write.results[0]) ||
+          Object.keys(write.results[0]).join(",") !== "changed" ||
+          write.results[0].changed !== 1))
     )
       return unavailable();
     if (dayReceipt(rows[1]) !== day) return unavailable();
