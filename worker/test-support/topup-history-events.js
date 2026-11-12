@@ -435,3 +435,124 @@ export async function admittedCommitMayOutliveDeadlineWithoutRetry(db) {
   assert.deepEqual(await call(db, f), { status: "duplicate" });
   assert.equal((await state(db)).revision, 2);
 }
+export async function schemaVersionsMustBePrimitiveDenseOwnDataBeforeIO(db) {
+  const f = await setup(db);
+  f.refunds = [item("refund", "pending", 1)];
+  const before = await state(db);
+  let io = 0,
+    getters = 0;
+  const source = {
+    prepare() {
+      io++;
+      throw new Error("unexpected database access");
+    },
+    batch() {
+      io++;
+      throw new Error("unexpected database access");
+    },
+  };
+  const missing = event();
+  delete missing.api_version;
+  assert.deepEqual(await call(db, f, missing, { apiVersions: new Array(1) }), {
+    status: "pending",
+  });
+  assert.deepEqual(await state(db), before);
+  assert.equal(f.calls.length, 0);
+  const inherited = new Array(1);
+  Object.setPrototypeOf(inherited, Object.create(Array.prototype, { 0: { value: version } }));
+  const accessor = [version];
+  Object.defineProperty(accessor, 0, {
+    get() {
+      getters++;
+      return version;
+    },
+  });
+  const inheritedEvent = event();
+  delete inheritedEvent.api_version;
+  Object.setPrototypeOf(inheritedEvent, { api_version: version });
+  const accessorEvent = event();
+  Object.defineProperty(accessorEvent, "api_version", {
+    get() {
+      getters++;
+      return version;
+    },
+  });
+  const cases = [
+    [missing, new Array(1)],
+    [event(), new Array(1)],
+    [event(), inherited],
+    [event(), accessor],
+    [event(), [version, version]],
+    [inheritedEvent, [version]],
+    [accessorEvent, [version]],
+    ...[undefined, null, {}, new String(version), 1, "", "bad version"].map((v) => [
+      { ...event(), api_version: v },
+      [version],
+    ]),
+  ];
+  for (const [e, apiVersions] of cases)
+    assert.deepEqual(await call(source, f, e, { apiVersions }), { status: "pending" });
+  assert.equal(io, 0);
+  assert.equal(getters, 0);
+  assert.equal(f.calls.length, 0);
+  assert.deepEqual(await state(db), before);
+}
+export async function providerConfigurationIsPinnedBeforeDiscovery(db) {
+  const f = await setup(db);
+  f.refunds = [item("refund", "pending", 1)];
+  const e = event();
+  delete e.data.object.payment_intent;
+  const config = { STRIPE_SECRET_KEY: "fixture-before", STRIPE_PRICE_TOPUP: "price_fixture" };
+  const auth = [];
+  const fetchImpl = async (url, init) => {
+    auth.push(init.headers.Authorization);
+    const response = await f.fetch(url, init);
+    config.STRIPE_SECRET_KEY = "fixture-after";
+    config.STRIPE_PRICE_TOPUP = "price_changed";
+    return response;
+  };
+  assert.deepEqual(
+    await observe(db, config, e, {
+      enabled: true,
+      livemode: false,
+      apiVersions: [version],
+      resolveOffer: () => offer,
+      fetchImpl,
+    }),
+    { status: "observed", revision: 2 },
+  );
+  assert.equal(auth.length, 10);
+  assert.deepEqual(auth, Array(10).fill("Bearer fixture-before"));
+}
+export async function oversizedLengthNeverPullsUpstreamBody(db) {
+  const f = await setup(db);
+  let pulls = 0,
+    cancelled = 0,
+    calls = 0;
+  const fetchImpl = async (url) => {
+    calls++;
+    const response = new Response(
+      new ReadableStream(
+        {
+          pull(out) {
+            pulls++;
+            out.enqueue(new Uint8Array([123]));
+          },
+          cancel() {
+            cancelled++;
+          },
+        },
+        { highWaterMark: 0 },
+      ),
+      { headers: { "Content-Length": "262145" } },
+    );
+    Object.defineProperty(response, "url", { value: url });
+    return response;
+  };
+  assert.deepEqual(await call(db, f, event(), { fetchImpl }), { status: "pending" });
+  assert.equal(calls, 1);
+  assert.equal(pulls, 0);
+  assert.equal(cancelled, 1);
+  assert.equal((await state(db)).receipts.length, 0);
+  assert.equal((await state(db)).revision, 1);
+}

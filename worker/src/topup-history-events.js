@@ -9,6 +9,7 @@ import { observeTopupHistory } from "./topup-history-observation.js";
 const pending = () => ({ status: "pending" });
 const id = (v, prefix) =>
   typeof v === "string" && new RegExp("^" + prefix + "_[A-Za-z0-9_]{1,250}$").test(v);
+const validVersion = (v) => typeof v === "string" && /^[A-Za-z0-9_.-]{1,64}$/.test(v);
 const ref = (v, kind, mode) =>
   typeof v === "string" ? v : v?.object === kind && v.livemode === mode ? v.id : null;
 const fail = () => {
@@ -26,8 +27,35 @@ export async function observeVerifiedTopupEvent(db, env, event, options = {}) {
     apiVersions,
     timeoutMs = PAYMENT_EVIDENCE_BOUNDS.timeoutMs,
   } = options;
-  let e, object, kind, paymentId, chargeId;
+  let e, object, kind, paymentId, chargeId, config;
   try {
+    const eventVersion = Object.getOwnPropertyDescriptor(event, "api_version");
+    if (
+      !eventVersion?.enumerable ||
+      !Object.hasOwn(eventVersion, "value") ||
+      !validVersion(eventVersion.value) ||
+      !Array.isArray(apiVersions) ||
+      !apiVersions.length ||
+      apiVersions.length > 4
+    )
+      fail();
+    const versions = [];
+    for (let i = 0; i < apiVersions.length; i++) {
+      const descriptor = Object.getOwnPropertyDescriptor(apiVersions, i);
+      if (
+        !descriptor?.enumerable ||
+        !Object.hasOwn(descriptor, "value") ||
+        !validVersion(descriptor.value) ||
+        versions.includes(descriptor.value)
+      )
+        fail();
+      versions.push(descriptor.value);
+    }
+    const secret = env?.STRIPE_SECRET_KEY,
+      price = env?.STRIPE_PRICE_TOPUP;
+    if (typeof secret !== "string" || !secret || (price !== undefined && typeof price !== "string"))
+      fail();
+    config = Object.freeze({ STRIPE_SECRET_KEY: secret, STRIPE_PRICE_TOPUP: price });
     e = structuredClone(event);
     object = e.data?.object;
     kind = topupReversalObject(e.type);
@@ -39,11 +67,8 @@ export async function observeVerifiedTopupEvent(db, env, event, options = {}) {
       e.livemode !== livemode ||
       e.account != null ||
       e.context != null ||
-      !Array.isArray(apiVersions) ||
-      !apiVersions.length ||
-      apiVersions.length > 4 ||
-      !apiVersions.every((v) => typeof v === "string" && /^[A-Za-z0-9_.-]{1,64}$/.test(v)) ||
-      !apiVersions.includes(e.api_version) ||
+      !validVersion(e.api_version) ||
+      !versions.includes(e.api_version) ||
       object?.object !== kind ||
       !id(object.id, { refund: "re", dispute: "du", charge: "ch" }[kind]) ||
       (kind !== "refund" && object.livemode !== livemode) ||
@@ -129,29 +154,32 @@ export async function observeVerifiedTopupEvent(db, env, event, options = {}) {
     };
     cancels.add(cancel);
     return new Response(
-      new ReadableStream({
-        async pull(out) {
-          try {
-            live();
-            const chunk = await reader.read();
-            live();
-            if (chunk.done) {
+      new ReadableStream(
+        {
+          async pull(out) {
+            try {
+              live();
+              const chunk = await reader.read();
+              live();
+              if (chunk.done) {
+                cancel();
+                out.close();
+              } else out.enqueue(chunk.value);
+            } catch {
               cancel();
-              out.close();
-            } else out.enqueue(chunk.value);
-          } catch {
-            cancel();
-            out.error(new Error("History association unavailable"));
-          }
+              out.error(new Error("History association unavailable"));
+            }
+          },
+          cancel,
         },
-        cancel,
-      }),
+        { highWaterMark: 0 },
+      ),
       { status: 200, headers: response.headers },
     );
   };
   async function run() {
     if (!paymentId) {
-      const c = await readTopupAssociation(env, "charges", chargeId, get);
+      const c = await readTopupAssociation(config, "charges", chargeId, get);
       live();
       if (c?.object !== "charge" || c.id !== chargeId || c.livemode !== livemode) return pending();
       paymentId = ref(c.payment_intent, "payment_intent", livemode);
@@ -181,7 +209,7 @@ export async function observeVerifiedTopupEvent(db, env, event, options = {}) {
     const offer = await resolveOffer(claim.offer_version, livemode);
     live();
     if (offer?.version !== claim.offer_version || offer?.livemode !== livemode) return pending();
-    const verified = await readVerifiedTopupPurchase(db, env, hash, offer, get);
+    const verified = await readVerifiedTopupPurchase(db, config, hash, offer, get);
     live();
     if (verified.status !== "verified") return pending();
     const { captured, reversals: r } = verified;
