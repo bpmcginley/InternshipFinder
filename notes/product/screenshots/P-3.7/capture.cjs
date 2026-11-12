@@ -59,7 +59,8 @@ async function capture(browser, width, colorScheme) {
           data[key] = value;
           return [key, { oldValue, newValue: value }];
         }));
-        listeners.forEach((listen) => listen(changes, "local"));
+        if (evidence.restoreEvents && marker in patch) evidence.restoreEvents.push(changes);
+        else listeners.forEach((listen) => listen(changes, "local"));
       },
     };
     const fetchOther = window.fetch.bind(window);
@@ -74,16 +75,28 @@ async function capture(browser, width, colorScheme) {
         }, { once: true });
       });
     };
+    const publish = async (at, sample) => {
+      const store = structuredClone(data.store);
+      store.profile.voice.sample = sample;
+      await local.set({ store, [marker]: { updated: at, at, shown: false } });
+    };
     evidence.restoreDuringInterview = () => {
       navigator.locks.request("internscout-store", async () => {
         const gate = new Promise((resolve) => { evidence.releaseRestore = resolve; });
-        const store = structuredClone(data.store);
-        store.profile.voice.sample = "Second account Voice sample";
-        await local.set({
-          store,
-          [marker]: { updated: "2026-11-12T14:06:00Z", at: "2026-11-12T14:07:00Z", shown: false },
-        });
+        await publish("2026-11-12T14:07:00Z", "Second account Voice sample");
         await gate;
+      });
+    };
+    evidence.supersedeRestore = async () => {
+      evidence.restoreEvents = [];
+      await navigator.locks.request("internscout-store", () =>
+        publish("2026-11-12T15:07:00Z", "First queued Voice sample"));
+      void navigator.locks.request("internscout-store", async () => {
+        const events = evidence.restoreEvents;
+        delete evidence.restoreEvents;
+        events.forEach((changes) => listeners.forEach((listen) => listen(changes, "local")));
+        await new Promise((resolve) => { evidence.releaseNewest = resolve; });
+        await publish("2026-11-12T15:08:00Z", "Newest queued Voice sample");
       });
     };
     window.chrome = {
@@ -126,6 +139,19 @@ async function capture(browser, width, colorScheme) {
     await page.evaluate(() => evidence.releaseRestore());
     await page.getByRole("button", { name: "Retry", exact: true }).waitFor();
     assert.equal(await page.evaluate(() => evidence.posts), 1);
+
+    await page.locator('[data-step="voice"]').click();
+    await sample.waitFor();
+    await page.evaluate(() => evidence.supersedeRestore());
+    await page.waitForFunction(async () => evidence.releaseNewest &&
+      (await navigator.locks.query()).pending.some(({ name }) => name === "internscout-store"));
+    await page.evaluate(() => evidence.releaseNewest());
+    await page.waitForFunction(() =>
+      document.querySelector('[data-voice="sample"]')?.value === "Newest queued Voice sample");
+    const newestNotice = page.getByText(/^Restored your Deep Dive from your account/);
+    await newestNotice.waitFor();
+    assert.equal(await newestNotice.count(), 1);
+    assert.equal(await page.evaluate(() => evidence.data["internscout.restored"].shown), true);
   }
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ phase, width, colorScheme, markerReadLocked: !before }));

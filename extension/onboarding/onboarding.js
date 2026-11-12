@@ -158,13 +158,15 @@ chrome.storage.onChanged.addListener((ch, area) => {
   const loadedOrQueued = Math.max(restoreTime(seenRestore), restoreTime(latestRestore));
   if (revision === change?.oldValue?.at || time <= loadedOrQueued) return;
   latestRestore = revision;
-  const waiting = S ? retireInterviewForRestore(revision) : null;
+  if (S) retireInterviewForRestore(revision);
   const refresh = async () => {
     await startup;
     if (latestRestore !== revision || time <= restoreTime(seenRestore)) return;
     const profile = await loadProfileWithRestore();
-    if (latestRestore !== revision || profile.revision === seenRestore) return;
-    const next = waiting || retireInterviewForRestore(profile.revision);
+    const loaded = restoreTime(profile.revision);
+    // A queued read can claim a newer notice than the event that requested it.
+    if (loaded < restoreTime(latestRestore) || loaded <= restoreTime(seenRestore)) return;
+    const next = interviewChat?.restoring ? interviewChat : retireInterviewForRestore(profile.revision);
     next.revision = profile.revision;
     next.restoring = false;
     useProfile(profile);
