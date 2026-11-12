@@ -48,23 +48,29 @@ const practiceLink = `<span class="small" style="display:block;margin:6px 0 0"><
 // It also restores the Deep Dive from the student's account (lib/sync.js): when that happened after this
 // page loaded, this page's copy is out of date and must not be written over it; the page reloads instead.
 let saveTimer = null;
+function queueStoreWrite(write) {
+  saveChain = saveChain.then(write, write);
+  return saveChain;
+}
 function save(now) {
   clearTimeout(saveTimer);
   const run = () => {
-    const snapshot = structuredClone(S), revision = seenRestore;
-    const write = async () => {
+    const store = S, revision = seenRestore;
+    // Navigation during a story commit must save the profile as it looks after that commit settles.
+    const queuedSnapshot = interviewChat?.savingStories ? null : structuredClone(store);
+    return queueStoreWrite(async () => {
+      if (S !== store) return;
+      const snapshot = queuedSnapshot ?? structuredClone(store);
       let applied = false;
       await updateStore(async (fresh) => {
-        if ((await restoredAt()) !== revision) return;
+        if ((await restoredAt()) !== revision || S !== store) return;
         for (const key of ["profile", "files", "ai"]) mergeProfileEdits(fresh[key], savedSnapshot[key], snapshot[key]);
         const editable = (settings) => Object.fromEntries(Object.entries(settings).filter(([k]) => !BACKGROUND_SETTINGS.includes(k)));
         mergeProfileEdits(fresh.settings, editable(savedSnapshot.settings), editable(snapshot.settings));
         applied = true;
       });
-      if (applied) savedSnapshot = snapshot;
-    };
-    saveChain = saveChain.then(write, write);
-    return saveChain;
+      if (applied && S === store) savedSnapshot = snapshot;
+    });
   };
   if (now) return run();
   saveTimer = setTimeout(run, 300);
@@ -951,10 +957,7 @@ async function interview(epoch) {
       // Start over can retire a pending request. Once the profile commit starts, finish that save first.
       conversation.savingStories = true;
       conversation.draw();
-      if (Array.isArray(x.stories)) S.profile.stories = x.stories;
-      for (const [k, v] of Object.entries(x.goals || {})) if (v) S.profile.goals[k] = v;
-      applyInterviewFacts(S.profile, x.facts);
-      await save(true);
+      if (!(await saveInterviewStories(conversation, x))) return;
       conversation.status = { text: `Saved ${S.profile.stories.length} stories and your goals.`, tone: "ok" };
       setTimeout(() => { if (isView()) go("voice"); }, 900);
     } catch (e) {
@@ -969,6 +972,42 @@ async function interview(epoch) {
   if (!conversation.failed && conversation.messages.at(-1)?.role !== "assistant") {
     requestInterview(conversation);
   }
+}
+
+function saveInterviewStories(conversation, x) {
+  const store = S;
+  const owns = () => S === store && interviewChat === conversation;
+  return queueStoreWrite(async () => {
+    if (!owns()) return false;
+    const before = structuredClone(store.profile);
+    const proposed = structuredClone(before);
+    if (Array.isArray(x.stories)) proposed.stories = x.stories;
+    for (const [k, v] of Object.entries(x.goals || {})) if (v) proposed.goals[k] = v;
+    applyInterviewFacts(proposed, x.facts);
+
+    let applied = false;
+    await updateStore(async (fresh) => {
+      if ((await restoredAt()) !== conversation.revision || !owns()) return;
+      mergeProfileEdits(fresh.profile, before, proposed);
+      applied = true;
+    });
+    if (!applied || (await restoredAt()) !== conversation.revision || !owns()) return false;
+
+    // Update the saved baseline, then layer any edits made while storage was pending onto the live profile.
+    mergeProfileEdits(savedSnapshot.profile, before, proposed);
+    const current = structuredClone(store.profile);
+    mergeProfileEdits(proposed, before, current);
+    // A manually edited fact and its provenance must stay together.
+    for (const [key, value] of Object.entries(current.facts)) {
+      const source = current.sources?.facts?.[key];
+      if (value === before.facts[key] && JSON.stringify(source) === JSON.stringify(before.sources?.facts?.[key])) continue;
+      proposed.facts[key] = value;
+      if (source) proposed.sources.facts[key] = source;
+      else delete proposed.sources.facts[key];
+    }
+    mergeProfileEdits(store.profile, current, proposed);
+    return true;
+  });
 }
 
 async function distill(msgs) {

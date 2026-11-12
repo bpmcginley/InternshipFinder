@@ -75,7 +75,11 @@ async function capture(browser, width, colorScheme) {
         patch = structuredClone(patch);
         if (evidence.holdProfile && patch.store?.profile?.stories?.length) {
           evidence.holdProfile = false;
-          await new Promise((resolve) => { evidence.releaseProfile = resolve; });
+          await new Promise((resolve, reject) => {
+            evidence.releaseProfile = () => evidence.rejectProfile
+              ? reject(new Error("Synthetic profile write rejected."))
+              : resolve();
+          });
         }
         if (evidence.holdWrite && patch[key]?.at(-1)?.content === evidence.holdWrite) {
           await new Promise((resolve) => { evidence.releaseWrite = resolve; });
@@ -165,8 +169,16 @@ async function capture(browser, width, colorScheme) {
   await page.waitForFunction(() => !!evidence.releaseProfile);
   assert.equal(await restart.isEnabled(), before);
   await shot("-finish-saving");
+  const editVoice = async (text) => {
+    await tab("voice").click();
+    await page.getByRole("heading", { name: "Your voice" }).waitFor();
+    await page.locator('[data-voice="sample"]').fill(text);
+    await tab("interview").click();
+    await say.waitFor();
+  };
+  const committedVoice = "Synthetic writing edit made while the profile write is held.";
   if (extended) {
-    await nav();
+    await editVoice(committedVoice);
     assert.equal(await restart.isDisabled(), true);
     let dialogs = 0;
     const unexpectedReset = async (dialog) => { dialogs++; await dialog.accept(); };
@@ -181,6 +193,8 @@ async function capture(browser, width, colorScheme) {
   await page.waitForFunction(() => evidence.data.store.profile.stories[0]?.theme === "Synthetic project");
 
   if (extended) {
+    await page.waitForFunction((sample) => evidence.data.store.profile.voice.sample === sample &&
+      evidence.data.store.profile.stories[0]?.theme === "Synthetic project", committedVoice);
     await page.waitForFunction(() => !document.querySelector("#restart").disabled);
     await say.press("Control+Enter");
     await count(3);
@@ -262,6 +276,41 @@ async function capture(browser, width, colorScheme) {
     assert.equal(await page.evaluate(() => evidence.storyWrites.includes("Retired stories")), false);
     assert.equal(await page.evaluate(() => evidence.data.store.profile.stories[0]?.theme), "Synthetic project");
     await stored("Welcome after retiring the old Finish request.");
+
+    // A rejected profile write cannot leak its proposed fields into navigation or Start over.
+    await turn("Another synthetic example for the new interview.");
+    await count(11);
+    await requests[10].finish("The new interview reply.");
+    await visible("The new interview reply.");
+    await page.evaluate(() => {
+      evidence.holdProfile = evidence.rejectProfile = true;
+      delete evidence.releaseProfile;
+    });
+    await finish.click();
+    await count(12);
+    await requests[11].finish(JSON.stringify({
+      stories: [{ theme: "Rejected stories" }], goals: { career: "Rejected goal" },
+      facts: { first_name: "Rejected fact" },
+    }));
+    await page.waitForFunction(() => !!evidence.releaseProfile);
+    const retainedVoice = "Synthetic writing edit made while the rejected save is held.";
+    await editVoice(retainedVoice);
+    assert.equal(await restart.isDisabled(), true);
+    await page.evaluate(() => evidence.releaseProfile());
+    await page.getByText("Synthetic profile write rejected.", { exact: true }).waitFor();
+    await page.waitForFunction((sample) => evidence.data.store.profile.voice.sample === sample, retainedVoice);
+    page.once("dialog", (dialog) => dialog.accept());
+    await restart.click();
+    await count(13);
+    await requests[12].finish("Welcome after the rejected story save.");
+    await stored("Welcome after the rejected story save.");
+    await visible("Welcome after the rejected story save.");
+    const fields = await page.evaluate(() => {
+      const { stories, goals, facts, voice } = evidence.data.store.profile;
+      return { theme: stories[0]?.theme, career: goals.career, firstName: facts.first_name, sample: voice.sample };
+    });
+    assert.deepEqual(fields, { theme: "Synthetic project", career: "", firstName: "", sample: retainedVoice });
+    assert.equal(await page.evaluate(() => evidence.storyWrites.includes("Rejected stories")), false);
   }
 
   assert.deepEqual(errors, []);

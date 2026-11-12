@@ -4,9 +4,13 @@ import { setTimeout } from "node:timers/promises";
 import test from "node:test";
 import vm from "node:vm";
 import { callAI, jsonOf, textOf } from "../background/claude.js";
-import { modelFor } from "../lib/store.js";
+import { emptyStore, modelFor, updateStore } from "../lib/store.js";
 import { interviewSystem } from "../onboarding/interview-prompt.js";
-import { applyInterviewFacts } from "../onboarding/profile.js";
+import {
+  applyInterviewFacts,
+  confirmProfileValue,
+  mergeProfileEdits,
+} from "../onboarding/profile.js";
 
 const source = readFileSync(new URL("../onboarding/onboarding.js", import.meta.url), "utf8");
 const key = "deepdive_chat";
@@ -29,24 +33,40 @@ test("Interview owns the pending reply and fences conflicting conversation write
     { role: "user", content: "(Begin the interview.)" },
     { role: "assistant", content: "Which synthetic project taught you the most?" },
   ];
+  const S = emptyStore();
+  S.settings.deep_dive_run = runId;
+  S.profile.facts.first_name = "Initial fact";
+  confirmProfileValue(S.profile, "facts", "first_name");
   const store = {
     [key]: previous,
+    store: structuredClone(S),
     "internscout.session": { token: "iss_synthetic_session", expires: "2099-01-01T00:00:00Z" },
   };
   const delayed = Promise.withResolvers(),
     writing = Promise.withResolvers();
-  const profileWriting = Promise.withResolvers(),
-    profileDelayed = Promise.withResolvers();
+  let heldProfile;
+  const holdProfile = (theme) => {
+    const writing = Promise.withResolvers(),
+      settle = Promise.withResolvers();
+    return (heldProfile = { theme, writing, settle });
+  };
   const late = "Late reply from the previous conversation.";
   const chrome = {
     storage: {
       local: {
-        get: async (name) => ({ [name]: structuredClone(store[name]) }),
+        get: async (keys) =>
+          Object.fromEntries([keys].flat().map((key) => [key, structuredClone(store[key])])),
         async set(patch) {
           const data = structuredClone(patch);
           if (data[key]?.at(-1)?.content === late) {
             writing.resolve();
             await delayed.promise;
+          }
+          if (heldProfile && data.store?.profile.stories[0]?.theme === heldProfile.theme) {
+            const { writing, settle } = heldProfile;
+            heldProfile = null;
+            writing.resolve();
+            await settle.promise;
           }
           Object.assign(store, data);
         },
@@ -101,21 +121,21 @@ test("Interview owns the pending reply and fences conflicting conversation write
     insertAdjacentHTML() {},
   };
   const noop = () => {};
-  const S = {
-    ai: { provider: "internscout" },
-    settings: { deep_dive_run: runId },
-    profile: { facts: {}, stories: [], goals: {} },
-  };
-  let savedProfile;
   const context = vm.createContext({
     S,
     chrome,
     AbortController,
+    structuredClone,
     callAI,
     jsonOf,
     textOf,
     applyInterviewFacts,
+    mergeProfileEdits,
     modelFor,
+    updateStore,
+    BACKGROUND_SETTINGS: [],
+    saveChain: Promise.resolve(),
+    savedSnapshot: structuredClone(S),
     interviewSystem,
     main,
     step: "interview",
@@ -130,13 +150,7 @@ test("Interview owns the pending reply and fences conflicting conversation write
     $: (selector) => main.querySelector(selector),
     esc: String,
     busy: noop,
-    async save() {
-      if (S.profile.stories.length && !savedProfile) {
-        profileWriting.resolve();
-        await profileDelayed.promise;
-        savedProfile = structuredClone(S.profile);
-      }
-    },
+    clearTimeout: noop,
     setTimeout: noop,
     drawSteps: noop,
     wireNav: noop,
@@ -152,7 +166,8 @@ test("Interview owns the pending reply and fences conflicting conversation write
     scrollTo: noop,
   });
   vm.runInContext(
-    between("const runId = () =>", "const busy =") +
+    between("let saveTimer = null;", "window.addEventListener") +
+      between("const runId = () =>", "const busy =") +
       between("function go(id)", "function navButtons") +
       between("function render()", "// The background restored") +
       between('const CHAT_KEY = "deepdive_chat";', "// ---------- 5. voice") +
@@ -182,32 +197,73 @@ test("Interview owns the pending reply and fences conflicting conversation write
   assert.equal(store[key].at(-1).content, "The current interview received the original reply.");
   assert.equal(requests.length, 1);
 
+  const accepted = holdProfile("Synthetic project");
   const finishing = node("finish").click();
   await until(() => requests.length === 2);
   assert.equal(node("restart").disabled, false);
-  requests[1].finish(JSON.stringify({ stories: [{ theme: "Synthetic project" }] }));
-  await profileWriting.promise;
+  requests[1].finish(
+    JSON.stringify({
+      stories: [{ theme: "Synthetic project" }],
+      goals: { career: "Proposed goal" },
+      facts: { first_name: "Proposed fact" },
+    }),
+  );
+  await accepted.writing.promise;
   assert.equal(node("restart").disabled, true);
   await node("restart").click();
-  assert.equal(savedProfile, undefined);
+  assert.equal(S.profile.stories.length, 0);
+  assert.equal(store.store.profile.stories.length, 0);
   assert.equal(store[key].at(-1).content, "The current interview received the original reply.");
   assert.equal(requests.length, 2);
-  profileDelayed.resolve();
+  S.profile.voice.sample = "Unrelated edit while the accepted write is held.";
+  S.profile.goals.career = "Manual goal";
+  S.profile.facts.first_name = "Manual fact";
+  confirmProfileValue(S.profile, "facts", "first_name");
+  context.navigate("voice");
+  context.navigate("interview");
+  accepted.settle.resolve();
   await finishing;
-  assert.equal(savedProfile.stories[0].theme, "Synthetic project");
+  await until(() => store.store.profile.voice.sample === S.profile.voice.sample);
+  assert.equal(store.store.profile.stories[0].theme, "Synthetic project");
   assert.equal(node("restart").disabled, false);
 
-  submit();
+  const rejected = holdProfile("Rejected project");
+  const failing = node("finish").click();
   await until(() => requests.length === 3);
-  requests[2].finish(late);
+  requests[2].finish(
+    JSON.stringify({
+      stories: [{ theme: "Rejected project" }],
+      goals: { career: "Rejected goal" },
+      facts: { first_name: "Rejected fact" },
+    }),
+  );
+  await rejected.writing.promise;
+  S.profile.voice.sample = "Unrelated edit while the rejected write is held.";
+  context.navigate("voice");
+  context.navigate("interview");
+  rejected.settle.reject(new Error("Synthetic profile write rejected."));
+  await failing;
+  assert.match(node("cstat").innerHTML, /Synthetic profile write rejected/);
+  await until(() => store.store.profile.voice.sample === S.profile.voice.sample);
+
+  submit();
+  await until(() => requests.length === 4);
+  requests[3].finish(late);
   await writing.promise;
   const restarting = node("restart").click();
   delayed.resolve();
   await restarting;
-  await until(() => requests.length === 4);
-  requests[3].finish("Welcome to the new conversation.");
+  await until(() => requests.length === 5);
+  requests[4].finish("Welcome to the new conversation.");
   await until(() => node("chat").innerHTML.includes("Welcome to the new conversation."));
   assert.equal(node("chat").innerHTML.includes(late), false);
   assert.equal(store[key].length, 2);
   assert.equal(store[key].at(-1).content, "Welcome to the new conversation.");
+  for (const profile of [S.profile, store.store.profile]) {
+    assert.equal(profile.stories[0].theme, "Synthetic project");
+    assert.equal(profile.goals.career, "Manual goal");
+    assert.equal(profile.facts.first_name, "Manual fact");
+    assert.deepEqual(profile.sources.facts.first_name, { source: "manual", value: "Manual fact" });
+    assert.equal(profile.voice.sample, "Unrelated edit while the rejected write is held.");
+  }
 });
