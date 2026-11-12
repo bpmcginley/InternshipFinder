@@ -46,6 +46,10 @@ def acquire_follow_catalog(
         )
     ):
         _fail()
+    repository = os.fspath(repo)
+    if not isinstance(repository, str) or not repository.strip():
+        _fail()
+    repository = str(Path(repository).absolute())
     deadline = time.monotonic() + timeout_seconds
     # Never inherit alternate object stores, replacement refs or an implicit repository.
     env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
@@ -70,7 +74,7 @@ def acquire_follow_catalog(
                 "-c",
                 "protocol.allow=never",
                 "-C",
-                str(Path(repo)),
+                repository,
                 *args,
             ],
             stdin=subprocess.DEVNULL,
@@ -85,10 +89,15 @@ def acquire_follow_catalog(
                 except OSError:
                     pass
 
-            timer = Timer(remaining, kill)
-            timer.daemon = True
-            timer.start()
+            timer = None
             try:
+                # Process creation itself is not preemptible; never grant its elapsed time again.
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    _fail()
+                timer = Timer(remaining, kill)
+                timer.daemon = True
+                timer.start()
                 # Bounded before allocation, including metadata and a single overflow byte.
                 data = child.stdout.read(cap + 1)
                 if len(data) > cap:
@@ -99,8 +108,11 @@ def acquire_follow_catalog(
                     _fail()
                 return data
             finally:
-                timer.cancel()
-                kill()
+                try:
+                    if timer is not None:
+                        timer.cancel()
+                finally:
+                    kill()
 
     def entry(ref, path):
         raw = read(["ls-tree", "-z", ref, "--", path], 512)
@@ -109,6 +121,8 @@ def acquire_follow_catalog(
             _fail()
         return match[1], match[2], match[3].decode("ascii")
 
+    if read(["rev-parse", "--show-prefix"], 512) != b"\n":
+        _fail()
     if read(["cat-file", "-t", commit], 16) != b"commit\n":
         _fail()
     mode, kind, actual_tree = entry(commit, "docs/data")
@@ -142,6 +156,20 @@ def acquire_follow_catalog(
         or len(manifest) > 26**2 + 2
         or any(not isinstance(key, str) or not codec._SHARD.fullmatch(key) for key in manifest)
     ):
+        _fail()
+    mode, kind, listing_tree = entry(tree, "listings")
+    if mode != b"040000" or kind != b"tree":
+        _fail()
+    # Bounded metadata inventory, not payload reads; descriptions and preview names are unrelated.
+    names = read(["ls-tree", "-z", "--name-only", listing_tree], (26**2 + 2) * 128)
+    if not names.endswith(b"\0"):
+        _fail()
+    eligible = [
+        name[:-5].decode("ascii")
+        for name in names[:-1].split(b"\0")
+        if re.fullmatch(rb"(?:[A-Z]{2}|Canada|remote)\.json", name)
+    ]
+    if len(eligible) != len(set(eligible)) or set(eligible) != set(manifest):
         _fail()
     for key in sorted(manifest):
         path = f"listings/{key}.json"

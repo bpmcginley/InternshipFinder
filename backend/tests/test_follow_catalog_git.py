@@ -227,3 +227,125 @@ def test_child_deadline_and_metadata_overflow_are_bounded(tmp_path, monkeypatch)
             acquire_follow_catalog(repo, **(args | {"timeout_seconds": 1}))
         assert time.monotonic() - started < 5
     assert len(commands) == 2
+
+
+def repin(repo, args):
+    git(repo, "add", "docs/data")
+    root = git(repo, "write-tree").strip().decode()
+    commit = (
+        git(
+            repo,
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.test",
+            "commit-tree",
+            root,
+            data=b"new inventory\n",
+        )
+        .strip()
+        .decode()
+    )
+    return args | {
+        "commit": commit,
+        "tree": git(repo, "rev-parse", commit + ":docs/data").strip().decode(),
+    }
+
+
+@pytest.mark.parametrize("extra_shard", [False, True])
+def test_pinned_inventory_rejects_omitted_slim_but_ignores_unrelated_names(tmp_path, extra_shard):
+    repo, args, payload, _ = fixture(tmp_path)
+    for name in ("NY.desc.json", "preview.json"):
+        (repo / "docs/data/listings" / name).write_bytes(b"unrelated\n")
+    if extra_shard:
+        (repo / "docs/data/listings/NY.json").write_bytes(b"[]")
+    args = repin(repo, args)
+    if extra_shard:
+        with pytest.raises(ValueError):
+            acquire_follow_catalog(repo, **args)
+    else:
+        assert acquire_follow_catalog(repo, **args).catalog.payload == payload
+
+
+def test_empty_and_nested_repository_do_not_fall_back(tmp_path, monkeypatch):
+    repo, args, _, _ = fixture(tmp_path)
+    monkeypatch.chdir(repo)
+    original = acquire.subprocess.Popen
+    calls = []
+
+    def count(*a, **k):
+        calls.append(a)
+        return original(*a, **k)
+
+    monkeypatch.setattr(acquire.subprocess, "Popen", count)
+    for missing in ("", "   "):
+        with pytest.raises(ValueError):
+            acquire_follow_catalog(missing, **args)
+    assert not calls
+    nested = repo / "nested"
+    nested.mkdir()
+    with pytest.raises(ValueError):
+        acquire_follow_catalog(nested, **args)
+
+
+@pytest.mark.parametrize("launch_elapsed", [0.85, 2])
+def test_delayed_launch_uses_remaining_deadline_and_always_kills(
+    tmp_path, monkeypatch, launch_elapsed
+):
+    repo, args, _, _ = fixture(tmp_path)
+    original = acquire.subprocess.Popen
+    at = [0.0]
+    children = []
+    intervals = []
+    monkeypatch.setattr(acquire.time, "monotonic", lambda: at[0])
+
+    def launch(_command, **options):
+        child = original([sys.executable, "-c", "import time;time.sleep(10)"], **options)
+        children.append(child)
+        at[0] = launch_elapsed
+        return child
+
+    class Timer:
+        def __init__(self, interval, kill):
+            intervals.append(interval)
+            self.kill = kill
+
+        def start(self):
+            self.kill()
+
+        def cancel(self):
+            pass
+
+    monkeypatch.setattr(acquire.subprocess, "Popen", launch)
+    monkeypatch.setattr(acquire, "Timer", Timer)
+    with pytest.raises(ValueError):
+        acquire_follow_catalog(repo, **(args | {"timeout_seconds": 1}))
+    assert children[0].poll() is not None
+    assert intervals == pytest.approx([0.15] if launch_elapsed < 1 else [])
+
+
+def test_timer_start_failure_cannot_leave_child_running(tmp_path, monkeypatch):
+    repo, args, _, _ = fixture(tmp_path)
+    original = acquire.subprocess.Popen
+    children = []
+
+    def launch(_command, **options):
+        child = original([sys.executable, "-c", "import time;time.sleep(10)"], **options)
+        children.append(child)
+        return child
+
+    class Timer:
+        def __init__(self, *_):
+            pass
+
+        def start(self):
+            raise RuntimeError("synthetic timer setup failure")
+
+        def cancel(self):
+            pass
+
+    monkeypatch.setattr(acquire.subprocess, "Popen", launch)
+    monkeypatch.setattr(acquire, "Timer", Timer)
+    with pytest.raises(RuntimeError, match="synthetic"):
+        acquire_follow_catalog(repo, **args)
+    assert children[0].poll() is not None
