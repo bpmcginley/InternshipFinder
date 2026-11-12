@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Manage my follows | InternScout</title>
+<script>
+(() => {
+  "use strict";
+  let token = "", version = 0, active = true, changed = () => {};
+  const shape = /^#token=([a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}\.[a-f0-9]{64})$/;
+  function consume() {
+    const raw = location.hash, query = location.href.includes("?");
+    token = ""; version++;
+    let cleared = false;
+    try { history.replaceState(null, "", location.pathname); cleared = true; } catch {}
+    if (active && cleared && !query) token = shape.exec(raw)?.[1] || "";
+    changed();
+  }
+  consume();
+  function receive() {
+    if ((!location.hash || location.hash === "#main") && !location.href.includes("?")) return false;
+    consume(); return true;
+  }
+  addEventListener("hashchange", receive);
+  addEventListener("popstate", receive);
+  function retire() {
+    active = false; token = ""; version++;
+    if (location.hash && location.hash !== "#main") {
+      try { history.replaceState(null, "", location.pathname); } catch {}
+    }
+    changed();
+  }
+  addEventListener("pagehide", retire);
+  addEventListener("pageshow", event => {
+    if (event.persisted) { retire(); active = true; changed(); }
+  });
+  const lifecycle = {
+    read: () => ({ token, version, active }), receive,
+    subscribe: callback => { changed = callback; },
+    forget: () => { token = ""; version++; changed(); },
+  };
+  document.addEventListener("DOMContentLoaded", () => {
+    import("/js/follow-management.mjs").then(({ mountManagementPage }) => {
+      mountManagementPage({ document, lifecycle });
+    }).catch(() => {
+      document.getElementById("status").textContent = "Email follows are unavailable. Please try again later.";
+    });
+  }, { once: true });
+})();
+</script>
+<style>
+:root{color-scheme:light dark;--bg:#f7f5f0;--panel:#fff;--ink:#172b35;--muted:#52626a;--line:#c3c9c6;--accent:#00695d;--button:#fff}
+@media(prefers-color-scheme:dark){:root{--bg:#121617;--panel:#1b2021;--ink:#f0f2ed;--muted:#b6c2c1;--line:#5c6c6a;--accent:#85d9c9;--button:#102b26}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:18px/1.6 system-ui,sans-serif}a{color:var(--accent)}header,main,footer{width:min(100% - 40px,720px);margin-inline:auto}header{padding-block:28px}.brand{font-weight:750;text-decoration:none;font-size:22px}main{margin-top:24px;padding:32px;border:1px solid var(--line);border-radius:14px;background:var(--panel)}h1{font-size:clamp(28px,5vw,38px);line-height:1.2;margin:0 0 24px}p{margin:16px 0}.eyebrow,.confirmation{color:var(--muted);font-size:15px}button,input{font:inherit;min-height:48px;padding:10px 16px;border:1px solid var(--accent);border-radius:7px}button{font-weight:650;color:var(--button);background:var(--accent);cursor:pointer}button:disabled{opacity:.65;cursor:default}input{width:100%;background:var(--panel);color:var(--ink);margin:8px 0 14px}label{display:block}ul{padding:0;list-style:none}li{padding:20px 0;border-top:1px solid var(--line);overflow-wrap:anywhere}.scope{white-space:pre-wrap;margin:0}.confirmation{margin:6px 0 14px}.actions{display:flex;gap:12px;flex-wrap:wrap}form{margin-top:24px;padding-top:24px;border-top:1px solid var(--line)}[hidden]{display:none!important}:focus-visible{outline:3px solid var(--accent);outline-offset:4px}#status{min-height:1.6em;overflow-wrap:anywhere}footer{padding-block:28px;font-size:16px}.skip{position:absolute;left:20px;top:-80px;background:var(--panel);padding:8px}.skip:focus{top:4px}@media(max-width:500px){main{margin-top:12px;padding:24px}button{width:100%}.actions{display:block}.actions button+button{margin-top:12px}}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header><a class="brand" href="/">InternScout</a></header>
+<main id="main" tabindex="-1">
+<p class="eyebrow">Email follows</p>
+<h1>Manage my follows</h1>
+<button id="load" type="button" disabled>Manage my follows</button>
+<ul id="scopes" aria-label="Manage my follows"></ul>
+<div class="actions">
+<button id="more" type="button" hidden disabled>Show more follows</button>
+<button id="delete" type="button" hidden disabled>Delete all my follows</button>
+</div>
+<p id="status" role="status" aria-live="polite" aria-atomic="true" tabindex="-1"></p>
+<form id="request" novalidate>
+<label for="email">Email</label>
+<input id="email" type="email" autocomplete="off" maxlength="254" required>
+<button id="request-button" type="submit" disabled>Email me a management link</button>
+</form>
+</main>
+<footer><a href="/">Find internships</a> · <a href="/privacy.html">Privacy</a></footer>
+</body>
+</html>

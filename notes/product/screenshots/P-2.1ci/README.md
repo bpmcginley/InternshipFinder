@@ -1,0 +1,16 @@
+# P-2.1ci offline management page evidence
+
+Native Edge, fresh isolated contexts, 1280 and 375 px wide, light and dark. Synthetic public company/search facts and runtime-generated fake capabilities only. No provider or real endpoint is contacted. The before response is HTTP 404 because this route is absent at base `8bce9e42`; the minimal local 404 fixture is not the production error page. After-initial is an untouched loaded link (zero API calls); after-list follows explicit keyboard activation of “Manage my follows”. The real source module receives an in-memory transport through an offline wrapper; checked-in page bootstrap has no transport.
+
+| Width/theme | Before | Initial | Explicitly loaded list |
+| --- | --- | --- | --- |
+| 1280 light | [Before](before-1280-light.png) | [Initial](after-initial-1280-light.png) | [List](after-list-1280-light.png) |
+| 1280 dark | [Before](before-1280-dark.png) | [Initial](after-initial-1280-dark.png) | [List](after-list-1280-dark.png) |
+| 375 light | [Before](before-375-light.png) | [Initial](after-initial-375-light.png) | [List](after-list-375-light.png) |
+| 375 dark | [Before](before-375-dark.png) | [Initial](after-initial-375-dark.png) | [List](after-list-375-dark.png) |
+
+Run `node notes/product/screenshots/P-2.1ci/capture.cjs` with Node22 and isolated `playwright-core` on NODE_PATH. It uses native installed Edge, a temporary localhost server and in-memory Response doubles. External requests are blocked in the four viewport lanes. The separate BFCache lane uses only the same local server without interception, enables the native cache, verifies persisted=true and asserts disabled management controls and zero API calls on return.
+
+The 41 scenario checks cover explicit keyboard list load/focus, exact pagination, false versus true removal with focus transfer, same-tab capability replacement and abort, stale result suppression, skip navigation, forced pagehide/restore ordering, generic request receipt, explicit full deletion and native BFCache. Controls are at least 50.8 px high in all four viewport lanes; no horizontal overflow. Source tests additionally exercise malformed/query/duplicate fragments, default-off transport, bounded fatal response decoding, timeout cancellation and busy deduplication.
+
+Visible words come from #177/#542 or existing page chrome: “Manage my follows”, “Email follows”, “Email”, “Email me a management link”, “Email me a new management link”, “Remove this follow”, “Delete all my follows”, “Show more follows”, “Confirmed”, “Pending confirmation”, “Following: {fields}; {states}. Other search filters are not included.”, “Follow removed.”, “All your follows and queued emails have been deleted.”, “You have no follows to manage.”, “This management link is no longer valid. Enter your email to request a new one.”, “If this address can receive email, a management link is on its way.”, “Enter a valid email address.”, “Email follows are unavailable. Please try again later.”, “Skip to content”, “InternScout”, “Find internships”, “Privacy”; title “Manage my follows | InternScout”. Company and field/state values are exact public scope facts, shown as text.
