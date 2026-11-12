@@ -3,12 +3,17 @@
 from dataclasses import replace
 from datetime import timedelta
 import json
+import os
+from pathlib import Path
 import socket
+import subprocess
+import sys
 
 import pytest
 
 from internscout import export_static, pipeline, run_ingest
 from scripts import ingest_data_writer as git
+from scripts import follow_ingest_publication as publication
 from scripts.follow_checkpoint_client import FollowCheckpointLoad
 from scripts.follow_checkpoint_promotion import AcceptedFollowObservation, BoundFollowAcceptance
 from scripts.follow_checkpoint_writer import FollowCheckpointWriter, FollowWriterCheckpointError
@@ -34,6 +39,7 @@ def offline(monkeypatch):
 def attempt(accepted, tmp_path, monkeypatch):
     codec, receipt, proof, source, bounds, directory, listing = accepted
     repo = directory.parent.parent
+    monkeypatch.setattr(publication, 'DATA_DIR', str(tmp_path / 'state'))
     now = NOW + timedelta(hours=1)
 
     class Later(FrozenDateTime):
@@ -206,18 +212,14 @@ def test_ordinary_publication_and_follow_hold_are_independent(attempt, fault):
         context = replace(context, observe=lambda: context.observation)
     result = ingest_and_publish(repo, state, 'Synthetic refresh', ingest_args=args, follow=context)
     assert result.publication[1] != source.commit
-    assert result.follow == (
-        'disabled'
-        if fault == 'disabled'
-        else 'no_publication'
-        if fault == 'stale_observation'
-        else 'held'
-    )
+    assert result.follow == ('disabled' if fault == 'disabled' else 'held')
     assert 'cas' not in store.calls
     if fault == 'disabled':
         assert store.calls == [] and store.state.accepted == initial
     elif fault == 'unavailable':
         assert store.calls == ['load']
+    else:
+        assert store.state.accepted == initial and store.state.pending is not None
 
 
 def test_noop_never_invokes_stage_or_push(accepted, tmp_path, monkeypatch):
@@ -262,3 +264,99 @@ def test_explicit_forward_seed_uses_exact_source(attempt):
     )
     assert result.follow == 'promoted'
     assert store.calls.count('stage') == store.calls.count('cas') == 1
+
+
+def test_wrong_state_stops_before_checkpoint_and_ingest(attempt, tmp_path, monkeypatch):
+    repo, state, _, _, _, store, context, args, *_ = attempt
+    wrong = tmp_path / 'wrong-state'
+    wrong.mkdir()
+    monkeypatch.setattr(run_ingest, 'main', lambda *_a, **_k: pytest.fail('Ingest started'))
+    with pytest.raises(ValueError, match='configured ingestion state'):
+        ingest_and_publish(repo, wrong, 'Rejected', ingest_args=args, follow=context)
+    assert store.calls == []
+    assert not (wrong / 'ats_registry.json').exists()
+
+
+def test_import_bound_state_rejects_empty_wrong_directory_and_preserves_caches(accepted, tmp_path):
+    _, _, _, _, _, directory, _ = accepted
+    repo = directory.parent.parent
+    configured, wrong = tmp_path / 'configured-state', tmp_path / 'empty-wrong-state'
+    configured.mkdir()
+    wrong.mkdir()
+    snapshots = {}
+    for path in git.STATE:
+        body = json.dumps({'synthetic_cache': Path(path).name}).encode()
+        target = repo / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(body)
+        (configured / target.name).write_bytes(body)
+        snapshots[path] = body
+    git.git(repo, 'add', '--', 'backend/data')
+    git.git(repo, 'commit', '-m', 'Synthetic tracked caches')
+    git.git(repo, 'push', 'origin', 'HEAD:refs/heads/data')
+    before = git.remote_tip(repo)
+    fixture = tmp_path / 'fresh.json'
+    fixture.write_text(json.dumps([raw('Synthetic Fresh', 'fresh')]), encoding='utf8')
+    child = r"""
+import os, socket, sys
+from pathlib import Path
+from internscout import config, discover, geo, probe
+from internscout.sources import google_jobs
+from scripts.follow_ingest_publication import ingest_and_publish
+repo, configured, wrong, fixture, metrics, mode = map(Path, sys.argv[1:])
+socket.socket = lambda *a, **k: (_ for _ in ()).throw(AssertionError('No network'))
+socket.create_connection = socket.socket
+assert Path(config.DATA_DIR).resolve() == configured.resolve()
+for path in [discover.REGISTRY_PATH, discover.DROPPED_PATH, geo.CACHE_PATH,
+             probe.CACHE_PATH, google_jobs.DAY_PATH]:
+    assert Path(path).parent.resolve() == configured.resolve()
+# Environment changes after imports must not rebind the already loaded writers.
+os.environ['INTERNSCOUT_DATA'] = str(wrong)
+args = ['--fixture', str(fixture), '--metrics', str(metrics)]
+if str(mode) == 'reject':
+    try:
+        ingest_and_publish(repo, wrong, 'Must reject', ingest_args=args)
+    except ValueError as error:
+        assert 'configured ingestion state' in str(error)
+    else:
+        raise AssertionError('Mismatched state accepted')
+else:
+    result = ingest_and_publish(repo, configured / '.', 'Synthetic valid state', ingest_args=args)
+    assert result.follow == 'disabled'
+"""
+    database_path = tmp_path / 'child.db'
+    env = {
+        **os.environ,
+        'INTERNSCOUT_DATA': str(configured),
+        'INTERNSCOUT_DB': database_path.as_posix(),
+        'GIT_ALLOW_PROTOCOL': 'file',
+    }
+    for mode in ('reject', 'allow'):
+        result = subprocess.run(
+            [
+                sys.executable,
+                '-c',
+                child,
+                str(repo),
+                str(configured),
+                str(wrong),
+                str(fixture),
+                str(tmp_path / 'child-metrics.json'),
+                mode,
+            ],
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+        if mode == 'reject':
+            assert result.stdout == '' and not database_path.exists()
+            assert git.remote_tip(repo) == before
+        else:
+            assert git.remote_tip(repo) != before
+        for path, body in snapshots.items():
+            assert (repo / path).read_bytes() == body
+            assert (configured / Path(path).name).read_bytes() == body
+            assert git.git(repo, 'cat-file', 'blob', f'origin/data:{path}').stdout == body
+        assert list(wrong.iterdir()) == []

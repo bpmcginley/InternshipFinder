@@ -8,6 +8,7 @@ from hashlib import sha256
 from pathlib import Path
 
 from internscout import run_ingest
+from internscout.config import DATA_DIR
 from internscout.follow_writer_provenance import ExportIdentity, FollowWriterCapture
 from scripts import ingest_data_writer as git
 from scripts.follow_checkpoint_client import FollowCheckpointClientError
@@ -62,6 +63,8 @@ def ingest_and_publish(
     Unexpected ingest/Git errors propagate. Lost mutation replies are never blindly retried.
     An outer process deadline remains required before production integration.
     """
+    if Path(state).resolve() != Path(DATA_DIR).resolve():
+        raise ValueError('Publication state must match configured ingestion state')
     if any(arg == '--export' or arg.startswith('--export=') for arg in ingest_args):
         raise ValueError('The publication checkout owns the export destination')
     checkout = Path(checkout)
@@ -134,7 +137,8 @@ def ingest_and_publish(
                 )
                 return BoundFollowAcceptance(exact.candidate_commit, receipt) if receipt else None
 
-            status = follow.writer.recover(current, bind_accepted=bind)
+            recovered = follow.writer.recover(current, bind_accepted=bind)
+            status = 'held' if recovered == 'no_publication' else recovered
         except _HELD:
             status = 'held'
     return IngestPublication(result, status)
