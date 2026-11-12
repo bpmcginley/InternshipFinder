@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { CHECKS } from "../../src/placements.js";
-import { reviewSig } from "../../src/orders.js";
+import { reviewSig } from "../../src/orders/templates.js";
 import { ID, TODAY, world } from "./fixtures.js";
 
 // ---------------------------------------------------------------- review

@@ -8,6 +8,7 @@
 // box) is left alone, and a file with no bullets it can edit makes the caller fall back.
 // This file is ASCII only; every other character is written as a \u escape.
 import { hasNewNumbers } from "./tailoring.js";
+import { hasUnsupportedAnchors } from "./tailor_claims.js";
 import { reorderSkills } from "./resume_doc.js";
 import { entryBytes, readZip, withContent, writeZip } from "./zip.js";
 
@@ -329,7 +330,12 @@ export function applyDocxTailoring(xml, { paras, groups }, out) {
       used.add(j);
       let text = tidy(b && b.text, orig[j].text);
       if (text && listLike(orig[j].text)) text = reorderSkills(orig[j].text, text); // same items, new order, or nothing
-      if (!text || !fits(text, orig[j].text) || hasNewNumbers(text, orig[j].text))
+      if (
+        !text ||
+        !fits(text, orig[j].text) ||
+        hasNewNumbers(text, orig[j].text) ||
+        hasUnsupportedAnchors(text, orig[j].text)
+      )
         text = orig[j].text;
       order.push({ j, text });
     }

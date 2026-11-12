@@ -5,8 +5,9 @@
 // date. Stripe holds the card, the name and the email; they never reach this Worker or D1.
 import { HttpError } from "./http.js";
 import { countEvent } from "./visits.js";
-import { listingEvent } from "./orders.js";
+import { listingEvent } from "./orders/settlement.js";
 import { studentCheckout, completeStudentCheckout } from "./student-checkout.js";
+import { topupWebhook } from "./topup-webhook.js";
 
 const API = "https://api.stripe.com/v1/";
 // The same version the webhook endpoint is set to, so events and API replies share one shape.
@@ -289,7 +290,14 @@ async function reversedStudentPayment(db, env, event, fetchImpl) {
 async function applyFresh(db, env, config, event, now, fetchImpl) {
   const o = (event.data && event.data.object) || {};
 
-  // Paid listings bought by employers (orders.js, added 2026-10-19) go first: a Checkout session whose
+  // Known top-ups stay inside the existing receipt and must never reach other billing handlers.
+  const topup = await topupWebhook({ db, env, event, fetchImpl, clock: () => now });
+  if (topup) {
+    if (!["settled", "expired", "reconciled", "inactive", "ignored"].includes(topup.status)) throw billingRetry();
+    return ["inactive", "ignored"].includes(topup.status) ? { ok: true, ignored: true } : { ok: true };
+  }
+
+  // Paid listings bought by employers (orders.js, added 2026-10-19) precede subscriptions: a Checkout session whose
   // metadata.kind is "listing", and a dispute or refund on a payment that belongs to an order. They are
   // never a student's plan, and everything below is left exactly as it was. null means "not a listing".
   const listing = await listingEvent(db, env, event, now, fetchImpl);

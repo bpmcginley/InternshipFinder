@@ -29,6 +29,7 @@ globalThis.chrome = {
 // Every model call lands here. `replies` answers by what the system prompt starts with, so a test
 // says what the layout reader, the Word tailor, the PDF tailor and the template tailor would reply.
 let calls = [],
+  sent = [],
   replies = {};
 const kindOfCall = (system) =>
   /^You transcribe/.test(system)
@@ -42,6 +43,7 @@ globalThis.fetch = async (url, init) => {
   const body = JSON.parse(init.body),
     kind = kindOfCall(body.system || "");
   calls.push(kind);
+  sent.push(body);
   const reply = replies[kind];
   const text = typeof reply === "string" ? reply : JSON.stringify(reply === undefined ? {} : reply);
   return {
@@ -57,6 +59,7 @@ globalThis.fetch = async (url, init) => {
 const reset = () => {
   data = {};
   calls = [];
+  sent = [];
   replies = {};
 };
 
@@ -328,4 +331,172 @@ test("urisIn reads link addresses and nothing else", () => {
   assert.deepEqual(urisIn(""), []);
   assert.equal(sameLink("https://www.LinkedIn.com/in/jane/", "linkedin.com/in/jane"), true);
   assert.equal(sameLink("https://a.com/x", "https://a.com/y"), false);
+});
+
+// Reconstruct the previous public key contract from the current real hash inputs. Only synthetic
+// fixtures are used. This checks the actual path keys, rather than a separate test-only version.
+test("all three paths ignore old-version cache entries and reuse newly checked results", async () => {
+  const { tailorKey } = await import("../lib/tailor_cache.js");
+  const digest = crypto.subtle.digest.bind(crypto.subtle);
+  const decodeKey = (raw) => {
+    const values = [];
+    let at = 0;
+    for (let n = 0; n < 3; n++) {
+      const end = raw.indexOf(":", at),
+        size = Number(raw.slice(at, end));
+      values.push(raw.slice(end + 1, end + 1 + size));
+      at = end + 1 + size;
+    }
+    return values;
+  };
+  for (const original of [null, await docx("Garamond"), pdf()]) {
+    reset();
+    let keyInput;
+    crypto.subtle.digest = async (algorithm, bytes) => {
+      const text = new TextDecoder().decode(bytes);
+      if (text.includes("\nfacts-4")) keyInput = text;
+      return digest(algorithm, bytes);
+    };
+    try {
+      // Default fake replies leave the original unchanged but still exercise file construction/cache.
+      if (original?.type === "application/pdf") replies.layout = layout();
+      const store = storeOf(original);
+      const fresh = await tailorResume(store, JOB);
+      assert.ok(keyInput, "real cache key includes the validation version");
+      assert.ok(!fresh.reused);
+      const count = calls.length;
+      const warm = await tailorResume(store, JOB);
+      assert.equal(warm.reused, true);
+      assert.equal(calls.length, count);
+      const [model, system, prompt] = decodeKey(keyInput);
+      const withoutLocalFacts = prompt.slice(0, prompt.lastIndexOf("\nLOCAL_FACTS:"));
+      const priorPrompt = original
+        ? withoutLocalFacts.replace("\nfacts-4\n", "\nformat-2\n")
+        : withoutLocalFacts.replace(/\nfacts-4$/, "");
+      const legacyPrompts = [priorPrompt, withoutLocalFacts.replace("\nfacts-4", "\nfacts-3")];
+      for (const legacyPrompt of legacyPrompts) {
+        const oldKey = await tailorKey(model, system, legacyPrompt);
+        data.tailor_cache = {
+          [oldKey]: { at: Date.now(), value: { file: { name: "unchecked-old" }, diff: [] } },
+        };
+        const before = calls.length;
+        const rebuilt = await tailorResume(store, JOB);
+        assert.notEqual(rebuilt.file.name, "unchecked-old");
+        assert.ok(!rebuilt.reused);
+        assert.equal(calls.length, before + 1);
+        const again = await tailorResume(store, JOB);
+        assert.equal(again.reused, true);
+        assert.equal(calls.length, before + 1);
+      }
+      // A different posting still cannot reuse the prior posting's checked cache entry.
+      await tailorResume(store, {
+        ...JOB,
+        description: JOB.description + " Different synthetic role.",
+      });
+      assert.equal(calls.length, count + legacyPrompts.length + 1);
+    } finally {
+      crypto.subtle.digest = digest;
+    }
+  }
+});
+
+test("posting requirements cannot become resume facts through any model response path", async () => {
+  for (const original of [null, await docx("Garamond"), pdf()]) {
+    reset();
+    replies.layout = layout();
+    const bullets = [
+      { from: 0, text: "Improved scores 40%" },
+      { from: 1, text: "Used Kubernetes" },
+      {
+        from: 2,
+        text: original?.name?.endsWith(".docx")
+          ? "Ordered supplies for the team"
+          : "Ordered supplies",
+      },
+    ];
+    replies.template = { summary: "Kubernetes expert", experience: [{ i: 0, bullets }] };
+    replies.doc = { entries: [{ s: 1, e: 0, bullets }] };
+    replies.docx = { groups: [{ g: 0, bullets }] };
+    const result = await tailorResume(storeOf(original), {
+      ...JOB,
+      description:
+        "Kubernetes expertise and improving scores 40% are desired for this synthetic job.",
+    });
+    assert.deepEqual(result.diff, []);
+    assert.equal(result.summary, "");
+    assert.equal(calls.length, original?.type === "application/pdf" ? 2 : 1);
+  }
+});
+
+test("template GPA and graduation changes invalidate cached PDF and summary without adding model facts", async () => {
+  for (const [field, before, after, summary] of [
+    ["gpa", "3.9", "3.2", "Student with GPA 3.9"],
+    ["end", "May 2028", "May 2029", "Graduating in 2028"],
+  ]) {
+    reset();
+    const store = storeOf(null);
+    store.profile.education[0][field] = before;
+    replies.template = { summary };
+    const first = await tailorResume(store, JOB);
+    assert.equal(first.summary, summary);
+    assert.equal((await tailorResume(store, JOB)).reused, true);
+    assert.equal(calls.length, 1);
+    store.profile.education[0][field] = after;
+    const changed = await tailorResume(store, JOB);
+    assert.ok(!changed.reused);
+    assert.equal(changed.summary, "");
+    assert.notEqual(changed.file.b64, first.file.b64);
+    assert.ok(Buffer.from(changed.file.b64, "base64").toString("latin1").includes(after));
+    assert.deepEqual(sent[1].messages, sent[0].messages);
+    assert.equal((await tailorResume(store, JOB)).reused, true);
+    assert.equal(calls.length, 2);
+  }
+});
+
+test("local cache identity covers render-only fields but excludes unrelated profile metadata", async () => {
+  const edits = [
+    (s) => (s.profile.education[0].start = "2024"),
+    (s) => (s.profile.education[0].grad_term = "Fall 2029"),
+    (s) => (s.profile.education[0].coursework = "Synthetic coursework"),
+    (s) => (s.profile.experience[0].start = "2024"),
+    (s) => (s.profile.experience[0].end = "2026"),
+    (s) => (s.profile.experience[0].location = "Synthetic location"),
+    (s) => (s.profile.projects[0].dates = "2026"),
+    (s) => (s.profile.projects[0].role = "Synthetic role"),
+    (s) => (s.profile.projects[0].link = "https://example.test/project"),
+    (s) => (s.profile.facts.first_name = "Casey"),
+    (s) => (s.settings.signup_email = "synthetic@example.test"),
+  ];
+  for (const edit of edits) {
+    reset();
+    const store = storeOf(null);
+    store.profile.projects = [{ name: "Synthetic project", description: "Kept records" }];
+    await tailorResume(store, JOB);
+    edit(store);
+    assert.ok(!(await tailorResume(store, JOB)).reused);
+    assert.equal(calls.length, 2);
+    assert.deepEqual(sent[1].messages, sent[0].messages);
+    store.profile.unrelated_note = "Synthetic ignored metadata";
+    store.profile.education[0].internal_note = "Synthetic ignored metadata";
+    store.settings.theme = "dark";
+    assert.equal((await tailorResume(store, JOB)).reused, true);
+    assert.equal(calls.length, 2);
+  }
+});
+
+test("format-preserving cache identity follows profile-derived output filename", async () => {
+  for (const original of [await docx("Garamond"), pdf()]) {
+    reset();
+    replies.layout = layout();
+    const store = storeOf(original);
+    const first = await tailorResume(store, JOB);
+    const count = calls.length;
+    // Last name still matches the fixture layout, so this isolates the derived filename.
+    store.profile.facts.first_name = "Casey";
+    const changed = await tailorResume(store, JOB);
+    assert.ok(!changed.reused);
+    assert.notEqual(changed.file.name, first.file.name);
+    assert.equal(calls.length, count + 1);
+    assert.equal((await tailorResume(store, JOB)).reused, true);
+  }
 });

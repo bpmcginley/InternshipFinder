@@ -7,10 +7,12 @@ from pathlib import Path
 
 import pytest
 
-from internscout.site import advisor
-from internscout import page_dates, seo_pages
+from internscout import page_dates
+from internscout.site import advisor, publish, runtime
 from internscout.site.render.advisor import render
-from test_seo_pages import _row, _site
+from tests.seo_fixture_data import _row, _site
+
+pytestmark = pytest.mark.without_seo_facade
 
 
 END = "2026-11-11T12:00:00Z"
@@ -218,7 +220,10 @@ def set_export_stamp(site, value):
 
 
 def build(site):
-    return {p["path"]: p for p in seo_pages.build(str(site), earning=frozenset())}
+    state = runtime.BuildState(near_on=False)
+    hooks = runtime.BuildHooks()
+    pages = runtime.invoke(state, hooks, runtime.build, str(site), earning=frozenset())
+    return {p["path"]: p for p in pages}, state, hooks
 
 
 def exported(i):
@@ -236,9 +241,9 @@ def test_integrated_pages_preserve_existing_catalog_and_have_no_feeds(tmp_path, 
     set_export_stamp(site, END)
     select = advisor.select
     monkeypatch.setattr(advisor, "select", lambda *_: [])
-    before = build(site)
+    before, _, _ = build(site)
     monkeypatch.setattr(advisor, "select", select)
-    after = build(site)
+    after, state, hooks = build(site)
     additions = {p.path for p in select(data([], majors))}
     assert after.keys() - before.keys() == additions
     for path, page in before.items():
@@ -246,7 +251,7 @@ def test_integrated_pages_preserve_existing_catalog_and_have_no_feeds(tmp_path, 
         assert after[path]["index"] == page["index"]
         if path != "/internships/for/":
             assert after[path]["html"] == page["html"], path
-    seo_pages.write(site, list(after.values()))
+    publish._write_site(site, list(after.values()), state, hooks)
     sitemap = (Path(site) / "sitemap.xml").read_text(encoding="utf-8")
     hub = after["/internships/for/"]["html"]
     for path in additions:
@@ -270,7 +275,7 @@ def test_selected_data_directory_supplies_weekly_roles_mapping_and_date(tmp_path
     )
     set_export_stamp(staged, END)
     monkeypatch.setenv("INTERNSCOUT_PUBLIC_DATA", str(Path(staged) / "data"))
-    pages = build(served)
+    pages, _, _ = build(served)
     assert "/internships/for/old-major-majors/weekly/" not in pages
     page = pages["/internships/for/computer-science-majors/weekly/"]
     assert "1 open student role first seen" in page["html"]
