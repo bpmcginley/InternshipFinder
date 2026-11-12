@@ -111,6 +111,32 @@ export class WitnessDouble {
   }
 }
 
+// Independent native witness for the CAS adapter tests. No production storage is selected.
+export class CheckpointWitnessCasFixture extends DurableObject {
+  constructor(ctx, env) {
+    super(ctx, env);
+    ctx.storage.sql.exec(
+      "CREATE TABLE IF NOT EXISTS witness (id INTEGER PRIMARY KEY, tag TEXT, text TEXT)",
+    );
+  }
+  seedWitness(text) {
+    this.ctx.storage.sql.exec("INSERT INTO witness VALUES(1,'1',?)", text);
+  }
+  readRecord() {
+    const row = this.ctx.storage.sql.exec("SELECT tag,text FROM witness WHERE id=1").toArray()[0];
+    return row ? JSON.stringify({ tag: row.tag, text: row.text }) : null;
+  }
+  compareAndSwap(tag, text) {
+    return (
+      this.ctx.storage.sql.exec(
+        "UPDATE witness SET tag=CAST(CAST(tag AS INTEGER)+1 AS TEXT),text=? WHERE id=1 AND tag=?",
+        text,
+        tag,
+      ).rowsWritten === 1
+    );
+  }
+}
+
 export class CheckpointIntegration extends DurableObject {
   constructor(ctx, env) {
     super(ctx, env);
