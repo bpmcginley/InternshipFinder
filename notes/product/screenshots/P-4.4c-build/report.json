@@ -1,0 +1,26 @@
+[
+  {
+    "width": 1280,
+    "colorScheme": "light",
+    "localSyntheticSubmissions": 2,
+    "externalRequestsAllowed": 0
+  },
+  {
+    "width": 1280,
+    "colorScheme": "dark",
+    "localSyntheticSubmissions": 2,
+    "externalRequestsAllowed": 0
+  },
+  {
+    "width": 375,
+    "colorScheme": "light",
+    "localSyntheticSubmissions": 2,
+    "externalRequestsAllowed": 0
+  },
+  {
+    "width": 375,
+    "colorScheme": "dark",
+    "localSyntheticSubmissions": 2,
+    "externalRequestsAllowed": 0
+  }
+]

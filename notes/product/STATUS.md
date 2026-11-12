@@ -374,6 +374,8 @@ The golden harness now covers static assets as well as generated pages. Each sit
 
 ## Waiting for Bruce
 
+[#479](https://github.com/bpmcginley/InternshipFinder/pull/479) P-4.4c advisor signup build wiring claims `backend/internscout/site/publish.py`, narrow per-build `runtime.py` plumbing, a new offline test, and owned Product notes. Draft needs-bruce, default off; no provider calls or settings. Integration is held until after G3 because backend source matches ingest push filters. Tags/no automation verification and conditional privacy publication remain activation gates.
+
 - **P-2.2ap native checkout recovery UI [#475](https://github.com/bpmcginley/InternshipFinder/pull/475)**: audit_site, `codex/product-p2.2ap-recovery-ui`, on published `82c3c429`. Draft needs-bruce; conditional Account/allowance recovery and exact pending-checkout deletion guidance implemented. 16 focused and 400 site tests, two golden tests and 24 paired synthetic screenshots. Session, refresh and cross-tab deletion races corrected. #472 is deployed with recovery off pending provider configuration. Independent review and hosted checks remain.
 
 
@@ -600,3 +602,7 @@ Merged #430 adds an authenticated, default-off Worker offer with exact Stripe Pr
 ## Chrome 0.6.0 strict Worker SSE parsing
 
 Draft needs-bruce [#443](https://github.com/bpmcginley/InternshipFinder/pull/443) normally refreshed on published #426 merge 3947e237, rejects malformed/truncated/oversized Worker SSE before model content can be dispatched, preserves valid multiline/UTF-8/signature/finish/cancellation behavior and bounds accumulation to 4 MiB body / 1 MiB event. Incremental raw-byte framing passes the deterministic fragmentation regression; only recognized terminal/block reasons complete the response and malformed function-call arguments fail closed. The original exact 381 extension tests passed. Fresh Node 22 focused tests pass 49 cases and scoped ESLint passes. Fresh hosted checks and independent integration review remain pending. Existing retry/admission policy is unchanged; ambiguous duplicate-generation handling and compatibility with operator-configured Worker bounds remain separate release gates. Guard, permissions, manifest and version unchanged. [Package evidence](P-0.6.0-strict-sse.md).
+
+## P-4.4c dormant advisor build wiring
+
+Draft needs-bruce [#479](https://github.com/bpmcginley/InternshipFinder/pull/479) wires an explicit default-off publisher option to the already-approved weekly advisor renderer. Missing/invalid action and ambiguous options fail closed; no field or advisor status is inferred. Default golden output is identical. Offline 72 focused/golden and 400 site tests plus eight paired browser captures and eight intercepted synthetic submissions pass. Fresh-artifact rollback, G3 hold, actual Buttondown Tags/no-automation verification and approved privacy publication remain required; no activation or provider access. [Evidence](P-4.4c-advisor-build.md).

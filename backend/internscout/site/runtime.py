@@ -3424,6 +3424,10 @@ def _emit_advisor_pages(add, data, majors_made):
     for model in models:
         add(**_render_advisor_module.render(
             model, listing_rows=_hooks().listing_rows, limit=_state().per_page,
+            advisor_signup=(
+                _select_signup_form("", None, _digest.SIGNUP_HEADING, True, "landing")
+                if _state().advisor_signup_enabled else None
+            ),
         ))
         links.append((model.path, model.name))
     return links
@@ -3668,6 +3672,14 @@ def build_result(
     served = set(live) | set(held)
     _state().beacon = _hooks().beacon_from(site_dir)
     _state().digest_form = _hooks().digest_form_action(site_dir)
+    if type(_state().advisor_signup_enabled) is not bool:
+        raise ValueError("Advisor signup requires an explicit boolean build option")
+    if _state().advisor_signup_enabled and (
+        not isinstance(_state().digest_form, str)
+        or _state().digest_form != _state().digest_form.strip()
+        or not digest_archive(_state().digest_form)
+    ):
+        raise ValueError("Advisor signup requires the existing valid Buttondown form action")
     data = _hooks().load(site_dir)
     _state().baseline = data["baseline"]
     listings = data["listings"]
@@ -3882,6 +3894,7 @@ class BuildState:
     baseline: str | None = BASELINE
     generated: datetime | None = GENERATED
     digest_form: str = DIGEST_FORM
+    advisor_signup_enabled: bool = False
     tracker: tuple[str, str] | None = TRACKER
     employers: dict[str, str] = field(default_factory=dict)
     texts: dict[str, str] = field(default_factory=dict)

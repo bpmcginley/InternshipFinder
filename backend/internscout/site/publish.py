@@ -209,7 +209,7 @@ def _held_paths(listing: str) -> frozenset[str]:
 
 def main(argv: list[str], *, card_renderer: share_cards.Renderer | None = None) -> None:
     """python -m internscout.site.publish SITE_DIR [LIVE_SITEMAP [LIVE_NOINDEX_LIST]] [--placements PATH]
-    [--placements-report PATH] [--employer-postings] [--employer-posting-capture]
+    [--placements-report PATH] [--employer-postings] [--employer-posting-capture] [--advisor-signup]
 
     --placements PATH (2026-10-14): the Worker's GET /placements answer, which the pages workflow
     fetches only when the repo variable INTERNSCOUT_PLACEMENTS_URL is set and otherwise writes as
@@ -225,8 +225,19 @@ def main(argv: list[str], *, card_renderer: share_cards.Renderer | None = None) 
     before rendering organic annotations from that same captured data. Off by default; it does
     not enable browser capture or Worker collection. Use a fresh staged export for each build.
     --employer-posting-capture additionally marks supported count scripts, only with that staging.
-    It does not configure Worker intake or change any production workflow."""
+    It does not configure Worker intake or change any production workflow.
+    --advisor-signup passes the existing valid Buttondown form only to weekly advisor pages.
+    Absent means off. Account Tags/automation and conditional privacy publication require
+    separate operator verification; this option does not perform or imply those checks."""
+    # This explicit build option is not an account/privacy approval check. Operators must
+    # qualify those gates before using it in publication; no workflow enables it by default.
     argv = list(argv)
+    advisor_options = [arg for arg in argv if arg.startswith("--advisor-signup")]
+    if advisor_options not in ([], ["--advisor-signup"]):
+        raise ValueError("Advisor signup requires one exact --advisor-signup option")
+    advisor_signup = bool(advisor_options)
+    if advisor_signup:
+        argv.remove("--advisor-signup")
     capture = "--employer-posting-capture" in argv
     if capture:
         if argv.count("--employer-posting-capture") != 1 or argv.count("--employer-postings") != 1:
@@ -251,7 +262,9 @@ def main(argv: list[str], *, card_renderer: share_cards.Renderer | None = None) 
     from .employer_capture import require_unmarked
 
     require_unmarked(Path(site_dir))
-    state = runtime.BuildState()
+    state = (
+        runtime.BuildState(advisor_signup_enabled=True) if advisor_signup else runtime.BuildState()
+    )
     hooks = runtime.BuildHooks()
     if employer_postings:
         from .employer_publication import prepare
