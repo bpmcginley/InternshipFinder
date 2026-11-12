@@ -11,6 +11,7 @@ const credential = () => randomUUID() + "." + randomBytes(32).toString("hex");
 const pageSource = fs.readFileSync(path.join(root, "docs/follows/manage.html"), "utf8");
 const moduleSource = fs.readFileSync(path.join(root, "docs/js/follow-management.mjs"), "utf8");
 const wrapper = `import {mountManagementPage as mount} from '/fixture-source.mjs';
+export {createManagementTransport} from '/fixture-source.mjs';
 export function mountManagementPage(args) {
  const key=company=>JSON.stringify({kind:'company',company});
  const row=(company,confirmed=false)=>({scope_key:key(company),created:'2026-11-12T00:00:00.000Z',confirmed_at:confirmed?'2026-11-12T01:00:00.000Z':null});
@@ -242,6 +243,128 @@ export function mountManagementPage(args) {
     assert.equal(await blockedPage.locator("#email").isDisabled(), true);
     cases++;
     await blocked.close();
+    // Exercise the real optional adapter with every remote request intercepted.
+    for (const enabled of [false, true]) {
+      const transportContext = await browser.newContext();
+      const calls = [],
+        capability = credential();
+      await transportContext.route("**/*", async (route) => {
+        const request = route.request(),
+          url = new URL(request.url());
+        if (url.hostname === "internscout-api.bpmcginley.workers.dev") {
+          if (request.method() === "OPTIONS") {
+            await route.fulfill({
+              status: 204,
+              headers: {
+                "Access-Control-Allow-Origin": base,
+                "Access-Control-Allow-Methods": "POST",
+                "Access-Control-Allow-Headers": "content-type",
+              },
+            });
+            return;
+          }
+          assert.equal(request.method(), "POST");
+          assert.equal(url.search, "");
+          assert.equal(url.hash, "");
+          assert.equal(request.headers()["content-type"], "application/json");
+          assert.equal(request.headers()["cookie"], undefined);
+          assert.equal(request.headers()["referer"], undefined);
+          const body = request.postDataJSON();
+          calls.push({ path: url.pathname, body });
+          const headers = {
+            "Access-Control-Allow-Origin": base,
+            "Content-Type": "application/json",
+            "Cache-Control": "no-store",
+          };
+          if (url.pathname.endsWith("/request")) {
+            await route.fulfill({ status: 202, headers, body: "" });
+            return;
+          }
+          const response = url.pathname.endsWith("/list")
+            ? {
+                scopes: [
+                  {
+                    scope_key: JSON.stringify({ kind: "company", company: "Example Robotics" }),
+                    created: "2026-11-12T00:00:00.000Z",
+                    confirmed_at: null,
+                  },
+                ],
+                next: null,
+              }
+            : url.pathname.endsWith("/remove")
+              ? { removed: true }
+              : { deleted: true };
+          await route.fulfill({ status: 200, headers, body: JSON.stringify(response) });
+          return;
+        }
+        if (url.origin !== base) {
+          await route.abort();
+          return;
+        }
+        if (url.pathname === "/follows/manage.html") {
+          await route.fulfill({
+            contentType: "text/html",
+            body: enabled
+              ? pageSource.replace(
+                  '<html lang="en">',
+                  '<html lang="en" data-follow-management-enabled="1">',
+                )
+              : pageSource,
+          });
+          return;
+        }
+        if (url.pathname === "/js/follow-management.mjs") {
+          await route.fulfill({ contentType: "text/javascript", body: moduleSource });
+          return;
+        }
+        await route.continue();
+      });
+      const transportPage = await transportContext.newPage();
+      await transportPage.goto(base + "/follows/manage.html#token=" + capability);
+      await transportPage.waitForFunction(() => !document.querySelector("#load").disabled);
+      assert.equal(calls.length, 0);
+      assert.equal(new URL(transportPage.url()).hash, "");
+      await transportPage.locator("#load").click();
+      if (!enabled) {
+        await transportPage.waitForFunction(() =>
+          document.querySelector("#status").textContent.includes("unavailable"),
+        );
+        assert.equal(calls.length, 0);
+      } else {
+        await transportPage.locator("#scopes li").waitFor();
+        await transportPage.locator("#scopes button").click();
+        await transportPage.waitForFunction(
+          () => document.querySelector("#status").textContent === "Follow removed.",
+        );
+        await transportPage.locator("#delete").click();
+        await transportPage.waitForFunction(() =>
+          document.querySelector("#status").textContent.includes("have been deleted"),
+        );
+        await transportPage.locator("#email").fill("reader@example.test");
+        await transportPage.locator("#request-button").click();
+        await transportPage.waitForFunction(() =>
+          document.querySelector("#status").textContent.includes("management link is on its way"),
+        );
+        assert.deepEqual(
+          calls.map((c) => c.path),
+          [
+            "/follows/manage/list",
+            "/follows/manage/remove",
+            "/follows/manage/delete",
+            "/follows/manage/request",
+          ],
+        );
+        assert.deepEqual(calls[0].body, [capability, null]);
+        assert.deepEqual(calls[1].body, [
+          capability,
+          JSON.stringify({ kind: "company", company: "Example Robotics" }),
+        ]);
+        assert.deepEqual(calls[2].body, [capability]);
+        assert.deepEqual(calls[3].body, { email: "reader@example.test" });
+      }
+      cases++;
+      await transportContext.close();
+    }
     console.log(
       JSON.stringify({
         cases,

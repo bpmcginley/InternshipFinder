@@ -59,8 +59,38 @@ async function replyBody(response, signal) {
   }
 }
 
-// No production URL or transport is selected here. A future reviewed first-party
-// adapter must send these exact JSON bodies without cookies, redirects or logging.
+// Trusted static opt-in only. No URL, identity or policy comes from the link.
+export function createManagementTransport({
+  enabled = false,
+  fetchImpl = (...args) => globalThis.fetch(...args),
+} = {}) {
+  if (enabled !== true || typeof fetchImpl !== "function") return null;
+  return (operation, body, { signal }) => {
+    if (!["list", "remove", "deleteAll", "request"].includes(operation))
+      throw new Error("operation");
+    return fetchImpl(
+      operation === "list"
+        ? "https://internscout-api.bpmcginley.workers.dev/follows/manage/list"
+        : operation === "remove"
+          ? "https://internscout-api.bpmcginley.workers.dev/follows/manage/remove"
+          : operation === "deleteAll"
+            ? "https://internscout-api.bpmcginley.workers.dev/follows/manage/delete"
+            : "https://internscout-api.bpmcginley.workers.dev/follows/manage/request",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        credentials: "omit",
+        cache: "no-store",
+        redirect: "error",
+        mode: "cors",
+        referrerPolicy: "no-referrer",
+        signal,
+      },
+    );
+  };
+}
+
 export function mountManagementPage({
   document,
   lifecycle,

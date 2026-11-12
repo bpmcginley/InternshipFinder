@@ -3,7 +3,11 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { randomBytes, randomUUID } from "node:crypto";
 import vm from "node:vm";
-import { mountManagementPage, scopeFacts } from "../../docs/js/follow-management.mjs";
+import {
+  mountManagementPage,
+  scopeFacts,
+  createManagementTransport,
+} from "../../docs/js/follow-management.mjs";
 const html = readFileSync(new URL("../../docs/follows/manage.html", import.meta.url), "utf8");
 const script = html.match(/<script>([\s\S]*?)<\/script>/)[1];
 const token = () => randomUUID() + "." + randomBytes(32).toString("hex");
@@ -66,6 +70,7 @@ async function fixture({ fragment, query = "", historyFails = false, transport, 
   );
   for (const id of ["load", "more", "delete", "request-button", "email"]) nodes[id].disabled = true;
   const document = {
+    documentElement: { getAttribute: () => null },
     getElementById: (id) => nodes[id],
     createElement: (tag) => new Node(tag),
     querySelectorAll: () =>
@@ -97,6 +102,7 @@ async function fixture({ fragment, query = "", historyFails = false, transport, 
       },
     },
     Promise,
+    createManagementTransport,
     mountManagementPage: (args) => {
       lifecycle = args.lifecycle;
       mountManagementPage({
@@ -115,7 +121,7 @@ async function fixture({ fragment, query = "", historyFails = false, transport, 
   vm.runInNewContext(
     script.replace(
       'import("/js/follow-management.mjs")',
-      "Promise.resolve({ mountManagementPage })",
+      "Promise.resolve({ mountManagementPage, createManagementTransport })",
     ),
     context,
   );
@@ -376,4 +382,58 @@ test("failed initial fragment scrubbing loads no module or transport and leaves 
   assert.match(f.nodes.status.textContent, /unavailable/);
   for (const id of ["load", "more", "delete", "request-button", "email"])
     assert.equal(f.nodes[id].disabled, true);
+});
+
+test("optional static transport is closed by default and uses only four exact POST bodies", async () => {
+  const calls = [];
+  const fetchImpl = async (...args) => {
+    calls.push(args);
+    return new Response(null, { status: 503 });
+  };
+  for (const enabled of [undefined, false, 1, "1", "true", {}, []])
+    assert.equal(createManagementTransport({ enabled, fetchImpl }), null);
+  const transport = createManagementTransport({ enabled: true, fetchImpl });
+  const capability = token(),
+    controller = new AbortController();
+  const cases = [
+    ["list", [capability, null], "list"],
+    ["remove", [capability, key("example")], "remove"],
+    ["deleteAll", [capability], "delete"],
+    ["request", { email: "reader@example.test" }, "request"],
+  ];
+  for (const [operation, body, path] of cases) {
+    await transport(operation, body, { signal: controller.signal });
+    const [url, options] = calls.at(-1);
+    assert.equal(url, "https://internscout-api.bpmcginley.workers.dev/follows/manage/" + path);
+    assert(!url.includes(capability));
+    assert.deepEqual(options, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      credentials: "omit",
+      cache: "no-store",
+      redirect: "error",
+      mode: "cors",
+      referrerPolicy: "no-referrer",
+      signal: controller.signal,
+    });
+  }
+  assert.equal(calls.length, 4);
+  assert.throws(() => transport("unknown", [capability], { signal: controller.signal }));
+  assert.equal(calls.length, 4);
+  assert.doesNotMatch(html, /<html[^>]*data-follow-management-enabled/);
+});
+test("optional transport never retries network failure", async () => {
+  let calls = 0;
+  const transport = createManagementTransport({
+    enabled: true,
+    fetchImpl: async () => {
+      calls++;
+      throw new Error("synthetic");
+    },
+  });
+  await assert.rejects(
+    transport("list", [token(), null], { signal: new AbortController().signal }),
+  );
+  assert.equal(calls, 1);
 });

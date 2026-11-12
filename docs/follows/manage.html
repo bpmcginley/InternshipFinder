@@ -20,6 +20,7 @@
     changed(); return cleared;
   }
   const scrubbed = consume();
+  const transportEnabled = document.documentElement.getAttribute("data-follow-management-enabled") === "1";
   function receive() {
     if ((!location.hash || location.hash === "#main") && !location.href.includes("?")) return false;
     consume(); return true;
@@ -47,8 +48,8 @@
       document.getElementById("status").textContent = "Email follows are unavailable. Please try again later.";
       return;
     }
-    import("/js/follow-management.mjs").then(({ mountManagementPage }) => {
-      mountManagementPage({ document, lifecycle });
+    import("/js/follow-management.mjs").then(({ mountManagementPage, createManagementTransport }) => {
+      mountManagementPage({ document, lifecycle, transport: createManagementTransport({ enabled: transportEnabled }) });
     }).catch(() => {
       document.getElementById("status").textContent = "Email follows are unavailable. Please try again later.";
     });
