@@ -34,6 +34,7 @@ const migrationNames = [
   "0021_follow_confirmation_outbox.sql",
   "0022_follow_confirmation_claim.sql",
   "0023_follow_scoped_link.sql",
+  "0024_follow_management_remove.sql",
 ];
 const legacySql = [...env.TEST_SCHEMA_SQL, ...env.TEST_EXTRA_SCHEMA_SQL];
 const databases = [env.LEGACY_DB, env.MIGRATION_DB];
@@ -50,6 +51,7 @@ beforeEach(async () => {
   // Explicit cleanup also makes the proof independent of test-runner storage isolation defaults.
   for (const db of databases) {
     await db.prepare("DROP VIEW IF EXISTS follow_link_requests").run();
+    await db.prepare("DROP VIEW IF EXISTS follow_management_removals").run();
     await db.prepare("DROP TRIGGER IF EXISTS follow_link_consumed").run();
     await db.prepare("DROP TRIGGER IF EXISTS follow_confirmation_scope_changed").run();
     await run(
@@ -100,8 +102,8 @@ it("migrations create the complete legacy schema, including constraints and trig
   expect(await schema(env.MIGRATION_DB)).toEqual(expected);
   expect(expected.objects.filter((row) => row.type === "table")).toHaveLength(64);
   expect(expected.objects.filter((row) => row.type === "index")).toHaveLength(35);
-  expect(expected.objects.filter((row) => row.type === "trigger")).toHaveLength(14);
-  expect(expected.objects.filter((row) => row.type === "view")).toHaveLength(2);
+  expect(expected.objects.filter((row) => row.type === "trigger")).toHaveLength(15);
+  expect(expected.objects.filter((row) => row.type === "view")).toHaveLength(3);
   expect(await ledger()).toEqual(migrationNames.map((name) => ({ name })));
 });
 
