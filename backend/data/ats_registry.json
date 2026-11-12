@@ -1845,6 +1845,12 @@
    "fails": 0,
    "added": "2026-10-04"
   },
+  "parabola-io": {
+   "name": "Parabola",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-12"
+  },
   "paragon": {
    "name": "Paragon",
    "quant": false,
@@ -2288,6 +2294,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "sfdata": {
+   "name": "San Francisco Data",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-12"
   },
   "shield": {
    "name": "Shield AI",
@@ -8102,12 +8114,6 @@
    "added": "2026-10-29",
    "sector": "education_research"
   },
-  "us-envoyair": {
-   "name": "Envoy Air",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-11-10"
-  },
   "uscareers-idemia": {
    "name": "IDEMIA",
    "quant": false,
@@ -9087,6 +9093,12 @@
    "fails": 0,
    "added": "2026-09-19"
   },
+  "pittsburghclo": {
+   "name": "Confluence Theater of Pittsburgh",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-12"
+  },
   "pointblueconservationscience": {
    "name": "Point Blue Conservation Science",
    "quant": false,
@@ -9329,6 +9341,12 @@
    "fails": 0,
    "added": "2026-09-15",
    "sector": "government_policy"
+  },
+  "sews": {
+   "name": "Sumitomo Electric Wiring Systems",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-12"
   },
   "sikichcareers": {
    "name": "Sikich",
@@ -11672,6 +11690,12 @@
    "fails": 0,
    "added": "2026-09-14"
   },
+  "inscipher-careers": {
+   "name": "InsCipher",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-12"
+  },
   "intelliguard": {
    "name": "Intelliguard",
    "quant": false,
@@ -12145,6 +12169,12 @@
    "fails": 0,
    "added": "2026-10-01"
   },
+  "accuscansciences": {
+   "name": "AccuScan Sciences",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-12"
+  },
   "al-warren-oil-company-inc": {
    "name": "Al Warren Oil Company",
    "quant": false,
@@ -12162,6 +12192,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-14"
+  },
+  "amax-1": {
+   "name": "AMAX",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-12"
   },
   "ants-sports": {
    "name": "ANTS Sports",
@@ -13464,6 +13500,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "austalusa|wd1|austal": {
+   "name": "Austal USA",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-12"
   },
   "austincc|wd1|external": {
    "name": "Austin Community College District",
@@ -18025,6 +18067,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-15"
+  },
+  "panerabread|wd5|panera_careers": {
+   "name": "Panera Bread",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-12"
   },
   "papajohns|wd1|papajohnscareers": {
    "name": "Papa John's",
