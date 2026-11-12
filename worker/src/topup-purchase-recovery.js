@@ -6,7 +6,7 @@ import { readTopupReversalEvidence } from "./topup-reversal-evidence.js";
 const pending = () => ({ status: "pending" });
 
 // Historical offer configuration is trusted input; no current-sales gate or browser evidence.
-export async function recoverTopupPurchase(db, env, paymentHash, originalOffer, fetchImpl) {
+export async function readVerifiedTopupPurchase(db, env, paymentHash, originalOffer, fetchImpl) {
   if (typeof fetchImpl !== "function") return pending();
   let offer;
   try {
@@ -65,6 +65,13 @@ export async function recoverTopupPurchase(db, env, paymentHash, originalOffer, 
     )
   )
     return pending();
+  return { status: "verified", captured, reversals };
+}
+
+export async function recoverTopupPurchase(db, env, paymentHash, originalOffer, fetchImpl) {
+  const evidence = await readVerifiedTopupPurchase(db, env, paymentHash, originalOffer, fetchImpl);
+  if (evidence.status !== "verified") return evidence;
+  const { captured, reversals } = evidence;
   // Committed prior flags/hold causes and current unused balances are read inside this helper.
   // First successful commit wins. A conflict needs a new capture AND new provider reads;
   // failed reads never advance the revision. Storage errors propagate, without retry.
