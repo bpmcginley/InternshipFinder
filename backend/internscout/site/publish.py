@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from functools import partial
 import hashlib
 from html import escape as esc
+from html.parser import HTMLParser
 import json
 import os
 from pathlib import Path
@@ -207,10 +208,81 @@ def _held_paths(listing: str) -> frozenset[str]:
         return frozenset()
 
 
+class _AdvisorMarkup(HTMLParser):
+    """Recognize only visible section anchors and usable controls in generated HTML."""
+
+    _VOID = frozenset(
+        "area base br col embed hr img input link meta param source track wbr".split()
+    )
+    _INERT = frozenset(
+        "script style template textarea title xmp iframe noembed noframes noscript plaintext".split()
+    )
+
+    def __init__(self, html: str):
+        super().__init__(convert_charrefs=True)
+        self.stack = []
+        self.section = None
+        self.digest_headings = 0
+        self.privacy_items = {}
+        self.controls = 0
+        self.feed(html)
+        self.close()
+
+    def handle_starttag(self, tag, pairs):
+        attrs = dict(pairs)
+        style = "".join((attrs.get("style") or "").lower().split())
+        hidden = (
+            any(blocked for _, blocked, _ in self.stack)
+            or tag in self._INERT
+            or "hidden" in attrs
+            or "inert" in attrs
+            or (attrs.get("aria-hidden") or "").strip().lower() == "true"
+            or any(
+                rule in style
+                for rule in ("display:none", "visibility:hidden", "content-visibility:hidden")
+            )
+        )
+        if not hidden:
+            ancestors = [name for name, _, _ in self.stack]
+            if tag == "h2":
+                self.section = attrs.get("id")
+                self.digest_headings += self.section == "digest"
+            if tag == "li" and self.section == "digest" and "ul" in ancestors:
+                self.privacy_items[self.getpos()] = None
+            if (
+                tag == "input"
+                and "form" in ancestors
+                and attrs.get("type") == "checkbox"
+                and attrs.get("name") == "tag"
+                and attrs.get("value") == "advisor"
+                and not any(key in attrs for key in ("checked", "required", "disabled"))
+            ):
+                self.controls += 1
+        if tag not in self._VOID:
+            self.stack.append((tag, hidden, self.getpos()))
+
+    def handle_endtag(self, tag):
+        for index in range(len(self.stack) - 1, -1, -1):
+            if self.stack[index][0] == tag:
+                start = self.stack[index][2]
+                if (
+                    tag == "li"
+                    and start in self.privacy_items
+                    and not any(blocked for _, blocked, _ in self.stack)
+                ):
+                    self.privacy_items[start] = self.getpos()
+                del self.stack[index:]
+                break
+
+    def handle_startendtag(self, tag, pairs):
+        # HTML non-void elements do not close themselves merely because of a trailing slash.
+        self.handle_starttag(tag, pairs)
+
+
 def _advisor_privacy(site_dir: str) -> bytes:
     """Prepare the approved disclosure without rewriting surrounding staged bytes."""
     raw = (Path(site_dir) / "privacy.html").read_bytes()
-    raw.decode("utf-8")
+    text = raw.decode("utf-8")
     heading = b'<h2 id="digest">'
     anchor = b"      <li><strong>Buttondown holds your address, not us.</strong>"
     disclosure = (
@@ -224,6 +296,18 @@ def _advisor_privacy(site_dir: str) -> bytes:
     lines = [line for line in section.splitlines(keepends=True) if line.startswith(anchor)]
     if len(lines) != 1 or not lines[0].rstrip(b"\r\n").endswith(b"</li>"):
         raise ValueError("Advisor privacy insertion point must be in the weekly email section")
+    markup = _AdvisorMarkup(text)
+    start = text.index(anchor.decode())
+
+    def position(offset):
+        # Preserve bytes; HTMLParser positions count LF only.
+        return (text.count("\n", 0, offset) + 1, offset - text.rfind("\n", 0, offset) - 1)
+
+    end = start + len(lines[0].decode().rstrip("\r\n")) - len("</li>")
+    if markup.digest_headings != 1 or markup.privacy_items.get(position(start + 6)) != position(
+        end
+    ):
+        raise ValueError("Advisor privacy insertion point must be visible in the weekly email list")
     line = lines[0]
     ending = b"\r\n" if line.endswith(b"\r\n") else b"\n"
     return raw.replace(line, line + b"      <li>" + disclosure + b"</li>" + ending, 1)
@@ -301,6 +385,14 @@ def main(argv: list[str], *, card_renderer: share_cards.Renderer | None = None) 
         _live_paths(argv[2]) if len(argv) > 2 else {},
         _held_paths(argv[3]) if len(argv) > 3 else frozenset(),
     ).pages
+    if advisor_signup:
+        weekly = [
+            p
+            for p in pages
+            if p["path"].startswith("/internships/for/") and p["path"].endswith("/weekly/")
+        ]
+        if not weekly or any(_AdvisorMarkup(p["html"]).controls != 1 for p in weekly):
+            raise ValueError("Advisor publication requires weekly pages with advisor controls")
     built = pages  # as build() made them, before any paid box, for the feeds
     today = _today_utc()
     if placements_path is not None:

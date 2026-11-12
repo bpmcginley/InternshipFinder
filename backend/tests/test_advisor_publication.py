@@ -1,6 +1,7 @@
 """One opt-in couples approved privacy and form bytes; no provider calls."""
 
 from pathlib import Path
+import json
 import runpy
 import shutil
 import socket
@@ -37,6 +38,72 @@ def public_fixture(root):
 
 
 @pytest.mark.parametrize(
+    "majors", [[], [{"name": "Graduate", "level": "graduate"}], [{"name": "!!!"}]]
+)
+def test_enabled_without_weekly_pages_rejects_before_any_output(tmp_path, majors):
+    site = fixture(tmp_path)
+    (site / "data/majors.json").write_text(json.dumps({"majors": majors}), encoding="utf-8")
+    before = files(site)
+    with pytest.raises(ValueError, match="weekly pages with advisor controls"):
+        publish.main(["publish", str(site), "--advisor-signup"])
+    assert files(site) == before
+
+
+@pytest.mark.parametrize("fault", ["wrong-tag", "comment", "template", "hidden", "duplicate"])
+def test_one_weekly_page_without_control_rejects_entire_artifact(tmp_path, monkeypatch, fault):
+    from internscout.site.render import advisor
+
+    original = advisor.render
+
+    def missing(model, **kwargs):
+        page = original(model, **kwargs)
+        if model.name == "Undeclared":
+            body = page["body"]
+            page["body"] = {
+                "wrong-tag": body.replace('value="advisor"', 'value="other"'),
+                "comment": "<!--" + body + "-->",
+                "template": "<template>" + body + "</template>",
+                "hidden": body.replace("<form ", "<form hidden "),
+                "duplicate": body + body,
+            }[fault]
+        return page
+
+    monkeypatch.setattr(advisor, "render", missing)
+    site = fixture(tmp_path)
+    before = files(site)
+    with pytest.raises(ValueError, match="weekly pages with advisor controls"):
+        publish.main(["publish", str(site), "--advisor-signup"])
+    assert files(site) == before
+
+
+@pytest.mark.parametrize(
+    "wrapper",
+    [
+        ("<!--\n", "-->"),
+        ("<script>\n", "</script>"),
+        ("<textarea>\n", "</textarea>"),
+        ("<template>\n", "</template>"),
+        ("<template/>\n", "</template>"),
+        ('<div hidden>\n', "</div>"),
+        ('<div aria-hidden="true">\n', "</div>"),
+        ('<div style="display: none">\n', "</div>"),
+    ],
+)
+@pytest.mark.parametrize("target", ["anchor", "heading"])
+def test_invisible_privacy_context_rejects_before_output(tmp_path, wrapper, target):
+    site = fixture(tmp_path)
+    privacy = site / "privacy.html"
+    raw = privacy.read_bytes()
+    marker = b"<li><strong>Buttondown holds" if target == "anchor" else b'<h2 id="digest">'
+    line = next(line for line in raw.splitlines(keepends=True) if marker in line)
+    privacy.write_bytes(raw.replace(line, wrapper[0].encode() + line + wrapper[1].encode()))
+    before = files(site)
+    with pytest.raises(ValueError, match="Advisor privacy insertion point"):
+        publish.main(["publish", str(site), "--advisor-signup"])
+    assert files(site) == before
+
+
+@pytest.mark.parametrize(
     "fault",
     [
         "missing",
@@ -46,6 +113,7 @@ def public_fixture(root):
         "duplicate-anchor",
         "outside",
         "unclosed",
+        "comment-inside",
         "already",
         "utf8",
     ],
@@ -67,6 +135,7 @@ def test_bad_privacy_rejects_before_any_output(tmp_path, fault):
             "duplicate-anchor": raw + anchor,
             "outside": raw.replace(anchor, b"") + anchor,
             "unclosed": raw.replace(anchor, anchor.replace(b"</li>", b"")),
+            "comment-inside": raw.replace(anchor, anchor.replace(b"</strong>", b"</strong><!--")),
             "already": raw + TEXT,
             "utf8": raw + b"\xff",
         }[fault]
@@ -81,6 +150,7 @@ def test_bad_privacy_rejects_before_any_output(tmp_path, fault):
 def test_privacy_preserves_all_surrounding_bytes_and_unique_placement(tmp_path, ending):
     site = fixture(tmp_path)
     original = (site / "privacy.html").read_bytes().replace(b"\r\n", b"\n").replace(b"\n", ending)
+    original = original.replace(b'<h2 id="digest">', '<!-- \u2028 -->\n<h2 id="digest">'.encode())
     (site / "privacy.html").write_bytes(original)
     prepared = publish._advisor_privacy(str(site))
     insertion = b"      <li>" + TEXT + b"</li>" + ending
