@@ -1,7 +1,7 @@
 import { loadStore, isWorker } from "../lib/store.js";
 import { spend, perApplication, money } from "../lib/usage.js";
 import { allowanceLines, tierNote, MAIN_TASKS } from "../lib/auth.js";
-import { takeRestored, restoredMessage } from "../lib/sync.js";
+import { loadProfileWithRestore, restoredMessage } from "../lib/sync.js";
 import { STORE_REVIEWS_URL } from "../lib/review.js";
 import { entryState } from "../lib/entry.js";
 
@@ -10,9 +10,8 @@ const $ = (id) => document.getElementById(id);
 $("ver").textContent = "v" + chrome.runtime.getManifest().version;
 
 (async () => {
-  const s = await loadStore();
   // Signed in on a new computer: the Deep Dive came back from the account (lib/sync.js). Said once.
-  const r = await takeRestored();
+  const { store: s, notice: r } = await loadProfileWithRestore();
   if (r) {
     $("restored").hidden = false;
     $("restored").textContent =

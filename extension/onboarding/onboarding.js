@@ -1,7 +1,7 @@
 // Deep Dive starts with the resume. Returning students can reopen any step.
 import { loadStore, updateStore, hasKey, isGemini, isWorker, modelFor, modeOf, PRESETS, CONFIRMATION_FACTS, ELIGIBILITY_FACTS, confirmedFacts, factFallback, factSuggestions, resumeReviewPending, unconfirmedOldFacts, workAuthMismatch, manualDetailsMissing } from "../lib/store.js";
 import { allowanceLines, tierNote, MAIN_TASKS, PROVIDER_LABELS, OFFER_KEY, SESSION_KEY } from "../lib/auth.js";
-import { BACKGROUND_SETTINGS, RESTORED_KEY, restoredMessage, takeRestored, restoredAt } from "../lib/sync.js";
+import { BACKGROUND_SETTINGS, RESTORED_KEY, restoredMessage, loadProfileWithRestore, restoredAt } from "../lib/sync.js";
 import { callAI, textOf, jsonOf } from "../background/claude.js";
 import { DEFAULT_PRICES, loadUsage, saveUsage, priceFor, spend, money } from "../lib/usage.js";
 import { quickStartReady, finishOnboarding, digestLink, enterDetailsManually, manualPathOpen, pausedMessage, shouldRevealQuick, revealQuick, setupDone, signInNeeded, readAfterSignIn } from "./quickstart.js";
@@ -21,18 +21,17 @@ const STEPS = [
 // Auto-Apply can be turned on from Files (2026-10-04); these three make its answers better and are
 // labelled as optional in the step bar. doneFor() still counts them, so the side panel still suggests them.
 const OPTIONAL_STEPS = ["facts", "interview", "voice"];
-let S = await loadStore();
-let savedSnapshot = structuredClone(S);
+let S, savedSnapshot, pendingResumeImport;
 let saveChain = Promise.resolve();
-let pendingResumeImport = pendingResumeReview(S);
+let restoreChain = Promise.resolve();
+let latestRestore;
 let renderEpoch = 0;
 let interviewChat = null;
 let interviewWrites = Promise.resolve();
-let rerun = !!S.settings.onboarded;   // was: const. A restore from the account (below) makes this a rerun.
+let rerun;
 const requestedStep = new URLSearchParams(location.search).get("step");
 const explicitStep = STEPS.some(([id]) => id === requestedStep);
-let step = explicitStep ? requestedStep : rerun ? "review" : "files";
-let seenRestore = await restoredAt();   // the last restore this page has loaded
+let step, seenRestore;   // the current step and the revision of its loaded profile
 let restoredNote = "";                  // shown above the current step until the student moves on
 // Signed in to InternScout's AI: true, false, or null until the background has said (refreshSignIn).
 // dashOffer: the dashboard has offered its own sign-in and the Worker has said it is live (U8).
@@ -75,7 +74,7 @@ function save(now) {
   if (now) return run();
   saveTimer = setTimeout(run, 300);
 }
-window.addEventListener("beforeunload", () => save(true));
+window.addEventListener("beforeunload", () => { if (S) save(true); });
 
 // One Deep Dive is one run to the Worker, however many questions it asks, so every call carries the
 // same run_id: minted on first use, kept across reloads, retired when the Deep Dive is finished so
@@ -131,37 +130,52 @@ function render() {
 
 // The background restored the Deep Dive from the student's account (after they signed in here or in the
 // popup, or at startup). Reload it, so a student on a new computer isn't sent through the Deep Dive again.
-async function showRestore() {
-  const r = await takeRestored();
-  seenRestore = await restoredAt();
-  if (!r) return false;
-  restoredNote = restoredMessage(r) + (S.files.resume ? "" : " Your files stay on each device, so add your resume under Resume.");
-  return true;
-}
-chrome.storage.onChanged.addListener(async (ch, area) => {
-  const r = area === "local" && ch[RESTORED_KEY] && ch[RESTORED_KEY].newValue;
-  if (!r || r.at === seenRestore || r.at === interviewChat?.revision) return;
-  const previous = interviewChat;
-  const next = interviewChat = interviewConversation(null, r.at);
-  next.restoring = true;
-  next.interrupted = !!(previous?.pending || previous?.failed || previous?.interrupted);
-  previous?.pending?.abort();
-  clearTimeout(saveTimer);
-  const current = await loadStore();
-  if (interviewChat !== next) return;
-  S = current;
+function useProfile({ store, revision, notice }) {
+  S = store;
+  seenRestore = revision;
   savedSnapshot = structuredClone(S);
   pendingResumeImport = pendingResumeReview(S);
   queuedResume = null;
   rerun = !!S.settings.onboarded;
-  const shown = await showRestore();
-  if (interviewChat !== next) return;
-  next.restoring = false;
-  if (shown && rerun) step = "review";
-  if (!shown && step !== "interview") return;
-  render();
-  scrollTo(0, 0);
-  focusStepHeading(main);
+  restoredNote = notice
+    ? restoredMessage(notice) + (S.files.resume ? "" : " Your files stay on each device, so add your resume under Resume.")
+    : "";
+}
+function retireInterviewForRestore(revision) {
+  const previous = interviewChat;
+  const next = interviewChat = interviewConversation(null, revision);
+  next.restoring = true;
+  next.interrupted = !!(previous?.pending || previous?.failed || previous?.interrupted);
+  previous?.pending?.abort();
+  clearTimeout(saveTimer);
+  return next;
+}
+const restoreTime = (revision) => Date.parse(revision) || 0;
+chrome.storage.onChanged.addListener((ch, area) => {
+  const change = area === "local" && ch[RESTORED_KEY];
+  const revision = change?.newValue?.at;
+  const time = restoreTime(revision);
+  const loadedOrQueued = Math.max(restoreTime(seenRestore), restoreTime(latestRestore));
+  if (revision === change?.oldValue?.at || time <= loadedOrQueued) return;
+  latestRestore = revision;
+  if (S) retireInterviewForRestore(revision);
+  const refresh = async () => {
+    await startup;
+    if (latestRestore !== revision || time <= restoreTime(seenRestore)) return;
+    const profile = await loadProfileWithRestore();
+    const loaded = restoreTime(profile.revision);
+    // A queued read can claim a newer notice than the event that requested it.
+    if (loaded < restoreTime(latestRestore) || loaded <= restoreTime(seenRestore)) return;
+    const next = interviewChat?.restoring ? interviewChat : retireInterviewForRestore(profile.revision);
+    next.revision = profile.revision;
+    next.restoring = false;
+    useProfile(profile);
+    if (profile.notice && rerun) step = "review";
+    render();
+    scrollTo(0, 0);
+    focusStepHeading(main);
+  };
+  restoreChain = restoreChain.then(refresh, refresh);
 });
 
 // ---------- 1. setup ----------
@@ -389,7 +403,7 @@ async function refreshSignIn() {
 // connects the dashboard tab at the same moment), and a sign-in in the popup or side panel changes the
 // session too, so either one updates the buttons and the step bar here.
 chrome.storage.onChanged.addListener((ch, area) => {
-  if ((area === "session" && ch[OFFER_KEY]) || (area === "local" && ch[SESSION_KEY])) refreshSignIn();
+  if ((area === "session" && ch[OFFER_KEY]) || (area === "local" && ch[SESSION_KEY])) startup.then(refreshSignIn);
 });
 
 // The Files step's sign-in (U4): the resume can't be read while signed out on InternScout's AI, so the
@@ -1102,10 +1116,13 @@ function review() {
   if (S.settings.onboarded) drawHeld();
 }
 
-// The Setup email saved as its first letter by 0.5.6 and earlier (U3): put the whole address back.
-if (repairSetupEmail(S)) { pendingResumeImport = pendingResumeReview(S); save(true); }
-// A restore that happened before this page opened (signed in from the popup on a new computer).
-await showRestore();
-if (restoredNote && S.settings.onboarded && !explicitStep) step = "review";
-render();
+// Register for restores before reading the startup profile so a newer write can always trigger a reload.
+const startup = loadProfileWithRestore().then((profile) => {
+  useProfile(profile);
+  step = explicitStep ? requestedStep : rerun ? "review" : "files";
+  // The Setup email saved as its first letter by 0.5.6 and earlier (U3): put the whole address back.
+  if (repairSetupEmail(S)) { pendingResumeImport = pendingResumeReview(S); save(true); }
+  render();
+});
+await startup;
 refreshSignIn();

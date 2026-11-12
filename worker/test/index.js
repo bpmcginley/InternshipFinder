@@ -41,12 +41,29 @@ import "./settlement-race.test.js";
 import "./api-contract.test.js";
 
 import "./follows.test.js";
+import "./follow-signup-admission.test.js";
+import "./follow-signup-route.test.js";
+import "./follow-signup-mount.test.js";
+import "./follow-linked-request.test.js";
+import "./follow-catalog.test.js";
+import "./follow-catalog-loader.test.js";
 import "./follow-management.test.js";
+import "./follow-management-http.test.js";
+import "./follow-management-request.test.js";
+import "./follow-management-claim.test.js";
+import "./follow-management-delivery.test.js";
+import "./follow-link-dispatch.test.js";
+import "./follow-link-runtime.test.js";
 import "./follow-outbox.test.js";
 import "./follow-retention.test.js";
+import "./follow-management-request-http.test.js";
+import "./follow-management-route.test.js";
 import "./follow-unsubscribe.test.js";
 import "./follow-unsubscribe-endpoint.test.js";
+import "./follow-token-endpoint.test.js";
+import "./follow-signup-http.test.js";
 import "./follow-mail.test.js";
+import "./follow-email-transport.test.js";
 import "./follow-request-deletion.test.js";
 import "./follow-matching.test.js";
 import "./follow-progress.test.js";
@@ -62,6 +79,7 @@ import "./follow-checkpoint-r2.test.js";
 import "./follow-checkpoint-r2-native.test.js";
 import "./follow-checkpoint-payload.test.js";
 import "./follow-checkpoint-integration.test.js";
+import "./follow-checkpoint-runtime.test.js";
 
 import "./topup-ledger.test.js";
 import "./topup-decisions.test.js";
@@ -98,6 +116,10 @@ import "./ai-lifecycle.test.js";
 
 import "./topup-retention.test.js";
 import "./topup-retirement.test.js";
+import "./topup-history-observation.test.js";
+import "./topup-history-coverage.test.js";
+import "./topup-history-traversal.test.js";
+import "./topup-history-page.test.js";
 
 import "./topup-webhook.test.js";
 import "./purchased-allowance.test.js";

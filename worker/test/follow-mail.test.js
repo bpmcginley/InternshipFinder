@@ -195,3 +195,251 @@ test("follow transport calls once and hides provider message and recipient detai
     message: "Follow mail is unavailable",
   });
 });
+
+const CONFIRM_TOKEN = `20000000-0000-4000-8000-000000000002.${"b".repeat(64)}`;
+const DELETE_TOKEN = `fd_30000000-0000-4000-8000-000000000003.${"c".repeat(64)}`;
+const action = (purpose, token) => `${SITE}/follows/action.html#purpose=${purpose}&token=${token}`;
+const actionLinks = {
+  ...input.links,
+  confirmation: action("confirm", CONFIRM_TOKEN),
+  deleteRequest: action("delete-request", DELETE_TOKEN),
+};
+
+test("canonical purpose-specific action fragments appear only in confirmation body", () => {
+  const legacy = renderFollowMail("confirm", { ...input, summary: "Fixture Company" });
+  const message = renderFollowMail("confirm", {
+    ...input,
+    summary: "Fixture Company",
+    links: actionLinks,
+  });
+  assert.deepEqual(message, {
+    ...legacy,
+    text: legacy.text
+      .replace(input.links.confirmation, actionLinks.confirmation)
+      .replace(input.links.deleteRequest, actionLinks.deleteRequest),
+  });
+  assert.deepEqual(message.headers, unsubscribeHeaders);
+  assert.ok(!JSON.stringify({ ...message, text: undefined }).includes(CONFIRM_TOKEN));
+  assert.ok(!JSON.stringify({ ...message, text: undefined }).includes(DELETE_TOKEN));
+});
+
+test("action fragments reject wrong purpose, token, origin, path and noncanonical fields before send", async () => {
+  const env = { EMAIL: { send: () => assert.fail("No send for invalid action links") } };
+  for (const [name, purpose, token] of [
+    ["confirmation", "confirm", CONFIRM_TOKEN],
+    ["deleteRequest", "delete-request", DELETE_TOKEN],
+  ]) {
+    const valid = action(purpose, token);
+    const bad = [
+      action(name === "confirmation" ? "delete-request" : "confirm", token),
+      action(purpose, name === "confirmation" ? DELETE_TOKEN : CONFIRM_TOKEN),
+      action(purpose, token.toUpperCase()),
+      action(purpose, token.slice(0, -1)),
+      action(purpose, token + "0"),
+      action(purpose, token.replace(".", "%2E")),
+      action(purpose, token.replace("-", "x")),
+      valid.replace(SITE, "https://unapproved.example.test"),
+      valid.replace("https:", "http:"),
+      valid.replace("site.example.test", "user@site.example.test"),
+      valid.replace("/follows/action.html", "/follows/other.html"),
+      valid.replace("/follows/", "/follows/../follows/"),
+      valid.replace("/follows/", "/%66ollows/"),
+      valid.replace("#", "?"),
+      valid.replace("#", "?#"),
+      valid.replace("#", "?tracking=1#"),
+      valid.replace("#", "#extra=1&"),
+      valid + "&extra=1",
+      valid + "&purpose=" + purpose,
+      valid + "&token=" + token,
+      `${SITE}/follows/action.html#token=${token}&purpose=${purpose}`,
+      valid.replace("purpose=", "pur%70ose="),
+      valid.replace("&token=", "&to%6ben="),
+      valid.replace(`purpose=${purpose}`, "purpose=manage"),
+      `${SITE}/follows/action.html#`,
+      valid + "#",
+    ];
+    for (const value of bad)
+      await assert.rejects(
+        sendFollowMail(env, "confirm", {
+          ...input,
+          summary: "Fixture Company",
+          links: { ...actionLinks, [name]: value },
+        }),
+        { message: "Invalid follow message input" },
+      );
+  }
+});
+
+test("action fragments stay in their purpose and tokens stay out of public links", () => {
+  for (const name of ["unsubscribe", "management"]) {
+    for (const value of [
+      actionLinks.confirmation,
+      actionLinks.deleteRequest,
+      `${input.links[name]}#`,
+    ])
+      assert.throws(
+        () => renderFollowMail("manage", { ...input, links: { ...input.links, [name]: value } }),
+        /Invalid follow message input/,
+      );
+  }
+  for (const name of ["matchingPage", "publicShare"]) {
+    for (const value of [
+      actionLinks.confirmation,
+      actionLinks.deleteRequest,
+      actionLinks.confirmation.replace(CONFIRM_TOKEN, CONFIRM_TOKEN.replace(".", "%2E")),
+    ])
+      assert.throws(
+        () =>
+          renderFollowMail("digest", {
+            ...input,
+            matches: [role(1)],
+            links: { ...input.links, [name]: value },
+          }),
+        /Invalid follow message input/,
+      );
+  }
+  assert.throws(
+    () =>
+      renderFollowMail("confirm", {
+        ...input,
+        summary: "Fixture Company",
+        links: { ...actionLinks, deleteRequest: action("delete-request", `fd_${TOKEN}`) },
+      }),
+    /Invalid follow message input/,
+    "address-wide unsubscribe token cannot become request deletion",
+  );
+});
+
+const MANAGEMENT_TOKEN = `40000000-0000-4000-8000-000000000004.${"d".repeat(64)}`;
+const MANAGEMENT_LINK = `https://internscout.org/follows/manage.html#token=${MANAGEMENT_TOKEN}`;
+const managementInput = {
+  ...input,
+  origins: [...input.origins, "https://internscout.org"],
+  links: { ...actionLinks, management: MANAGEMENT_LINK },
+  matches: [role(1)],
+  summary: "Fixture Company",
+};
+
+test("the first-party management capability appears only in the management and digest bodies", () => {
+  for (const [kind, label] of [
+    ["manage", "Manage your follows"],
+    ["digest", "Manage my follows"],
+  ]) {
+    const message = renderFollowMail(kind, managementInput);
+    assert.ok(message.text.split("\n").includes(`${label}: ${MANAGEMENT_LINK}`));
+    assert.deepEqual(message.headers, unsubscribeHeaders);
+    const { text, ...envelope } = message;
+    assert.equal(text.split(MANAGEMENT_TOKEN).length, 2);
+    assert.ok(!JSON.stringify(envelope).includes(MANAGEMENT_TOKEN));
+  }
+});
+
+test("management links reject normalized variants and stay out of every other link slot", async () => {
+  let sends = 0;
+  const env = { EMAIL: { send: () => sends++ } };
+  const invalid = { message: "Invalid follow message input" };
+  const mail = (kind, name, value) =>
+    sendFollowMail(env, kind, {
+      ...managementInput,
+      links: { ...managementInput.links, [name]: value },
+    });
+  for (const value of [
+    MANAGEMENT_LINK.replace("https:", "http:"),
+    MANAGEMENT_LINK.replace("internscout.org", "internscout.org:443"),
+    MANAGEMENT_LINK.replace("internscout.org", "user@internscout.org"),
+    MANAGEMENT_LINK.replace("https://internscout.org", SITE),
+    MANAGEMENT_LINK.replace("/follows/", "/follows/../follows/"),
+    MANAGEMENT_LINK.replace("manage.html", "man%61ge.html"),
+    MANAGEMENT_LINK.replace("manage.html", "other.html"),
+    MANAGEMENT_LINK.replace("#", "?"),
+    MANAGEMENT_LINK.replace("manage.html#", "other.html?"),
+    MANAGEMENT_LINK.replace("manage.html#", "manage.html/?"),
+    MANAGEMENT_LINK.replace("#", "?tracking=1#"),
+    MANAGEMENT_LINK.replace("token=", "to%6ben="),
+    MANAGEMENT_LINK.replace(MANAGEMENT_TOKEN, MANAGEMENT_TOKEN.toUpperCase()),
+    MANAGEMENT_LINK.replace(MANAGEMENT_TOKEN, MANAGEMENT_TOKEN.replace(".", "%2E")),
+    MANAGEMENT_LINK + "&token=" + MANAGEMENT_TOKEN,
+    MANAGEMENT_LINK + "#",
+    MANAGEMENT_LINK.split("#")[0],
+  ])
+    await assert.rejects(mail("manage", "management", value), invalid);
+
+  for (const [kind, name] of [
+    ["confirm", "confirmation"],
+    ["confirm", "deleteRequest"],
+    ["manage", "unsubscribe"],
+    ["digest", "matchingPage"],
+    ["digest", "publicShare"],
+  ])
+    await assert.rejects(mail(kind, name, MANAGEMENT_LINK), invalid);
+  const alternateTokens = [
+    MANAGEMENT_TOKEN,
+    MANAGEMENT_TOKEN.toUpperCase(),
+    MANAGEMENT_TOKEN.replace(".", "%2E"),
+    MANAGEMENT_TOKEN.replace(".", "%252E"),
+    MANAGEMENT_TOKEN.replace(".", "%25252E"),
+  ];
+  for (const token of alternateTokens) {
+    await assert.rejects(mail("manage", "unsubscribe", `${ACTIONS}/unsubscribe/${token}`), invalid);
+    await assert.rejects(
+      mail("manage", "unsubscribe", `${ACTIONS}/unsubscribe?token=${token}`),
+      invalid,
+    );
+    await assert.rejects(mail("digest", "publicShare", `${SITE}/share?value=${token}`), invalid);
+  }
+  for (const path of ["/FOLLOWS/manage.html", "/follows/man%2561ge.html"]) {
+    const wrongRoute = `https://internscout.org${path}?token=${TOKEN}`;
+    await assert.rejects(mail("manage", "unsubscribe", wrongRoute), invalid);
+    await assert.rejects(mail("digest", "matchingPage", wrongRoute), invalid);
+  }
+
+  for (const apply_url of [
+    MANAGEMENT_LINK,
+    MANAGEMENT_LINK.replace(MANAGEMENT_TOKEN, TOKEN),
+    MANAGEMENT_LINK.replace("manage.html", "man%2561ge.html").replace(MANAGEMENT_TOKEN, TOKEN),
+    ...alternateTokens.map((token) => `https://jobs.example.test/1?source=${token}`),
+  ]) {
+    for (const roleInput of [
+      { matches: [role(1, { apply_url })] },
+      { similar: [role(2, { apply_url })] },
+    ])
+      await assert.rejects(
+        sendFollowMail(env, "digest", { ...managementInput, ...roleInput }),
+        invalid,
+      );
+  }
+  await assert.rejects(
+    sendFollowMail(env, "digest", {
+      ...managementInput,
+      links: { ...managementInput.links, management: input.links.management },
+      matches: [role(1, { apply_url: MANAGEMENT_LINK.replace(MANAGEMENT_TOKEN, TOKEN) })],
+    }),
+    invalid,
+  );
+  assert.equal(sends, 0);
+});
+
+test("encoded reserved action paths cannot fall through to legacy query links", () => {
+  for (const name of ["confirmation", "deleteRequest", "management", "unsubscribe"]) {
+    for (const path of ["/%66ollows/action.html", "/follows/act%69on.html"]) {
+      for (const suffix of ["", `?purpose=confirm&token=${CONFIRM_TOKEN}`]) {
+        assert.throws(
+          () =>
+            renderFollowMail(name === "management" ? "manage" : "confirm", {
+              ...input,
+              summary: "Fixture Company",
+              links: { ...input.links, [name]: SITE + path + suffix },
+            }),
+          /Invalid follow message input/,
+        );
+      }
+    }
+  }
+  const legacy = `${ACTIONS}/legacy/%66ollow?token=fixture`;
+  const message = renderFollowMail("confirm", {
+    ...input,
+    summary: "Fixture Company",
+    links: { ...input.links, confirmation: legacy },
+  });
+  assert.ok(message.text.includes(`Confirm: ${legacy}`));
+});
