@@ -1,3 +1,4 @@
+import { readAppSource } from "./app-fixture.mjs";
 // tokens.css owns the shared light, dark and touch rules. The generated copies stay inline.
 // The existing design checks cover WCAG AA, type and controls, plus the local overlay subset.
 import { test } from "node:test";
@@ -398,7 +399,7 @@ test("one icon set of six, shared by the site and the extension", () => {
   assert.match(SHEETS.dashboard, /\.field\.search::before\{[^}]*mask:var\(--i-search\)/);
   assert.match(SHEETS.dashboard, /select\.mine\{[^}]*var\(--i-select\)[^}]*appearance:none/);
   // The Why panel's ✓ ✗ ! characters are icons with the meaning in words for a screen reader.
-  const app = read("docs/js/app.js").replace(/^\s*\/\/.*$/gm, "");
+  const app = readAppSource().replace(/^\s*\/\/.*$/gm, "");
   assert.doesNotMatch(app, /"✓ "|"✗ "|"! "/);
   assert.match(app, /icon\("check", "Have: "\)/);
 });

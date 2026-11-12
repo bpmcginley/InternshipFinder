@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { parse } from "acorn";
 import { fileURLToPath } from "node:url";
 import { AUTH, ROUTES, SPECIAL_ROUTES } from "../src/api-contract.js";
+import { CONFIG } from "../src/config.js";
 import { generateApi } from "../scripts/generate-api.mjs";
 import { handle } from "../src/index.js";
 import { captureRouteResponses, exactCases } from "../test-support/route-baseline.js";
@@ -15,7 +16,7 @@ const publicWorkerOrigin = JSON.parse(read("config/public.json")).workerOrigin;
 const key = (method, path) => `${method} ${path.split("?")[0].replace(/\/+$/, "") || "/"}`;
 const declared = new Set(ROUTES.map((r) => key(r.method, r.path)));
 
-test("the contract contains every exact table or switch route, with auth and descriptive shapes", () => {
+test("the contract contains every exact table route, with auth and descriptive shapes", () => {
   const served = [],
     prefixes = new Set();
   let tables = 0;
@@ -35,8 +36,11 @@ test("the contract contains every exact table or switch route, with auth and des
         }
       }
       if (node.type === "SwitchCase" && node.test?.type === "Literal") {
-        const match = /^([A-Z]+) (\/.*)$/.exec(String(node.test.value));
-        if (match) served.push(key(match[1], match[2]));
+        assert.doesNotMatch(
+          String(node.test.value),
+          /^[A-Z]+ \/.*/,
+          "exact routes must use the table",
+        );
       }
       if (
         node.type === "CallExpression" &&
@@ -107,17 +111,70 @@ test("global preflight, media delegation and fallback are explicit, without chan
   assert.equal(await head.text(), "");
 });
 
-test("the original router's offline response bytes and headers stay fixed", async () => {
+test("webhook body bounds and placement JSON shape precede their downstream gates", async () => {
+  const env = {
+    EMPLOYER_CHECKOUT: "1",
+    ADMIN_TOKEN: "fixture-admin",
+    STRIPE_SECRET_KEY: "fixture-stripe",
+    STRIPE_WEBHOOK_SECRET: "fixture-webhook",
+    REVIEW_TO: "review@example.test",
+    ORDER_FROM: "orders@example.test",
+    EMAIL: { send: () => assert.fail("guard probes must not send mail") },
+  };
+  const fetch = async () => assert.fail("guard probes must not fetch");
+  const webhook = await handle(
+    new Request("https://api.test/billing/webhook", { method: "POST", body: "12345" }),
+    env,
+    undefined,
+    { fetch, config: { ...CONFIG, MAX_BODY_BYTES: 4 } },
+  );
+  assert.equal(webhook.status, 400);
+  assert.deepEqual(await webhook.json(), {
+    error: "bad_request",
+    message: "Request body is too large",
+  });
+
+  const placement = await handle(
+    new Request("https://api.test/admin/placements/on", {
+      method: "POST",
+      headers: { Authorization: "Bearer fixture-admin" },
+      body: "[]",
+    }),
+    env,
+    undefined,
+    { fetch },
+  );
+  assert.equal(placement.status, 400);
+  assert.deepEqual(await placement.json(), {
+    error: "bad_request",
+    message: "Body must be a JSON object",
+  });
+});
+
+test("offline routes match the original capture and signed-in cache policy", async () => {
   const fixture = JSON.parse(
     readFileSync(new URL("./fixtures/route-baseline.json", import.meta.url), "utf8"),
   );
   assert.equal(fixture.capturedFrom, "067a033785214ec63d0d67b26b6ed1d54b940e16");
-  assert.equal(exactCases.length, ROUTES.length);
-  assert.deepEqual(new Set(exactCases.map(({ method, path }) => key(method, path))), declared);
+  // The historical baseline stays immutable. These later routes have their own
+  // offline HTTP/D1 tests; future additions must be named explicitly here.
+  const added = new Set([
+    "POST /follows/unsubscribe",
+    "GET /billing/topup/offer",
+    "POST /billing/topup/checkout",
+  ]);
+  assert.equal(exactCases.length + added.size, ROUTES.length);
+  assert.deepEqual(
+    new Set([...exactCases.map(({ method, path }) => key(method, path)), ...added]),
+    declared,
+  );
   const actual = await captureRouteResponses();
   assert.deepEqual(Object.keys(actual), Object.keys(fixture.responses));
   for (const [label, expected] of Object.entries(fixture.responses)) {
-    assert.deepEqual(actual[label], expected, label);
+    const headers = label === "me-synthetic-session"
+      ? { ...expected.headers, "cache-control": "no-store" }
+      : expected.headers;
+    assert.deepEqual(actual[label], { ...expected, headers }, label);
   }
 });
 

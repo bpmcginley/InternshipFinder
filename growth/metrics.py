@@ -30,6 +30,7 @@ Run from the repo root:  python growth/metrics.py [docs] [--write]
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import sys
@@ -1458,12 +1459,11 @@ def main(argv: list[str]) -> int:
         for sql, params in prune_sql(now):
             d1(token, sql, params)
     except (urllib.error.HTTPError, urllib.error.URLError, RuntimeError) as e:
-        detail = (
-            e.read().decode("utf-8", "replace")[:300]
-            if isinstance(e, urllib.error.HTTPError)
-            else str(e)
+        console(
+            f"[metrics] write failed: {type(e).__name__}",
+            level=logging.WARNING,
+            exception_type=type(e).__name__,
         )
-        print(f"[metrics] write failed: {detail}")
         console("[metrics] The Cloudflare token needs D1: Edit as well as Account Analytics: Read.")
         return 1
     console(f"[metrics] wrote {len(days)} days and a snapshot")

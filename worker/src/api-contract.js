@@ -13,11 +13,19 @@ const route = (method, path, auth, request, response, gate = "none") =>
 
 export const ROUTES = Object.freeze([
   route(
+    "POST",
+    "/follows/unsubscribe",
+    "follow-unsubscribe-token",
+    "Exactly one query parameter token=deletion-only UUID.secret; URL-encoded or multipart List-Unsubscribe=One-Click, at most 4,096 bytes with an absolute 5-second body-read deadline; no login, cookies or Origin required",
+    "Empty no-store 204 for deletion/replay/unknown/wrong-purpose; malformed 400; body timeout/capacity/storage 503 with Retry-After: 60; GET/HEAD fall through to 404 without mutation",
+    "none; deletion remains available when signup or sending is off",
+  ),
+  route(
     "GET",
     "/config",
     "public",
     "none",
-    "JSON {providers: Provider[], allowance: PlanAllowances, payments: {enabled, plans}, paused: boolean, invite: {bonus, max}, sessions: true, sync: boolean}",
+    "JSON {providers: Provider[], allowance: PlanAllowances, payments: {enabled, plans}, topups?: true, paused: boolean, invite: {bonus, max}, sessions: true, sync: boolean}",
   ),
   route(
     "GET",
@@ -86,6 +94,22 @@ export const ROUTES = Object.freeze([
     "JSON {url: string}",
     "payments",
   ),
+  route(
+    "GET",
+    "/billing/topup/offer",
+    "session + site-origin",
+    "First-party dashboard Origin and current session bearer. The server verifies the configured Price.",
+    "No-store JSON {enabled: true, offer: {amount, currency, units}} 200, auth 401, disallowed Origin 403, disabled or unavailable 503",
+    "TOPUPS_ENABLED and existing payment configuration",
+  ),
+  route(
+    "POST",
+    "/billing/topup/checkout",
+    "session + site-origin",
+    "First-party dashboard Origin and current session bearer. The server owns the offer and return URLs.",
+    "No-store JSON {status: open, url} 200, {status: pending} 202, auth 401, disallowed Origin 403, disabled or unavailable 503",
+    "TOPUPS_ENABLED and existing payment configuration",
+  ),
   route("POST", "/billing/portal", "user", "none", "JSON {url: string}", "payments"),
   route(
     "POST",
@@ -93,7 +117,7 @@ export const ROUTES = Object.freeze([
     "stripe-signature",
     "Raw signed event body; Stripe-Signature header",
     "JSON {ok: true, repeat?: true}; event-specific effects stay in existing handlers",
-    "payments-or-orders",
+    "payments-or-orders-or-historical-topups",
   ),
   route(
     "POST",
@@ -115,7 +139,7 @@ export const ROUTES = Object.freeze([
     "POST",
     "/hit",
     "site-origin",
-    "JSON/text-plain object {p?, r?, u?, m?, c?, t?, e?, s?}; bounded names and tags from visits.js",
+    "JSON/text-plain object {p?, r?, u?, m?, c?, t?, e?, s?}; optional gated organic {e: employer_posting_open, c: canonical key}; maximum 2,000 bytes",
     "204, no body",
   ),
   route(
@@ -144,8 +168,8 @@ export const ROUTES = Object.freeze([
     "GET",
     "/admin/employer-metrics",
     "admin",
-    "Query days?: integer 1..90, default 28",
-    "JSON {start, end_exclusive, days, currency, events, page_views, cash_cohort, campaign_reports_all_time, about}; no-store",
+    "Query days?: integer 1..90, default 28; optional gated organic_after cursor",
+    "JSON {start, end_exclusive, days, currency, events, page_views, cash_cohort, campaign_reports_all_time, about}; optional organic_posting_counts and organic_posting_readiness; no-store",
   ),
   route(
     "POST",
@@ -321,6 +345,8 @@ export const SPECIAL_ROUTES = Object.freeze([
 ]);
 
 export const AUTH = Object.freeze({
+  "follow-unsubscribe-token":
+    "Existing hashed, deletion-only follow token in the HTTPS URL query; never a confirmation, management or request-only deletion capability.",
   public: "No sign-in required; route-specific validation still applies.",
   user: "Provider ID token or live session bearer token, through the existing authenticateUser path.",
   "provider-id": "Fresh verified provider ID token only; session tokens cannot create sessions.",

@@ -39,7 +39,7 @@ sitemap.xml that .github/workflows/pages.yml builds at deploy time, so those wou
 Repo → **Settings → Pages** → Source: **GitHub Actions**. Set this before the first deploy: the
 **Deploy site** workflow (`.github/workflows/pages.yml`) refuses to run while the source is still
 "Deploy from a branch". It copies `docs/` into an artifact, builds the `/internships/` pages with
-`backend/internscout/seo_pages.py`, and deploys it on every push to `main` and after every ingest
+`backend/internscout/site/publish.py`, and deploys it on every push to `main` and after every ingest
 run. Run it once by hand (**Actions → Deploy site → Run workflow**); your site appears at
 `https://<your-username>.github.io/<repo-name>/` when it finishes.
 

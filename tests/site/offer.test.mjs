@@ -1,3 +1,4 @@
+import { readAppSource } from "./app-fixture.mjs";
 // The Auto-Apply offer in docs/js/offer.js, run against a stand-in browser with a fixed clock: when it
 // shows, what it says and links to, what it counts, and every case where it must stay hidden.
 import { test } from "node:test";
@@ -376,7 +377,7 @@ test("the copy stays plain: no dashes, exclamation marks or hype, and it says th
 
 test("the dashboard loads it and marks the posting links it can fill", () => {
   const index = readFileSync(new URL("../../docs/index.html", import.meta.url), "utf8");
-  const app = readFileSync(new URL("../../docs/js/app.js", import.meta.url), "utf8");
+  const app = readAppSource();
   assert.match(index, /<script defer src="js\/offer\.js"><\/script>/);
   assert.match(
     app,

@@ -1,10 +1,18 @@
 """The RSS feed beside each landing page: valid XML whatever a job board sends, newest first, and
 linking straight to the employer's posting."""
 
+import json
+import subprocess
+import sys
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
+from functools import cache
+from pathlib import Path
+
+import pytest
 
 from internscout import feeds
+from internscout.site import assets, runtime
 
 
 def _row(i, **over):
@@ -63,12 +71,77 @@ def test_a_feed_is_written_beside_each_listing_page_and_not_the_hubs(tmp_path):
 
 def test_a_feed_is_dated_by_its_data_not_the_clock(tmp_path, monkeypatch):
     # lastBuildDate came from the clock, so every deploy rewrote every feed even when nothing changed.
-    from internscout import seo_pages
-
-    monkeypatch.setattr(seo_pages, "GENERATED", datetime(2026, 9, 23, 10, tzinfo=timezone.utc))
+    monkeypatch.setattr(assets, "SITE", "https://legacy.example.test")
+    monkeypatch.setattr(runtime, "GENERATED", datetime(2026, 9, 23, 10, tzinfo=timezone.utc))
+    monkeypatch.setattr(
+        feeds, "_standalone_settings", cache(feeds._standalone_settings.__wrapped__)
+    )
     (tmp_path / "internships" / "x").mkdir(parents=True)
     feeds.write_all(
         str(tmp_path), [{"path": "/internships/x/", "h1": "X", "items": [_row(1)], "state": None}]
     )
     xml = (tmp_path / "internships" / "x" / "feed.xml").read_text(encoding="utf-8")
     assert "<lastBuildDate>Wed, 23 Sep 2026 10:00:00 +0000</lastBuildDate>" in xml
+    assert "<link>https://legacy.example.test/internships/x/</link>" in xml
+
+
+@pytest.mark.parametrize("scenario", ["clock", "configured", "prior-rss"])
+def test_standalone_defaults_work_with_the_legacy_facade_blocked(tmp_path, scenario):
+    script = """
+import json
+from datetime import datetime, timezone
+from importlib.abc import MetaPathFinder
+from pathlib import Path
+import sys
+
+class BlockLegacy(MetaPathFinder):
+    def find_spec(self, fullname, path=None, target=None):
+        if fullname == "internscout.seo_pages":
+            raise AssertionError("standalone feed imported the legacy facade")
+
+blocker = BlockLegacy()
+sys.meta_path.insert(0, blocker)
+from internscout import feeds
+from internscout.site import runtime
+
+class Clock(datetime):
+    @classmethod
+    def now(cls, tz=None):
+        return cls(2026, 9, 23, 11, tzinfo=tz)
+
+feeds.datetime = Clock
+scenario = sys.argv[3]
+configured = datetime(2026, 9, 23, 9, tzinfo=timezone.utc)
+if scenario != "clock":
+    runtime.GENERATED = configured
+if scenario == "prior-rss":
+    feeds.rss("/internships/x/", "X", [], configured)
+    runtime.GENERATED = configured.replace(hour=10)
+root = Path(sys.argv[1])
+page = root / "internships/x"
+page.mkdir(parents=True)
+pages = [{"path": "/internships/x/", "h1": "X", "items": [json.loads(sys.argv[2])]}]
+assert feeds.write_all(str(root), pages) == 1
+xml = (page / "feed.xml").read_text(encoding="utf-8")
+assert "<link>https://internscout.org/internships/x/</link>" in xml
+hour = 11 if scenario == "clock" else 9
+assert f"<lastBuildDate>Wed, 23 Sep 2026 {hour:02}:00:00 +0000</lastBuildDate>" in xml
+assert feeds.write_all(str(root), pages, now=configured.replace(hour=12)) == 1
+assert "<lastBuildDate>Wed, 23 Sep 2026 12:00:00 +0000</lastBuildDate>" in (
+    page / "feed.xml"
+).read_text(encoding="utf-8")
+assert "internscout.seo_pages" not in sys.modules
+if scenario == "prior-rss":
+    assert feeds.write_all(str(root), pages) == 1
+    assert "<lastBuildDate>Wed, 23 Sep 2026 09:00:00 +0000</lastBuildDate>" in (
+        page / "feed.xml"
+    ).read_text(encoding="utf-8")
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", script, str(tmp_path), json.dumps(_row(1)), scenario],
+        cwd=Path(__file__).resolve().parents[1],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stderr

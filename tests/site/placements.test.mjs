@@ -1,7 +1,9 @@
+import { createTestApp, readAppSource } from "./app-fixture.mjs";
 // Paid listings ("placements") on the dashboard (2026-10-14, B2 plan section 5.4; rows S5 and S6). The rule
 // these tests hold the code to: payment never changes any score, order, filter, count or what Auto-Apply
-// does. docs/js/core.js, docs/js/placements.js and docs/js/app.js are loaded the way the page loads them,
-// against a stand-in `window`; T1 uses synthetic listing shards.
+// does. The Core factory and classic placements/app scripts use a stand-in `window`.
+// T1 uses synthetic listing shards.
+import { installCore } from "./core-fixture.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -9,9 +11,8 @@ import vm from "node:vm";
 import { LISTING_CLOCK, MAJORS, listingRows } from "./fixtures/listing_cases.mjs";
 
 const read = p => readFileSync(new URL("../../" + p, import.meta.url), "utf8");
-const CORE_SRC = read("docs/js/core.js");
 const PLACE_SRC = read("docs/js/placements.js");
-const APP_SRC = read("docs/js/app.js");
+const APP_SRC = readAppSource();
 
 function context(extra = {}) {
   const store = () => { const m = new Map(); return { getItem: k => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)), removeItem: k => m.delete(k) }; };
@@ -32,7 +33,7 @@ const freezeClock = ctx => vm.runInContext(`{ const D = Date; Date = class exten
 function loadBoth(extra) {
   const ctx = context(extra);
   freezeClock(ctx);
-  vm.runInContext(CORE_SRC, ctx);
+  installCore(ctx);
   vm.runInContext(PLACE_SRC, ctx);
   return { IS: ctx.IS, P: ctx.ISPlace, ctx };
 }
@@ -105,7 +106,8 @@ test("T1b: the ranking code has no way in", () => {
   // listRows and score take no placements argument and never name them ("paid" is the pay filter, so the
   // code is named "placement" and the guard greps for that).
   const { IS } = loadBoth();
-  assert.doesNotMatch(CORE_SRC, /placement|ISPlace/i);
+  for (const name of ["entry", "index", "profile", "ranking", "listings", "bridge", "account"])
+    assert.doesNotMatch(read(`docs/js/core/${name}.mjs`), /placement|ISPlace/i);
   assert.equal(IS.listRows.length, 3);
   assert.equal(IS.score.length, 2);
   // app.js builds the list from the same six inputs as before, and only after that is the pick made.
@@ -190,11 +192,10 @@ function uiHarness() {
     useEffect(fn, deps) { const i = cursor++, old = slots[i]; if (!old || deps.some((x, j) => x !== old.deps[j])) { slots[i] = { deps }; pending.push(fn); } },
   };
   const ctx = context({ React: react, CONFIG: {} });
-  vm.runInContext(CORE_SRC, ctx);
+  installCore(ctx);
   vm.runInContext(PLACE_SRC, ctx);
-  vm.runInContext(APP_SRC.replace('ReactDOM.createRoot(document.getElementById("root")).render(h(App));',
-    'window.components = { ListTable, Row, Why, factsLine, matchControl, companyRuns };'), ctx);
-  return { c: ctx.components, P: ctx.ISPlace, IS: ctx.IS, h: react.createElement,
+  const components = createTestApp(ctx);
+  return { c: components, P: ctx.ISPlace, IS: ctx.IS, h: react.createElement,
     render(component, props) { cursor = 0; pending = []; const tree = component(props); pending.forEach(fn => fn()); return tree; },
     reset() { slots.length = 0; } };
 }
@@ -359,8 +360,8 @@ test("T8: headed Paid listing, Ad before the company name, and a sponsored link"
   }
   // Never the words the plan rules out.
   assert.doesNotMatch(PLACE_SRC.replace(/^\s*\/\/.*$/gm, ""), /Sponsored|Promoted|Featured/);
-  // The same words as the landing pages' box (backend/internscout/seo_pages.py placement_box).
-  const seo = read("backend/internscout/seo_pages.py");
+  // The same words as the landing pages' box (backend/internscout/site/publish.py _placement_box).
+  const seo = read("backend/internscout/site/publish.py");
   for (const w of ["Paid listing", '"ad">Ad<', "Why am I seeing this?", "Open posting", 'rel="sponsored noopener"']) assert.ok(seo.includes(w), w);
   for (const w of ['"Paid listing"', '"Ad"', '"Why am I seeing this?"', '"Open posting"', '"sponsored noopener"']) assert.ok(PLACE_SRC.includes(w), w);
   // Both boxes link to the ad disclosure, #paid-listings, never #paid (the paid plans section).
@@ -463,11 +464,12 @@ test("load: one same-origin fetch, nothing on a missing or bad file, and none at
   assert.match(read("docs/index.html"), /placements: true,/);
 });
 
-test("index.html loads placements.js between core.js and app.js, deferred", () => {
+test("index.html loads placements and share between the deferred Core and App entries", () => {
   const html = read("docs/index.html");
   const srcs = [...html.matchAll(/<script\b[^>]*\bsrc="([^"]+)"[^>]*>/g)].map(m => m[0]);
   const at = s => srcs.findIndex(t => t.includes(s));
-  assert.ok(at("js/core.js") < at("js/placements.js") && at("js/placements.js") < at("js/app.js"));
+  assert.ok(at("js/core/entry.mjs") < at("js/placements.js") && at("js/placements.js") < at("js/share.js") &&
+    at("js/share.js") < at("js/app/entry.mjs"));
   assert.match(srcs[at("js/placements.js")], /\sdefer\b/);
 });
 

@@ -1,0 +1,370 @@
+[
+  {
+    "width": 1280,
+    "colorScheme": "light",
+    "keyboardWeeklyNavigation": "/internships/for/accounting-majors/weekly/",
+    "targetHeight": 44
+  },
+  {
+    "phase": "after",
+    "name": "hub",
+    "width": 1280,
+    "colorScheme": "light",
+    "bounds": {
+      "width": 1280,
+      "scroll": 1280
+    }
+  },
+  {
+    "name": "populated",
+    "width": 1280,
+    "colorScheme": "light",
+    "lead": "28 open student roles first seen in the seven days ending November 10, 2026 at 12:00 UTC.",
+    "keyboardBrowseDestination": "/internships/software-engineering/"
+  },
+  {
+    "phase": "after",
+    "name": "populated",
+    "width": 1280,
+    "colorScheme": "light",
+    "bounds": {
+      "width": 1280,
+      "scroll": 1280
+    }
+  },
+  {
+    "name": "empty",
+    "width": 1280,
+    "colorScheme": "light",
+    "lead": "0 open student roles first seen in the seven days ending November 10, 2026 at 12:00 UTC.",
+    "keyboardBrowseDestination": "/internships/for/"
+  },
+  {
+    "phase": "after",
+    "name": "empty",
+    "width": 1280,
+    "colorScheme": "light",
+    "bounds": {
+      "width": 1280,
+      "scroll": 1280
+    }
+  },
+  {
+    "name": "unmapped",
+    "width": 1280,
+    "colorScheme": "light",
+    "lead": "This major has no direct field mapping yet. Choose a field to browse current roles.",
+    "keyboardBrowseDestination": "/internships/for/"
+  },
+  {
+    "phase": "after",
+    "name": "unmapped",
+    "width": 1280,
+    "colorScheme": "light",
+    "bounds": {
+      "width": 1280,
+      "scroll": 1280
+    }
+  },
+  {
+    "name": "long-name",
+    "width": 1280,
+    "colorScheme": "light",
+    "lead": "0 open student roles first seen in the seven days ending November 10, 2026 at 12:00 UTC.",
+    "keyboardBrowseDestination": "/internships/for/"
+  },
+  {
+    "phase": "after",
+    "name": "long-name",
+    "width": 1280,
+    "colorScheme": "light",
+    "bounds": {
+      "width": 1280,
+      "scroll": 1280
+    }
+  },
+  {
+    "width": 1280,
+    "colorScheme": "light",
+    "externalAllowed": 0,
+    "blockedExternalOrigins": [
+      "https://static.cloudflareinsights.com"
+    ]
+  },
+  {
+    "width": 1280,
+    "colorScheme": "dark",
+    "keyboardWeeklyNavigation": "/internships/for/accounting-majors/weekly/",
+    "targetHeight": 44
+  },
+  {
+    "phase": "after",
+    "name": "hub",
+    "width": 1280,
+    "colorScheme": "dark",
+    "bounds": {
+      "width": 1280,
+      "scroll": 1280
+    }
+  },
+  {
+    "name": "populated",
+    "width": 1280,
+    "colorScheme": "dark",
+    "lead": "28 open student roles first seen in the seven days ending November 10, 2026 at 12:00 UTC.",
+    "keyboardBrowseDestination": "/internships/software-engineering/"
+  },
+  {
+    "phase": "after",
+    "name": "populated",
+    "width": 1280,
+    "colorScheme": "dark",
+    "bounds": {
+      "width": 1280,
+      "scroll": 1280
+    }
+  },
+  {
+    "name": "empty",
+    "width": 1280,
+    "colorScheme": "dark",
+    "lead": "0 open student roles first seen in the seven days ending November 10, 2026 at 12:00 UTC.",
+    "keyboardBrowseDestination": "/internships/for/"
+  },
+  {
+    "phase": "after",
+    "name": "empty",
+    "width": 1280,
+    "colorScheme": "dark",
+    "bounds": {
+      "width": 1280,
+      "scroll": 1280
+    }
+  },
+  {
+    "name": "unmapped",
+    "width": 1280,
+    "colorScheme": "dark",
+    "lead": "This major has no direct field mapping yet. Choose a field to browse current roles.",
+    "keyboardBrowseDestination": "/internships/for/"
+  },
+  {
+    "phase": "after",
+    "name": "unmapped",
+    "width": 1280,
+    "colorScheme": "dark",
+    "bounds": {
+      "width": 1280,
+      "scroll": 1280
+    }
+  },
+  {
+    "name": "long-name",
+    "width": 1280,
+    "colorScheme": "dark",
+    "lead": "0 open student roles first seen in the seven days ending November 10, 2026 at 12:00 UTC.",
+    "keyboardBrowseDestination": "/internships/for/"
+  },
+  {
+    "phase": "after",
+    "name": "long-name",
+    "width": 1280,
+    "colorScheme": "dark",
+    "bounds": {
+      "width": 1280,
+      "scroll": 1280
+    }
+  },
+  {
+    "width": 1280,
+    "colorScheme": "dark",
+    "externalAllowed": 0,
+    "blockedExternalOrigins": [
+      "https://static.cloudflareinsights.com"
+    ]
+  },
+  {
+    "width": 375,
+    "colorScheme": "light",
+    "keyboardWeeklyNavigation": "/internships/for/accounting-majors/weekly/",
+    "targetHeight": 44
+  },
+  {
+    "phase": "after",
+    "name": "hub",
+    "width": 375,
+    "colorScheme": "light",
+    "bounds": {
+      "width": 375,
+      "scroll": 375
+    }
+  },
+  {
+    "name": "populated",
+    "width": 375,
+    "colorScheme": "light",
+    "lead": "28 open student roles first seen in the seven days ending November 10, 2026 at 12:00 UTC.",
+    "keyboardBrowseDestination": "/internships/software-engineering/"
+  },
+  {
+    "phase": "after",
+    "name": "populated",
+    "width": 375,
+    "colorScheme": "light",
+    "bounds": {
+      "width": 375,
+      "scroll": 375
+    }
+  },
+  {
+    "name": "empty",
+    "width": 375,
+    "colorScheme": "light",
+    "lead": "0 open student roles first seen in the seven days ending November 10, 2026 at 12:00 UTC.",
+    "keyboardBrowseDestination": "/internships/for/"
+  },
+  {
+    "phase": "after",
+    "name": "empty",
+    "width": 375,
+    "colorScheme": "light",
+    "bounds": {
+      "width": 375,
+      "scroll": 375
+    }
+  },
+  {
+    "name": "unmapped",
+    "width": 375,
+    "colorScheme": "light",
+    "lead": "This major has no direct field mapping yet. Choose a field to browse current roles.",
+    "keyboardBrowseDestination": "/internships/for/"
+  },
+  {
+    "phase": "after",
+    "name": "unmapped",
+    "width": 375,
+    "colorScheme": "light",
+    "bounds": {
+      "width": 375,
+      "scroll": 375
+    }
+  },
+  {
+    "name": "long-name",
+    "width": 375,
+    "colorScheme": "light",
+    "lead": "0 open student roles first seen in the seven days ending November 10, 2026 at 12:00 UTC.",
+    "keyboardBrowseDestination": "/internships/for/"
+  },
+  {
+    "phase": "after",
+    "name": "long-name",
+    "width": 375,
+    "colorScheme": "light",
+    "bounds": {
+      "width": 375,
+      "scroll": 375
+    }
+  },
+  {
+    "width": 375,
+    "colorScheme": "light",
+    "externalAllowed": 0,
+    "blockedExternalOrigins": [
+      "https://static.cloudflareinsights.com"
+    ]
+  },
+  {
+    "width": 375,
+    "colorScheme": "dark",
+    "keyboardWeeklyNavigation": "/internships/for/accounting-majors/weekly/",
+    "targetHeight": 44
+  },
+  {
+    "phase": "after",
+    "name": "hub",
+    "width": 375,
+    "colorScheme": "dark",
+    "bounds": {
+      "width": 375,
+      "scroll": 375
+    }
+  },
+  {
+    "name": "populated",
+    "width": 375,
+    "colorScheme": "dark",
+    "lead": "28 open student roles first seen in the seven days ending November 10, 2026 at 12:00 UTC.",
+    "keyboardBrowseDestination": "/internships/software-engineering/"
+  },
+  {
+    "phase": "after",
+    "name": "populated",
+    "width": 375,
+    "colorScheme": "dark",
+    "bounds": {
+      "width": 375,
+      "scroll": 375
+    }
+  },
+  {
+    "name": "empty",
+    "width": 375,
+    "colorScheme": "dark",
+    "lead": "0 open student roles first seen in the seven days ending November 10, 2026 at 12:00 UTC.",
+    "keyboardBrowseDestination": "/internships/for/"
+  },
+  {
+    "phase": "after",
+    "name": "empty",
+    "width": 375,
+    "colorScheme": "dark",
+    "bounds": {
+      "width": 375,
+      "scroll": 375
+    }
+  },
+  {
+    "name": "unmapped",
+    "width": 375,
+    "colorScheme": "dark",
+    "lead": "This major has no direct field mapping yet. Choose a field to browse current roles.",
+    "keyboardBrowseDestination": "/internships/for/"
+  },
+  {
+    "phase": "after",
+    "name": "unmapped",
+    "width": 375,
+    "colorScheme": "dark",
+    "bounds": {
+      "width": 375,
+      "scroll": 375
+    }
+  },
+  {
+    "name": "long-name",
+    "width": 375,
+    "colorScheme": "dark",
+    "lead": "0 open student roles first seen in the seven days ending November 10, 2026 at 12:00 UTC.",
+    "keyboardBrowseDestination": "/internships/for/"
+  },
+  {
+    "phase": "after",
+    "name": "long-name",
+    "width": 375,
+    "colorScheme": "dark",
+    "bounds": {
+      "width": 375,
+      "scroll": 375
+    }
+  },
+  {
+    "width": 375,
+    "colorScheme": "dark",
+    "externalAllowed": 0,
+    "blockedExternalOrigins": [
+      "https://static.cloudflareinsights.com"
+    ]
+  }
+]

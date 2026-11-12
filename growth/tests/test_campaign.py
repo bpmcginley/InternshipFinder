@@ -12,8 +12,9 @@ ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 sys.path.insert(0, os.path.join(ROOT, "growth"))
 sys.path.insert(0, os.path.join(ROOT, "backend"))
 import campaign  # noqa: E402
-from internscout import seo_pages as sp  # noqa: E402
-from test_seo_pages import _row, _site  # noqa: E402
+from tests.seo_fixture_data import _row, _site  # noqa: E402
+
+pytestmark = pytest.mark.without_seo_facade
 
 NOW = datetime(2026, 10, 26, 12, tzinfo=timezone.utc)  # a Monday, ISO week 44
 

@@ -316,7 +316,8 @@ def test_a_bad_key_stops_at_the_first_request(site, ready, api, capsys):
     assert digest_send.main(["digest_send.py", site, "--send"]) == digest_send.EXIT_PROVIDER
     assert len(api.requests) == 1
     out = capsys.readouterr().out
-    assert "401" in out and "email_access and sending_access" in out
+    assert "ProviderError" in out and "email_access and sending_access" in out
+    assert "Invalid token." not in out
     assert KEY not in out
 
 
@@ -326,7 +327,9 @@ def test_a_duplicate_email_says_what_to_check(site, ready, api, capsys):
         _refused("https://api.buttondown.com/v1/emails", 400, {"code": "email_duplicate"}),
     ]
     assert digest_send.main(["digest_send.py", site, "--send"]) == digest_send.EXIT_PROVIDER
-    assert "same subject" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "same subject" in out and "email_duplicate" not in out
+    assert "could not make a Buttondown draft. ProviderError" in out
 
 
 def test_a_refused_send_names_the_draft_it_left(site, ready, api, capsys):
@@ -592,11 +595,20 @@ def test_check_needs_only_the_key(monkeypatch, api, capsys):
     assert digest_send.main(["digest_send.py", "--check"]) == 0
 
 
-def test_check_reports_a_refused_key(ready, api, capsys):
+@pytest.mark.parametrize("json_mode", [False, True])
+def test_check_reports_a_refused_key(ready, api, capsys, monkeypatch, json_mode):
+    if json_mode:
+        monkeypatch.setenv("INTERNSCOUT_LOG_FORMAT", "json")
+    else:
+        monkeypatch.delenv("INTERNSCOUT_LOG_FORMAT", raising=False)
     api.answers = [_refused(LIST_URL, 401, {"detail": "Invalid token."})]
     assert digest_send.main(["digest_send.py", "--check"]) == digest_send.EXIT_PROVIDER
     out = capsys.readouterr().out
-    assert "Check failed" in out and "email_access" in out and KEY not in out
+    assert "Check failed: ProviderError" in out and "email_access" in out
+    assert "Invalid token." not in out and KEY not in out
+    if json_mode:
+        record = json.loads(out)
+        assert record["level"] == "WARNING" and record["exception_type"] == "ProviderError"
 
 
 def test_check_says_when_a_send_this_week_would_refuse(ready, api, capsys):

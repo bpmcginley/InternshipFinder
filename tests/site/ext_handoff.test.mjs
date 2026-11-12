@@ -1,10 +1,10 @@
+import { readAppSource } from "./app-fixture.mjs";
 // The dashboard's side of two extension fixes (2026-10-14): U2, the postings picked before setup are kept
 // and the note says so; U8, the dashboard offers its own sign-in to a signed-out extension.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 
-const app = readFileSync(new URL("../../docs/js/app.js", import.meta.url), "utf8");
+const app = readAppSource();
 
 test("U8: the dashboard offers only its own session code, once, to an installed extension that is signed out", () => {
   const i = app.indexOf('type: "auth:offer"');

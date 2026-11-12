@@ -108,6 +108,22 @@ class _Content(HTMLParser):
         # Revert: remove these sentence rules to count export-label changes as content changes.
         date_text = re.escape(day)
         contexts = []
+        # Only the generated field/employer lede, not arbitrary dated citations.
+        self.fact_date = (
+            re.compile(
+                r"^(As of )" + date_text
+                + r"(?=, InternScout lists [\d,]+ open student roles? (?:in|at) )"
+            )
+            if re.fullmatch(r"/internships/(?:at/)?[^/]+/", path)
+            else None
+        )
+        utc = stamp.astimezone(timezone.utc) if stamp.tzinfo else stamp.replace(tzinfo=timezone.utc)
+        weekly_label = f"{utc:%B} {utc.day}, {utc.year} at {utc:%H:%M} UTC"
+        self.weekly_date = (
+            re.compile(r"^([\d,]+ open student roles? first seen in the seven days ending )"
+                       + re.escape(weekly_label) + r"(?=\.)")
+            if re.fullmatch(r"/internships/for/[^/]+-majors/weekly/", path) else None
+        )
         if path.startswith("/internships/"):
             # The first listing FAQ answer, whose subject changes with its field/place.
             contexts.append((r"^([\d,]+ open [^.!?]* as of\s+)", r"(?=, from [\d,]+ employers?\.)"))
@@ -153,7 +169,14 @@ class _Content(HTMLParser):
         self.routine = [re.compile(prefix + date_text + tail) for prefix, tail in contexts]
         self.updated = re.compile(r"((?:^|[.,]\s+)[Uu]pdated\s+)" + date_text + r"(?=\.)")
 
-    def _text(self, text: str, *, description: bool = False, export_label: bool = False) -> str:
+    def _text(
+        self, text: str, *, description: bool = False, export_label: bool = False,
+        fact_label: bool = False,
+    ) -> str:
+        if fact_label and self.fact_date:
+            text = self.fact_date.sub(r"\1[export date]", text)
+        if (fact_label or description) and self.weekly_date:
+            text = self.weekly_date.sub(r"\1[export window]", text)
         for pattern in self.routine:
             text = pattern.sub(r"\1[export date]", text)
         # "Updated" is routine only in the common template label or an actual generated listing
@@ -197,7 +220,10 @@ class _Content(HTMLParser):
             export_label = bool(self.stack and self.stack[-1][2]) or (
                 tag == "p" and "updated" in a.get("class", "").split()
             )
-            self.stack.append((tag, hidden, export_label))
+            fact_label = bool(self.stack and self.stack[-1][3]) or (
+                tag == "p" and "lede" in a.get("class", "").split()
+            )
+            self.stack.append((tag, hidden, export_label, fact_label))
 
     def handle_endtag(self, tag):
         for i in range(len(self.stack) - 1, -1, -1):
@@ -211,7 +237,11 @@ class _Content(HTMLParser):
 
     def handle_data(self, data):
         if (self.body or self.title) and not (self.stack and self.stack[-1][1]):
-            text = self._text(data, export_label=bool(self.stack and self.stack[-1][2]))
+            text = self._text(
+                data,
+                export_label=bool(self.stack and self.stack[-1][2]),
+                fact_label=bool(self.stack and self.stack[-1][3]),
+            )
             if text:
                 self.parts.append(["text", text])
 

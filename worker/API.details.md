@@ -14,6 +14,20 @@ dashboard (`docs/index.html`). Update the route data and these notes together, t
   Methods `GET, POST, PUT, DELETE, OPTIONS` (`PUT` is for `PUT /profile`); headers `Authorization, Content-Type`.
   A preflight (`OPTIONS`, any path) answers 204 with these headers for an allowed origin.
 
+## One-click follow unsubscribe
+
+`POST /follows/unsubscribe` uses one HTTPS query parameter named `token`, with a deletion-only
+follow token and a 256-character query limit. Send exactly the text form field
+`List-Unsubscribe=One-Click` as URL-encoded or multipart form data. The body has a 4,096-byte limit
+and a single five-second read deadline. The token is the sole credential. The request can omit
+login, cookies, an authorization header and an Origin header.
+
+Deletion, replay, unknown tokens and other well-formed tokens with a different purpose all return
+an empty 204 with `Cache-Control: no-store`. Malformed input returns an empty 400. Body timeout,
+capacity or unavailable storage returns an empty 503 with `Retry-After: 60`. Up to four operations
+can be in flight per Worker isolate. GET and HEAD use the standard 404 fallback. Deletion is
+available independently of signup and sending switches.
+
 ## Public brand videos
 
 `GET` or `HEAD /social-video/YYYY-MM-DD-field.mp4` serves a generated brand Reel from the fixed
@@ -138,6 +152,7 @@ its own Stripe price id is set. When paid plans are on, `payments` looks like
 and otherwise it is `{ "enabled": false, "plans": [] }`.
 
 ### `GET /me` (auth)
+The authenticated response is served with `Cache-Control: no-store`.
 ```json
 { "month": "2026-09", "plan": "free", "plan_renews": null, "tier": "edu", "paused": false,
   "can_upgrade": true, "can_manage": false,
@@ -153,10 +168,13 @@ and otherwise it is `{ "enabled": false, "plans": [] }`.
   this student (at their own tier, so a non-.edu account sees its share), or `null` when there is none.
   The dashboard and the extension's Upgrade button quote it.
 - **`can_manage`** is true when they have a Stripe customer, so the dashboard can show "Manage subscription".
-- **Invite units** (see `GET /invite`) are already in `limit`: it is the month's allowance, or what was
-  used if invite units took the student past it, plus the invite units left. So `limit - used` is always
-  what they can still run, and an older client needs no change. A task with invite units left also
-  carries `"bonus": 3`.
+- **Invite units** (see `GET /invite`) are already in `limit`. A task with invite units left also
+  carries `"bonus": 3`, which always refers to invite units.
+- **Purchased Auto-Apply runs** appear as an optional positive `allowance.autofill.purchased` count.
+  It reflects unused purchased runs that clear the ledger's hold, refund and revocation checks.
+  The count stays visible when sales or funded creation are off. When funded purchased creation is
+  ready and the Auto-Apply allowance is enabled and finite, these runs are already included in
+  `limit - used`. Clients can show the separate balance without adding it to that remainder again.
 
 ### `GET /invite` (auth)
 The student's own invite link, made on first ask:
@@ -280,6 +298,28 @@ While a subscription is active it returns `409 subscribed` instead: cancelling i
 first, so nothing keeps billing a card for an account that no longer exists here.
 
 ### `POST /ai` (auth)
+
+Internal rollout (off by default): absent/`legacy` `FUNDED_RUNS_MODE` uses existing
+admission and does not query the funded schema. After qualified migration and draining
+old handlers, `create` admits new funded generations; `drain` stops new generation
+creation while continuing existing ones through exact-call callbacks. Existing legacy
+runs can continue only through a guarded existing-row path, without inferred refundable
+funding. Never switch back to the legacy writer while funded generations can exist.
+Invalid modes, missing required response bounds, unavailable/ambiguous funded storage
+or a lost reservation acknowledgment fail closed; no fallback or automatic provider retry.
+
+Opted-in modes require explicit positive integer `FUNDED_RESPONSE_MAX_BYTES`,
+`FUNDED_RESPONSE_EVENT_BYTES` (no larger than the body bound), and
+`FUNDED_RESPONSE_DEADLINE_MS`. No production values are selected here. The deadline
+bounds the single provider attempt and response consumption; accepted output is fenced
+before exposure. Definite failures release only their call; uncertain transport,
+interruption and missing accounting retain the estimate. A pending admission/acceptance
+returns generic `503 busy`; existing recognized cap/rate/paused responses retain their
+contracts. Purchased first admission is separately disabled unless `FUNDED_PURCHASES=1`;
+enabling it requires the remaining purchase balance/disclosure and release qualification.
+These controls are deployment configuration, not client request fields. Request shape,
+success bytes/headers, and default legacy behavior remain unchanged.
+
 Body:
 ```json
 { "task": "autofill", "run_id": "uuid-from-client",
@@ -319,6 +359,19 @@ Body:
 
 ### `POST /demand` (auth)
 Body: `{ "states": ["MA", "NY", "REMOTE"] }`, using USPS codes plus `REMOTE` (max 60). Replaces the user's row. Returns `{ "ok": true }`.
+
+### Optional organic employer posting counts (default off)
+
+The existing `POST /hit` accepts only `{e:"employer_posting_open",c:canonicalKey}` for this optional branch. It requires `EMPLOYER_POSTING_COUNTS_ENABLED` exactly `"1"` and an explicit `EMPLOYER_POSTING_CATALOG` JSON descriptor. The only URL is `https://internscout.org/data/employer-posting-keys.json`. Two exact, mutually exclusive shapes are supported; mixed fields or unknown modes disable the branch:
+
+- Pinned mode keeps the existing `{url,version,sha256}` shape. Version is a 40-character lowercase hexadecimal public release identity; SHA-256 is the 64-character lowercase digest of its exact uncompressed catalog bytes. GET appends `?v=<version>` and verifies the raw-byte digest before parsing. The version query is not immutable Pages history. A changed catalog fails closed until the configured pin matches.
+- Published mode requires exactly `{mode:"published",url}`. It GETs the fixed URL without a version query using `cache:"no-store"`, avoiding an additional Cloudflare fetch cache. It trusts the current first-party publication and refreshes without per-release Worker configuration changes. It does not claim an independently pinned release or keep a second digest state. The catalog remains the same keys-only array, parsed by the existing canonical validator.
+
+Both modes use `redirect:"manual"` so Workers returns redirect responses without following them; the strict status check rejects them. Both modes omit credentials, require exact response URL/status 200, and bound streamed bytes to 256 KiB. The existing request-owned refresh has a five-second deadline and a five-minute hard cache lifetime measured from load start. Configuration changes and mode switches invalidate the prior generation. During refresh, competing requests fail closed without sharing or cancelling the owner's I/O. Failed, malformed, oversized, late or expired refreshes cannot fall back to stale membership. A valid cached catalog can remain in use until its hard expiry; removed keys are rejected after replacement. No descriptor or enablement is configured here. Publishing annotations and their matching catalog together from the selected export remains a separate release gate.
+
+Legacy hits keep their existing admission and 204 response. Organic abuse admission stays separate and precedes fetch/DB work. The request checks the current UTC retention/cap invariant atomically and cannot bootstrap a day cap or clean rows. The existing maintenance schedule is unchanged. **Do not enable collection until separate maintenance is integrated and verified across UTC rollover and independent requests.** The current daily 07:17 UTC schedule alone leaves the midnight-to-cleanup gap. Physical deletion must continue after disabling collection.
+
+The existing authenticated owner-only `GET /admin/employer-metrics` retains `no-store` and existing paid/funnel fields. With valid enabled configuration it adds the reviewed completed-day organic report and cursor. When the switch is `"1"`, it also adds `organic_posting_readiness: {catalog_configured, retention}`. Retention is `not_checked`, `ready`, `blocked` or `unavailable`. `ready` describes the current database invariant only, not cleanup history, remaining count capacity, or verified/fetched catalog freshness. Health performs no catalog GET, cleanup or bootstrap. Missing/invalid descriptor leaves organic report reads off. With the switch absent the response is unchanged. No public totals or new storage are introduced.
 
 ### `POST /hit` (site only, no auth)
 One page load on internscout.org, sent by `docs/js/count.js` with `sendBeacon` as `text/plain`:
@@ -465,7 +518,7 @@ current status does not allow (or a row that changed while it was being saved).
 
 ## Paid listing orders (bought on the site; off until `EMPLOYER_CHECKOUT` is `"1"`)
 
-Added 2026-10-19 (`src/orders.js`, `src/mail.js`; the design is `worker/ORDERS.md`). An employer buys a
+Added 2026-10-19 (`src/orders/`, `src/mail.js`; the design is `worker/ORDERS.md`). An employer buys a
 paid listing for 1 or 3 of its open roles on `internscout.org/employers/buy/`; Bruce approves or refuses
 each order from a signed link in his email. Approving runs the same placement steps as the admin routes
 above (`update` if the start day has passed, `check` with all eight checks, `on`), by `"bruce"`, so every
@@ -584,6 +637,53 @@ token. Not tied to `EMPLOYER_CHECKOUT`, so pilot codes can be made before buying
 Deletes orders never confirmed after 7 days (always, even while orders are off). While on: sends a review
 email that failed, reminds Bruce once about an order waiting more than a day, ends closed roles and makes
 the offer above, sends an offer email that failed, and refunds offers unanswered after 30 days.
+
+## Signed top-up event recovery
+
+The existing `POST /billing/webhook` signature and `stripe_events` receipt boundary also
+accepts configured historical top-ups. The existing Stripe secret, webhook secret and
+validated dedicated `STRIPE_PRICE_TOPUP` configure this path independently of current sales.
+The fixed `topup-v1` terms and authenticated mode are checked by the existing authoritative
+Checkout/payment readers. Inactive Prices and disabled sales do not suppress recovery.
+No extra Price request is required.
+
+Marked or durably associated top-up events never fall through to subscription or employer
+handling. Pending recovery returns the existing generic billing error and releases the
+receipt for Stripe retry. Confirmed settlement, expiry, reconciliation and terminal replay
+use existing typed helpers and durable claim/revision checks. Unknown reversals can use
+at most one bounded Charge GET to resolve a missing PaymentIntent and one bounded
+PaymentIntent GET to classify its metadata. Each uses the existing 10-second/256-KiB
+pinned Stripe reader with manual redirects and no provider writes. Known employer payment
+associations need no discovery GET. No top-up configuration means no extra database or
+provider work for unrelated historical billing events. No event fields or redirects grant
+credit directly, and no new receipt or storage is introduced.
+
+## One-time Auto-Apply checkout
+
+`GET /billing/topup/offer` uses the same origin, current-session and configuration gates
+as checkout. The optional `topups: true` in `GET /config` is a configuration hint only.
+It requires no provider request and carries no price or account information. The
+authenticated offer route checks current Auto-Apply availability, verifies the configured
+one-time Price and product, rechecks service availability and session identity, and returns
+200 with `{enabled: true, offer: {amount, currency, units}}` and `Cache-Control: no-store`.
+Amount is in minor currency units. The response contains no provider references.
+
+`POST /billing/topup/checkout` defaults off. It requires the exact `TOPUPS_ENABLED` and
+`PAYMENTS_ENABLED` opt-ins and the existing private Stripe configuration. It accepts the
+two existing HTTPS dashboard Origins, `https://internscout.org` and
+`https://bpmcginley.github.io`, only when permitted by the configured CORS list.
+
+An existing session bearer authorizes the request without sliding its expiry. The server
+validates current Auto-Apply availability and the configured offer before reserving a
+checkout. The configured first-party
+dashboard root is the return destination for both completion and cancellation. The handler
+ignores request body and query fields. The existing reservation permits one active checkout
+attempt per account.
+
+Responses use `Cache-Control: no-store`. A verified open checkout returns 200 with
+`{status: "open", url}`. An unresolved attempt returns 202 with `{status: "pending"}`.
+Missing or invalid sessions return 401, disallowed Origins return 403, and disabled or
+unavailable checkout returns 503. Checkout does not itself grant purchased runs.
 
 ## Paid plans (optional, off by default)
 

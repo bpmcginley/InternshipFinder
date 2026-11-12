@@ -1,0 +1,130 @@
+[
+  {
+    "phase": "after",
+    "name": "field",
+    "width": 1280,
+    "colorScheme": "light",
+    "text": "As of November 10, 2026, InternScout lists 29 open student roles in software engineering. They range from internships to co-ops and research. That includes 5 co-ops, 5 research positions and 4 fellowships. 100% list pay or say they are paid. The most common start terms are Summer 2027 and Spring 2027. Employers with the most openings: Bose, Fixture Laboratory, Lyft, Medtronic and Under Armour.",
+    "bounds": {
+      "width": 1280,
+      "scroll": 1280
+    },
+    "keyboardFirstLink": "/"
+  },
+  {
+    "phase": "after",
+    "name": "employer",
+    "width": 1280,
+    "colorScheme": "light",
+    "text": "As of November 10, 2026, InternScout lists 38 open student roles at Bose. They range from internships to co-ops and research. That includes 12 research positions. 100% list pay or say they are paid. The most common start terms are Summer 2027 and Spring 2027.",
+    "bounds": {
+      "width": 1280,
+      "scroll": 1280
+    },
+    "keyboardFirstLink": "/"
+  },
+  {
+    "width": 1280,
+    "colorScheme": "light",
+    "externalAllowed": 0,
+    "blockedExternalOrigins": [
+      "https://static.cloudflareinsights.com"
+    ]
+  },
+  {
+    "phase": "after",
+    "name": "field",
+    "width": 1280,
+    "colorScheme": "dark",
+    "text": "As of November 10, 2026, InternScout lists 29 open student roles in software engineering. They range from internships to co-ops and research. That includes 5 co-ops, 5 research positions and 4 fellowships. 100% list pay or say they are paid. The most common start terms are Summer 2027 and Spring 2027. Employers with the most openings: Bose, Fixture Laboratory, Lyft, Medtronic and Under Armour.",
+    "bounds": {
+      "width": 1280,
+      "scroll": 1280
+    },
+    "keyboardFirstLink": "/"
+  },
+  {
+    "phase": "after",
+    "name": "employer",
+    "width": 1280,
+    "colorScheme": "dark",
+    "text": "As of November 10, 2026, InternScout lists 38 open student roles at Bose. They range from internships to co-ops and research. That includes 12 research positions. 100% list pay or say they are paid. The most common start terms are Summer 2027 and Spring 2027.",
+    "bounds": {
+      "width": 1280,
+      "scroll": 1280
+    },
+    "keyboardFirstLink": "/"
+  },
+  {
+    "width": 1280,
+    "colorScheme": "dark",
+    "externalAllowed": 0,
+    "blockedExternalOrigins": [
+      "https://static.cloudflareinsights.com"
+    ]
+  },
+  {
+    "phase": "after",
+    "name": "field",
+    "width": 375,
+    "colorScheme": "light",
+    "text": "As of November 10, 2026, InternScout lists 29 open student roles in software engineering. They range from internships to co-ops and research. That includes 5 co-ops, 5 research positions and 4 fellowships. 100% list pay or say they are paid. The most common start terms are Summer 2027 and Spring 2027. Employers with the most openings: Bose, Fixture Laboratory, Lyft, Medtronic and Under Armour.",
+    "bounds": {
+      "width": 375,
+      "scroll": 375
+    },
+    "keyboardFirstLink": "/"
+  },
+  {
+    "phase": "after",
+    "name": "employer",
+    "width": 375,
+    "colorScheme": "light",
+    "text": "As of November 10, 2026, InternScout lists 38 open student roles at Bose. They range from internships to co-ops and research. That includes 12 research positions. 100% list pay or say they are paid. The most common start terms are Summer 2027 and Spring 2027.",
+    "bounds": {
+      "width": 375,
+      "scroll": 375
+    },
+    "keyboardFirstLink": "/"
+  },
+  {
+    "width": 375,
+    "colorScheme": "light",
+    "externalAllowed": 0,
+    "blockedExternalOrigins": [
+      "https://static.cloudflareinsights.com"
+    ]
+  },
+  {
+    "phase": "after",
+    "name": "field",
+    "width": 375,
+    "colorScheme": "dark",
+    "text": "As of November 10, 2026, InternScout lists 29 open student roles in software engineering. They range from internships to co-ops and research. That includes 5 co-ops, 5 research positions and 4 fellowships. 100% list pay or say they are paid. The most common start terms are Summer 2027 and Spring 2027. Employers with the most openings: Bose, Fixture Laboratory, Lyft, Medtronic and Under Armour.",
+    "bounds": {
+      "width": 375,
+      "scroll": 375
+    },
+    "keyboardFirstLink": "/"
+  },
+  {
+    "phase": "after",
+    "name": "employer",
+    "width": 375,
+    "colorScheme": "dark",
+    "text": "As of November 10, 2026, InternScout lists 38 open student roles at Bose. They range from internships to co-ops and research. That includes 12 research positions. 100% list pay or say they are paid. The most common start terms are Summer 2027 and Spring 2027.",
+    "bounds": {
+      "width": 375,
+      "scroll": 375
+    },
+    "keyboardFirstLink": "/"
+  },
+  {
+    "width": 375,
+    "colorScheme": "dark",
+    "externalAllowed": 0,
+    "blockedExternalOrigins": [
+      "https://static.cloudflareinsights.com"
+    ]
+  }
+]

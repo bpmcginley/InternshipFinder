@@ -1,7 +1,7 @@
 name: Deploy site
 
 # Publishes docs/ to GitHub Pages together with the crawlable landing pages under /internships/,
-# which backend/internscout/seo_pages.py builds from docs/data on every deploy. They are built here
+# which backend/internscout/site/publish.py builds from docs/data on every deploy. They are built here
 # rather than committed: 1,000+ pages rewritten four times a day would bloat the repo, and a page
 # built at deploy time is always exactly as fresh as the data it is deployed with.
 #
@@ -50,6 +50,8 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: main             # after an ingest run: the commit that run just pushed
+          fetch-depth: 0
+          filter: blob:none
 
       - uses: ./.github/actions/python
 
@@ -58,10 +60,10 @@ jobs:
         uses: ./.github/actions/public-data
 
       - name: Save the sitemap that is live now
-        # seo_pages keeps a page that is already live until its listings fall well below the bar for
+        # the publisher keeps a page that is already live until its listings fall well below the bar for
         # a new one (keep_at), so pages near the line do not vanish and return between deploys. On
         # the first deploy there is none, and every page is judged as new.
-        # The noindex pages live now (seo_pages HELD_FILE, 2026-10-13) are not in the sitemap, and count as
+        # The noindex pages live now (publisher HELD_FILE, 2026-10-13) are not in the sitemap, and count as
         # live for keep_at too. Missing before the first deploy that writes it, which is fine.
         run: |
           curl -sfL --max-time 20 https://internscout.org/sitemap.xml -o live-sitemap.xml || rm -f live-sitemap.xml
@@ -85,9 +87,12 @@ jobs:
             echo '{"placements":[]}' > placements.json
           fi
 
+      - name: Install the link preview renderer
+        run: python -m pip install -r scripts/share-card-requirements.txt
+
       - name: Build the site and its landing pages
         id: pages
-        # seo_pages uses only the standard library, so nothing is installed.
+        # The share-card entry point builds pages and their local link previews together.
         # A malformed listing is skipped and counted inside the build, so bad data no longer stops a
         # deploy. Anything else that breaks here fails the run and deploys nothing, which leaves the
         # last good site live, landing pages and all.
@@ -96,10 +101,19 @@ jobs:
         # 404 until the next good build. A few hours of older listings costs far less than that.
         env:
           INTERNSCOUT_PUBLIC_DATA: ${{ steps.public-data.outputs.directory }}
-          # A backstop: seo_pages breaks every tie itself so two builds of the same data are the same
+          EMPLOYER_POSTING_MODE: ${{ vars.INTERNSCOUT_EMPLOYER_POSTING_MODE }}
+          # A backstop: the publisher breaks every tie itself so two builds of the same data are the same
           # bytes, and a fixed hash seed keeps any tie it missed from moving between deploys.
           PYTHONHASHSEED: "0"
         run: |
+          # Off until explicitly staged: annotations first, capture only after Worker qualification.
+          employer_args=()
+          case "${EMPLOYER_POSTING_MODE:-}" in
+            ""|off) ;;
+            annotations) employer_args=(--employer-postings) ;;
+            capture) employer_args=(--employer-postings --employer-posting-capture) ;;
+            *) echo "::error::Invalid employer posting mode."; exit 1 ;;
+          esac
           cp -r docs _site
           if [ "$INTERNSCOUT_PUBLIC_DATA" != "$GITHUB_WORKSPACE/docs/data" ]; then
             rm -rf -- _site/data
@@ -110,7 +124,7 @@ jobs:
           rm -f _site/CNAME        # the custom domain lives in the Pages settings for an Actions deploy
           # --placements-report (2026-10-14): what this build kept and dropped, for the next step. Written
           # outside _site, so it is never published.
-          (cd backend && INTERNSCOUT_PUBLIC_DATA="$GITHUB_WORKSPACE/_site/data" python -m internscout.seo_pages ../_site ../live-sitemap.xml ../live-noindex.txt --placements ../placements.json --placements-report ../placements-report.json)
+          (cd backend && INTERNSCOUT_PUBLIC_DATA="$GITHUB_WORKSPACE/_site/data" PYTHONPATH="..:." python -m scripts.make_og_image --site ../_site ../live-sitemap.xml ../live-noindex.txt --placements ../placements.json --placements-report ../placements-report.json "${employer_args[@]}")
           # 2026-10-23: fail before publishing missing links/canonicals or directory redirects.
           (cd backend && python -m internscout.site_links ../_site)
           # For the notify job: what was live before this deploy, and what this deploy publishes.
@@ -135,7 +149,7 @@ jobs:
 
       - name: Stamp local script and stylesheet content versions
         working-directory: backend
-        run: python -m internscout.asset_versions ../_site
+        run: python -m internscout.asset_versions ../_site --retain-core-git ..
 
       - name: Check public site contents before publishing
         run: |
