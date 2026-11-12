@@ -17,15 +17,11 @@
 //
 // Off until ordersOn(env). While off every /employer/* route answers 404, except GET /employer/config,
 // which says enabled: false so the buy page can say buying on the site is not open yet.
-import { HttpError } from "./http.js";
-import { DAYS, FIELD_CAP, MAX_START_DAYS, PRICES, TERMS_VERSION } from "./orders/shared.js";
-import { ordersOn } from "./orders/access.js";
-
 export { listOrders } from "./orders/admin.js";
 export { PILOT_MAX, createPilotCode } from "./orders/pilot.js";
 export { readShard, shardOf } from "./orders/roles.js";
 export { availability, notePlacementFields } from "./orders/capacity.js";
-export { CREDIT_DEFAULT_DAYS, DAYS, FIELD_CAP, MAX_START_DAYS, PRICES, TERMS_BOX, TERMS_VERSION,
+export { CREDIT_DEFAULT_DAYS, DAYS, FIELD_CAP, MAX_ORDER_BYTES, MAX_START_DAYS, PRICES, TERMS_BOX, TERMS_VERSION,
   UNVERIFIED_DAYS } from "./orders/shared.js";
 export { TERMS_ARCHIVE, reviewSig } from "./orders/templates.js";
 export { listingEvent } from "./orders/settlement.js";
@@ -33,26 +29,4 @@ export { CLOSE_REASONS, dropUnverifiedOrders, ordersCron } from "./orders/cron.j
 export { chooseCredit, creditInfo } from "./orders/refunds.js";
 export { MAX_FORM_BYTES, reviewDecision, reviewPage } from "./orders/review.js";
 export { ALL_PER_DAY, PER_ADDRESS_PER_DAY, TOKEN_HOURS, WEBMAIL, checkoutForm, confirmOrder, takeOrder } from "./orders/checkout.js";
-export { newToken, ordersOn, tokenHash } from "./orders/access.js";
-
-export const MAX_ORDER_BYTES = 4_000;
-
-const notFound = () => new HttpError(404, "not_found", "No such endpoint");
-
-// ---------------------------------------------------------------- on or off
-
-export function requireOrders(env) {
-  if (!ordersOn(env)) throw notFound();
-}
-
-// GET /employer/config: what the buy page needs before it shows anything.
-export function orderConfig(env) {
-  return {
-    enabled: ordersOn(env),
-    prices: PRICES,
-    days: DAYS,
-    field_cap: FIELD_CAP,
-    max_start_days: MAX_START_DAYS,
-    terms_version: TERMS_VERSION,
-  };
-}
+export { newToken, orderConfig, ordersOn, requireOrders, tokenHash } from "./orders/access.js";

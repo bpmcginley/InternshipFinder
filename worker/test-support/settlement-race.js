@@ -1,5 +1,8 @@
 // 2026-10-23: the same race runs against SQLite and actual local D1, never live Stripe/mail (W3).
-import { listingEvent, reviewDecision, reviewSig, TERMS_VERSION } from "../src/orders.js";
+import { listingEvent } from "../src/orders/settlement.js";
+import { reviewDecision } from "../src/orders/review.js";
+import { reviewSig } from "../src/orders/templates.js";
+import { TERMS_VERSION } from "../src/orders/shared.js";
 
 export async function settlementRace(db, orderId) {
   const now = new Date("2026-09-14T10:05:30Z"), at = now.toISOString();
