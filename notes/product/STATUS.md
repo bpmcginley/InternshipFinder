@@ -53,6 +53,7 @@ Queued means not started, not approved for release. A dash means no branch or PR
 
 | Wave | Package | Owner | Branch | PR | State | Next step / Bruce gate |
 |---|---|---|---|---|---|---|
+| C | P-2.1av Same-process Follow publication | audit_worker_extension | `codex/product-p2.1av-writer-seam` | Draft claim | Preparing dormant integration on exact #427 | In-process capture and one pre-push stage. G3, runtime storage and activation remain held. |
 | D | P-2.1t Follow timestamp provenance | Product session | `codex/product-p2.1t-follow-time-provenance` | [#334](https://github.com/bpmcginley/InternshipFinder/pull/334) | Draft needs-bruce | Verified UTC origin or prior-observation evidence for each naive open row. Stack parent #327. No writer or archive publication. |
 | D | P-2.1v In-process follow timestamp provenance | Product session | `codex/product-p2.1v-writer-provenance` | [#344](https://github.com/bpmcginley/InternshipFinder/pull/344) | Draft needs-bruce | Opt-in committed origins and exact writer carry evidence. No CLI activation, durable proof, staged-tree integration or archive publication. |
 | D | P-2.1w Staged follow proof | Product session | `codex/product-p2.1w-staged-proof` | [#347](https://github.com/bpmcginley/InternshipFinder/pull/347) | Draft needs-bruce | Opt-in exact staged-tree receipt for #344 evidence. No CLI change, publication or durable state. |
@@ -212,6 +213,7 @@ Dates are when the item was recorded, not a claim that a separate message was se
 
 | Recorded | Item | Ready artifact / next action | Done |
 |---|---|---|---|
+| 2026-11-12 | P-2.1av Same-process Follow publication | Draft on exact #427. Local synthetic qualification only. No live writer or provider configuration. G3, storage retention/restore witness and activation stay held. | Draft needs-bruce |
 | 2026-11-11 | Follow writer provenance | [#344](https://github.com/bpmcginley/InternshipFinder/pull/344) provides the dormant in-process evidence hook for #334. Verified seed, cross-run proof, staged-tree integration, writer release and owner approval remain pending. | Draft needs-bruce |
 | 2026-11-11 | Follow staged-tree verification | [#347](https://github.com/bpmcginley/InternshipFinder/pull/347) binds the dormant writer proof to the exact locally validated staged listing blobs. Owner integration, writer release and staged-to-published handoff remain pending. | Draft needs-bruce |
 | 2026-11-11 | Follow accepted publication proof | [#348](https://github.com/bpmcginley/InternshipFinder/pull/348) binds the dormant staged receipt to an accepted immutable data commit. Independent review, owner integration, writer release, cross-run lineage and archive publication remain pending. | Draft needs-bruce |
