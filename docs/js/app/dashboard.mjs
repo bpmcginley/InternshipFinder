@@ -486,12 +486,20 @@ export function createDashboard(browser, {
       clearTracker(); browser.setTimeout(() => { const heading = browser.document.getElementById("listings"); if (heading) heading.focus(); }, 0);
     }
     async function deleteData() {
+      const { token } = auth;
+      const generation = authGeneration.current;
+      const currentAccount = () => authRef.current.token === token && authGeneration.current === generation;
+      if (!currentAccount()) return;
       // was: const msg = "Delete your InternScout profile from this browser" + (auth.token ? " and your chosen states and past usage from our server (this month's counts go when the month ends)" : "") + "? This can't be undone.";
       // DELETE /me now also removes the Deep Dive saved to the account and signs out every device.
       const msg = "Delete your InternScout profile from this browser" + (auth.token ? " and, from our server, your chosen states, past usage and the Deep Dive saved to your account, and sign you out everywhere (this month's counts go when the month ends)" : "") + "? This can't be undone.";
       if (!browser.confirm(msg)) return;
-      const r = await IS.deleteMyData(auth.source === "page" ? auth.token : auth.token);
-      if (r.blocked) { setNote(r.reason === "topup_payment_pending" ? PENDING_TOPUP_DELETION : "Cancel your Supporter plan first (Manage plan), then delete. Nothing was deleted."); return; }
+      const r = await IS.deleteMyData(token, currentAccount);
+      if (!currentAccount()) return;
+      if (r.blocked) {
+        setNote(r.reason === "topup_payment_pending" ? PENDING_TOPUP_DELETION : "Cancel your Supporter plan first (Manage plan), then delete. Nothing was deleted.");
+        return;
+      }
       setDigestNudge(false);
       // Statuses and saved searches are the student's own tracker, so they go only if they say so.
       if ((Object.keys(appStates).length || saved.length || ghToken || Object.keys(roleBook.roles).length || previousVisit || visitStart) && browser.confirm("Also delete your application statuses, saved roles, saved searches and last-visit timestamp from this browser? Cancel keeps them.")) {

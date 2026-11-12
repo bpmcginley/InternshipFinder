@@ -6,7 +6,7 @@ Before uses exact published `82c3c429` native allowance, dashboard and Core acco
 
 The actual native UI and Core are executed. One test-only intercepted dashboard binding allows an A-B-A auth generation change to exercise a held recovery response; it is not shipped. `results.json` records no passive recovery requests, keyboard pending/retry, terminal fresh /me exactly once, focus after the disappearing panel action, ordinary Account entry with sales off, absent capability, a held response ignored after A-B-A, and preservation of all browser values after deletion409. Account activation returns focus to Account. The panel status is a persistent polite live region; actual screen-reader software was not exercised.
 
-Reproduce with isolated playwright-core, React/ReactDOM and Edge: export the three baseline modules from `82c3c429` into a temporary directory named by their basenames, then run `node notes/product/screenshots/P-2.2ap/capture.cjs <baseline-directory>`. The script serves local files through route interception and makes no production request. Browser evidence does not prove the forthcoming Worker route is deployed or the owner has enabled recovery.
+Reproduce with isolated playwright-core, React/ReactDOM and Edge: export the three baseline modules from `82c3c429` into a temporary directory named by their basenames, then run `node notes/product/screenshots/P-2.2ap/capture.cjs <baseline-directory>`. The script serves local files through route interception and makes no production request. The browser proof uses local responses. The production Worker route is deployed with recovery disabled.
 
 ## Allowance
 
@@ -34,4 +34,3 @@ Reproduce with isolated playwright-core, React/ReactDOM and Edge: export the thr
 | 1280 dark | [Before](before-deletion-1280-dark.png) | [After](after-deletion-1280-dark.png) |
 | 375 light | [Before](before-deletion-375-light.png) | [After](after-deletion-375-light.png) |
 | 375 dark | [Before](before-deletion-375-dark.png) | [After](after-deletion-375-dark.png) |
-

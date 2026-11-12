@@ -180,6 +180,19 @@ test("A-B-A auth generation and explicit cancellation reject late open or termin
       assert.equal(h.lock.current, null);
     }
 });
+test("a concurrent account refresh does not interrupt recovery for the same session", async () => {
+  let release;
+  const h = harness((url) => new Promise((resolve) => {
+    release = () => resolve(reply(url, { status: "settled" }));
+  }));
+  const recovery = h.actions.recover();
+  h.context.eligible = false;
+  release();
+  await recovery;
+  assert.equal(h.states.at(-1).status, "terminal");
+  assert.equal(h.refreshed(), 1);
+  assert.equal(h.lock.current, null);
+});
 test("absolute deadline rejects late fetch even when timer has not fired", async () => {
   const h = harness((url) => {
     h.tick(1001);
@@ -263,26 +276,66 @@ test("real Core preserves every local value on all 409s and classifies only the 
     assert.deepEqual([...h.browser.sessionStorage.m], session);
   }
 });
-test("dashboard deletion refusal uses top-up guidance only for its reason and exits before clearing local state", async () => {
+test("a delayed deletion success cannot clear a replacement browser session", async () => {
+  let release;
+  const response = new Promise((resolve) => { release = resolve; });
+  const h = core(response);
+  let current = true;
+  const pending = h.IS.deleteMyData("iss_synthetic", () => current);
+  current = false;
+  h.browser.localStorage.setItem(h.IS.SESSION_KEY, "replacement session");
+  h.browser.sessionStorage.setItem("internscout.idtoken", "replacement token");
+  const before = [...h.browser.localStorage.m], session = [...h.browser.sessionStorage.m];
+  release(reply(base + "/me", { ok: true }));
+  await pending;
+  assert.deepEqual([...h.browser.localStorage.m], before);
+  assert.deepEqual([...h.browser.sessionStorage.m], session);
+});
+test("dashboard deletion outcomes only update the current account", async () => {
   const source = readFileSync(new URL("../../docs/js/app/dashboard.mjs", import.meta.url), "utf8"),
     start = source.indexOf("async function deleteData() {");
   const end = source.indexOf("setDigestNudge(false)", start);
   const refusal = source.slice(start, end) + "throw Error('unexpected deletion'); }";
-  for (const reason of [undefined, "subscription_active", "topup_payment_pending"]) {
-    let note;
+  const cases = [
+    { reason: undefined },
+    { reason: "subscription_active" },
+    { reason: "topup_payment_pending" },
+    { reason: "topup_payment_pending", accountChanged: "iss_other" },
+    { reason: "topup_payment_pending", accountChanged: "iss_synthetic" },
+    { accountChanged: "iss_other", success: true },
+  ];
+  for (const { reason, accountChanged, success } of cases) {
+    let note, release;
+    const auth = { token: "iss_synthetic", source: "page" };
+    const authRef = { current: auth }, authGeneration = { current: 0 };
     const fn = runInNewContext(`(${refusal})`, {
       browser: { confirm: () => true },
-      auth: { token: "iss_synthetic", source: "page" },
-      IS: { deleteMyData: async () => ({ blocked: true, reason }) },
+      auth, authRef, authGeneration,
+      IS: { deleteMyData: (token, currentAccount) => {
+        assert.equal(token, auth.token);
+        assert.equal(currentAccount(), true);
+        return new Promise((resolve) => {
+          release = () => {
+            assert.equal(currentAccount(), !accountChanged);
+            resolve(success ? { server: true } : { blocked: true, reason });
+          };
+        });
+      } },
       setNote: (value) => {
         note = value;
       },
       PENDING_TOPUP_DELETION,
     });
-    await fn();
+    const deletion = fn();
+    if (accountChanged) {
+      authRef.current = { token: accountChanged, source: "page" };
+      authGeneration.current = accountChanged === auth.token ? 2 : 1;
+    }
+    release();
+    await deletion;
     assert.equal(
       note,
-      reason === "topup_payment_pending"
+      accountChanged ? undefined : reason === "topup_payment_pending"
         ? PENDING_TOPUP_DELETION
         : "Cancel your Supporter plan first (Manage plan), then delete. Nothing was deleted.",
     );

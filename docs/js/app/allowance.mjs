@@ -327,7 +327,7 @@ export function recoveryEligible(me, status, token) {
 }
 export function createRecoveryActions(browser, { context, update, lock, refresh, deadlineMs = 8000 }) {
   let sequence = 0, active = null;
-  const same = c => { const n = context(); return n.eligible && n.token === c.token && n.generation === c.generation && n.workerUrl === c.workerUrl; };
+  const same = c => { const n = context(); return n.token === c.token && n.generation === c.generation && n.workerUrl === c.workerUrl; };
   const cancel = () => { sequence++; active?.abort(); active = null; };
   async function recover() {
     const c = { ...context() };
