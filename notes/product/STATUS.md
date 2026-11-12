@@ -424,6 +424,7 @@ The golden harness now covers static assets as well as generated pages. Each sit
 
 ## Waiting for Bruce
 
+- **Chrome 0.6.0 install instructions** remain held. Publish only after the signed Chrome 0.6.0 extension is publicly verifiable in the Chrome Web Store. [Staged install instructions #494](https://github.com/bpmcginley/InternshipFinder/pull/494).
 - **Top-up activation** remains pending the verified Stripe Price and release configuration. The [recovery route #472](https://github.com/bpmcginley/InternshipFinder/pull/472) and [dashboard recovery controls #475](https://github.com/bpmcginley/InternshipFinder/pull/475) are published. Sales and attached recovery remain disabled.
 
 
