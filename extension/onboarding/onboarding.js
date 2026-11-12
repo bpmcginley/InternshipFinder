@@ -887,7 +887,8 @@ async function interview(epoch) {
     ${navButtons("facts", "voice")}`;
   wireNav();
   focusStepHeading(main);
-  const chat = $("#chat"), say = $("#say"), stat = $("#cstat"), sendBtn = $("#send"), finishBtn = $("#finish");
+  const chat = $("#chat"), say = $("#say"), stat = $("#cstat");
+  const sendBtn = $("#send"), finishBtn = $("#finish"), restartBtn = $("#restart");
   say.value = conversation.draft;
   const isView = () => epoch === renderEpoch && step === "interview" && interviewChat === conversation;
   conversation.draw = (focus = false) => {
@@ -895,6 +896,7 @@ async function interview(epoch) {
     chat.innerHTML = conversation.messages.slice(1).map((m) => `<div class="msg ${m.role === "user" ? "u" : "a"}">${esc(String(m.content).replace("[[DONE]]", "").trim())}</div>`).join("");
     chat.scrollTop = chat.scrollHeight;
     sendBtn.disabled = finishBtn.disabled = !!conversation.pending || conversation.finishing;
+    restartBtn.disabled = !!conversation.savingStories;
     sendBtn.textContent = conversation.failed ? "Retry" : "Send";
     const status = conversation.status;
     if (conversation.pending) busy(stat, "Thinking…");
@@ -920,8 +922,8 @@ async function interview(epoch) {
     e.preventDefault();
     if (!e.repeat && !conversation.failed) send();
   });
-  $("#restart").addEventListener("click", async () => {
-    if (!isView()) return;
+  restartBtn.addEventListener("click", async () => {
+    if (!isView() || conversation.savingStories) return;
     if (conversation.messages.length > 2 && !confirm("Clear this conversation? Stories you already saved are kept.")) return;
     conversation.pending?.abort();
     const next = interviewChat = interviewConversation([]);
@@ -943,13 +945,22 @@ async function interview(epoch) {
     conversation.finishing = true;
     conversation.draw();
     try {
-      const stillCurrent = () => currentInterview(conversation);
-      if (!(await stillCurrent()) || !(await distill(conversation.messages, stillCurrent))) return;
+      if (!(await currentInterview(conversation))) return;
+      const x = await distill(conversation.messages);
+      if (!(await currentInterview(conversation))) return;
+      // Start over can retire a pending request. Once the profile commit starts, finish that save first.
+      conversation.savingStories = true;
+      conversation.draw();
+      if (Array.isArray(x.stories)) S.profile.stories = x.stories;
+      for (const [k, v] of Object.entries(x.goals || {})) if (v) S.profile.goals[k] = v;
+      applyInterviewFacts(S.profile, x.facts);
+      await save(true);
       conversation.status = { text: `Saved ${S.profile.stories.length} stories and your goals.`, tone: "ok" };
       setTimeout(() => { if (isView()) go("voice"); }, 900);
     } catch (e) {
       conversation.status = { text: e.message, tone: "err" };
     } finally {
+      conversation.savingStories = false;
       conversation.finishing = false;
       conversation.draw();
     }
@@ -960,7 +971,7 @@ async function interview(epoch) {
   }
 }
 
-async function distill(msgs, stillCurrent) {
+async function distill(msgs) {
   const transcript = msgs.slice(1).map((m) => `${m.role === "user" ? "STUDENT" : "INTERVIEWER"}: ${m.content}`).join("\n\n");
   const r = await ai({
     model: M().deep, max_tokens: 16000, thinking: { type: "adaptive" },
@@ -980,13 +991,7 @@ Return JSON only:
 - "goals": merged; keep an existing value when the transcript says nothing new.
 - "facts": only clear factual updates the student stated, using these keys: ${Object.keys(S.profile.facts).join(", ")}.` }],
   });
-  if (!(await stillCurrent())) return false;
-  const x = jsonOf(r);
-  if (Array.isArray(x.stories)) S.profile.stories = x.stories;
-  for (const [k, v] of Object.entries(x.goals || {})) if (v) S.profile.goals[k] = v;
-  applyInterviewFacts(S.profile, x.facts);
-  await save(true);
-  return true;
+  return jsonOf(r);
 }
 
 // ---------- 5. voice ----------

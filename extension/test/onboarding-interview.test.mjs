@@ -3,9 +3,10 @@ import { readFileSync } from "node:fs";
 import { setTimeout } from "node:timers/promises";
 import test from "node:test";
 import vm from "node:vm";
-import { callAI, textOf } from "../background/claude.js";
+import { callAI, jsonOf, textOf } from "../background/claude.js";
 import { modelFor } from "../lib/store.js";
 import { interviewSystem } from "../onboarding/interview-prompt.js";
+import { applyInterviewFacts } from "../onboarding/profile.js";
 
 const source = readFileSync(new URL("../onboarding/onboarding.js", import.meta.url), "utf8");
 const key = "deepdive_chat";
@@ -23,7 +24,7 @@ async function until(condition) {
   assert.ok(condition(), "Synthetic interview did not reach the expected state");
 }
 
-test("Interview owns one pending reply across rerender and fences a held write on Start over", async (t) => {
+test("Interview owns the pending reply and fences conflicting conversation writes", async (t) => {
   const previous = [
     { role: "user", content: "(Begin the interview.)" },
     { role: "assistant", content: "Which synthetic project taught you the most?" },
@@ -34,6 +35,8 @@ test("Interview owns one pending reply across rerender and fences a held write o
   };
   const delayed = Promise.withResolvers(),
     writing = Promise.withResolvers();
+  const profileWriting = Promise.withResolvers(),
+    profileDelayed = Promise.withResolvers();
   const late = "Late reply from the previous conversation.";
   const chrome = {
     storage: {
@@ -103,12 +106,15 @@ test("Interview owns one pending reply across rerender and fences a held write o
     settings: { deep_dive_run: runId },
     profile: { facts: {}, stories: [], goals: {} },
   };
+  let savedProfile;
   const context = vm.createContext({
     S,
     chrome,
     AbortController,
     callAI,
+    jsonOf,
     textOf,
+    applyInterviewFacts,
     modelFor,
     interviewSystem,
     main,
@@ -124,7 +130,14 @@ test("Interview owns one pending reply across rerender and fences a held write o
     $: (selector) => main.querySelector(selector),
     esc: String,
     busy: noop,
-    save: noop,
+    async save() {
+      if (S.profile.stories.length && !savedProfile) {
+        profileWriting.resolve();
+        await profileDelayed.promise;
+        savedProfile = structuredClone(S.profile);
+      }
+    },
+    setTimeout: noop,
     drawSteps: noop,
     wireNav: noop,
     focusStepHeading: noop,
@@ -142,7 +155,7 @@ test("Interview owns one pending reply across rerender and fences a held write o
     between("const runId = () =>", "const busy =") +
       between("function go(id)", "function navButtons") +
       between("function render()", "// The background restored") +
-      between('const CHAT_KEY = "deepdive_chat";', "async function distill(") +
+      between('const CHAT_KEY = "deepdive_chat";', "// ---------- 5. voice") +
       "\nglobalThis.openInterview = () => interview(++renderEpoch); globalThis.navigate = go;",
     context,
   );
@@ -169,15 +182,30 @@ test("Interview owns one pending reply across rerender and fences a held write o
   assert.equal(store[key].at(-1).content, "The current interview received the original reply.");
   assert.equal(requests.length, 1);
 
-  submit();
+  const finishing = node("finish").click();
   await until(() => requests.length === 2);
-  requests[1].finish(late);
+  assert.equal(node("restart").disabled, false);
+  requests[1].finish(JSON.stringify({ stories: [{ theme: "Synthetic project" }] }));
+  await profileWriting.promise;
+  assert.equal(node("restart").disabled, true);
+  await node("restart").click();
+  assert.equal(savedProfile, undefined);
+  assert.equal(store[key].at(-1).content, "The current interview received the original reply.");
+  assert.equal(requests.length, 2);
+  profileDelayed.resolve();
+  await finishing;
+  assert.equal(savedProfile.stories[0].theme, "Synthetic project");
+  assert.equal(node("restart").disabled, false);
+
+  submit();
+  await until(() => requests.length === 3);
+  requests[2].finish(late);
   await writing.promise;
   const restarting = node("restart").click();
   delayed.resolve();
   await restarting;
-  await until(() => requests.length === 3);
-  requests[2].finish("Welcome to the new conversation.");
+  await until(() => requests.length === 4);
+  requests[3].finish("Welcome to the new conversation.");
   await until(() => node("chat").innerHTML.includes("Welcome to the new conversation."));
   assert.equal(node("chat").innerHTML.includes(late), false);
   assert.equal(store[key].length, 2);
