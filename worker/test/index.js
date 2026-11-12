@@ -43,6 +43,7 @@ import "./api-contract.test.js";
 import "./follows.test.js";
 import "./follow-signup-admission.test.js";
 import "./follow-catalog.test.js";
+import "./follow-catalog-loader.test.js";
 import "./follow-management.test.js";
 import "./follow-outbox.test.js";
 import "./follow-retention.test.js";
