@@ -58,7 +58,9 @@ test("only bounded body credentials reach the explicit follow POST routes", asyn
 
 test("body timeout cancels held readers in both actions and recovers shared capacity", async () => {
   const scheduled = new Map();
+  let elapsed = 0;
   const timers = {
+    monotonicNow: () => elapsed,
     setTimeout(fn, ms) {
       assert.equal(ms, 5000);
       const id = Symbol();
@@ -69,9 +71,13 @@ test("body timeout cancels held readers in both actions and recovers shared capa
   };
   const endpoints = createFollowTokenEndpoints(timers);
   let canceled = 0;
+  let stream;
   const body = (token) =>
     new ReadableStream({
-      start: (c) => c.enqueue(new TextEncoder().encode(token)),
+      start: (c) => {
+        stream = c;
+        c.enqueue(new TextEncoder().encode(token));
+      },
       cancel: () => {
         canceled += 1;
       },
@@ -94,6 +100,24 @@ test("body timeout cancels held readers in both actions and recovers shared capa
   assert.equal(canceled, 4);
   assert.equal(scheduled.size, 0);
   await expectStatus(await endpoints.confirm(post(CONFIRM, ""), noDb, now), 400);
+
+  let storageCalls = 0;
+  const late = endpoints.confirm(
+    post(CONFIRM, body(TOKEN), { "Content-Type": "text/plain" }),
+    {
+      prepare: () => {
+        storageCalls += 1;
+        throw new Error("Late read reached storage");
+      },
+    },
+    now,
+  );
+  // Complete the stream at the cutoff with its timer callback still held.
+  elapsed = 5000;
+  stream.close();
+  await expectStatus(await late, 503);
+  assert.equal(storageCalls, 0);
+  assert.equal(scheduled.size, 0);
 });
 
 test("storage faults are retryable and do not log internal error or request credentials", async () => {
@@ -132,6 +156,7 @@ test(
     let started = 0;
     const pending = new Set();
     const endpoints = createFollowTokenEndpoints({
+      monotonicNow: () => 0,
       setTimeout() {
         const id = Symbol();
         pending.add(id);
