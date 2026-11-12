@@ -247,16 +247,20 @@ test("reservation source defaults off and a closed witness cannot reach the slot
 });
 
 test("reconciliation crossing its original cutoff cannot publish or extend expiry", async () => {
-  const { object, nonce } = await setup(DAY - 1000);
+  const { object, nonce } = await setup(DAY - 1000, true);
   expect(await object.uploadReserved(nonce)).toBe("stored");
   const before = await state(object);
   await runInDurableObject(object, (i) => {
-    i.beforeCommit = () =>
-      new Promise((resolve) =>
+    i.beforeCommit = () => {
+      i.reachedExpiryCommit = true;
+      i.restoreAdmissionClock();
+      return new Promise((resolve) =>
         setTimeout(resolve, Math.max(0, i.state().reservation.expires - i.now()) + 5),
       );
+    };
   });
   expect(await object.reconcileReserved(nonce)).toBe("held");
+  expect(await runInDurableObject(object, (i) => i.reachedExpiryCommit)).toBe(true);
   expect(await state(object)).toEqual(before);
   expect((await object.read("pending")).status).toBe("held");
 });
