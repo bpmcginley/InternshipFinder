@@ -1,9 +1,8 @@
 // Dormant authenticated-event association. No coverage authority or balance transition.
 import { topupReversalObject } from "./topup-reversal-events.js";
-import { readTopupAssociation } from "./topup-stripe.js";
-import { readVerifiedTopupPurchase } from "./topup-purchase-recovery.js";
+import { readTopupAssociation, readHistoricalTopupTarget } from "./topup-stripe.js";
+import { readVerifiedTopupPayment } from "./topup-purchase-recovery.js";
 import { PAYMENT_EVIDENCE_BOUNDS } from "./topup-payment-evidence.js";
-import { REVERSAL_BOUNDS } from "./topup-reversal-evidence.js";
 import { referenceHash } from "./topup-ledger.js";
 import { observeTopupHistory } from "./topup-history-observation.js";
 const pending = () => ({ status: "pending" });
@@ -106,14 +105,14 @@ export async function observeVerifiedTopupEvent(db, env, event, options = {}) {
     for (const cancel of cancels) cancel();
   };
   // Existing readers retain their streamed limits. This owner adds one shared deadline,
-  // cancellation and a request ceiling: one discovery + payment + reversal phases.
+  // cancellation and a request ceiling: one discovery + three paid reads + one target.
   const get = async (url, init) => {
     live();
     if (
       init?.method !== "GET" ||
       init.body != null ||
       init.redirect !== "manual" ||
-      ++requests > 1 + PAYMENT_EVIDENCE_BOUNDS.requests + REVERSAL_BOUNDS.requests
+      ++requests > 2 + PAYMENT_EVIDENCE_BOUNDS.requests
     )
       fail();
     const response = await fetchImpl(url, {
@@ -209,18 +208,30 @@ export async function observeVerifiedTopupEvent(db, env, event, options = {}) {
     const offer = await resolveOffer(claim.offer_version, livemode);
     live();
     if (offer?.version !== claim.offer_version || offer?.livemode !== livemode) return pending();
-    const verified = await readVerifiedTopupPurchase(db, config, hash, offer, get);
+    const verified = await readVerifiedTopupPayment(db, config, hash, offer, get);
     live();
-    if (verified.status !== "verified") return pending();
-    const { captured, reversals: r } = verified;
+    if (verified.status !== "verified_payment") return pending();
+    const { captured, payment } = verified;
     if (
-      r.paymentId !== paymentId ||
-      r.livemode !== livemode ||
-      (chargeId && r.chargeId !== chargeId) ||
-      (kind === "refund" && !r.refunds.some((v) => v.id === object.id)) ||
-      (kind === "dispute" && !r.disputes.some((v) => v.id === object.id))
+      payment.paymentId !== paymentId ||
+      payment.livemode !== livemode ||
+      (chargeId && payment.chargeId !== chargeId)
     )
       return pending();
+    if (kind !== "charge") {
+      const target = await readHistoricalTopupTarget(config, kind + "s", object.id, get);
+      live();
+      if (
+        target?.object !== kind ||
+        target.id !== object.id ||
+        ref(target.charge, "charge", livemode) !== payment.chargeId ||
+        (target.payment_intent != null &&
+          ref(target.payment_intent, "payment_intent", livemode) !== paymentId) ||
+        (kind === "dispute" && target.livemode !== livemode) ||
+        (target.livemode !== undefined && target.livemode !== livemode)
+      )
+        return pending();
+    }
     live();
     return observeTopupHistory(
       db,

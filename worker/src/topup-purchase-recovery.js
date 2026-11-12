@@ -4,9 +4,14 @@ import { referenceHash } from "./topup-ledger.js";
 import { readTopupPaymentEvidence } from "./topup-payment-evidence.js";
 import { readTopupReversalEvidence } from "./topup-reversal-evidence.js";
 const pending = () => ({ status: "pending" });
+const getOnly = (fetchImpl) => (url, options) => {
+  if (options?.method !== "GET" || options.body != null)
+    throw new Error("Purchase refresh transport must be GET-only");
+  return fetchImpl(url, options);
+};
 
 // Historical offer configuration is trusted input; no current-sales gate or browser evidence.
-export async function readVerifiedTopupPurchase(db, env, paymentHash, originalOffer, fetchImpl) {
+export async function readVerifiedTopupPayment(db, env, paymentHash, originalOffer, fetchImpl) {
   if (typeof fetchImpl !== "function") return pending();
   let offer;
   try {
@@ -16,7 +21,7 @@ export async function readVerifiedTopupPurchase(db, env, paymentHash, originalOf
   }
   if (typeof offer?.livemode !== "boolean") return pending();
   const config = { STRIPE_SECRET_KEY: env?.STRIPE_SECRET_KEY };
-  // Read before BOTH provider phases. This is commit CAS, not a latest-start generation.
+  // Read before provider evidence. This is commit CAS, not a latest-start generation.
   const captured = await readTopupRevision(db, paymentHash);
   if (!captured) return { status: "unavailable" };
   const attempt = await db
@@ -42,11 +47,7 @@ export async function readVerifiedTopupPurchase(db, env, paymentHash, originalOf
     attempt.user_hash !== captured.user_hash
   )
     return pending();
-  const get = (url, options) => {
-    if (options?.method !== "GET" || options.body != null)
-      throw new Error("Purchase refresh transport must be GET-only");
-    return fetchImpl(url, options);
-  };
+  const get = getOnly(fetchImpl);
   const payment = await readTopupPaymentEvidence(config, attempt, offer, get);
   if (
     payment.status !== "paid_evidence" ||
@@ -57,7 +58,22 @@ export async function readVerifiedTopupPurchase(db, env, paymentHash, originalOf
     payment.currency !== captured.currency
   )
     return pending();
-  const reversals = await readTopupReversalEvidence(config, payment, get);
+  return { status: "verified_payment", captured, payment };
+}
+
+export async function readVerifiedTopupPurchase(db, env, paymentHash, originalOffer, fetchImpl) {
+  if (typeof fetchImpl !== "function") return pending();
+  const config = { STRIPE_SECRET_KEY: env?.STRIPE_SECRET_KEY };
+  const evidence = await readVerifiedTopupPayment(
+    db,
+    config,
+    paymentHash,
+    originalOffer,
+    fetchImpl,
+  );
+  if (evidence.status !== "verified_payment") return evidence;
+  const { captured, payment } = evidence;
+  const reversals = await readTopupReversalEvidence(config, payment, getOnly(fetchImpl));
   if (
     reversals.status !== "reversal_evidence" ||
     !["paymentId", "checkoutId", "chargeId", "livemode", "currency", "capturedAmount"].every(
