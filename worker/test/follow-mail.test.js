@@ -270,7 +270,7 @@ test("action fragments reject wrong purpose, token, origin, path and noncanonica
   }
 });
 
-test("fragments remain forbidden on unsubscribe and management and tokens stay out of public links", () => {
+test("action fragments stay in their purpose and tokens stay out of public links", () => {
   for (const name of ["unsubscribe", "management"]) {
     for (const value of [
       actionLinks.confirmation,
@@ -308,6 +308,115 @@ test("fragments remain forbidden on unsubscribe and management and tokens stay o
     /Invalid follow message input/,
     "address-wide unsubscribe token cannot become request deletion",
   );
+});
+
+const MANAGEMENT_TOKEN = `40000000-0000-4000-8000-000000000004.${"d".repeat(64)}`;
+const MANAGEMENT_LINK = `https://internscout.org/follows/manage.html#token=${MANAGEMENT_TOKEN}`;
+const managementInput = {
+  ...input,
+  origins: [...input.origins, "https://internscout.org"],
+  links: { ...actionLinks, management: MANAGEMENT_LINK },
+  matches: [role(1)],
+  summary: "Fixture Company",
+};
+
+test("the first-party management capability appears only in the management and digest bodies", () => {
+  for (const [kind, label] of [
+    ["manage", "Manage your follows"],
+    ["digest", "Manage my follows"],
+  ]) {
+    const message = renderFollowMail(kind, managementInput);
+    assert.ok(message.text.split("\n").includes(`${label}: ${MANAGEMENT_LINK}`));
+    assert.deepEqual(message.headers, unsubscribeHeaders);
+    const { text, ...envelope } = message;
+    assert.equal(text.split(MANAGEMENT_TOKEN).length, 2);
+    assert.ok(!JSON.stringify(envelope).includes(MANAGEMENT_TOKEN));
+  }
+});
+
+test("management links reject normalized variants and stay out of every other link slot", async () => {
+  let sends = 0;
+  const env = { EMAIL: { send: () => sends++ } };
+  const invalid = { message: "Invalid follow message input" };
+  const mail = (kind, name, value) =>
+    sendFollowMail(env, kind, {
+      ...managementInput,
+      links: { ...managementInput.links, [name]: value },
+    });
+  for (const value of [
+    MANAGEMENT_LINK.replace("https:", "http:"),
+    MANAGEMENT_LINK.replace("internscout.org", "internscout.org:443"),
+    MANAGEMENT_LINK.replace("internscout.org", "user@internscout.org"),
+    MANAGEMENT_LINK.replace("https://internscout.org", SITE),
+    MANAGEMENT_LINK.replace("/follows/", "/follows/../follows/"),
+    MANAGEMENT_LINK.replace("manage.html", "man%61ge.html"),
+    MANAGEMENT_LINK.replace("manage.html", "other.html"),
+    MANAGEMENT_LINK.replace("#", "?"),
+    MANAGEMENT_LINK.replace("manage.html#", "other.html?"),
+    MANAGEMENT_LINK.replace("manage.html#", "manage.html/?"),
+    MANAGEMENT_LINK.replace("#", "?tracking=1#"),
+    MANAGEMENT_LINK.replace("token=", "to%6ben="),
+    MANAGEMENT_LINK.replace(MANAGEMENT_TOKEN, MANAGEMENT_TOKEN.toUpperCase()),
+    MANAGEMENT_LINK.replace(MANAGEMENT_TOKEN, MANAGEMENT_TOKEN.replace(".", "%2E")),
+    MANAGEMENT_LINK + "&token=" + MANAGEMENT_TOKEN,
+    MANAGEMENT_LINK + "#",
+    MANAGEMENT_LINK.split("#")[0],
+  ])
+    await assert.rejects(mail("manage", "management", value), invalid);
+
+  for (const [kind, name] of [
+    ["confirm", "confirmation"],
+    ["confirm", "deleteRequest"],
+    ["manage", "unsubscribe"],
+    ["digest", "matchingPage"],
+    ["digest", "publicShare"],
+  ])
+    await assert.rejects(mail(kind, name, MANAGEMENT_LINK), invalid);
+  const alternateTokens = [
+    MANAGEMENT_TOKEN,
+    MANAGEMENT_TOKEN.toUpperCase(),
+    MANAGEMENT_TOKEN.replace(".", "%2E"),
+    MANAGEMENT_TOKEN.replace(".", "%252E"),
+    MANAGEMENT_TOKEN.replace(".", "%25252E"),
+  ];
+  for (const token of alternateTokens) {
+    await assert.rejects(mail("manage", "unsubscribe", `${ACTIONS}/unsubscribe/${token}`), invalid);
+    await assert.rejects(
+      mail("manage", "unsubscribe", `${ACTIONS}/unsubscribe?token=${token}`),
+      invalid,
+    );
+    await assert.rejects(mail("digest", "publicShare", `${SITE}/share?value=${token}`), invalid);
+  }
+  for (const path of ["/FOLLOWS/manage.html", "/follows/man%2561ge.html"]) {
+    const wrongRoute = `https://internscout.org${path}?token=${TOKEN}`;
+    await assert.rejects(mail("manage", "unsubscribe", wrongRoute), invalid);
+    await assert.rejects(mail("digest", "matchingPage", wrongRoute), invalid);
+  }
+
+  for (const apply_url of [
+    MANAGEMENT_LINK,
+    MANAGEMENT_LINK.replace(MANAGEMENT_TOKEN, TOKEN),
+    MANAGEMENT_LINK.replace("manage.html", "man%2561ge.html").replace(MANAGEMENT_TOKEN, TOKEN),
+    ...alternateTokens.map((token) => `https://jobs.example.test/1?source=${token}`),
+  ]) {
+    for (const roleInput of [
+      { matches: [role(1, { apply_url })] },
+      { similar: [role(2, { apply_url })] },
+    ])
+      await assert.rejects(
+        sendFollowMail(env, "digest", { ...managementInput, ...roleInput }),
+        invalid,
+      );
+  }
+  await assert.rejects(
+    sendFollowMail(env, "digest", {
+      ...managementInput,
+      links: { ...managementInput.links, management: input.links.management },
+      matches: [role(1, { apply_url: MANAGEMENT_LINK.replace(MANAGEMENT_TOKEN, TOKEN) })],
+    }),
+    invalid,
+  );
+  assert.equal(sends, 0);
 });
 
 test("encoded reserved action paths cannot fall through to legacy query links", () => {
