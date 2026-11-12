@@ -76,6 +76,37 @@ export async function readHistoricalTopupTarget(env, kind, id, fetchImpl) {
   );
 }
 
+// History-only positive employer proof. Fixed GET paths, no current sales configuration.
+export async function readEmployerHistoryObject(env, kind, id, fetchImpl) {
+  const prefix = new Map([
+    ["charges", "ch"],
+    ["payment_intents", "pi"],
+  ]).get(kind);
+  if (
+    typeof env?.STRIPE_SECRET_KEY !== "string" ||
+    !env.STRIPE_SECRET_KEY ||
+    typeof fetchImpl !== "function" ||
+    !(kind === "checkout/sessions"
+      ? validTopupCheckoutId(id)
+      : prefix &&
+        typeof id === "string" &&
+        new RegExp("^" + prefix + "_[A-Za-z0-9_]{1,250}$").test(id))
+  )
+    throw unavailable();
+  return boundedRequest(
+    { STRIPE_SECRET_KEY: env.STRIPE_SECRET_KEY },
+    kind +
+      "/" +
+      encodeURIComponent(id) +
+      (kind === "checkout/sessions" ? "?expand[]=line_items" : ""),
+    {},
+    fetchImpl,
+    null,
+    "GET",
+    TOPUP_CHECKOUT_BOUNDS.timeoutMs,
+  );
+}
+
 export function topupConfigured(env) {
   return (
     env?.TOPUPS_ENABLED === "1" &&

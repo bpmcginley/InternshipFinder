@@ -3,6 +3,7 @@ import { captureTopupSettlement, settleFirstTopup } from "../src/topup-first-set
 import { attempt, session } from "./topup-stripe.js";
 import { validateTopupHistoryTraversal } from "../src/topup-history-traversal.js";
 import { observeVerifiedTopupEvent } from "../src/topup-history-events.js";
+import { readEmployerHistoryObject } from "../src/topup-stripe.js";
 import {
   replayTopupHistoryTarget as replay,
   replayTopupHistoryWindow,
@@ -729,4 +730,302 @@ export async function terminalCollectionUsesExistingFourHundredEventBound(db) {
     });
     assert.equal(rejected.status, "held");
   }
+}
+
+async function employerFixture(db, kind = "refund") {
+  const f = await setup(db),
+    orderId = "o-1111111111111111";
+  await db.prepare("DELETE FROM employer_orders").run();
+  await db
+    .prepare(
+      "INSERT INTO employer_orders(id,created,updated,status,package,start_day,employer_key,employer,company,name,email,email_domain,terms_version,terms_at,price,paid_amount,paid_at,paid_ref,payment_intent,paid_session) VALUES(?,?,?,'paid','one','2026-11-11','fixture','Fixture','Fixture','Synthetic','fixture@example.invalid','example.invalid','fixture',?,1000,900,?,'stripe:pi_employer','pi_employer','cs_employer')",
+    )
+    .bind(orderId, now.toISOString(), now.toISOString(), now.toISOString(), now.toISOString())
+    .run();
+  const metadata = { kind: "listing", order: orderId };
+  f.employer = {
+    target: {
+      ...item(kind === "charge" ? "refund" : kind, "succeeded", 100),
+      charge: "ch_employer",
+      payment_intent: "pi_employer",
+    },
+    charge: {
+      ...f.charge,
+      id: "ch_employer",
+      payment_intent: "pi_employer",
+      amount: 900,
+      amount_captured: 900,
+    },
+    intent: {
+      ...f.intent,
+      id: "pi_employer",
+      latest_charge: "ch_employer",
+      amount: 900,
+      amount_received: 900,
+      metadata,
+    },
+    checkout: {
+      object: "checkout.session",
+      id: "cs_employer",
+      livemode: false,
+      currency: "usd",
+      mode: "payment",
+      status: "complete",
+      payment_status: "paid",
+      client_reference_id: orderId,
+      recovered_from: null,
+      payment_intent: "pi_employer",
+      metadata,
+      amount_subtotal: 1000,
+      amount_total: 900,
+      total_details: { amount_discount: 100, amount_tax: 0, amount_shipping: 0 },
+      line_items: {
+        object: "list",
+        url: "/v1/checkout/sessions/cs_employer/line_items",
+        has_more: false,
+        data: [
+          {
+            object: "item",
+            id: "li_employer",
+            quantity: 1,
+            currency: "usd",
+            amount_subtotal: 1000,
+            amount_total: 900,
+            price: {
+              object: "price",
+              id: "price_employer",
+              type: "one_time",
+              livemode: false,
+              currency: "usd",
+              unit_amount: 1000,
+            },
+          },
+        ],
+      },
+    },
+  };
+  f.employer.target.id = kind === "dispute" ? "du_employer" : "re_employer";
+  f.employerEvent = {
+    ...f.target,
+    id: "evt_employer",
+    type:
+      kind === "charge"
+        ? "charge.refunded"
+        : kind === "dispute"
+          ? "charge.dispute.updated"
+          : "refund.updated",
+    data: { object: structuredClone(kind === "charge" ? f.employer.charge : f.employer.target) },
+  };
+  f.pages = [[f.employerEvent]];
+  const original = f.fetch;
+  f.options.fetchImpl = async (url, init) => {
+    const path = new URL(url).pathname;
+    const name = new Map([
+      ["/v1/charges/ch_employer", "charge"],
+      ["/v1/payment_intents/pi_employer", "intent"],
+      ["/v1/checkout/sessions/cs_employer", "checkout"],
+      ["/v1/refunds/re_employer", "target"],
+      ["/v1/disputes/du_employer", "target"],
+    ]).get(path);
+    if (!name) return original(url, init);
+    assert.equal(init.method, "GET");
+    assert.equal(init.redirect, "manual");
+    assert.equal(init.headers.Authorization, "Bearer fixture-not-a-key");
+    assert.equal(init.headers["Stripe-Version"], version);
+    if (name === "checkout")
+      assert.deepEqual([...new URL(url).searchParams], [["expand[]", "line_items"]]);
+    f.calls.push(url);
+    await f.before(url);
+    const value = structuredClone(f.employer[name]);
+    f.alter(value, path);
+    const r = new Response(JSON.stringify(value));
+    Object.defineProperty(r, "url", { value: url });
+    return r;
+  };
+  f.exclude = (database = db, extra = {}) =>
+    windowReplay(database, f, { excludeEmployerPayments: true, ...extra });
+  return f;
+}
+
+export async function employerPositiveMixedWindowHasNoFinancialOrCoverageAuthority(db) {
+  for (const kind of ["refund", "dispute", "charge"]) {
+    const f = await employerFixture(db, kind),
+      before = (await capture(db, false, on)).coverage;
+    f.employerEvent.data.object.metadata = { kind: "listing", order: "o-1111111111111111" };
+    delete f.config.STRIPE_PRICE_TOPUP;
+    assert.deepEqual(await f.exclude(), {
+      status: "handled_unproven",
+      observed: 0,
+      duplicate: 0,
+      inactive: 0,
+      excluded: 1,
+    });
+    assert.equal(f.calls.length, kind === "charge" ? 3 : 4);
+    assert.equal(await count(db, "topup_history_receipts"), 0);
+    assert.equal(await revision(db), 1);
+    assert.deepEqual(await balance(db), [25, 0, 0, 0]);
+    assert.deepEqual((await capture(db, false, on)).coverage, before);
+  }
+  const f = await employerFixture(db);
+  f.pages = [[f.target, f.employerEvent]];
+  assert.deepEqual(await f.exclude(), {
+    status: "handled_unproven",
+    observed: 1,
+    duplicate: 0,
+    inactive: 0,
+    excluded: 1,
+  });
+  assert.equal(await count(db, "topup_history_receipts"), 1);
+  assert.equal(await revision(db), 2);
+  assert.deepEqual(await balance(db), [25, 0, 0, 0]);
+}
+export async function employerProofRejectsWrongCurrentProviderAssociation(db) {
+  const mutations = [
+    (f) => (f.employer.target.metadata = []),
+    (f) =>
+      (f.employerEvent.data.object.metadata = { kind: "listing", order: "o-2222222222222222" }),
+    (f) => (f.employer.target.charge = "ch_other"),
+    (f) => (f.employer.target.payment_intent = "pi_other"),
+    (f) => (f.employer.target.id = "re_other"),
+    (f) => (f.employer.charge.payment_intent = "pi_other"),
+    (f) => (f.employer.intent.latest_charge = "ch_other"),
+    (f) => (f.employer.intent.metadata = { kind: "autofill_topup" }),
+    (f) => (f.employer.checkout.metadata = { kind: "listing", order: "o-2222222222222222" }),
+    (f) => (f.employer.checkout.metadata.attempt_id = "synthetic"),
+    (f) => (f.employer.checkout.payment_intent = "pi_other"),
+    (f) => (f.employer.checkout.livemode = true),
+  ];
+  for (const mutate of mutations) {
+    const f = await employerFixture(db);
+    mutate(f);
+    assert.equal((await f.exclude()).status, "closed");
+    assert.equal(await count(db, "topup_history_receipts"), 0);
+    assert.ok(f.calls.length <= 4);
+  }
+}
+export async function employerProofRequiresCompleteExactPaidEconomics(db) {
+  for (const fault of [
+    "partial",
+    "items",
+    "quantity",
+    "currency",
+    "subtotal",
+    "total",
+    "price",
+    "discount",
+    "charge",
+    "intent",
+  ]) {
+    const f = await employerFixture(db),
+      s = f.employer.checkout,
+      i = s.line_items.data[0];
+    if (fault === "partial") s.line_items.has_more = true;
+    if (fault === "items") s.line_items.data.push(structuredClone(i));
+    if (fault === "quantity") i.quantity = 2;
+    if (fault === "currency") i.currency = "eur";
+    if (fault === "subtotal") s.amount_subtotal++;
+    if (fault === "total") i.amount_total++;
+    if (fault === "price") i.price.unit_amount++;
+    if (fault === "discount") s.total_details.amount_discount++;
+    if (fault === "charge") f.employer.charge.amount_captured--;
+    if (fault === "intent") f.employer.intent.amount_received--;
+    assert.equal((await f.exclude()).status, "closed", fault);
+    assert.equal(await count(db, "topup_history_receipts"), 0);
+  }
+}
+export async function employerExclusionNeverUsesGenericPendingOrUnknownFamily(db) {
+  for (const fault of [
+    "default",
+    "unknown",
+    "marked",
+    "missing-order",
+    "unpaid-order",
+    "zero-paid",
+    "false-claim-ack",
+  ]) {
+    const f = await employerFixture(db);
+    if (fault === "unknown") f.employerEvent.type = "customer.updated";
+    if (fault === "marked") f.employerEvent.data.object.metadata = { kind: "autofill_topup" };
+    if (fault === "missing-order") await db.prepare("DELETE FROM employer_orders").run();
+    if (fault === "unpaid-order")
+      await db.prepare("UPDATE employer_orders SET status='verified'").run();
+    if (fault === "zero-paid") await db.prepare("UPDATE employer_orders SET paid_amount=0").run();
+    const wrapped = {
+      prepare: (sql) => db.prepare(sql),
+      batch: async (ss) => {
+        const r = await db.batch(ss);
+        if (fault === "false-claim-ack" && ss.length === 1 && r[0].results.length === 0)
+          r[0].success = false;
+        return r;
+      },
+    };
+    assert.equal(
+      (await f.exclude(wrapped, { excludeEmployerPayments: fault !== "default" })).status,
+      "closed",
+      fault,
+    );
+    assert.equal(f.calls.length, 0, fault);
+    assert.equal(await count(db, "topup_history_receipts"), 0);
+  }
+}
+export async function employerFinalTupleEpochAndDeadlineRacesStayHeld(db) {
+  for (const fault of ["delete", "change", "claim", "attempt", "epoch", "deadline", "ack"]) {
+    const f = await employerFixture(db);
+    f.before = async (url) => {
+      if (!url.includes("checkout/sessions")) return;
+      if (fault === "delete") await db.prepare("DELETE FROM employer_orders").run();
+      if (fault === "change") await db.prepare("UPDATE employer_orders SET paid_amount=901").run();
+      if (fault === "attempt")
+        await db.prepare("UPDATE topup_checkout_attempts SET checkout_id='cs_employer'").run();
+      if (fault === "claim")
+        await db
+          .prepare("UPDATE topup_claims SET checkout_hash=?")
+          .bind(
+            await import("../src/topup-ledger.js").then((m) =>
+              m.referenceHash("checkout", false, "cs_employer"),
+            ),
+          )
+          .run();
+      if (fault === "epoch")
+        await rotate(
+          db,
+          { livemode: false, schemaKey: "replacement", expected: f.input.expected },
+          on,
+        );
+      if (fault === "deadline") f.time += 10000;
+    };
+    let lost = 0;
+    const wrapped = {
+      prepare: (sql) => db.prepare(sql),
+      batch: async (ss) => {
+        const r = await db.batch(ss);
+        if (fault === "ack" && ss.length === 2 && r[0].results[0]?.id === "o-1111111111111111") {
+          lost++;
+          throw Error("synthetic lost read ack");
+        }
+        return r;
+      },
+    };
+    assert.ok(["held", "closed"].includes((await f.exclude(wrapped)).status), fault);
+    assert.equal(lost, fault === "ack" ? 1 : 0);
+    assert.equal(await count(db, "topup_history_receipts"), 0);
+    assert.deepEqual(await balance(db), [25, 0, 0, 0]);
+    if (fault === "epoch")
+      assert.equal((await capture(db, false, on)).coverage.schema_key, "replacement");
+  }
+}
+export async function employerDiscoveryUsesFiveReadsAndFixedPortRejectsInvalidKind(db) {
+  const f = await employerFixture(db);
+  delete f.employerEvent.data.object.payment_intent;
+  assert.equal((await f.exclude()).excluded, 1);
+  assert.equal(f.calls.length, 5);
+  for (const kind of ["constructor", "__proto__", "refunds", "prices", "charges/elsewhere"]) {
+    await assert.rejects(
+      readEmployerHistoryObject(env, kind, "ch_employer", () => assert.fail("no IO")),
+    );
+  }
+  const g = await employerFixture(db);
+  g.pages = [[g.employerEvent], [{ ...g.employerEvent, id: "evt_invalid", created: g.input.to }]];
+  assert.equal((await g.exclude()).status, "closed");
+  assert.equal(g.calls.length, 0);
 }
