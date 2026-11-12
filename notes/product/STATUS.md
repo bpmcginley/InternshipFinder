@@ -448,7 +448,7 @@ The golden harness now covers static assets as well as generated pages. Each sit
 
 ## Waiting for Bruce
 
-- **P-2.1cs company Follow identity staging**: draft source-only adapter on #518; no backend merge before G3 or publisher/browser activation. [Scope](P-2.1cs-company-identity.md).
+- **P-2.1cs company Follow identity staging**: [#570](https://github.com/bpmcginley/InternshipFinder/pull/570) is a qualified source-only adapter on #518; independent review/CI and G3 remain; publisher/browser activation is separate. [Scope](P-2.1cs-company-identity.md).
 
 - **Follow action-page wording** is awaiting approval. The [exact copy inventory](https://github.com/bpmcginley/InternshipFinder/blob/20ee1571f45be56d517b6b986d013b4e011d444f/notes/product/P-2.1ba-follow-landing.md#exact-newly-presented-text) lists the new wording in [#503](https://github.com/bpmcginley/InternshipFinder/pull/503). Production publication and activation are separately gated.
 - **Follow confirmation rollout** remains held after [#508](https://github.com/bpmcginley/InternshipFinder/pull/508) and the [#506 queue](https://github.com/bpmcginley/InternshipFinder/pull/506) merged to source. Production migration, dispatch and sending remain held.
@@ -709,4 +709,4 @@ Draft needs-bruce [#443](https://github.com/bpmcginley/InternshipFinder/pull/443
 
 | Package | Owner | Branch | State |
 |---|---|---|---|
-| P-2.1cs | audit_growth_generated | `codex/product-p2.1cs-company-identity` | Draft; same-export bytes only; stacks on #518; G3-held |
+| P-2.1cs | audit_growth_generated | `codex/product-p2.1cs-company-identity` | [#570](https://github.com/bpmcginley/InternshipFinder/pull/570): 76 focused tests, unchanged 836-file parent golden and real pinned 68-shard/first-preview staging pass. Draft; independent review/CI and G3-held. |
