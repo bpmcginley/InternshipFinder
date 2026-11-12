@@ -1,7 +1,15 @@
 // Dormant trusted-storage boundary: no provider, route, expiry or deletion integration.
 import { referenceHash, validTopupCheckoutId, validTopupOfferVersion } from "./topup-ledger.js";
+import { sessionWriteFence } from "./session.js";
 import { decideTopup } from "./topup-decisions.js";
-import { topupFinanciallyResolved, topupRetentionStatement } from "./topup-retention.js";
+import {
+  topupFinanciallyResolved,
+  topupRetentionStatement,
+  topupHistoryProven,
+  financialEvidenceDigest,
+} from "./topup-retention.js";
+// The supported pre-tax economics verified independently of the tax-inclusive charge.
+export const TOPUP_SETTLEMENT_TERMS = Object.freeze({ amount: 300, currency: "usd", units: 25 });
 const active = "a.state IN ('creating','open')";
 const uuid = (v) =>
   typeof v === "string" && /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/.test(v);
@@ -9,17 +17,18 @@ const revision = (n) => Number.isSafeInteger(n) && n > 0;
 
 // Call BEFORE both authoritative reads. A later capture invalidates earlier evidence even
 // if that later reader fails. Never reuse evidence after capturing a different revision.
-export async function captureTopupSettlement(db, attemptId) {
+export async function captureTopupSettlement(db, attemptId, session) {
   if (!uuid(attemptId)) return null;
+  const fence = sessionWriteFence(session, "a.user_hash");
   const [, selected] = await db.batch([
     db
       .prepare(
         "INSERT INTO topup_attempt_revisions(attempt_id,revision) " +
-          `SELECT id,1 FROM topup_checkout_attempts a WHERE id=? AND ${active} ` +
+          `SELECT id,1 FROM topup_checkout_attempts a WHERE id=? AND ${active}${fence.sql} ` +
           "ON CONFLICT(attempt_id) DO UPDATE SET revision=topup_attempt_revisions.revision+1 " +
           "WHERE topup_attempt_revisions.revision<9007199254740991",
       )
-      .bind(attemptId),
+      .bind(attemptId, ...fence.args),
     db
       .prepare(
         "SELECT a.*,r.revision FROM topup_checkout_attempts a " +
@@ -33,7 +42,9 @@ export async function captureTopupSettlement(db, attemptId) {
 // Inputs must come from the authenticated payment/reversal readers, never HTTP claims or
 // redirects. Decision prior state is initial ONLY because the guarded insert must win a
 // new durable claim. Existing/deleted/retired claims cannot enter this path.
-export async function settleFirstTopup(db, capture, payment, reversals, now = new Date()) {
+export async function settleFirstTopup(db, capture, payment, reversals, now = new Date(), session) {
+  // Validate original JSON types before structuredClone can erase custom prototypes.
+  const hashing = financialEvidenceDigest(reversals);
   let a, p, r;
   try {
     [a, p, r] = structuredClone([capture, payment, reversals]);
@@ -47,9 +58,9 @@ export async function settleFirstTopup(db, capture, payment, reversals, now = ne
     typeof a.user_hash !== "string" ||
     !/^[a-f0-9]{64}$/.test(a.user_hash) ||
     !validTopupOfferVersion(a.offer_version) ||
-    a.amount !== 300 ||
-    a.currency !== "usd" ||
-    a.units !== 25 ||
+    a.amount !== TOPUP_SETTLEMENT_TERMS.amount ||
+    a.currency !== TOPUP_SETTLEMENT_TERMS.currency ||
+    a.units !== TOPUP_SETTLEMENT_TERMS.units ||
     typeof a.created !== "string" ||
     !(a.checkout_id === null || validTopupCheckoutId(a.checkout_id)) ||
     p?.status !== "paid_evidence" ||
@@ -98,6 +109,7 @@ export async function settleFirstTopup(db, capture, payment, reversals, now = ne
   // Every state/identity/generation guard is on the FIRST mutation. The subsequent writes
   // are deterministic, chained through changes(), with no interleaving inside this batch.
   // Any constraint failure aborts the entire batch, including the initial replay claim.
+  const fence = sessionWriteFence(session, "a.user_hash");
   const results = await db.batch([
     db
       .prepare(
@@ -105,7 +117,9 @@ export async function settleFirstTopup(db, capture, payment, reversals, now = ne
           "SELECT ?,?,'granted' WHERE EXISTS (SELECT 1 FROM topup_checkout_attempts a " +
           "JOIN topup_attempt_revisions r ON r.attempt_id=a.id WHERE a.id=? AND r.revision=? " +
           `AND ${active} AND a.state=? AND a.checkout_id IS ? AND a.user_hash=? ` +
-          "AND a.offer_version=? AND a.amount=? AND a.currency=? AND a.units=? AND a.created=?) " +
+          "AND a.offer_version=? AND a.amount=? AND a.currency=? AND a.units=? AND a.created=?" +
+          fence.sql +
+          ") " +
           "ON CONFLICT DO NOTHING",
       )
       .bind(
@@ -121,6 +135,7 @@ export async function settleFirstTopup(db, capture, payment, reversals, now = ne
         a.currency,
         a.units,
         a.created,
+        ...fence.args,
       ),
     db
       .prepare(
@@ -157,7 +172,13 @@ export async function settleFirstTopup(db, capture, payment, reversals, now = ne
         "UPDATE topup_checkout_attempts SET checkout_id=?,state='settled' WHERE id=? AND changes()=1",
       )
       .bind(p.checkoutId, a.id),
-    topupRetentionStatement(db, paymentHash, topupFinanciallyResolved(r, { loss: false })),
+    topupRetentionStatement(
+      db,
+      paymentHash,
+      topupFinanciallyResolved(r, { loss: false }),
+      topupHistoryProven(r, { loss: false, historyProven: true }, decision),
+      await hashing,
+    ),
     // Terminal state consumes this capture; no second increment can overflow.
     db.prepare("DELETE FROM topup_attempt_revisions WHERE attempt_id=? AND changes()=1").bind(a.id),
   ]);

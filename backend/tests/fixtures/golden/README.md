@@ -39,11 +39,11 @@ listing data, private notes, credentials or service responses.
 The harness copies current production Python modules and public static assets to
 a temporary directory. It omits `docs/data` entirely and seeds an isolated SQLite
 database using only `inputs/listings.json`. It executes the actual module command
-entry points, in separate processes: `internscout.export_static`,
-`internscout.seo_pages`, then `internscout.site_links`. Consequently feeds, role
-index, widget data, placements and content dates use production orchestration.
-The near-page switch keeps its production value; pytest's in-process autouse
-fixture cannot disable it. Coverage assertions require all 500 near pages and
+entry points in separate processes. It runs `internscout.export_static`,
+`scripts.make_og_image --site`, `internscout.asset_versions` and
+`internscout.site_links` in that order. Feeds, the role index, widget data,
+placements and content dates use production orchestration. The near-page
+switch keeps its production value. Coverage assertions require all 500 near pages and
 their hub, plus the field, state, major, employer, pay, numbers, new-listing,
 term-tracker and digest families, a paid box and cohort detail records.
 

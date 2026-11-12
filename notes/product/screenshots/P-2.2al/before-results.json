@@ -1,0 +1,122 @@
+[
+  {
+    "phase": "before",
+    "page": "terms",
+    "width": 1280,
+    "colorScheme": "light",
+    "overflow": false,
+    "errors": [],
+    "blockedExternalRequests": 1,
+    "clip": {
+      "x": 0,
+      "y": 2528.609375,
+      "width": 1280,
+      "height": 810.875
+    }
+  },
+  {
+    "phase": "before",
+    "page": "terms",
+    "width": 1280,
+    "colorScheme": "dark",
+    "overflow": false,
+    "errors": [],
+    "blockedExternalRequests": 1,
+    "clip": {
+      "x": 0,
+      "y": 2528.609375,
+      "width": 1280,
+      "height": 810.875
+    }
+  },
+  {
+    "phase": "before",
+    "page": "terms",
+    "width": 375,
+    "colorScheme": "light",
+    "overflow": false,
+    "errors": [],
+    "blockedExternalRequests": 1,
+    "clip": {
+      "x": 0,
+      "y": 4027.78125,
+      "width": 375,
+      "height": 1444.25
+    }
+  },
+  {
+    "phase": "before",
+    "page": "terms",
+    "width": 375,
+    "colorScheme": "dark",
+    "overflow": false,
+    "errors": [],
+    "blockedExternalRequests": 1,
+    "clip": {
+      "x": 0,
+      "y": 4027.78125,
+      "width": 375,
+      "height": 1444.25
+    }
+  },
+  {
+    "phase": "before",
+    "page": "privacy",
+    "width": 1280,
+    "colorScheme": "light",
+    "overflow": false,
+    "errors": [],
+    "blockedExternalRequests": 1,
+    "clip": {
+      "x": 0,
+      "y": 10076.671875,
+      "width": 1280,
+      "height": 579.75
+    }
+  },
+  {
+    "phase": "before",
+    "page": "privacy",
+    "width": 1280,
+    "colorScheme": "dark",
+    "overflow": false,
+    "errors": [],
+    "blockedExternalRequests": 1,
+    "clip": {
+      "x": 0,
+      "y": 10076.671875,
+      "width": 1280,
+      "height": 579.75
+    }
+  },
+  {
+    "phase": "before",
+    "page": "privacy",
+    "width": 375,
+    "colorScheme": "light",
+    "overflow": false,
+    "errors": [],
+    "blockedExternalRequests": 1,
+    "clip": {
+      "x": 0,
+      "y": 19409.3125,
+      "width": 375,
+      "height": 1081.171875
+    }
+  },
+  {
+    "phase": "before",
+    "page": "privacy",
+    "width": 375,
+    "colorScheme": "dark",
+    "overflow": false,
+    "errors": [],
+    "blockedExternalRequests": 1,
+    "clip": {
+      "x": 0,
+      "y": 19409.3125,
+      "width": 375,
+      "height": 1081.171875
+    }
+  }
+]

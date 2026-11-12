@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { FIELD_CAP, PRICES, TERMS_VERSION, ordersCron, reviewSig } from "../../src/orders.js";
+import { FIELD_CAP, PRICES, TERMS_VERSION } from "../../src/orders/shared.js";
+import { ordersCron } from "../../src/orders/cron.js";
+import { reviewSig } from "../../src/orders/templates.js";
 import { NOW } from "../../test/helpers.js";
 import { GOOD, ID, ON, ROLES, SITE, TODAY, hold, sessionEvent, world } from "./fixtures.js";
 

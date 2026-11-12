@@ -1,5 +1,5 @@
 // Dashboard state, effects and React controller.
-import { createAskExtension, createLoadMe, openInviteAction, copyInviteAction, billingAction } from "./allowance.mjs";
+import { createAskExtension, createLoadMe, watchAllowanceReturns, openInviteAction, copyInviteAction, billingAction, topupEligible, createTopupActions, recoveryEligible, createRecoveryActions, PENDING_TOPUP_DELETION } from "./allowance.mjs";
 import { saveProfileAction, saveQuickProfileAction, finishQuickProfileAction } from "./setup.mjs";
 import { clearTrackerAction, createSetAppState, createToggleSaved, useManualAppState, showMyListAction } from "./tracker.mjs";
 import { useDigestPrompt } from "./navigation.mjs";
@@ -84,15 +84,15 @@ export function createDashboard(browser, {
     const digestPrompt = useDigestPrompt({ useRef, IS });
     const [digestNudge, setDigestNudge] = useState(false);
     const [busy, setBusy] = useState("");
-    const billingRequest = useRef(0);
+    const billingRequest = useRef(0), checkoutLock = useRef(null);
     const [ghToken, setGhToken] = useState(() => { try { return browser.localStorage.getItem("internscout.gh_token") || ""; } catch (e) { return ""; } });
     // was: const [auth, setAuth] = useState(() => ({ cfg: null, token: IS.storedToken(), source: "page" }));
     // auth.token is the bearer sent to the Worker (a session code or an ID token); auth.who is
     // IS.authInfo() of the sign-in it came from ({ email, sub, exp, signin, session }), because a
     // session code can't be decoded the way an ID token could.
     const [auth, setAuthState] = useState(() => { const t = IS.storedToken(); return { cfg: null, token: t, who: IS.authInfo(t), source: "page" }; });
-    const authRef = useRef(auth);
-    const setAuth = useCallback(update => { const next = typeof update === "function" ? update(authRef.current) : update; authRef.current = next; setAuthState(next); }, []);
+    const authRef = useRef(auth), authGeneration = useRef(0);
+    const setAuth = useCallback(update => { const next = typeof update === "function" ? update(authRef.current) : update; if (next.token !== authRef.current.token || next.source !== authRef.current.source) authGeneration.current++; authRef.current = next; setAuthState(next); }, []);
     const invite = inviteState && inviteState.token === auth.token ? inviteState.data : null;
     const inviteStatus = inviteState && inviteState.token === auth.token ? inviteState.status : "idle";
     const [cfgStatus, setCfgStatus] = useState("loading");
@@ -255,8 +255,8 @@ export function createDashboard(browser, {
     // was: const who = auth.token ? (IS.decodeJwt(auth.token) || {}) : null;
     const who = auth.token ? auth.who : null;
     const [meResult, setMeResult] = useState(null), meRequest = useRef(0);
-    const me = meResult && meResult.token === auth.token ? meResult.data : null;
-    const meStatus = meResult && meResult.token === auth.token ? meResult.status : "loading";
+    const me = meResult && meResult.token === auth.token && meResult.generation === authGeneration.current ? meResult.data : null;
+    const meStatus = meResult && meResult.token === auth.token && meResult.generation === authGeneration.current ? meResult.status : "loading";
     // An ID token lasts about an hour, a session until sign-out or a year unused. When either runs out
     // (or the Worker refuses it), stop showing "Signed in": take a fresh one from the extension if it
     // has one, otherwise show the sign-in buttons again.
@@ -266,16 +266,15 @@ export function createDashboard(browser, {
       if (info.installed) askExtension();
     }, [info.installed]);
     const loadMe = useCallback(createLoadMe({
-      authRef, meRequest, setMeResult, bounded, IS, runAllowance, dropToken,
+      authRef, authGeneration, meRequest, setMeResult, bounded, IS, runAllowance, dropToken,
     }), [dropToken]);
     useEffect(() => {
       setMeResult(null); setInviteState(null); setInviteNote(""); inviteRequest.current++;
       if (!auth.token) return;
-      let last = browser.Date.now();
       // was: ... else if (!IS.tokenOk(auth.token)) dropToken(); });
       // authOk is also false once the Worker has answered 401 for this token (a session it ended).
       const load = () => loadMe(auth.token);
-      load();
+      const stopReturns = watchAllowanceReturns(browser, load);
       // was: const ms = ((IS.decodeJwt(auth.token) || {}).exp || 0) * 1000 - Date.now() - 60000;
       // was: const timer = setTimeout(dropToken, Math.max(0, Math.min(ms, 2 ** 31 - 1)));
       // An ID token ends within the hour. A session ends up to a year out, past the longest delay
@@ -284,11 +283,8 @@ export function createDashboard(browser, {
       // Worker's 401 is what ends it.
       const ms = ((auth.who && auth.who.exp) || 0) - browser.Date.now() - 60000;
       const timer = ms <= 2 ** 31 - 1 ? browser.setTimeout(dropToken, Math.max(0, ms)) : 0;
-      // Coming back to the tab after an Auto-Apply run: the "left this month" text should be current.
-      const onVis = () => { if (browser.document.visibilityState === "visible" && browser.Date.now() - last > 60000) { last = browser.Date.now(); load(); } };
-      browser.document.addEventListener("visibilitychange", onVis);
-      return () => { meRequest.current++; browser.clearTimeout(timer); browser.document.removeEventListener("visibilitychange", onVis); };
-    }, [auth.token, loadMe]);
+      return () => { meRequest.current++; browser.clearTimeout(timer); stopReturns(); };
+    }, [auth.token, auth.source, authGeneration.current, loadMe]);
 
     // The extension's Upgrade button (a job paused on a used-up allowance) opens /?upgrade=<plan>.
     // Kept as a notice rather than sent straight on to Stripe: the student sees the plan and what it
@@ -422,11 +418,13 @@ export function createDashboard(browser, {
       });
     }
 
-    function billing(kind, plan, fromArrival = false) {
-      return billingAction({
+    async function billing(kind, plan, fromArrival = false) {
+      if (checkoutLock.current?.kind === "topup") return;
+      const ticket = { kind: "billing" }; checkoutLock.current = ticket;
+      try { return await billingAction({
         authRef, meResult, meStatus, upgrades, billingRequest, countArrival, IS, setBusy,
         bounded, browser, setNote,
-      }, kind, plan, fromArrival);
+      }, kind, plan, fromArrival); } finally { if (checkoutLock.current === ticket) checkoutLock.current = null; }
     }
 
     // profile sync with the extension
@@ -488,12 +486,20 @@ export function createDashboard(browser, {
       clearTracker(); browser.setTimeout(() => { const heading = browser.document.getElementById("listings"); if (heading) heading.focus(); }, 0);
     }
     async function deleteData() {
+      const { token } = auth;
+      const generation = authGeneration.current;
+      const currentAccount = () => authRef.current.token === token && authGeneration.current === generation;
+      if (!currentAccount()) return;
       // was: const msg = "Delete your InternScout profile from this browser" + (auth.token ? " and your chosen states and past usage from our server (this month's counts go when the month ends)" : "") + "? This can't be undone.";
       // DELETE /me now also removes the Deep Dive saved to the account and signs out every device.
       const msg = "Delete your InternScout profile from this browser" + (auth.token ? " and, from our server, your chosen states, past usage and the Deep Dive saved to your account, and sign you out everywhere (this month's counts go when the month ends)" : "") + "? This can't be undone.";
       if (!browser.confirm(msg)) return;
-      const r = await IS.deleteMyData(auth.source === "page" ? auth.token : auth.token);
-      if (r.blocked) { setNote("Cancel your Supporter plan first (Manage plan), then delete. Nothing was deleted."); return; }
+      const r = await IS.deleteMyData(token, currentAccount);
+      if (r.stale || !currentAccount()) return;
+      if (r.blocked) {
+        setNote(r.reason === "topup_payment_pending" ? PENDING_TOPUP_DELETION : "Cancel your Supporter plan first (Manage plan), then delete. Nothing was deleted.");
+        return;
+      }
       setDigestNudge(false);
       // Statuses and saved searches are the student's own tracker, so they go only if they say so.
       if ((Object.keys(appStates).length || saved.length || ghToken || Object.keys(roleBook.roles).length || previousVisit || visitStart) && browser.confirm("Also delete your application statuses, saved roles, saved searches and last-visit timestamp from this browser? Cancel keeps them.")) {
@@ -810,6 +816,38 @@ export function createDashboard(browser, {
     // so with invites off a student who ran out heard nothing. Now the invite is one of its options.
     const outOfRuns = !!(auth.token && allowance && allowance.exhausted);
     const showAllowance = !arrivalDismissed && (upgradeAsk || outOfRuns);
+    const eligibleTopup = topupEligible({ open: showAllowance, auth, cfgStatus, meStatus, allowance });
+    const [topupState, setTopupState] = useState(null);
+    const topupContext = useRef(null);
+    topupContext.current = { eligible: eligibleTopup, workerUrl: C.workerUrl };
+    const topupActions = useRef(null);
+    if (!topupActions.current) topupActions.current = createTopupActions(browser, {
+      context: () => ({ ...topupContext.current, token: authRef.current.token, generation: authGeneration.current }),
+      update: setTopupState, lock: checkoutLock, onPurchase: () => countArrival("out_of_runs_topup"),
+    });
+    useEffect(() => {
+      topupActions.current.cancel(); setTopupState(null);
+      if (eligibleTopup) void topupActions.current.load();
+      return () => topupActions.current.cancel();
+    }, [eligibleTopup, auth.token, authGeneration.current]);
+    const topup = eligibleTopup && topupState ? { ...topupState, buy: topupActions.current.buy, retry: topupActions.current.load } : null;
+    const canRecover = recoveryEligible(me, meStatus, auth.token);
+    const recoveryContext = useRef(null), recoveryActions = useRef(null);
+    const [recoveryState, setRecoveryState] = useState(null);
+    recoveryContext.current = { eligible: canRecover, workerUrl: C.workerUrl };
+    if (!recoveryActions.current) recoveryActions.current = createRecoveryActions(browser, {
+      context: () => ({ ...recoveryContext.current, token: authRef.current.token, generation: authGeneration.current }),
+      update: state => {
+        const restore = state.status === "terminal" && browser.document.activeElement?.id === "checkout-recovery-action";
+        setRecoveryState(state);
+        if (restore) browser.setTimeout(() => { if (browser.document.activeElement === browser.document.body) browser.document.getElementById("checkout-recovery-status")?.focus(); }, 0);
+      }, lock: checkoutLock, refresh: () => loadMe(),
+    });
+    useEffect(() => {
+      recoveryActions.current.cancel(); setRecoveryState(null);
+      return () => recoveryActions.current.cancel();
+    }, [auth.token, authGeneration.current]);
+    const recovering = recoveryState?.status === "checking";
     const arrivalFocused = useRef(false);
     const arrivalInserted = useRef(false), arrivalAnchor = useRef(null);
     if (showAllowance && !arrivalInserted.current) arrivalAnchor.current = visibleFocusAnchor();
@@ -1132,10 +1170,13 @@ export function createDashboard(browser, {
             email: who && who.email,
             planLabel: auth.token ? (me && me.plan && me.plan !== "free" ? `${IS.PLAN_LABELS[me.plan] || me.plan} plan` : me && me.tier === "edu" ? "Free plan, school (.edu) allowance" : "Free plan") : "Not signed in",
             // The same lines the allowance tooltip used to hold, now visible.
+            hasPurchased: !!(allowance && allowance.purchased > 0),
+            purchased: meStatus === "ready" && allowance ? allowance.purchased : 0,
             allowLines: auth.token && me && me.allowance ? IS.allowanceText(me).split("\n") : [],
             resetDay: auth.token && me && me.allowance ? resetDay : null,
             spendText: info.spend && info.spend.calls > 0 ? `Estimated AI cost: $${info.spend.month_usd.toFixed(2)}${info.spend.budget ? ` of $${info.spend.budget}` : ""}` : null,
             items: [
+              canRecover && { key: "recover", group: "plan", label: "Check or resume checkout", onClick: () => { browser.document.querySelector(".acct-btn")?.focus(); void recoveryActions.current.recover(); }, disabled: !!busy || recovering || topup?.status === "opening", desc: "Check your existing checkout. No new checkout is created." },
               auth.token && inviteOffer && { key: "invite", group: "share", label: invite ? "Hide your invite link" : "Invite classmates", onClick: openInvite,
                 desc: "New .edu classmates can earn extra AI use. Check your reward eligibility." },
               ...(auth.token ? upgrades.map(pl => ({ key: pl.plan, group: "plan", label: `${pl.label}${pl.price ? ` · ${pl.price}` : ""}`, onClick: () => billing("checkout", pl.plan),
@@ -1185,9 +1226,9 @@ export function createDashboard(browser, {
       h("main", { id: "main" },
       h("div", { id: "allowance-announcement", className: "sr", role: "status", "aria-live": "polite", "aria-atomic": true }, showAllowance ? "Auto-Apply allowance options are open." : ""),
       showAllowance && h(AllowancePanel, { signedIn: !!auth.token, me, status: meStatus, cfgStatus, allowance, resetDay,
-        plans: [...upgrades].sort((a, b) => Number(b.plan === arrivalRoute.plan) - Number(a.plan === arrivalRoute.plan)), busy, signIn: signInProviders,
+        plans: [...upgrades].sort((a, b) => Number(b.plan === arrivalRoute.plan) - Number(a.plan === arrivalRoute.plan)), busy: busy || (topup?.status === "opening") || recovering, topup, recovery: canRecover ? recoveryActions.current.recover : null, signIn: signInProviders,
         inviteBlock: inviteOffer && h(InviteBlock, { invite, status: inviteStatus, note: inviteNote, onLoad: () => { countArrival("out_of_runs_invite"); openInvite(true); }, onCopy: () => { countArrival("out_of_runs_invite"); copyInvite(); } }),
-        onRetry: () => loadMe(), onConfigRetry: loadConfig, onCheckout: plan => billing("checkout", plan, true), onClose: dismissArrival }),
+        onRetry: () => loadMe(), onConfigRetry: loadConfig, onCheckout: plan => billing("checkout", plan, true), onClose: () => { topupActions.current.cancel(); dismissArrival(); } }),
       // D2.3 (2026-10-05 audit): on a first visit the setup wizard greeted the student before the
       // counters or any statement of what is here. Now the figures come first while the setup card is
       // open with no profile saved; once there is a profile the card is an edit form and the old order
@@ -1201,6 +1242,7 @@ export function createDashboard(browser, {
       topNotice,
       info.stale && h("div", { className: "notice" }, h("b", null, "The extension was reloaded or updated. "), h("a", { href: "#", onClick: prevent(() => browser.location.reload()) }, "Reload this page"), " to reconnect Auto-Apply."),
       // was: info.installed && !info.onboarded && h("div", { className: "notice" }, h("b", null, "One step left: "), ...): topNotice above.
+      h("div", { id: "checkout-recovery-status", tabIndex: -1, className: recoveryState?.message ? "notice" : "sr", role: "status", "aria-live": "polite", "aria-atomic": true }, recoveryState?.message || ""),
       note && h("div", { className: "notice", role: "status" }, note),
       // Always in the page, so a screen reader hears the message when it appears inside.
       h("div", { role: "status" }, selNote && h("div", { className: "selnote" }, h("span", null, selNote),
