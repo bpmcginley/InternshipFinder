@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { runFollowLinkDispatch as tick } from "../src/follow-link-dispatch.js";
 import { requestFollowConfirmation, mintFollowToken } from "../src/follows.js";
 import { enqueueFollowManagementRequest } from "../src/follow-management-request.js";
+import { reserveFollowSendAttempt } from "../src/follow-send-budget.js";
 import { presentation, buildLinks } from "./follow-management-delivery.js";
 export const config = (db, transport = async () => {}) => ({
   enabled: true,
@@ -275,4 +276,76 @@ export async function expiryAndClaimedBacklogsUseIndexedPages(db) {
   assert.equal(result.counts.examined, 2);
   assert.equal(result.counts.accepted, 2);
   assert.equal(sends, 2);
+}
+
+export async function exhaustedCapacityPreservesTheBlockedTurn(db) {
+  for (const kind of ["confirmation", "management"])
+    for (let n = 0; n < 3; n++) await seed(db, kind, n);
+  let continuation;
+  const sent = [];
+  for (let cap = 1; cap <= 6; cap++) {
+    const result = await tick({
+      ...config(db, async (e) => sent.push(kindOf(e))),
+      maxCandidates: 2,
+      cap,
+      ...(continuation ? { continuation } : {}),
+    });
+    assert.equal(result.counts.accepted, 1);
+    if (cap === 1) {
+      assert.equal(result.status, "paused");
+      assert.equal(result.continuation.management, null);
+      assert.equal(result.continuation.nextKind, "management");
+    }
+    continuation = result.continuation;
+  }
+  assert.deepEqual(sent, [
+    "confirmation",
+    "management",
+    "confirmation",
+    "management",
+    "confirmation",
+    "management",
+  ]);
+  assert.equal(await budget(db), 6);
+}
+export async function competingCapacityClaimPreservesEitherKindCursor(db) {
+  for (const kind of ["confirmation", "management"]) {
+    await db.batch(
+      ["follow_subscribers", "follow_send_budget", "rate"].map((t) =>
+        db.prepare(`DELETE FROM ${t}`),
+      ),
+    );
+    await seed(db, kind);
+    let raced = false,
+      sends = 0;
+    const wrapped = {
+      prepare: (s) => db.prepare(s),
+      batch: async (statements) => {
+        if (!raced && statements.length > 2) {
+          raced = true;
+          assert.equal(await reserveFollowSendAttempt(db, 1), true);
+        }
+        return db.batch(statements);
+      },
+    };
+    const first = await tick({
+      ...config(wrapped, async () => sends++),
+      cap: 1,
+      maxCandidates: 2,
+      continuation: { confirmation: null, management: null, nextKind: kind },
+    });
+    assert.equal(raced, true);
+    assert.equal(first.status, "paused");
+    assert.equal(first.continuation[kind], null);
+    assert.equal(first.continuation.nextKind, kind);
+    assert.equal(sends, 0);
+    const second = await tick({
+      ...config(db, async () => sends++),
+      cap: 2,
+      maxCandidates: 2,
+      continuation: first.continuation,
+    });
+    assert.equal(second.counts.accepted, 1);
+    assert.equal(sends, 1);
+  }
 }

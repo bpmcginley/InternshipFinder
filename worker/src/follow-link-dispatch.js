@@ -92,6 +92,7 @@ export async function runFollowLinkDispatch({
     };
     let previous = "",
       databasePrevious = "",
+      exhausted = false,
       day;
     const fresh = () => {
       const value = clock();
@@ -107,21 +108,36 @@ export async function runFollowLinkDispatch({
     };
     const admitted = async () => {
       fresh();
-      const [rows] = receipts(await db.batch([db.prepare(`SELECT ${NOW} AS at`)]), 1);
+      const [rows] = receipts(
+        await db.batch([
+          db.prepare(
+            `SELECT ${NOW} AS at,b.observed_at,b.attempts FROM (SELECT 1) LEFT JOIN follow_send_budget b ON b.slot=1`,
+          ),
+        ]),
+        1,
+      );
       fresh();
       const at = rows[0]?.at;
       if (
         rows.length !== 1 ||
-        !exact(rows[0], "at") ||
+        !exact(rows[0], "at,attempts,observed_at") ||
         !stamp(at) ||
         at < databasePrevious ||
         at.slice(0, 10) !== day
       )
         throw new Error();
+      const { observed_at: observed, attempts } = rows[0];
+      if (observed === null && attempts === null) exhausted = false;
+      else {
+        if (!stamp(observed) || observed > at || !Number.isSafeInteger(attempts) || attempts < 0)
+          throw new Error();
+        exhausted = observed.slice(0, 10) === day && attempts >= cap;
+      }
       databasePrevious = at;
       return at;
     };
     let at = await admitted();
+    if (exhausted) return finish("paused");
     const queries = kinds.map((kind) => {
       const table = `follow_${kind}_outbox`,
         after = next[kind];
@@ -164,8 +180,13 @@ export async function runFollowLinkDispatch({
       if (offsets[k] >= pages[k].length) k = 1 - k;
       if (offsets[k] >= pages[k].length) break;
       at = await admitted();
+      const kind = kinds[k];
+      if (exhausted) {
+        next.nextKind = kind;
+        return finish("paused");
+      }
       const row = pages[k][offsets[k]++],
-        kind = kinds[k];
+        beforeCursor = next[kind];
       counts.examined++;
       next[kind] = { expires_at: row.expires_at, id: row.id };
       next.nextKind = kinds[1 - k];
@@ -185,7 +206,13 @@ export async function runFollowLinkDispatch({
           : await deliverFollowManagement({ ...common, enabled: true, presentation, buildLinks });
       if (!["accepted", "uncertain", "unavailable", "paused"].includes(result?.status))
         throw new Error();
-      if (result.status === "paused") return finish("paused");
+      // The claim remains authority. A competing debit can exhaust capacity after preflight.
+      if (result.status === "unavailable") await admitted();
+      if (result.status === "paused" || (result.status === "unavailable" && exhausted)) {
+        next[kind] = beforeCursor;
+        next.nextKind = kind;
+        return finish("paused");
+      }
       counts[result.status]++;
       if (result.status === "uncertain") return finish("uncertain");
       fresh();
