@@ -20,9 +20,10 @@ test("isolated native checkpoint entry admission suite", () => {
       maxBuffer: 1024 * 1024,
     },
   );
+  assert.ifError(result.error);
   assert.equal(
     result.status,
     0,
-    String(result.error ?? "") + (result.stdout + result.stderr).slice(-6000),
+    `${result.stdout ?? ""}${result.stderr ?? ""}`.slice(-6000),
   );
 });

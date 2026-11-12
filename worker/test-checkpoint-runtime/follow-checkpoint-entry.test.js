@@ -127,7 +127,6 @@ test("invalid configuration cannot pull a body or open the singleton", async () 
   expect(opened).toBe(0);
 });
 
-
 test("fully configured admission stays closed without the exact literal opt-in", async () => {
   let reads = 0;
   let opened = 0;
