@@ -38,9 +38,12 @@ def run_build(tmp_path):
     if not bash:
         pytest.skip("Bash is needed for the actual Pages build fixture")
 
-    def run(mode=None, *, selected=False, failure=""):
+    roots = []
+
+    def run(mode=None, *, selected=False, failure="", advisor=None):
         # Fresh, isolated root. Only the real workflow's relative _site/data removal runs.
-        root = tmp_path / "isolated Pages fixture"
+        root = tmp_path / f"isolated Pages fixture {len(roots)}"
+        roots.append(root)
         (root / "docs/data").mkdir(parents=True)
         (root / "backend").mkdir()
         (root / "docs/index.html").write_text("unchanged dashboard", encoding="utf-8")
@@ -63,8 +66,11 @@ def run_build(tmp_path):
             "FAIL_COMMAND": failure,
         }
         env.pop("EMPLOYER_POSTING_MODE", None)
+        env.pop("ADVISOR_SIGNUP_MODE", None)
         if mode is not None:
             env["EMPLOYER_POSTING_MODE"] = mode
+        if advisor is not None:
+            env["ADVISOR_SIGNUP_MODE"] = advisor
         # Command/argument recording preserves boundaries, including spaces and absent flags.
         stub = r'''
 python() {
