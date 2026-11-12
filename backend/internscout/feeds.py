@@ -13,7 +13,6 @@ gets removed), and says where the rest of that page's listings are.
 from __future__ import annotations
 
 import re
-import sys
 from datetime import datetime, timezone
 from email.utils import format_datetime
 from functools import cache
@@ -33,22 +32,10 @@ _BAD_XML = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f￾￿]")
 
 @cache
 def _standalone_settings() -> tuple[str, datetime | None]:
-    # The old first feed lookup imported the facade and copied these defaults once.
+    # Snapshot the site URL and configured build date on first use.
     from .site import runtime
 
     return assets.SITE, runtime.GENERATED
-
-
-def _settings() -> tuple[str, datetime | None]:
-    legacy = sys.modules.get(f"{__package__}.seo_pages")
-    if legacy is not None:
-        try:
-            generated = legacy.GENERATED
-            return legacy.SITE, generated
-        except AttributeError:
-            # Python registers the module before running its initialization.
-            pass
-    return _standalone_settings()
 
 
 def _x(text) -> str:
@@ -74,7 +61,7 @@ def rss(
         now,
         state,
         limit,
-        site=_settings()[0],
+        site=_standalone_settings()[0],
         place=source.place,
         pay_text=source.pay_text,
         safe_url=safe_url,
@@ -88,5 +75,5 @@ def write_all(site_dir: str, pages: list[dict], now: datetime | None = None) -> 
 
     Prefer the supplied snapshot date, then the configured build date. Use the current UTC
     time when neither is available."""
-    now = now or _settings()[1] or datetime.now(timezone.utc)
+    now = now or _standalone_settings()[1] or datetime.now(timezone.utc)
     return _site_rss.write_all(site_dir, pages, now, rss, ITEMS)

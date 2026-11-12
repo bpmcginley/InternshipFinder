@@ -7,11 +7,13 @@ import re
 
 import pytest
 
-from internscout import page_dates, seo_pages
+from internscout import page_dates
 from internscout.employer_posting_stage import CATALOG_PATH, stage_employer_postings
-from internscout.site import runtime
+from internscout.site import publish, runtime
 from internscout.site.employer_posting_links import PostingLinks
-from test_seo_pages import _row, _site
+from tests.seo_fixture_data import _row, _site
+
+pytestmark = pytest.mark.without_seo_facade
 
 
 STAMP = datetime(2026, 9, 23, 10, tzinfo=timezone.utc)
@@ -158,15 +160,15 @@ def test_complete_page_build_changes_only_organic_attributes(tmp_path):
     assert "/internships/mechanical-engineering/" in changed
     assert "/internships/highest-paying/" in changed
     # Paid placement rendering is a separate path, even for the same organic role.
-    paid = run(links, seo_pages.placement_box, rows[0], {"id": "synthetic", "end": "2027-01-01"})
+    paid = run(links, publish._placement_box, rows[0], {"id": "synthetic", "end": "2027-01-01"})
     assert 'rel="sponsored noopener"' in paid
     assert not MARK.search(paid)
 
 
-def test_legacy_facade_without_optional_state_remains_compatible():
+def test_renderers_without_optional_state_leave_links_unannotated():
     rows = [dict(row, keys={"MA"}) for row in fixture_rows()]
-    assert MARK.search(seo_pages.listing_rows(rows, STAMP)) is None
-    assert MARK.search(seo_pages.pay_rows([(rows[0], 30, 35)], STAMP)) is None
+    assert MARK.search(runtime.listing_rows(rows, STAMP)) is None
+    assert MARK.search(runtime.pay_rows([(rows[0], 30, 35)], STAMP)) is None
 
 
 @pytest.mark.parametrize(

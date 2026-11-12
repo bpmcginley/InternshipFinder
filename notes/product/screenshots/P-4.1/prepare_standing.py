@@ -6,7 +6,7 @@ import sys
 root = Path(__file__).resolve().parents[4]
 sys.path[:0] = [str(root / "backend"), str(root / "backend/tests")]
 import golden_build
-from test_seo_pages import _site
+from tests.seo_fixture_data import _site
 from test_site_launch import fixture_rows
 
 work = Path(sys.argv[1]).resolve()
