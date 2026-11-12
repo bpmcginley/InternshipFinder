@@ -32,7 +32,7 @@ export const ROUTES = Object.freeze([
     "/me",
     "user",
     "none",
-    "JSON {month, plan, plan_renews, can_upgrade, upgrade_offer, can_manage, tier, paused, allowance: {task: {used, limit, bonus?}}}",
+    "JSON {month, plan, plan_renews, can_upgrade, upgrade_offer, can_manage, can_recover_topup?: true, tier, paused, allowance: {task: {used, limit, bonus?, purchased?}}}",
   ),
   route(
     "POST",
@@ -109,6 +109,14 @@ export const ROUTES = Object.freeze([
     "First-party dashboard Origin and current session bearer. The server owns the offer and return URLs.",
     "No-store JSON {status: open, url} 200, {status: pending} 202, auth 401, disallowed Origin 403, disabled or unavailable 503",
     "TOPUPS_ENABLED and existing payment configuration",
+  ),
+  route(
+    "POST",
+    "/billing/topup/recover",
+    "session + site-origin",
+    "Current session bearer, first-party dashboard Origin, no body or query",
+    "No-store JSON {status: open, url} or {status: settled|expired|inactive} 200; pending 202, invalid 400, auth 401, disallowed Origin 403, wrong method 405, limited 429, disabled or unavailable 503",
+    "Historical top-up recovery configuration independent of sales",
   ),
   route("POST", "/billing/portal", "user", "none", "JSON {url: string}", "payments"),
   route(

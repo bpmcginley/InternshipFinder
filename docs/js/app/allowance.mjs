@@ -76,7 +76,7 @@ export function createAllowance(browser, {
           : h("button", { type: "button", className: "btn", disabled: status === "loading", onClick: onLoad }, status === "loading" ? "Loading invite link…" : status === "error" ? "Retry invite link" : "Get my invite link")),
       h("p", { className: "muted", role: "status" }, status === "error" ? "Couldn't load your invite link. Try again." : note));
   }
-  function AllowancePanel({ signedIn, me, status, cfgStatus, allowance, resetDay, plans, busy, signIn, inviteBlock, topup, onRetry, onConfigRetry, onCheckout, onClose }) {
+  function AllowancePanel({ signedIn, me, status, cfgStatus, allowance, resetDay, plans, busy, signIn, inviteBlock, topup, recovery, onRetry, onConfigRetry, onCheckout, onClose }) {
     return h("section", { id: "allowance-panel", className: "notice allowance-panel", "aria-labelledby": "allowance-title", tabIndex: -1 },
       h("h2", { id: "allowance-title" }, allowance && allowance.exhausted ? "No Auto-Apply runs left in your allowance" : "Your Auto-Apply allowance"),
       h("p", { id: "allowance-status", role: "status", "aria-live": "polite", "aria-atomic": true }, !signedIn ? ""
@@ -90,6 +90,9 @@ export function createAllowance(browser, {
           status === "ready" && allowance.purchased > 0 && h("p", { role: "status", "aria-live": "polite" }, `Purchased Auto-Apply runs remaining: ${allowance.purchased.toLocaleString()}. Purchased runs do not expire. Service limits and temporary pauses still apply.`),
           h("p", { className: "muted" }, me.paused ? "AI use is temporarily paused. Search still works." : allowance.disabled ? "Auto-Apply is currently unavailable for this account." : "Per-run and other service limits can still apply."),
           !allowance.disabled && !me.paused && inviteBlock),
+      recovery && h("section", { "aria-label": "Existing checkout" },
+        h("p", null, "Check an existing checkout or resume it on Stripe. This does not create a new checkout."),
+        h("button", { type: "button", id: "checkout-recovery-action", className: "btn", style: { minHeight: 44 }, "aria-disabled": !!busy, onClick: () => { if (!busy) recovery(); } }, "Check or resume checkout")),
       topup && h("section", { "aria-label": "Extra Auto-Apply runs" },
         h("p", { role: "status", "aria-live": "polite", "aria-atomic": true }, topup.status === "loading" ? "Loading extra runs…" : topup.status === "error" ? TOPUP_UNAVAILABLE : topup.status === "opening" ? "Opening Stripe…" : ""),
         topup.verified && h(F, null,
@@ -131,8 +134,11 @@ export function createLoadMe({
     if (!token || token !== authRef.current.token) return null;
     const seq = ++meRequest.current, generation = authGeneration.current;
     setMeResult(previous => ({ token, generation, data: previous && previous.token === token && previous.generation === generation ? previous.data : null, status: "loading" }));
-    const data = await bounded(IS.fetchMe(token));
-    if (token !== authRef.current.token || generation !== authGeneration.current || seq !== meRequest.current) return null;
+    const current = () => token === authRef.current.token && generation === authGeneration.current && seq === meRequest.current;
+    let active = true, data;
+    try { data = await bounded(IS.fetchMe(token, () => active && current())); }
+    finally { active = false; } // A late response after timeout must not mutate Core auth.
+    if (!current()) return null;
     setMeResult({ token, generation, data, status: runAllowance(data) ? "ready" : "error" });
     if (!data && !IS.authOk(authRef.current.who)) dropToken();
     return data;
@@ -246,39 +252,7 @@ export function createTopupActions(browser, { context, update, lock, onPurchase 
     return n.eligible && n.token === c.token && n.generation === c.generation && n.workerUrl === c.workerUrl;
   };
   const cancel = () => { sequence++; active?.abort(); active = null; verified = null; };
-  async function request(path, method, c, controller) {
-    const base = new URL(c.workerUrl);
-    if (base.protocol !== "https:" || base.username || base.password || base.search || base.hash || base.pathname !== "/") throw Error("base");
-    const url = base.origin + path, started = browser.performance.now();
-    let last = started, reader, timer;
-    const check = () => {
-      const now = browser.performance.now();
-      if (!Number.isFinite(now) || now < last || now - started >= deadlineMs || controller.signal.aborted || !same(c)) throw Error("expired");
-      last = now;
-    };
-    const expired = new Promise((_, reject) => { timer = browser.setTimeout(() => { controller.abort(); reject(Error("timeout")); }, deadlineMs); });
-    const work = async () => {
-      check();
-      const response = await browser.fetch(url, { method, headers: { Authorization: "Bearer " + c.token }, credentials: "omit", cache: "no-store", redirect: "error", referrerPolicy: "no-referrer", signal: controller.signal });
-      check();
-      if (response.status !== 200 || response.redirected || response.url !== url || !/(?:^|,)\s*no-store\s*(?:,|$)/i.test(response.headers.get("cache-control") || "")) throw Error("response");
-      if (Number(response.headers.get("content-length")) > 16384 || !response.body) throw Error("size");
-      reader = response.body.getReader();
-      let size = 0, text = "";
-      const decoder = new TextDecoder("utf-8", { fatal: true });
-      while (true) {
-        const part = await reader.read(); check();
-        if (part.done) break;
-        size += part.value.byteLength;
-        if (size > 16384) throw Error("size");
-        text += decoder.decode(part.value, { stream: true });
-      }
-      text += decoder.decode(); check();
-      return JSON.parse(text);
-    };
-    try { return await Promise.race([work(), expired]); }
-    finally { browser.clearTimeout(timer); controller.abort(); if (reader) void reader.cancel().catch(() => {}); }
-  }
+  const request = async (path, method, c, controller) => (await topupRequest(browser, path, method, c, controller, same, deadlineMs)).data;
   async function load() {
     if (active) return;
     const c = { ...context() }; if (!c.eligible) return;
@@ -309,4 +283,78 @@ export function createTopupActions(browser, { context, update, lock, onPurchase 
     finally { if (lock.current === ticket) lock.current = null; if (seq === sequence) active = null; }
   }
   return { load, buy, cancel };
+}
+
+async function topupRequest(browser, path, method, c, controller, same, deadlineMs, statuses = [200]) {
+    const base = new URL(c.workerUrl);
+    if (base.protocol !== "https:" || base.username || base.password || base.search || base.hash || base.pathname !== "/") throw Error("base");
+    const url = base.origin + path, started = browser.performance.now();
+    if (!Number.isFinite(started)) throw Error("clock");
+    let last = started, reader, timer;
+    const check = () => {
+      const now = browser.performance.now();
+      if (!Number.isFinite(now) || now < last || now - started >= deadlineMs || controller.signal.aborted || !same(c)) throw Error("expired");
+      last = now;
+    };
+    const expired = new Promise((_, reject) => { timer = browser.setTimeout(() => { controller.abort(); reject(Error("timeout")); }, deadlineMs); });
+    const work = async () => {
+      check();
+      const response = await browser.fetch(url, { method, headers: { Authorization: "Bearer " + c.token }, credentials: "omit", cache: "no-store", redirect: "error", referrerPolicy: "no-referrer", signal: controller.signal });
+      check();
+      if (!statuses.includes(response.status) || response.redirected || response.url !== url || !/(?:^|,)\s*no-store\s*(?:,|$)/i.test(response.headers.get("cache-control") || "")) throw Error("response");
+      if (Number(response.headers.get("content-length")) > 16384 || !response.body) throw Error("size");
+      reader = response.body.getReader();
+      let size = 0, text = "";
+      const decoder = new TextDecoder("utf-8", { fatal: true });
+      while (true) {
+        const part = await reader.read(); check();
+        if (part.done) break;
+        size += part.value.byteLength;
+        if (size > 16384) throw Error("size");
+        text += decoder.decode(part.value, { stream: true });
+      }
+      text += decoder.decode(); check();
+      return { status: response.status, data: JSON.parse(text) };
+    };
+    try { return await Promise.race([work(), expired]); }
+    finally { browser.clearTimeout(timer); controller.abort(); if (reader) void reader.cancel().catch(() => {}); }
+  }
+
+export const RECOVERY_UNAVAILABLE = "Couldn't check your checkout. Try again. No new checkout was created.";
+export const PENDING_TOPUP_DELETION = "Finish or let your pending checkout expire before deleting your data. Contact support if a billing confirmation is pending. Nothing was deleted.";
+export function recoveryEligible(me, status, token) {
+  return status === "ready" && me?.can_recover_topup === true && typeof token === "string" && token.startsWith("iss_");
+}
+export function createRecoveryActions(browser, { context, update, lock, refresh, deadlineMs = 8000 }) {
+  let sequence = 0, active = null;
+  const same = c => { const n = context(); return n.token === c.token && n.generation === c.generation && n.workerUrl === c.workerUrl; };
+  const cancel = () => { sequence++; active?.abort(); active = null; };
+  async function recover() {
+    const c = { ...context() };
+    if (!c.eligible || active || lock.current) return;
+    const seq = ++sequence, controller = new AbortController(), ticket = { kind: "topup" };
+    active = controller; lock.current = ticket;
+    update({ status: "checking", message: "Checking your checkout…" });
+    try {
+      const { status, data } = await topupRequest(browser, "/billing/topup/recover", "POST", c, controller, same, deadlineMs, [200, 202, 401, 429, 503]);
+      if (seq !== sequence || !same(c)) return;
+      if (status === 200 && data?.status === "open") {
+        const url = topupCheckoutUrl(data.url); if (!url) throw Error("checkout");
+        update({ status: "open", message: "Opening your existing checkout on Stripe…" });
+        browser.location.assign(url);
+      } else if (status === 200 && ["settled", "expired", "inactive"].includes(data?.status)) {
+        update({ status: "terminal", message: data.status === "expired" ? "That checkout has expired. Refreshing your allowance." : data.status === "inactive" ? "No active checkout was found. Refreshing your allowance." : "Checkout checked. Refreshing your allowance." });
+        void refresh(); // Existing loader fences this fresh read by account and request generation.
+      } else {
+        const message = status === 202 && data?.status === "pending" ? "Your checkout is still being checked. Try again later."
+          : status === 401 && data?.status === "auth" ? "Sign in again to check your checkout."
+          : status === 429 && data?.status === "limited" ? "Too many checkout checks. Wait a minute, then try again."
+          : status === 503 && data?.status === "disabled" ? "Checkout recovery is unavailable right now. Try again later."
+          : RECOVERY_UNAVAILABLE;
+        update({ status: "error", message });
+      }
+    } catch { if (seq === sequence && same(c)) update({ status: "error", message: RECOVERY_UNAVAILABLE }); }
+    finally { if (lock.current === ticket) lock.current = null; if (seq === sequence) active = null; }
+  }
+  return { recover, cancel };
 }

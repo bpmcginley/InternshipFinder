@@ -26,6 +26,8 @@ let savedSnapshot = structuredClone(S);
 let saveChain = Promise.resolve();
 let pendingResumeImport = pendingResumeReview(S);
 let renderEpoch = 0;
+let interviewChat = null;
+let interviewWrites = Promise.resolve();
 let rerun = !!S.settings.onboarded;   // was: const. A restore from the account (below) makes this a rerun.
 const requestedStep = new URLSearchParams(location.search).get("step");
 const explicitStep = STEPS.some(([id]) => id === requestedStep);
@@ -46,23 +48,29 @@ const practiceLink = `<span class="small" style="display:block;margin:6px 0 0"><
 // It also restores the Deep Dive from the student's account (lib/sync.js): when that happened after this
 // page loaded, this page's copy is out of date and must not be written over it; the page reloads instead.
 let saveTimer = null;
+function queueStoreWrite(write) {
+  saveChain = saveChain.then(write, write);
+  return saveChain;
+}
 function save(now) {
   clearTimeout(saveTimer);
   const run = () => {
-    const snapshot = structuredClone(S), revision = seenRestore;
-    const write = async () => {
+    const store = S, revision = seenRestore;
+    // Navigation during a story commit must save the profile as it looks after that commit settles.
+    const queuedSnapshot = interviewChat?.savingStories ? null : structuredClone(store);
+    return queueStoreWrite(async () => {
+      if (S !== store) return;
+      const snapshot = queuedSnapshot ?? structuredClone(store);
       let applied = false;
       await updateStore(async (fresh) => {
-        if ((await restoredAt()) !== revision) return;
+        if ((await restoredAt()) !== revision || S !== store) return;
         for (const key of ["profile", "files", "ai"]) mergeProfileEdits(fresh[key], savedSnapshot[key], snapshot[key]);
         const editable = (settings) => Object.fromEntries(Object.entries(settings).filter(([k]) => !BACKGROUND_SETTINGS.includes(k)));
         mergeProfileEdits(fresh.settings, editable(savedSnapshot.settings), editable(snapshot.settings));
         applied = true;
       });
-      if (applied) savedSnapshot = snapshot;
-    };
-    saveChain = saveChain.then(write, write);
-    return saveChain;
+      if (applied && S === store) savedSnapshot = snapshot;
+    });
   };
   if (now) return run();
   saveTimer = setTimeout(run, 300);
@@ -132,15 +140,25 @@ async function showRestore() {
 }
 chrome.storage.onChanged.addListener(async (ch, area) => {
   const r = area === "local" && ch[RESTORED_KEY] && ch[RESTORED_KEY].newValue;
-  if (!r || r.at === seenRestore) return;
+  if (!r || r.at === seenRestore || r.at === interviewChat?.revision) return;
+  const previous = interviewChat;
+  const next = interviewChat = interviewConversation(null, r.at);
+  next.restoring = true;
+  next.interrupted = !!(previous?.pending || previous?.failed || previous?.interrupted);
+  previous?.pending?.abort();
   clearTimeout(saveTimer);
-  S = await loadStore();
+  const current = await loadStore();
+  if (interviewChat !== next) return;
+  S = current;
   savedSnapshot = structuredClone(S);
   pendingResumeImport = pendingResumeReview(S);
   queuedResume = null;
   rerun = !!S.settings.onboarded;
-  if (!(await showRestore())) return;
-  if (rerun) step = "review";
+  const shown = await showRestore();
+  if (interviewChat !== next) return;
+  next.restoring = false;
+  if (shown && rerun) step = "review";
+  if (!shown && step !== "interview") return;
   render();
   scrollTo(0, 0);
   focusStepHeading(main);
@@ -781,76 +799,215 @@ function facts() {
 
 // ---------- 4. interview ----------
 const CHAT_KEY = "deepdive_chat";
+function interviewConversation(messages = null, revision = seenRestore) {
+  return { revision, messages, draft: "", pending: null, finishing: false, failed: false };
+}
+
+async function currentInterview(conversation) {
+  const revision = await restoredAt();
+  return interviewChat === conversation && conversation.revision === revision;
+}
+
+function persistInterview(conversation, messages, beforeReply) {
+  // Start over and post-restore reads wait for any write this document has already issued.
+  const storage = chrome.storage.local;
+  const write = async () => {
+    const revision = await restoredAt();
+    if (interviewChat !== conversation || conversation.revision !== revision) return false;
+    await storage.set({ [CHAT_KEY]: messages });
+    const restored = (await restoredAt()) !== revision;
+    if (restored && beforeReply) {
+      // Restore only our own exact late reply and retain the already saved user answer.
+      const current = (await storage.get(CHAT_KEY))[CHAT_KEY];
+      if (current?.length === messages.length && messages.every((message, i) =>
+        current[i]?.role === message.role && current[i].content === message.content)) {
+        await storage.set({ [CHAT_KEY]: beforeReply });
+      }
+    }
+    return interviewChat === conversation && !restored;
+  };
+  const result = interviewWrites.then(write);
+  interviewWrites = result.catch(() => {});
+  return result;
+}
+
+async function requestInterview(conversation) {
+  if (conversation.pending || conversation.finishing || interviewChat !== conversation) return;
+  if (!conversation.messages.length) {
+    conversation.messages.push({ role: "user", content: `(Begin the interview. Greet me${S.profile.facts.first_name ? ` as ${S.profile.facts.first_name}` : ""} in one short sentence and ask the first question.)` });
+  }
+  const controller = new AbortController();
+  conversation.pending = controller;
+  conversation.failed = false;
+  conversation.status = null;
+  conversation.draw?.();
+  try {
+    const { messages } = conversation;
+    if (!conversation.reply) {
+      if (!(await persistInterview(conversation, messages)) || !(await currentInterview(conversation))) return;
+      const r = await ai({ model: M().agent, max_tokens: 1024, system: interviewSystem(S), messages, signal: controller.signal });
+      if (!(await currentInterview(conversation))) return;
+      conversation.reply = { role: "assistant", content: textOf(r) };
+    }
+    const completed = [...messages, conversation.reply];
+    if (!(await persistInterview(conversation, completed, messages))) return;
+    conversation.messages = completed;
+    conversation.reply = null;
+    if (/\[\[DONE\]\]/.test(completed.at(-1).content)) {
+      conversation.status = { text: "All topics covered. Press Finish & save." };
+    }
+  } catch (e) {
+    conversation.failed = true;
+    conversation.status = { text: e.message, tone: "err" };
+  } finally {
+    conversation.pending = null;
+    conversation.draw?.(true);
+  }
+}
+
 async function interview(epoch) {
-  let msgs = (await chrome.storage.local.get(CHAT_KEY))[CHAT_KEY] || [];
+  const conversation = interviewChat ??= interviewConversation();
+  if (conversation.restoring) return;
+  if (!conversation.messages) {
+    await interviewWrites;
+    const stored = (await chrome.storage.local.get(CHAT_KEY))[CHAT_KEY] || [];
+    if (interviewChat !== conversation) return;
+    if (!conversation.messages) {
+      conversation.messages = stored;
+      if (conversation.interrupted && stored.at(-1)?.role === "user") {
+        conversation.failed = true;
+        conversation.status = { text: "Interview paused after your profile was restored." };
+      }
+      conversation.interrupted = false;
+    }
+  }
   if (epoch !== renderEpoch || step !== "interview") return;
   main.innerHTML = `<h2>Interview</h2><p class="lead">The optional Deep Dive, part 1: a 10 to 15 minute conversation about your experiences and goals. Short, honest answers are perfect. Stop any time; what you've said is saved.</p>
     <div class="card"><div class="chat" id="chat"></div>
       <textarea id="say" placeholder="Type your answer… (Ctrl+Enter to send)"></textarea>
       <div class="row" style="margin-top:8px;justify-content:space-between">
-        <div class="row"><button class="btn primary" id="send">Send</button><span id="cstat" class="small muted"></span></div>
+        <div class="row"><button class="btn primary" id="send">Send</button><span id="cstat" class="small muted" role="status"></span></div>
         <div class="row"><button class="btn small" id="restart">Start over</button><button class="btn primary" id="finish">Finish & save stories</button></div></div>
     </div>
     ${S.profile.stories.length ? `<div class="card"><h3>Saved stories (${S.profile.stories.length})</h3>${S.profile.stories.map((s) => `<div class="story"><b>${esc(s.theme)}</b><div class="small muted">${esc(s.situation)}</div></div>`).join("")}</div>` : ""}
     ${navButtons("facts", "voice")}`;
   wireNav();
   focusStepHeading(main);
-  const chat = $("#chat"), say = $("#say"), stat = $("#cstat"), sendBtn = $("#send"), finishBtn = $("#finish");
-  const draw = () => {
-    chat.innerHTML = msgs.slice(1).map((m) => `<div class="msg ${m.role === "user" ? "u" : "a"}">${esc(String(m.content).replace("[[DONE]]", "").trim())}</div>`).join("");
+  const chat = $("#chat"), say = $("#say"), stat = $("#cstat");
+  const sendBtn = $("#send"), finishBtn = $("#finish"), restartBtn = $("#restart");
+  say.value = conversation.draft;
+  const isView = () => epoch === renderEpoch && step === "interview" && interviewChat === conversation;
+  conversation.draw = (focus = false) => {
+    if (!isView()) return;
+    chat.innerHTML = conversation.messages.slice(1).map((m) => `<div class="msg ${m.role === "user" ? "u" : "a"}">${esc(String(m.content).replace("[[DONE]]", "").trim())}</div>`).join("");
     chat.scrollTop = chat.scrollHeight;
+    sendBtn.disabled = finishBtn.disabled = !!conversation.pending || conversation.finishing;
+    restartBtn.disabled = !!conversation.savingStories;
+    sendBtn.textContent = conversation.failed ? "Retry" : "Send";
+    const status = conversation.status;
+    if (conversation.pending) busy(stat, "Thinking…");
+    else if (conversation.finishing) busy(stat, "Turning the conversation into stories… (about a minute)");
+    else if (status?.tone) stat.innerHTML = `<span class="${status.tone}">${esc(status.text)}</span>`;
+    else stat.textContent = status?.text ?? "";
+    if (focus) say.focus();
   };
-  const persist = () => chrome.storage.local.set({ [CHAT_KEY]: msgs });
-  const turn = async () => {
-    sendBtn.disabled = true;
-    busy(stat, "Thinking…");
-    try {
-      const r = await ai({ model: M().agent, max_tokens: 1024, system: interviewSystem(S), messages: msgs });
-      msgs.push({ role: "assistant", content: textOf(r) });
-      await persist();
-      draw();
-      stat.textContent = /\[\[DONE\]\]/.test(textOf(r)) ? "All topics covered. Press Finish & save." : "";
-    } catch (e) {
-      stat.innerHTML = `<span class="err">${esc(e.message)}</span>`;
-    } finally { sendBtn.disabled = false; if (say.isConnected && step === "interview") say.focus(); }
+  const send = () => {
+    if (!isView() || conversation.pending || conversation.finishing) return;
+    if (!conversation.failed) {
+      const text = say.value.trim();
+      if (!text) return;
+      conversation.messages.push({ role: "user", content: text });
+      conversation.draft = say.value = "";
+    }
+    requestInterview(conversation);
   };
-  const send = async () => {
-    const t = say.value.trim();
-    if (!t) return;
-    msgs.push({ role: "user", content: t });
-    say.value = "";
-    draw();
-    await persist();
-    await turn();
-  };
-  $("#send").addEventListener("click", send);
-  say.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) send(); });
-  $("#restart").addEventListener("click", async () => {
-    if (msgs.length > 2 && !confirm("Clear this conversation? Stories you already saved are kept.")) return;
-    msgs = [];
-    await persist();
-    go("interview");
+  sendBtn.addEventListener("click", send);
+  say.addEventListener("input", () => { if (isView()) conversation.draft = say.value; });
+  say.addEventListener("keydown", (e) => {
+    if (e.isComposing || e.key !== "Enter" || !(e.ctrlKey || e.metaKey)) return;
+    e.preventDefault();
+    if (!e.repeat && !conversation.failed) send();
   });
-  $("#finish").addEventListener("click", async () => {
-    if (msgs.length < 3) { stat.textContent = "Answer a few questions first."; return; }
-    finishBtn.disabled = true;
-    busy(stat, "Turning the conversation into stories… (about a minute)");
+  restartBtn.addEventListener("click", async () => {
+    if (!isView() || conversation.savingStories) return;
+    if (conversation.messages.length > 2 && !confirm("Clear this conversation? Stories you already saved are kept.")) return;
+    conversation.pending?.abort();
+    const next = interviewChat = interviewConversation([]);
     try {
-      await distill(msgs);
-      stat.innerHTML = `<span class="ok">Saved ${S.profile.stories.length} stories and your goals.</span>`;
-      setTimeout(() => go("voice"), 900);
+      await persistInterview(next, []);
     } catch (e) {
-      stat.innerHTML = `<span class="err">${esc(e.message)}</span>`;
-      finishBtn.disabled = false;
+      next.failed = true;
+      next.status = { text: e.message, tone: "err" };
+    }
+    if (interviewChat === next && step === "interview") go("interview");
+  });
+  finishBtn.addEventListener("click", async () => {
+    if (!isView() || conversation.pending || conversation.finishing) return;
+    if (conversation.messages.length < 3) {
+      conversation.status = { text: "Answer a few questions first." };
+      conversation.draw();
+      return;
+    }
+    conversation.finishing = true;
+    conversation.draw();
+    try {
+      if (!(await currentInterview(conversation))) return;
+      const x = await distill(conversation.messages);
+      if (!(await currentInterview(conversation))) return;
+      // Start over can retire a pending request. Once the profile commit starts, finish that save first.
+      conversation.savingStories = true;
+      conversation.draw();
+      if (!(await saveInterviewStories(conversation, x))) return;
+      conversation.status = { text: `Saved ${S.profile.stories.length} stories and your goals.`, tone: "ok" };
+      setTimeout(() => { if (isView()) go("voice"); }, 900);
+    } catch (e) {
+      conversation.status = { text: e.message, tone: "err" };
+    } finally {
+      conversation.savingStories = false;
+      conversation.finishing = false;
+      conversation.draw();
     }
   });
-  if (!msgs.length) {
-    msgs.push({ role: "user", content: `(Begin the interview. Greet me${S.profile.facts.first_name ? ` as ${S.profile.facts.first_name}` : ""} in one short sentence and ask the first question.)` });
-    await turn();
-  } else {
-    draw();
-    if (msgs[msgs.length - 1].role === "user") await turn();
+  conversation.draw();
+  if (!conversation.failed && conversation.messages.at(-1)?.role !== "assistant") {
+    requestInterview(conversation);
   }
+}
+
+function saveInterviewStories(conversation, x) {
+  const store = S;
+  const owns = () => S === store && interviewChat === conversation;
+  return queueStoreWrite(async () => {
+    if (!owns()) return false;
+    const before = structuredClone(store.profile);
+    const proposed = structuredClone(before);
+    if (Array.isArray(x.stories)) proposed.stories = x.stories;
+    for (const [k, v] of Object.entries(x.goals || {})) if (v) proposed.goals[k] = v;
+    applyInterviewFacts(proposed, x.facts);
+
+    let applied = false;
+    await updateStore(async (fresh) => {
+      if ((await restoredAt()) !== conversation.revision || !owns()) return;
+      mergeProfileEdits(fresh.profile, before, proposed);
+      applied = true;
+    });
+    if (!applied || (await restoredAt()) !== conversation.revision || !owns()) return false;
+
+    // Update the saved baseline, then layer any edits made while storage was pending onto the live profile.
+    mergeProfileEdits(savedSnapshot.profile, before, proposed);
+    const current = structuredClone(store.profile);
+    mergeProfileEdits(proposed, before, current);
+    // A manually edited fact and its provenance must stay together.
+    for (const [key, value] of Object.entries(current.facts)) {
+      const source = current.sources?.facts?.[key];
+      if (value === before.facts[key] && JSON.stringify(source) === JSON.stringify(before.sources?.facts?.[key])) continue;
+      proposed.facts[key] = value;
+      if (source) proposed.sources.facts[key] = source;
+      else delete proposed.sources.facts[key];
+    }
+    mergeProfileEdits(store.profile, current, proposed);
+    return true;
+  });
 }
 
 async function distill(msgs) {
@@ -873,11 +1030,7 @@ Return JSON only:
 - "goals": merged; keep an existing value when the transcript says nothing new.
 - "facts": only clear factual updates the student stated, using these keys: ${Object.keys(S.profile.facts).join(", ")}.` }],
   });
-  const x = jsonOf(r);
-  if (Array.isArray(x.stories)) S.profile.stories = x.stories;
-  for (const [k, v] of Object.entries(x.goals || {})) if (v) S.profile.goals[k] = v;
-  applyInterviewFacts(S.profile, x.facts);
-  await save(true);
+  return jsonOf(r);
 }
 
 // ---------- 5. voice ----------
