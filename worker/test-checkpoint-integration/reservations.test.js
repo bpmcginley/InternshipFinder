@@ -19,20 +19,58 @@ const ordered = (v) =>
       : v;
 const key = "follow-checkpoint-slot-0";
 const state = (object) => runInDurableObject(object, (i) => i.state());
-async function pending(age = 1000) {
-  const value = JSON.parse(golden.cases[0].checkpoint),
-    now = Date.now();
+async function pending(age = 1000, now = Date.now()) {
+  const value = JSON.parse(golden.cases[0].checkpoint);
   value.prepared_at = wire(now - age);
   value.covers_after = wire(now - 2 * DAY);
   return encode(JSON.stringify(ordered(value)));
 }
-async function setup(age) {
+async function setup(age, anchored = false) {
   const object = env.CHECKPOINT.get(env.CHECKPOINT.newUniqueId()),
-    raw = await pending(age);
+    now = anchored ? await anchorAdmissionClock(object) : Date.now(),
+    raw = await pending(age, now);
   await object.bootstrap();
   const reserved = await object.reservePending(raw);
   expect(reserved.status).toBe("reserved");
   return { object, raw, nonce: reserved.nonce };
+}
+// Freeze only fixture admission; expiry/cleanup below use the exact original native SQL clock.
+async function anchorAdmissionClock(object) {
+  return runInDurableObject(object, (i) => {
+    const original = i.control.now,
+      now = i.now();
+    i.restoreAdmissionClock = () => {
+      i.control.now = original;
+    };
+    i.control.now = () => now;
+    return now;
+  });
+}
+async function restoreAdmissionClock(object) {
+  await runInDurableObject(object, (i) => i.restoreAdmissionClock());
+}
+async function uploadReachedHook(object, upload) {
+  try {
+    await Promise.race([
+      expect
+        .poll(() => runInDurableObject(object, (i) => typeof i.releaseUpload === "function"), {
+          timeout: 5000,
+          interval: 5,
+        })
+        .toBe(true),
+      upload.then((status) => {
+        throw new Error(`Upload settled before delay hook: ${status}`);
+      }),
+    ]);
+  } catch (error) {
+    await runInDurableObject(object, (i) => {
+      i.beforeUpload = null;
+      i.releaseUpload?.();
+    });
+    throw error;
+  } finally {
+    await restoreAdmissionClock(object);
+  }
 }
 async function expire(object) {
   const remaining = await runInDurableObject(
@@ -95,7 +133,7 @@ test("lost upload reply reconciles after actual eviction only with an explicitly
 test.each([false, true])(
   "a delayed PUT across expiry cannot expose bytes (cleanup first: %s)",
   async (cleanupFirst) => {
-    const { object, nonce } = await setup(DAY - 1000);
+    const { object, nonce } = await setup(DAY - 1000, true);
     await runInDurableObject(object, (i) => {
       i.beforeUpload = () =>
         new Promise((resolve) => {
@@ -103,10 +141,7 @@ test.each([false, true])(
         });
     });
     const upload = object.uploadReserved(nonce);
-    for (let n = 0; n < 100; n++) {
-      if (await runInDurableObject(object, (i) => Boolean(i.releaseUpload))) break;
-      await new Promise((resolve) => setTimeout(resolve, 1));
-    }
+    await uploadReachedHook(object, upload);
     await expire(object);
     if (cleanupFirst) expect(await object.reconcileReserved(nonce)).toBe("committed");
     await runInDurableObject(object, (i) => {
@@ -238,7 +273,7 @@ test.each(["uploaded", "fence", "delayed"])(
   "captured predecessor cutoff survives retirement and physical cleanup (%s)",
   async (mode) => {
     const object = env.CHECKPOINT.get(env.CHECKPOINT.newUniqueId());
-    const now = await runInDurableObject(object, (i) => i.now());
+    const now = await anchorAdmissionClock(object);
     const next = JSON.parse(golden.cases[0].checkpoint),
       prior = JSON.parse(golden.cases[1].checkpoint);
     for (const value of [next, prior]) {
@@ -284,12 +319,8 @@ test.each(["uploaded", "fence", "delayed"])(
           });
       });
       late = object.uploadReserved(nonce);
-      for (let n = 0; n < 100; n++) {
-        if (await runInDurableObject(object, (i) => Boolean(i.releaseUpload))) break;
-        await new Promise((resolve) => setTimeout(resolve, 1));
-      }
-      expect(await runInDurableObject(object, (i) => Boolean(i.releaseUpload))).toBe(true);
-    }
+      await uploadReachedHook(object, late);
+    } else await restoreAdmissionClock(object);
     const remaining = await runInDurableObject(
       object,
       (i) => i.state().reservation.cutoff - i.now(),
