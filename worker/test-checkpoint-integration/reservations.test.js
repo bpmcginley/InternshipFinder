@@ -2,6 +2,7 @@ import { env } from "cloudflare:workers";
 import { evictDurableObject, runInDurableObject } from "cloudflare:test";
 import { beforeEach, expect, test } from "vitest";
 import golden from "../test/fixtures/follow-checkpoint-payload.json";
+import { createFollowCheckpointReservation } from "../src/follow-checkpoint-reservation.js";
 import { WitnessDouble } from "./worker.js";
 
 const DAY = 86_400_000,
@@ -208,11 +209,39 @@ test("unverified eligibility alone cannot authorize early physical retirement", 
   const before = await state(object),
     etag = (await env.SLOTS.head(key)).etag;
   await runInDurableObject(object, (i) => {
-    i.predecessorMatches = () => false;
+    i.control.now = () => before.reservation.starts - 1;
   });
   expect(await object.reconcileReserved(nonce)).toBe("held");
   expect(await state(object)).toEqual(before);
   expect((await env.SLOTS.head(key)).etag).toBe(etag);
+});
+
+test("reservation source defaults off and a closed witness cannot reach the slots", async () => {
+  const off = createFollowCheckpointReservation();
+  expect(await off.inspectStageReservation("unused")).toEqual({ status: "held" });
+  expect(await off.reservePending()).toEqual({ status: "held" });
+  expect(await off.uploadReserved()).toBe("held");
+  expect(await off.reconcileReserved()).toBe("held");
+  expect(await off.recoverCleanup()).toBe("held");
+
+  const { object, nonce } = await setup();
+  await runInDurableObject(object, async (i) => {
+    const before = i.state();
+    i.witness.value.phase = "closed";
+    let calls = 0;
+    const never = () => {
+      calls++;
+      throw new Error("closed witness reached storage");
+    };
+    i.slots.read = i.slots.write = never;
+    i.witness.readCleanup = never;
+    expect(await i.inspectStageReservation(before.reservation.digest)).toEqual({ status: "held" });
+    expect(await i.uploadReserved(nonce)).toBe("held");
+    expect(await i.reconcileReserved(nonce)).toBe("held");
+    expect(await i.recoverCleanup()).toBe("held");
+    expect(i.state()).toEqual(before);
+    expect(calls).toBe(0);
+  });
 });
 
 test("reconciliation crossing its original cutoff cannot publish or extend expiry", async () => {
