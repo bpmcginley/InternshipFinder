@@ -36,6 +36,8 @@ const migrationNames = [
   "0023_follow_scoped_link.sql",
   "0024_follow_management_remove.sql",
   "0025_follow_catalog_admission.sql",
+  "0026_follow_management_outbox.sql",
+  "0027_follow_management_claim.sql",
 ];
 const legacySql = [...env.TEST_SCHEMA_SQL, ...env.TEST_EXTRA_SCHEMA_SQL];
 const databases = [env.LEGACY_DB, env.MIGRATION_DB];
@@ -61,6 +63,7 @@ beforeEach(async () => {
       // Wrangler can group late CREATE statements with a trigger. Reset both altered
       // tables explicitly so their migrations replay against the actual prior shape.
       [
+        "follow_management_outbox",
         "follow_confirmation_outbox",
         "topup_retention",
         ...tableNames.toReversed(),
@@ -102,8 +105,8 @@ it("migrations create the complete legacy schema, including constraints and trig
   await initialize();
   const expected = await schema(env.LEGACY_DB);
   expect(await schema(env.MIGRATION_DB)).toEqual(expected);
-  expect(expected.objects.filter((row) => row.type === "table")).toHaveLength(64);
-  expect(expected.objects.filter((row) => row.type === "index")).toHaveLength(35);
+  expect(expected.objects.filter((row) => row.type === "table")).toHaveLength(65);
+  expect(expected.objects.filter((row) => row.type === "index")).toHaveLength(36);
   expect(expected.objects.filter((row) => row.type === "trigger")).toHaveLength(16);
   expect(expected.objects.filter((row) => row.type === "view")).toHaveLength(4);
   expect(await ledger()).toEqual(migrationNames.map((name) => ({ name })));
@@ -359,4 +362,23 @@ it("0020 preserves old retention timestamps but cannot infer historical eligibil
       .bind(hash)
       .first("consumed"),
   ).toBe(25);
+});
+
+it("0027 preserves a populated management queue and starts it unclaimed", async () => {
+  await applyD1Migrations(
+    env.MIGRATION_DB,
+    env.TEST_MIGRATIONS.filter((m) => m.name < "0027"),
+  );
+  await env.MIGRATION_DB.prepare(
+    "INSERT INTO follow_subscribers(id,email,created) VALUES('management-fixture','synthetic@example.test','2026-01-01T00:00:00.000Z')",
+  ).run();
+  await env.MIGRATION_DB.prepare(
+    "INSERT INTO follow_management_outbox VALUES('job','management-fixture','2026-01-01T00:00:00.000Z','2026-01-01T01:00:00.000Z')",
+  ).run();
+  const before = await env.MIGRATION_DB.prepare("SELECT * FROM follow_management_outbox").first();
+  await apply();
+  expect(await env.MIGRATION_DB.prepare("SELECT * FROM follow_management_outbox").first()).toEqual({
+    ...before,
+    claim_id: null,
+  });
 });
