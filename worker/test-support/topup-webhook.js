@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { handle } from "../src/index.js";
-import { hmacHex } from "../src/billing.js";
+import { hmacHex, verifyWebhook, applyEvent } from "../src/billing.js";
+import { referenceHash } from "../src/topup-ledger.js";
+import { CONFIG } from "../src/config.js";
 import { deleteUser } from "../src/limits.js";
 import { topupWebhook } from "../src/topup-webhook.js";
 import { attempt, session } from "./topup-stripe.js";
@@ -21,6 +23,7 @@ async function fixture(db) {
       "topup_purchases",
       "topup_claims",
       "stripe_events",
+      "topup_history_receipts",
       "forget",
       "plans",
       "employer_orders",
@@ -86,6 +89,7 @@ async function fixture(db) {
     f.calls.push(new URL(url).pathname);
     if (f.fail) throw Error("synthetic failure");
     const path = new URL(url).pathname;
+    await f.before?.(path);
     let value =
       path === "/v1/checkout/sessions/cs_fixture"
         ? f.checkout
@@ -94,12 +98,19 @@ async function fixture(db) {
           : path === "/v1/charges/ch_fixture"
             ? f.charge
             : null;
+    if (!value && /^\/v1\/(refunds|disputes)\//.test(path)) {
+      const [, , kind, id] = path.split("/");
+      value = f[kind].find((v) => v.id === id) ?? { object: "missing" };
+    }
     if (!value) {
       const kind = path.slice(4);
       assert.ok(["refunds", "disputes"].includes(kind));
       value = { object: "list", url: path, data: f[kind], has_more: false };
     }
-    return new Response(JSON.stringify(value));
+    const response = new Response(JSON.stringify(value));
+    Object.defineProperty(response, "url", { value: url });
+    await f.after?.(path);
+    return response;
   };
   f.event = (type = "checkout.session.completed", object = f.checkout, id = "evt_fixture") => ({
     object: "event",
@@ -199,6 +210,16 @@ export async function topupKnownEmployerAvoidsDiscovery(db) {
       env,
       event,
       fetchImpl: () => assert.fail("Known employer needs no discovery"),
+    }),
+    null,
+  );
+  assert.equal(
+    await topupWebhook({
+      db,
+      env,
+      event,
+      historyPolicy: { enabled: true, apiVersions: new Array(1) },
+      fetchImpl: () => assert.fail("No unrelated discovery"),
     }),
     null,
   );
@@ -378,4 +399,367 @@ export async function signedTopupRollbackAndUnsupported(db) {
   );
   assert.equal((await f.post(event)).status, 502);
   assert.equal(await count(db, "plans"), 0);
+}
+const historyPolicy = { enabled: true, livemode: false, apiVersions: ["2026-08-26.dahlia"] };
+const historyEvent = (f, id = "evt_history") => ({
+  ...f.event("refund.updated", item("refund", "succeeded"), id),
+  api_version: "2026-08-26.dahlia",
+});
+async function signedApply(db, f, event, policy, signature = true, config = env) {
+  const body = JSON.stringify(event),
+    t = Math.floor(+now / 1000),
+    mac = await hmacHex(env.STRIPE_WEBHOOK_SECRET, t + "." + body);
+  const verified = await verifyWebhook(
+    env.STRIPE_WEBHOOK_SECRET,
+    signature ? `t=${t},v1=${mac}` : "invalid",
+    body,
+    now,
+  );
+  f.verified = verified;
+  return applyEvent(db, config, CONFIG, verified, now, f.fetch, policy);
+}
+const revision = async (db) =>
+  (await db.prepare("SELECT revision FROM topup_reconciliations").first()).revision;
+const receipt = (db, id) =>
+  db.prepare("SELECT COUNT(*) AS n FROM stripe_events WHERE id=?").bind(id).first("n");
+export async function signedHistoryDefaultOffPreservesLegacyRecovery(db) {
+  for (const policy of [undefined, { enabled: false }, { enabled: "1" }]) {
+    const f = await fixture(db);
+    assert.equal((await f.post()).status, 200);
+    f.refunds = [item("refund", "pending")];
+    f.calls = [];
+    const event = f.event("refund.updated", f.refunds[0], "evt_legacy_history");
+    assert.deepEqual(await signedApply(db, f, event, policy), { ok: true });
+    assert.equal(f.calls.length, 9);
+    assert.equal(await count(db, "topup_history_receipts"), 0);
+    assert.equal(await revision(db), 2);
+  }
+}
+export async function signedHistoryObservesThenFreshlyRecoversAndReplays(db) {
+  const f = await fixture(db);
+  assert.equal((await f.post()).status, 200);
+  f.refunds = [item("refund", "pending")];
+  f.calls = [];
+  const revisions = [];
+  f.before = async () => revisions.push(await revision(db));
+  const wrapped = {
+    prepare: (s) => db.prepare(s),
+    batch: async (statements) => {
+      const result = await db.batch(statements);
+      if (statements.length === 4) {
+        f.refunds[0].status = "succeeded";
+        f.charge.amount_refunded = 327;
+        f.charge.refunded = true;
+      }
+      return result;
+    },
+  };
+  assert.deepEqual(await signedApply(wrapped, f, historyEvent(f), historyPolicy), { ok: true });
+  assert.equal(f.calls.length, 13);
+  assert.deepEqual(revisions, [1, 1, 1, 1, ...Array(9).fill(2)]);
+  assert.equal(await revision(db), 3);
+  assert.equal(await count(db, "topup_history_receipts"), 1);
+  assert.deepEqual(await balance(db), { available: 0, held: 0, consumed: 0, revoked: 25 });
+  assert.deepEqual(await signedApply(db, f, historyEvent(f), historyPolicy), {
+    ok: true,
+    repeat: true,
+  });
+  assert.equal(f.calls.length, 13);
+  await assert.rejects(
+    () => signedApply(db, f, historyEvent(f, "evt_bad_signature"), historyPolicy, false),
+    (e) => e.status === 400,
+  );
+  assert.equal(await receipt(db, "evt_bad_signature"), 0);
+  assert.equal(f.calls.length, 13);
+}
+export async function signedHistoryReceiptCannotAcknowledgeFailedRecovery(db) {
+  const f = await fixture(db);
+  assert.equal((await f.post()).status, 200);
+  f.refunds = [item("refund", "pending")];
+  f.calls = [];
+  f.before = async (path) => {
+    if (path === "/v1/checkout/sessions/cs_fixture" && (await count(db, "topup_history_receipts")))
+      throw Error("synthetic recovery failure");
+  };
+  await assert.rejects(
+    () => signedApply(db, f, historyEvent(f), historyPolicy),
+    (e) => e.status === 502,
+  );
+  assert.equal(await receipt(db, "evt_history"), 0);
+  assert.equal(await count(db, "topup_history_receipts"), 1);
+  assert.equal(await revision(db), 2);
+  assert.deepEqual(await balance(db), { available: 25, held: 0, consumed: 0, revoked: 0 });
+  f.before = null;
+  f.calls = [];
+  assert.deepEqual(await signedApply(db, f, historyEvent(f), historyPolicy), { ok: true });
+  assert.equal(await count(db, "topup_history_receipts"), 1);
+  assert.equal(await revision(db), 3);
+  assert.equal(f.calls.length, 13);
+}
+export async function signedHistoryUnknownCommitReleasesPreclaimWithoutRetry(db) {
+  const f = await fixture(db);
+  assert.equal((await f.post()).status, 200);
+  f.refunds = [item("refund", "pending")];
+  f.calls = [];
+  let commits = 0;
+  const wrapped = {
+    prepare: (s) => db.prepare(s),
+    batch: async (statements) => {
+      const result = await db.batch(statements);
+      if (statements.length === 4) {
+        commits++;
+        throw Error("synthetic lost ack");
+      }
+      return result;
+    },
+  };
+  await assert.rejects(
+    () => signedApply(wrapped, f, historyEvent(f), historyPolicy),
+    (e) => e.status === 502,
+  );
+  assert.equal(commits, 1);
+  assert.equal(f.calls.length, 4);
+  assert.equal(await count(db, "topup_history_receipts"), 1);
+  assert.equal(await revision(db), 2);
+  assert.equal(await receipt(db, "evt_history"), 0);
+  assert.deepEqual(await signedApply(db, f, historyEvent(f), historyPolicy), { ok: true });
+  assert.equal(await revision(db), 3);
+}
+export async function signedHistoryPendingDeletionAndRaceCannotFallThrough(db) {
+  for (const fault of ["schema", "policy", "target", "delete", "revision"]) {
+    const f = await fixture(db);
+    assert.equal((await f.post()).status, 200);
+    f.refunds = [item("refund", "pending")];
+    f.calls = [];
+    const event = historyEvent(f);
+    if (fault === "schema") delete event.api_version;
+    if (fault === "target") f.refunds[0].charge = "ch_other";
+    if (fault === "delete" || fault === "revision")
+      f.before = async (path) => {
+        if (path !== "/v1/refunds/re_fixture") return;
+        if (fault === "delete") await deleteUser(db, f.a.user_hash, now);
+        else await db.prepare("UPDATE topup_reconciliations SET revision=revision+1").run();
+      };
+    await assert.rejects(
+      () =>
+        signedApply(
+          db,
+          f,
+          event,
+          fault === "policy" ? { ...historyPolicy, apiVersions: new Array(1) } : historyPolicy,
+        ),
+      (e) => e.status === 502,
+    );
+    assert.equal(await receipt(db, "evt_history"), 0);
+    assert.equal(await count(db, "topup_history_receipts"), 0);
+    assert.equal(await count(db, "plans"), 0);
+    assert.equal(await count(db, "employer_orders"), 0);
+    if (fault === "delete") {
+      f.before = null;
+      f.calls = [];
+      assert.deepEqual(await signedApply(db, f, event, historyPolicy), { ok: true, ignored: true });
+      assert.equal(f.calls.length, 0);
+    }
+  }
+}
+export async function signedHistoryDiscoveryAndRecoveryKeepPinnedPolicyAndCredential(db) {
+  const f = await fixture(db);
+  assert.equal((await f.post()).status, 200);
+  f.refunds = [item("refund", "pending")];
+  f.calls = [];
+  const e = historyEvent(f);
+  e.data.object.payment_intent = null;
+  const config = { ...env },
+    policy = { enabled: true, livemode: false, apiVersions: ["2026-08-26.dahlia"] };
+  const base = f.fetch,
+    authorizations = [];
+  f.fetch = async (url, init) => {
+    authorizations.push(init.headers.Authorization);
+    const response = await base(url, init);
+    policy.livemode = true;
+    policy.apiVersions[0] = "unsupported";
+    return response;
+  };
+  let observations = 0;
+  const wrapped = {
+    prepare: (s) => db.prepare(s),
+    batch: async (statements) => {
+      const result = await db.batch(statements);
+      if (statements.length === 4) {
+        observations++;
+        config.STRIPE_SECRET_KEY = "fixture-changed";
+        config.STRIPE_PRICE_TOPUP = "price_changed";
+      }
+      return result;
+    },
+  };
+  assert.deepEqual(await signedApply(wrapped, f, e, policy, true, config), { ok: true });
+  assert.equal(observations, 1);
+  assert.equal(authorizations.length, 14);
+  assert.ok(authorizations.every((v) => v === "Bearer fixture-not-a-key"));
+  assert.equal(await count(db, "topup_history_receipts"), 1);
+  assert.equal(await revision(db), 3);
+}
+
+export async function signedHistoryPinsOriginalEventBeforeDiscovery(db) {
+  for (const direct of [false, true]) {
+    const f = await fixture(db);
+    assert.equal((await f.post()).status, 200);
+    f.refunds = [item("refund", "pending")];
+    const event = historyEvent(f);
+    event.data.object.payment_intent = null;
+    f.before = async () => {
+      (direct ? event : f.verified).id = "evt_replacement";
+    };
+    if (direct)
+      assert.deepEqual(await topupWebhook({ db, env, event, fetchImpl: f.fetch, historyPolicy }), {
+        status: "reconciled",
+      });
+    else assert.deepEqual(await signedApply(db, f, event, historyPolicy), { ok: true });
+    const digest = await referenceHash("history-event", false, "evt_history");
+    assert.equal(
+      await db
+        .prepare("SELECT COUNT(*) AS n FROM topup_history_receipts WHERE event_digest=?")
+        .bind(digest)
+        .first("n"),
+      1,
+    );
+    assert.equal(await count(db, "topup_history_receipts"), 1);
+    if (!direct) assert.equal(await receipt(db, "evt_history"), 1);
+  }
+}
+export async function signedHistoryPinsPolicyBeforePreclaim(db) {
+  for (const fault of ["enabled", "malformed", "config"]) {
+    const malformed = fault === "malformed";
+    const f = await fixture(db);
+    assert.equal((await f.post()).status, 200);
+    f.refunds = [item("refund", "succeeded")];
+    f.charge.amount_refunded = 327;
+    f.charge.refunded = true;
+    f.calls = [];
+    const policy = {
+      ...historyPolicy,
+      apiVersions: malformed ? new Array(1) : [...historyPolicy.apiVersions],
+    };
+    const config = { ...env };
+    const wrapped = {
+      batch: (s) => db.batch(s),
+      prepare(sql) {
+        const statement = db.prepare(sql);
+        if (!sql.startsWith("INSERT OR IGNORE INTO stripe_events")) return statement;
+        return {
+          bind(...args) {
+            const bound = statement.bind(...args);
+            return {
+              async run() {
+                const result = await bound.run();
+                policy.enabled = false;
+                if (fault === "config") {
+                  config.STRIPE_SECRET_KEY = "fixture-rotated";
+                  config.STRIPE_PRICE_TOPUP = "price_changed";
+                }
+                return result;
+              },
+            };
+          },
+        };
+      },
+    };
+    const base = f.fetch,
+      headers = [];
+    f.fetch = (url, init) => {
+      headers.push(init.headers.Authorization);
+      return base(url, init);
+    };
+    if (malformed) {
+      await assert.rejects(
+        () => signedApply(wrapped, f, historyEvent(f), policy, true, config),
+        (e) => e.status === 502,
+      );
+      assert.equal(await receipt(db, "evt_history"), 0);
+      assert.equal(await revision(db), 1);
+      assert.equal(f.calls.length, 0);
+    } else {
+      assert.deepEqual(await signedApply(wrapped, f, historyEvent(f), policy, true, config), {
+        ok: true,
+      });
+      assert.equal(await count(db, "topup_history_receipts"), 1);
+      assert.equal(await revision(db), 3);
+      assert.ok(headers.every((v) => v === "Bearer fixture-not-a-key"));
+    }
+  }
+}
+
+export async function signedHistoryDisabledPolicyCannotEnableAfterPreclaim(db) {
+  for (const initial of [false, "1", undefined]) {
+    const f = await fixture(db);
+    assert.equal((await f.post()).status, 200);
+    f.refunds = [item("refund", "pending")];
+    f.calls = [];
+    const policy = { ...historyPolicy, enabled: initial };
+    const wrapped = {
+      batch: (s) => db.batch(s),
+      prepare(sql) {
+        const statement = db.prepare(sql);
+        if (!sql.startsWith("INSERT OR IGNORE INTO stripe_events")) return statement;
+        return {
+          bind(...args) {
+            const bound = statement.bind(...args);
+            return {
+              async run() {
+                const result = await bound.run();
+                policy.enabled = true;
+                return result;
+              },
+            };
+          },
+        };
+      },
+    };
+    assert.deepEqual(await signedApply(wrapped, f, historyEvent(f), policy), { ok: true });
+    assert.equal(f.calls.length, 9);
+    assert.equal(await count(db, "topup_history_receipts"), 0);
+    assert.equal(await revision(db), 2);
+  }
+}
+
+export async function signedHistoryUnrelatedFamilyCannotChangeAfterPreclaim(db) {
+  const f = await fixture(db);
+  assert.equal((await f.post()).status, 200);
+  f.refunds = [item("refund", "succeeded")];
+  f.charge.amount_refunded = 327;
+  f.charge.refunded = true;
+  f.calls = [];
+  const event = f.event("charge.succeeded", { ...f.charge, metadata: {} }, "evt_unrelated_signed");
+  const wrapped = {
+    batch: (s) => db.batch(s),
+    prepare(sql) {
+      const statement = db.prepare(sql);
+      if (!sql.startsWith("INSERT OR IGNORE INTO stripe_events")) return statement;
+      return {
+        bind(...args) {
+          const bound = statement.bind(...args);
+          return {
+            async run() {
+              const result = await bound.run();
+              f.verified.type = "refund.updated";
+              f.verified.data.object = item("refund", "succeeded");
+              return result;
+            },
+          };
+        },
+      };
+    },
+  };
+  assert.deepEqual(await signedApply(wrapped, f, event, historyPolicy), {
+    ok: true,
+    ignored: true,
+  });
+  assert.equal(f.calls.length, 0);
+  assert.equal(await revision(db), 1);
+  assert.equal(await count(db, "topup_history_receipts"), 0);
+  assert.deepEqual(await balance(db), { available: 25, held: 0, consumed: 0, revoked: 0 });
+  assert.equal(await receipt(db, "evt_unrelated_signed"), 1);
+  assert.equal(await count(db, "plans"), 0);
+  assert.equal(await count(db, "employer_orders"), 0);
 }

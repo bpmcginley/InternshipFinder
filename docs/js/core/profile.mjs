@@ -71,7 +71,7 @@ export function createProfile(browser) {
     ["other", "Other / prefer not to say"],
   ];
   const FIELD_NAMES = { swe: "Software", ml: "ML / AI", pm: "Product / program mgmt", hr: "HR", ui: "UI", ux: "UX", co_op: "Co-op" };
-  const fieldLabel = t => FIELD_NAMES[t] || (t.length <= 3 ? t.toUpperCase() : (t[0].toUpperCase() + t.slice(1)).replace(/_/g, " "));
+  const fieldLabel = t => Object.hasOwn(FIELD_NAMES, t) ? FIELD_NAMES[t] : t in FIELD_NAMES ? t : (t.length <= 3 ? t.toUpperCase() : (t[0].toUpperCase() + t.slice(1)).replace(/_/g, " "));
   // was: remote, US, then US_STATES only
   const keyLabel = k => k === "remote" ? "US remote" : k === "US" ? "US (no state listed)" : k === "Canada" ? "Canada (no province listed)"
     : US_STATES[k] ? `${US_STATES[k]} (${k})` : CA_PROVINCES[k] ? `${CA_PROVINCES[k]} (${k})` : k;
