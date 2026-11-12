@@ -166,12 +166,18 @@ export function createProfile(browser) {
   const FILTER_PARAMS = ["q", "field", "state", "company", "new", "stage", "year", "paid", "sector", "where", "status", "progress", "eligible", "citizen", "sort"];
   const SORTS = ["score", "new", "company", "comp"];
   const PROGRESS = ["none", "interested", "applied", "interviewing", "rejected", "offer", "auto"];
+  // Preserve syntactically valid older/newer tags: dropping one would broaden a shared search.
+  // Bound parsing while allowing the entire current picker (66 tags), with room for vocabulary growth.
+  function fieldsFromUrl(value) {
+    if (!value || value.length > 8192) return [];
+    return [...new Set(value.split(",").filter(v => /^[a-z_]{2,32}$/.test(v)))].slice(0, 128);
+  }
   function filtersFromUrl(search) {
     // was (in app.js fromLink): field, state, company, new, stage, year and paid=1 only.
     const q = new browser.URLSearchParams(search || ""), list = (k, ok, max = 6) => (q.get(k) || "").split(",").filter(v => ok.test(v)).slice(0, max);
     // ?company= comes from an employer's page (every spelling its listings use) and matches names exactly;
     // ?state=all is the State picker's "Everywhere", from the pages that cover every state.
-    const f = { fields: list("field", /^[a-z_]{2,32}$/), states: list("state", /^(?:[A-Z]{2}|remote|Canada|all)$/, 80),
+    const f = { fields: fieldsFromUrl(q.get("field")), states: list("state", /^(?:[A-Z]{2}|remote|Canada|all)$/, 80),
       company: q.getAll("company").filter(c => c && c.length <= 120).slice(0, 8) };
     if (q.get("new") === "1") f.new_only = true;
     const stage = q.get("stage"), year = q.get("year"), paid = q.get("paid"), text = q.get("q"), sort = q.get("sort"), sector = q.get("sector"),
