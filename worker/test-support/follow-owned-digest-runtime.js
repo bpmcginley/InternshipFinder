@@ -505,3 +505,146 @@ export async function terminalRollbackLeavesAttemptAndClosedOwner(db) {
     await db.prepare("DROP TRIGGER synthetic_digest_terminal_failure").run();
   }
 }
+
+export async function inheritedPausedCannotReleaseOrInvokeGetter(db) {
+  let reads = 0;
+  const prototypes = [
+    { paused: 1 },
+    {
+      get paused() {
+        reads++;
+        return 1;
+      },
+    },
+  ];
+  for (const prototype of prototypes) {
+    const a = await acquireFollowDeliveryOwner(db);
+    assert.equal(a.status, "acquired");
+    assert.equal(
+      (
+        await finishFollowDigestOwner(a.ticket, {
+          status: "paused",
+          counts: Object.create(prototype),
+        })
+      ).status,
+      "held",
+    );
+    assert.equal((await owner(db)).phase, "held");
+    await reset(db);
+  }
+  assert.equal(reads, 0);
+  const a = await acquireFollowDeliveryOwner(db);
+  const counts = Object.create({
+    get accepted() {
+      reads++;
+      throw Error("inherited getter");
+    },
+  });
+  assert.equal(
+    (await finishFollowDigestOwner(a.ticket, { status: "processed", counts })).status,
+    "held",
+  );
+  assert.equal(reads, 0);
+}
+export async function terminalAccessorCannotCertifyAcknowledgement(db) {
+  const f = await fixture(db, 2);
+  let reads = 0;
+  const changed = {
+    get changed() {
+      reads++;
+      return 1;
+    },
+  };
+  const index = [];
+  Object.defineProperty(index, 0, {
+    enumerable: true,
+    get() {
+      reads++;
+      return { changed: 1 };
+    },
+  });
+  for (const results of [[changed], index]) {
+    const proxy = wrap(db, async (sql, rows) =>
+      sql[1]?.startsWith("UPDATE follow_digest_outbox SET state=?")
+        ? [rows[0], { ...rows[1], results }]
+        : rows,
+    );
+    assert.equal((await f.run({ db: proxy })).status, "held");
+    assert.equal((await owner(db)).phase, "held");
+    assert.equal(reads, 0);
+    await reset(db);
+  }
+  assert.equal(f.calls(), 2);
+}
+
+export async function terminalAggregateBoundPreservesTriggerEffects(db) {
+  const f = await fixture(db, 3);
+  for (const changes of [32771, Number.MAX_SAFE_INTEGER]) {
+    const proxy = wrap(db, async (sql, rows) =>
+      sql[1]?.startsWith("UPDATE follow_digest_outbox SET state=?")
+        ? [rows[0], { ...rows[1], meta: { ...rows[1].meta, changes } }]
+        : rows,
+    );
+    assert.equal((await f.run({ db: proxy })).status, "held");
+    assert.equal((await owner(db)).phase, "held");
+    await reset(db);
+  }
+  let actual;
+  const proxy = wrap(db, async (sql, rows) => {
+    if (sql[1]?.startsWith("UPDATE follow_digest_outbox SET state=?"))
+      actual = rows[1].meta.changes;
+    return rows;
+  });
+  assert.equal((await f.run({ db: proxy })).counts.accepted, 1);
+  // SQLite reports the direct row; native D1 also counts the pending deletion
+  // and this fixture's one progress advance. Both are valid acknowledgements.
+  assert.ok(actual === 1 || actual === 3);
+  assert.equal((await owner(db)).phase, "ready");
+  assert.equal(await db.prepare("SELECT count(*) n FROM follow_pending_progress").first("n"), 0);
+  assert.equal(
+    await db
+      .prepare(
+        "SELECT count(*) n FROM follow_scope_progress p JOIN follow_subscriptions s USING(subscriber_id,scope_key) WHERE p.watermark>s.confirmed_at",
+      )
+      .first("n"),
+    3,
+  );
+}
+
+export async function nonPlainReceiptRecordsStayClosed(db) {
+  for (const result of [
+    { status: "processed", counts: new Date(0) },
+    { status: "processed", counts: Object.assign(new Date(0), { accepted: 1 }) },
+    { status: "paused", counts: Object.assign(new Map(), { paused: 1 }) },
+  ]) {
+    const a = await acquireFollowDeliveryOwner(db);
+    assert.equal((await finishFollowDigestOwner(a.ticket, result)).status, "held");
+    await reset(db);
+  }
+  const a = await acquireFollowDeliveryOwner(db);
+  assert.equal(
+    (
+      await finishFollowDigestOwner(a.ticket, {
+        status: "paused",
+        counts: Object.assign(Object.create(null), { paused: 1 }),
+      })
+    ).status,
+    "ready",
+  );
+  const f = await fixture(db, 3);
+  for (const row of [
+    Object.assign(new Date(0), { changed: 1 }),
+    Object.assign(new Map(), { changed: 1 }),
+    Object.assign(Object.create(null), { changed: 1 }),
+  ]) {
+    const proxy = wrap(db, async (sql, rows) =>
+      sql[1]?.startsWith("UPDATE follow_digest_outbox SET state=?")
+        ? [rows[0], { ...rows[1], results: [row] }]
+        : rows,
+    );
+    const valid = Object.getPrototypeOf(row) === null;
+    assert.equal((await f.run({ db: proxy })).status, valid ? "processed" : "held");
+    assert.equal((await owner(db)).phase, valid ? "ready" : "held");
+    if (!valid) await reset(db);
+  }
+}

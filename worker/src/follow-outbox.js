@@ -9,6 +9,10 @@ import {
 
 const DAY = 86400_000,
   LEASE = 5 * 60_000;
+// Migrations 0010/0012 bound pending JSON to 32768 bytes and unique advances.
+// Each advance occupies at least one byte. Add one outbox update and one pending
+// deletion for a conservative aggregate bound without reading retained scopes.
+const MAX_TERMINAL_CHANGES = 32768 + 2;
 const encoder = new TextEncoder();
 const iso = (now) => now.toISOString();
 const dayOf = (now) => iso(now).slice(0, 10);
@@ -294,17 +298,26 @@ export async function finishFollowDigestAttempt(db, id, lease, outcome, now = ne
   )
     return false;
   const rows = terminal.results;
+  const entry = Object.getOwnPropertyDescriptor(rows, 0);
+  const row = entry && Object.hasOwn(entry, "value") ? entry.value : null;
+  if (
+    rows.length !== 1 ||
+    !row ||
+    typeof row !== "object" ||
+    Array.isArray(row) ||
+    ![Object.prototype, null].includes(Object.getPrototypeOf(row)) ||
+    Reflect.ownKeys(row).length !== 1
+  )
+    return false;
+  const changed = Object.getOwnPropertyDescriptor(row, "changed");
   // RETURNING counts the direct outbox update, independently of watermark triggers.
+  // Only an own data property can certify the acknowledgement; never invoke a getter.
   return (
-    rows.length === 1 &&
-    Object.hasOwn(rows, 0) &&
-    rows[0] !== null &&
-    typeof rows[0] === "object" &&
-    !Array.isArray(rows[0]) &&
-    Object.keys(rows[0]).length === 1 &&
-    Object.hasOwn(rows[0], "changed") &&
-    rows[0].changed === 1 &&
+    changed?.enumerable === true &&
+    Object.hasOwn(changed, "value") &&
+    changed.value === 1 &&
     terminal.meta.changes >= 1 &&
+    terminal.meta.changes <= MAX_TERMINAL_CHANGES &&
     subscriber.meta.changes === (outcome === "accepted" ? 1 : 0)
   );
 }

@@ -186,11 +186,15 @@ export async function finishFollowDigestOwner(ticket, result) {
     exact(result, ["status", "counts"]);
     if (!["processed", "paused"].includes(result.status)) fail();
     const c = result.counts;
-    exact(c, Object.keys(c || {}));
-    const keys = Object.keys(c);
-    if (keys.some((key) => !["accepted", "paused"].includes(key)) || keys.length > 1) fail();
-    if (keys.length && c[keys[0]] !== 1) fail();
-    if (result.status === "paused" ? c.paused !== 1 : Object.hasOwn(c, "paused")) fail();
+    if (!c || ![Object.prototype, null].includes(Object.getPrototypeOf(c))) fail();
+    const key =
+      result.status === "paused"
+        ? "paused"
+        : Object.getOwnPropertyNames(c || {}).length
+          ? "accepted"
+          : null;
+    exact(c, key === null ? [] : [key]);
+    if (key !== null && Object.getOwnPropertyDescriptor(c, key).value !== 1) fail();
     return null;
   });
 }
