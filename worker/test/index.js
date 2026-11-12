@@ -58,6 +58,8 @@ import "./follow-archive-reader.test.js";
 import "./follow-archive-enqueue.test.js";
 import "./follow-digest-delivery.test.js";
 import "./follow-delivery-tick.test.js";
+import "./follow-checkpoint-r2.test.js";
+import "./follow-checkpoint-r2-native.test.js";
 
 import "./topup-ledger.test.js";
 import "./topup-decisions.test.js";
