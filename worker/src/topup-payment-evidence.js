@@ -1,6 +1,7 @@
 // Dormant GET-only evidence. Paid evidence is NOT permission to grant or settle.
 // Complete reversal snapshots, atomic settlement and account-deletion fences remain required.
 import { stripe } from "./billing.js";
+import { checkoutUrl } from "./topup-stripe.js";
 import { validTopupCheckoutId, validTopupOfferVersion } from "./topup-ledger.js";
 const pending = () => ({ status: "pending" });
 const ref = (value) => (typeof value === "string" ? value : value?.id);
@@ -23,6 +24,7 @@ export async function readTopupPaymentEvidence(
   fetchImpl,
   candidateCheckoutId = attempt?.checkout_id,
   timeoutMs = PAYMENT_EVIDENCE_BOUNDS.timeoutMs,
+  returnUrl,
 ) {
   const a = { ...attempt },
     offer = { ...originalOffer };
@@ -208,6 +210,30 @@ export async function readTopupPaymentEvidence(
       session.amount_total !== a.amount + total.amount_tax
     )
       return pending();
+    if (
+      typeof returnUrl === "string" &&
+      a.state === "open" &&
+      a.checkout_id === candidateCheckoutId &&
+      session.status === "open" &&
+      session.payment_status === "unpaid"
+    ) {
+      if (
+        session.success_url !== returnUrl ||
+        session.cancel_url !== returnUrl ||
+        !Number.isSafeInteger(session.expires_at) ||
+        session.expires_at <= 0 ||
+        session.expires_at > Math.floor(8.64e15 / 1000) ||
+        typeof session.url !== "string" ||
+        !session.url.startsWith("https://checkout.stripe.com/") ||
+        /[<>"']/.test(session.url)
+      )
+        return pending();
+      return {
+        ...evidence("open_evidence"),
+        url: checkoutUrl(session.url, candidateCheckoutId),
+        expiresAt: session.expires_at,
+      };
+    }
     const expired =
       session.status === "expired" && session.payment_status === "unpaid" && a.state !== "settled";
     const paid =
