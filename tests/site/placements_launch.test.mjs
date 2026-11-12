@@ -25,7 +25,7 @@ test("privacy: the paid listings section is #paid-listings (#paid is paid plans)
   // Every in-page link has a target.
   for (const m of v.matchAll(/href="#([a-z-]+)"/g)) assert.match(v, new RegExp(` id="${m[1]}"`), "#" + m[1]);
   // The boxes link here.
-  assert.match(read("backend/internscout/seo_pages.py"), /href="\/privacy\.html#paid-listings">Why am I seeing this\?/);
+  assert.match(read("backend/internscout/site/publish.py"), /href="\/privacy\.html#paid-listings">Why am I seeing this\?/);
   assert.match(read("docs/js/placements.js"), /href: "privacy\.html#paid-listings"/);
   assert.match(APP, /href: "privacy\.html#paid-listings", onClick: onHide/);
   assert.match(TERMS, /href="privacy\.html#paid-listings"/);

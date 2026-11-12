@@ -113,7 +113,7 @@ export async function sessionReservationDeletionRace(db) {
     if (hasAttempt) {
       // P-2.2m now blocks account deletion once reservation has committed. Sign-out
       // remains independently valid, and must still fence a stale reservation request.
-      await assert.rejects(deleteUser(db, user, now), /topup_payment_pending/);
+      await assert.rejects(deleteUser(db, user, now), { status: 409, code: "topup_payment_pending" });
       await forgetSessions(db, user).run();
       assert.deepEqual(await reserve(db, user, source.token, cap, clock), refused);
     } else assert.deepEqual(await reserve(guarded, user, source.token, cap, clock), refused);
