@@ -1,0 +1,18 @@
+# Standalone private checkpoint Worker. It has no checked-in ingress or settings.
+name = "internscout-follow-checkpoint"
+main = "src/follow-checkpoint-entry.js"
+compatibility_date = "2026-09-01"
+workers_dev = false
+preview_urls = false
+logpush = false
+
+[observability]
+enabled = false
+
+[[durable_objects.bindings]]
+name = "FOLLOW_CHECKPOINT"
+class_name = "FollowCheckpoint"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["FollowCheckpoint"]
