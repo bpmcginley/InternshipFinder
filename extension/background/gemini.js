@@ -383,9 +383,11 @@ export async function callWorker({
 }) {
   if (!token) throw workerError(401, { error: "auth" });
   const body = JSON.stringify(buildWorkerRequest({ task, run_id, ...opts }));
+  const maxAttempts = 4;
   let refreshed = false,
     lastErr = null;
-  for (let attempt = 0; attempt < 4; attempt++) {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const hasNextAttempt = attempt + 1 < maxAttempts;
     throwIfAborted(signal);
     let res;
     try {
@@ -398,7 +400,7 @@ export async function callWorker({
     } catch (e) {
       if (signal?.aborted || e.name === "AbortError") throw e;
       lastErr = workerError(502, { error: "upstream" });
-      await sleepImpl(1500 * 2 ** attempt, signal);
+      if (hasNextAttempt) await sleepImpl(1500 * 2 ** attempt, signal);
       continue;
     }
     throwIfAborted(signal);
@@ -410,14 +412,14 @@ export async function callWorker({
         if (signal?.aborted || e.name === "AbortError") throw e;
         whole = null;
       }
+      throwIfAborted(signal);
       // A stream that stopped before Gemini said it was finished is a dropped connection, not an
       // answer: half a tool call or half a resume must not be acted on. Try again like any 502.
       if (!whole || (!whole.complete && !whole.promptFeedback)) {
         lastErr = workerError(502, { error: "upstream" });
-        await sleepImpl(1500 * 2 ** attempt, signal);
+        if (hasNextAttempt) await sleepImpl(1500 * 2 ** attempt, signal);
         continue;
       }
-      throwIfAborted(signal);
       return fromResponse(whole);
     }
     const data = await res.json().catch((e) => {
@@ -442,7 +444,8 @@ export async function callWorker({
       err.code === "upstream"
     ) {
       lastErr = err;
-      await sleepImpl(err.retry_after ? err.retry_after * 1000 : 2000 * 2 ** attempt, signal);
+      if (hasNextAttempt)
+        await sleepImpl(err.retry_after ? err.retry_after * 1000 : 2000 * 2 ** attempt, signal);
       continue;
     }
     throw err;
