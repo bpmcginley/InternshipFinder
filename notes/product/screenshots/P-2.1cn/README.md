@@ -1,0 +1,16 @@
+# P-2.1cn native dashboard evidence
+
+Offline synthetic golden listing fixture, not production activity. The before site is exact `1ae528e7`; its archive is also byte-identical to parent #555 `adc060a2`. The after site is this package's stamped golden archive. The normal publisher-produced dashboard and native App/Core modules run in fresh isolated Edge contexts. React URLs are fulfilled from pinned local packages, existing analytics is stubbed, all API responses are synthetic and all other network destinations are blocked.
+
+`capture.cjs BEFORE_DIR AFTER_DIR` uses Node 22 and the existing isolated Playwright/Edge installation. Extract the two exact review archives into fresh directories first. No production switch, account or settings is used. Only the enabled fixture response injects the absent HTML attribute; default output is served unchanged.
+
+| Width/theme | Before (default) | Enabled anonymous | Enabled explicit-link option |
+|---|---|---|---|
+| 1280 light | [before](before-1280-light.png) | [after](after-anonymous-1280-light.png) | [link option](after-linked-option-1280-light.png) |
+| 1280 dark | [before](before-1280-dark.png) | [after](after-anonymous-1280-dark.png) | [link option](after-linked-option-1280-dark.png) |
+| 375 light | [before](before-375-light.png) | [after](after-anonymous-375-light.png) | [link option](after-linked-option-375-light.png) |
+| 375 dark | [before](before-375-dark.png) | [after](after-anonymous-375-dark.png) | [link option](after-linked-option-375-dark.png) |
+
+All 16 scenarios pass. The four after-default captures compare byte-for-byte with the before PNGs. The eight enabled scenarios cover keyboard opening/focus, unchecked optional consent, explicit submit, exact scope-only JSON, omitted anonymous authorization, current linked authorization, no referrer, empty202 generic focused feedback, Escape/reopen reset, malformed200, filter-change abortion and stale result suppression. Four signed-in scenarios also sign out through the actual Account menu during a held linked request and prove no anonymous fallback. Each enabled scenario verifies mixed all/MA, remote, Canada, text-only and unfiltered Everywhere cannot submit, while field-only Everywhere and state-only render exact approved empty-dimension labels. No horizontal overflow; form toggle/input/submit bounds are at least44px high. Node additionally covers64/65/66 keys, unknown aliases, A→B→A, token mismatch, expiry/deadline and a stalled empty-receipt read.
+
+Every visible form phrase is already approved; fixture listing names and counts are synthetic. Existing form bytes and screenshots' wording are unchanged.

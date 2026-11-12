@@ -14,7 +14,7 @@ export function createDashboard(browser, {
     restoreArrivalAnchor, focusArrival, Setup, QuickProfile, STATE_LABEL, useNarrow, factsLine,
     matchControl, Why, prevent, PLACE_NOTICE_KEY, PlaceNotice, F, installUrl, SiteNav, ADMIN,
     AccountMenu, noCount, NOCOUNT_KEY, AllowancePanel, InviteBlock, Sel, opt, APP_STATES,
-    SearchBox, MultiSelect, ShareSearch, ListTable, Digest, Row, sinceVisit, Landing,
+    SearchBox, MultiSelect, ShareSearch, ListTable, Digest, Row, sinceVisit, Landing, DashboardFollow,
   }) {
   function App() {
     const store = useRef(null); if (!store.current) store.current = IS.createStore();
@@ -1338,6 +1338,7 @@ export function createDashboard(browser, {
         shareUrl && h(ShareSearch, { url: shareUrl }),
         onlySearch ? h("button", { type: "button", className: "btn quiet", onClick: () => upd("q", "") }, "Clear search")
           : anyFilter && h("button", { type: "button", className: "btn quiet", onClick: clearFilters }, "Clear filters")),
+      !myList && h(DashboardFollow, { filters: f, auth, generation: authGeneration.current, getAuth: () => ({ auth: authRef.current, generation: authGeneration.current }) }),
       h("div", { className: "sr", role: "status", "aria-live": "polite", "aria-atomic": "true" }, spoken),
 
       // was: `Searching titles, companies and fields in ${keys.length} states. `

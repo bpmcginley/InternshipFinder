@@ -94,13 +94,11 @@ function fixture(extra = {}) {
     },
   };
 }
-test("default and nonliteral enablement render nothing; no dashboard mount or network/storage port", () => {
+test("default and nonliteral enablement render nothing; form has no network/storage port", () => {
   for (const enabled of [undefined, false, "true", 1, null])
     assert.equal(fixture({ enabled }).tree, null);
-  for (const path of ["docs/js/app/index.mjs", "docs/js/app/dashboard.mjs", "docs/index.html"])
-    assert.doesNotMatch(readFileSync(path, "utf8"), /follow-form/);
   assert.doesNotMatch(
-    readFileSync("docs/js/follow-form.mjs", "utf8"),
+    readFileSync("docs/js/app/follow-form.mjs", "utf8"),
     /\bfetch\s*\(|localStorage|sessionStorage/,
   );
 });
