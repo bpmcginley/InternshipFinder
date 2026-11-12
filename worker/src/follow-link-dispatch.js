@@ -139,11 +139,13 @@ export async function runFollowLinkDispatch({
     for (let k = 0; k < kinds.length; k++) {
       if (pages[k].length > maxCandidates) throw new Error();
       let last = next[kinds[k]];
+      const seen = new Set();
       for (const row of pages[k]) {
         if (
           !exact(row, "expires_at,id,queued_at") ||
           typeof row.id !== "string" ||
           !UUID.test(row.id) ||
+          seen.has(row.id) ||
           !stamp(row.queued_at) ||
           !stamp(row.expires_at) ||
           row.queued_at >= row.expires_at ||
@@ -151,6 +153,7 @@ export async function runFollowLinkDispatch({
           (last && !later(row, last))
         )
           throw new Error();
+        seen.add(row.id);
         last = row;
       }
       if (!pages[k].length) next[kinds[k]] = null; // Wrap only after an observed empty page.

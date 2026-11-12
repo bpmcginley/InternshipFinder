@@ -184,7 +184,7 @@ export async function futureDueRowsAreBoundedSkippedCandidates(db) {
 }
 export async function selectionReceiptsAndClockFailClosed(db) {
   await seed(db, "management");
-  for (const fault of ["false", "hole", "oversize", "badRow", "regression"]) {
+  for (const fault of ["false", "hole", "oversize", "badRow", "regression", "duplicateId"]) {
     let batches = 0,
       samples = 0,
       sends = 0;
@@ -198,6 +198,11 @@ export async function selectionReceiptsAndClockFailClosed(db) {
           if (fault === "hole") delete result[1];
           if (fault === "oversize") result[1].results = Array(5).fill(result[1].results[0]);
           if (fault === "badRow") result[1].results[0].id = [result[1].results[0].id];
+          if (fault === "duplicateId")
+            result[1].results.push({
+              ...result[1].results[0],
+              expires_at: new Date(Date.parse(result[1].results[0].expires_at) + 1).toISOString(),
+            });
         }
         return result;
       },
