@@ -53,6 +53,7 @@ import "./follow-management-request.test.js";
 import "./follow-management-claim.test.js";
 import "./follow-management-delivery.test.js";
 import "./follow-link-dispatch.test.js";
+import "./follow-link-runtime.test.js";
 import "./follow-outbox.test.js";
 import "./follow-retention.test.js";
 import "./follow-management-request-http.test.js";
