@@ -369,6 +369,8 @@ The golden harness now covers static assets as well as generated pages. Each sit
 
 ## Waiting for Bruce
 
+Chrome 0.6.0 release preparation: claims only `extension/manifest.json`, the pinned version assertion in `extension/test/held_install.test.mjs`, and its owned Product evidence. Draft needs-bruce; final combined integration and signed Store delivery remain pending after both refactors. No tag, upload, deployment or release.
+
 P-2.1u [#341](https://github.com/bpmcginley/InternshipFinder/pull/341) remains owner-gated after archive-reader integration. Publication, scheduling and activation remain pending.
 
 P-2.1s [#330](https://github.com/bpmcginley/InternshipFinder/pull/330) dormant archive reader remains owner-gated for configuration, publication and activation; no deployment or sending.
