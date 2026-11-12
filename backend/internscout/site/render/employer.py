@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from html import escape as esc
 
-from ..employer import Page
+from ..employer import Page, validated_company_follow
 from .layout import link_list
 
 
@@ -24,6 +24,16 @@ def render_employer_page(
     state_slug: Callable[..., str],
     employer_facts: Callable[..., tuple[str, str]],
 ) -> dict:
+    selected = validated_company_follow(model)
+    follow = (
+        (
+            f'<section data-follow-company-key="{esc(selected.key, quote=True)}" '
+            f'data-follow-company-label="{esc(selected.label, quote=True)}"></section>'
+            '<script type="module" src="/js/follow-company.mjs"></script>'
+        )
+        if selected
+        else ""
+    )
     name, items, path, main = model.name, model.items, model.path, model.main
     note = (
         f"<p class=\"more\">InternScout is not affiliated with {esc(name)}. These are roles InternScout "
@@ -76,7 +86,7 @@ def render_employer_page(
             related,
             dash=dash_link(state=model.where, companies=model.spellings),
             here=path,
-            extra=facts,
+            extra=facts + follow,
             src="seo-employer",
             details=model.details,
             export_stamp=model.export_stamp,

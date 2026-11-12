@@ -1,6 +1,8 @@
 // Dormant UI. The mounting layer supplies catalog labels, session generation and a request port.
-const COPY = {
+export const FOLLOW_COPY = Object.freeze({
   search: "Email me new roles like these",
+  emailLabel: "Email",
+  submitLabel: "Email me new internships",
   helper:
     "Confirm your email first. Then get one email a day when there are new matches. No account needed. Unsubscribe any time.",
   link: "Link these follows to my account so Delete my data removes them too.",
@@ -8,7 +10,16 @@ const COPY = {
   email: "Enter a valid email address.",
   scope: "Choose a company or at least one field or state.",
   unavailable: "Email follows are unavailable. Please try again later.",
-};
+});
+const COPY = FOLLOW_COPY;
+export function normalizeFollowEmail(email) {
+  if (typeof email !== "string") return null;
+  const normalized = email.trim().toLowerCase();
+  return normalized.length <= 254 &&
+    /^[^\s@<>\x00-\x1f\x7f]+@[^\s@<>\x00-\x1f\x7f]+\.[^\s@<>\x00-\x1f\x7f]+$/.test(normalized)
+    ? normalized
+    : null;
+}
 // Values and labels come from the same trusted catalog selection, never arbitrary search text.
 export function followSelection(selection) {
   const item = (v) =>
@@ -77,11 +88,8 @@ export function createFollowForm({ h, useState, useRef, useEffect, useId }) {
     const submit = async (event) => {
       event.preventDefault();
       if (flight.current) return;
-      const normalized = email.trim().toLowerCase();
-      if (
-        normalized.length > 254 ||
-        !/^[^\s@<>\x00-\x1f\x7f]+@[^\s@<>\x00-\x1f\x7f]+\.[^\s@<>\x00-\x1f\x7f]+$/.test(normalized)
-      ) {
+      const normalized = normalizeFollowEmail(email);
+      if (normalized === null) {
         setInvalid(true);
         setMessage(COPY.email);
         input.current?.focus();
@@ -169,7 +177,7 @@ export function createFollowForm({ h, useState, useRef, useEffect, useId }) {
             },
           },
           selected?.summary && h("p", { className: "meta" }, selected.summary),
-          h("label", { className: "lbl", htmlFor: id + "-email" }, "Email"),
+          h("label", { className: "lbl", htmlFor: id + "-email" }, COPY.emailLabel),
           h("input", {
             id: id + "-email",
             ref: input,
@@ -225,7 +233,7 @@ export function createFollowForm({ h, useState, useRef, useEffect, useId }) {
                 disabled: busy || !selected,
                 style: { minHeight: "44px" },
               },
-              "Email me new internships",
+              COPY.submitLabel,
             ),
           ),
           h(

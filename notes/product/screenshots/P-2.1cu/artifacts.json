@@ -1,0 +1,19 @@
+{
+  "beforePaths": 846,
+  "afterPaths": 847,
+  "changed": [
+    "index.html",
+    "js/app/follow-form.mjs"
+  ],
+  "newAsset": "js/follow-company.mjs",
+  "nativeGraphMovedPaths": 14,
+  "onlyChangedNativeBody": "follow-form.mjs",
+  "defaultEmployerHTML": "byte-identical; no script/control/request",
+  "archiveSHA256": "50201364c9f9aeb6e91410a35f8c9391fd67fcb03fb85ffdb6742ace2f7dccf7",
+  "correctionDeltaFromBe634d5f": [
+    "js/follow-company.mjs"
+  ],
+  "correctionDeltaFrom4b66f86a": [
+    "js/follow-company.mjs"
+  ]
+}
