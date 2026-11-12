@@ -70,13 +70,32 @@ const sample = (clock) => {
 export async function validateTopupHistoryTraversal(db, input, options = {}) {
   if (options?.enabled !== true) return { status: "disabled" };
   const cap = HISTORY_TRAVERSAL_BOUNDS;
-  let expected, config, clock, readPage, timeoutMs, initial;
+  let expected,
+    config,
+    clock,
+    readPage,
+    timeoutMs,
+    initial,
+    targetEventId,
+    onCaptured,
+    closeCoverage;
   try {
     config = copy(input);
     expected = copy(config.expected);
-    ({ clock = Date.now, readPage, timeoutMs = cap.timeoutMs } = options);
+    ({
+      clock = Date.now,
+      readPage,
+      timeoutMs = cap.timeoutMs,
+      targetEventId,
+      onCaptured,
+      closeCoverage,
+    } = options);
     if (
       Object.keys(config).sort().join(",") !== "apiVersions,expected,from,livemode,schemaKey,to" ||
+      (targetEventId !== undefined &&
+        (typeof targetEventId !== "string" || !/^evt_[A-Za-z0-9_]{1,250}$/.test(targetEventId))) ||
+      (onCaptured !== undefined && typeof onCaptured !== "function") ||
+      (closeCoverage !== undefined && typeof closeCoverage !== "function") ||
       typeof config.livemode !== "boolean" ||
       expected.mode !== (config.livemode ? "live" : "test") ||
       typeof config.schemaKey !== "string" ||
@@ -120,6 +139,17 @@ export async function validateTopupHistoryTraversal(db, input, options = {}) {
   if (captured.status !== "captured" || !same(captured.coverage, expected)) return held();
   // Use only the database-validated, copied tuple for any subsequent closure.
   expected = captured.coverage;
+  if (onCaptured !== undefined) {
+    try {
+      const receipt = onCaptured({ ...expected });
+      if (receipt !== true) {
+        void Promise.resolve(receipt).catch(() => {});
+        return held();
+      }
+    } catch {
+      return held();
+    }
+  }
   const controller = new AbortController();
   let stopped = false,
     last = initial,
@@ -202,7 +232,8 @@ export async function validateTopupHistoryTraversal(db, input, options = {}) {
   }
   async function traverse() {
     let cursor = null,
-      previous = Infinity;
+      previous = Infinity,
+      selected = null;
     const seen = new Set();
     for (let page = 0; page < cap.pages; page++) {
       check();
@@ -230,6 +261,7 @@ export async function validateTopupHistoryTraversal(db, input, options = {}) {
           !/^evt_[A-Za-z0-9_]{1,250}$/.test(e.id) ||
           seen.has(e.id) ||
           e.livemode !== config.livemode ||
+          (targetEventId !== undefined && (e.account != null || e.context != null)) ||
           !config.apiVersions.includes(e.api_version) ||
           !Number.isSafeInteger(e.created) ||
           e.created < config.from ||
@@ -245,12 +277,15 @@ export async function validateTopupHistoryTraversal(db, input, options = {}) {
           fail();
         previous = e.created;
         seen.add(e.id);
+        if (e.id === targetEventId) selected = e;
       }
       if (!value.has_more) {
         const final = await captureTopupCoverage(db, config.livemode, on);
         check();
         if (final.status !== "captured" || !same(final.coverage, expected)) fail();
-        return { status: "unproven" };
+        return targetEventId === undefined
+          ? { status: "unproven" }
+          : { status: "unproven", event: selected };
       }
       cursor = value.data.at(-1).id;
     }
@@ -268,8 +303,15 @@ export async function validateTopupHistoryTraversal(db, input, options = {}) {
     return result;
   } catch {
     stop();
-    const closed = await closeTopupCoverage(db, expected, on);
-    return closed.status === "committed" ? { status: "closed" } : held();
+    try {
+      const closed =
+        closeCoverage === undefined
+          ? await closeTopupCoverage(db, expected, on)
+          : await closeCoverage({ ...expected });
+      return closed?.status === "committed" ? { status: "closed" } : held();
+    } catch {
+      return held();
+    }
   } finally {
     clearTimeout(timer);
     stop();
