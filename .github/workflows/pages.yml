@@ -18,6 +18,8 @@ on:
     workflows: ["Ingest internships"]
     types: [completed]
   workflow_dispatch:
+  repository_dispatch:
+    types: [internscout-catchup-publication]
 
 permissions:
   contents: read
@@ -30,12 +32,26 @@ concurrency:
   # cancelling a run that is inside deploy-pages can leave the Pages deployment half-made, and
   # GitHub's own Pages starter workflow sets false for that reason. A queued run waits a few minutes.
   cancel-in-progress: false
+  queue: max  # Keep pending direct and supplementary publications serialized.
 
 # Pinned to ubuntu-24.04 (was: ubuntu-latest): that label moves to Ubuntu 26 on 2026-10-19, and the move should be a deliberate change.
 jobs:
   build:
+    if: >-
+      github.event_name != 'repository_dispatch' ||
+      (github.ref == 'refs/heads/main' && github.actor == 'github-actions[bot]' &&
+      github.triggering_actor == 'github-actions[bot]' &&
+      github.event.sender.login == 'github-actions[bot]' &&
+      github.event.repository.full_name == github.repository)
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read
+      pages: write
+      id-token: write
+    outputs:
+      catchup-commit: ${{ steps.catchup.outputs.commit }}
     steps:
       - name: Check that Pages deploys from this workflow
         env:
@@ -55,9 +71,38 @@ jobs:
 
       - uses: ./.github/actions/python
 
+      - name: Verify automatic catch-up writer
+        if: github.event_name == 'repository_dispatch'
+        id: catchup-writer
+        timeout-minutes: 2
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/catchup_pages.py verify-run
+
+      - name: Download the exact automatic catch-up receipt
+        if: github.event_name == 'repository_dispatch'
+        uses: actions/download-artifact@v8
+        timeout-minutes: 1
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.catchup-writer.outputs.run_id }}
+          artifact-ids: ${{ steps.catchup-writer.outputs.artifact_id }}
+          merge-multiple: true
+          path: ${{ runner.temp }}/catchup-publication
+
+      - name: Verify automatic catch-up receipt
+        if: github.event_name == 'repository_dispatch'
+        id: catchup
+        run: python scripts/catchup_pages.py verify-receipt
+
       - name: Select public listing data
         id: public-data
         uses: ./.github/actions/public-data
+        with:
+          expected-commit: ${{ steps.catchup.outputs.commit }}
+          expected-tree: ${{ steps.catchup.outputs.tree }}
+          upstream-run: ${{ steps.catchup.outputs.run_id }}
 
       - name: Save the sitemap that is live now
         # the publisher keeps a page that is already live until its listings fall well below the bar for
@@ -176,6 +221,18 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - name: Recheck the automatic catch-up data tip
+        if: github.event_name == 'repository_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_DATA_COMMIT: ${{ needs.build.outputs.catchup-commit }}
+        run: |
+          current=$(timeout 15s gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/data" \
+            --header "Cache-Control: no-cache" --jq 'select(.ref == "refs/heads/data" and .object.type == "commit") | .object.sha')
+          if ! [[ "$EXPECTED_DATA_COMMIT" =~ ^[a-f0-9]{40}$ ]] || [ "$current" != "$EXPECTED_DATA_COMMIT" ]; then
+            echo "::error::Automatic catch-up data tip changed before deployment."
+            exit 1
+          fi
       - id: deployment
         uses: actions/deploy-pages@v5
 
