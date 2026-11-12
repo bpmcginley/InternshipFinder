@@ -372,17 +372,27 @@ test("management links reject normalized variants and stay out of every other li
     ["digest", "publicShare"],
   ])
     await assert.rejects(mail(kind, name, MANAGEMENT_LINK), invalid);
-  for (const unsubscribe of [
-    `${ACTIONS}/unsubscribe/${MANAGEMENT_TOKEN}`,
-    `${ACTIONS}/unsubscribe?token=${MANAGEMENT_TOKEN.replace(".", "%2E")}`,
-  ])
-    await assert.rejects(mail("manage", "unsubscribe", unsubscribe), invalid);
+  const alternateTokens = [
+    MANAGEMENT_TOKEN,
+    MANAGEMENT_TOKEN.toUpperCase(),
+    MANAGEMENT_TOKEN.replace(".", "%2E"),
+    MANAGEMENT_TOKEN.replace(".", "%252E"),
+    MANAGEMENT_TOKEN.replace(".", "%25252E"),
+  ];
+  for (const token of alternateTokens) {
+    await assert.rejects(mail("manage", "unsubscribe", `${ACTIONS}/unsubscribe/${token}`), invalid);
+    await assert.rejects(
+      mail("manage", "unsubscribe", `${ACTIONS}/unsubscribe?token=${token}`),
+      invalid,
+    );
+    await assert.rejects(mail("digest", "publicShare", `${SITE}/share?value=${token}`), invalid);
+  }
 
   for (const apply_url of [
     MANAGEMENT_LINK,
     MANAGEMENT_LINK.replace(MANAGEMENT_TOKEN, TOKEN),
-    `https://jobs.example.test/1?source=${MANAGEMENT_TOKEN}`,
-    `https://jobs.example.test/1/${MANAGEMENT_TOKEN.replace(".", "%2E")}`,
+    MANAGEMENT_LINK.replace("manage.html", "man%2561ge.html").replace(MANAGEMENT_TOKEN, TOKEN),
+    ...alternateTokens.map((token) => `https://jobs.example.test/1?source=${token}`),
   ]) {
     for (const roleInput of [
       { matches: [role(1, { apply_url })] },

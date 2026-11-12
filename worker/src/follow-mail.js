@@ -57,6 +57,21 @@ function decodedLink(value) {
   }
 }
 
+// Capability characters are ASCII. Collapse nested percent escapes without reparsing the URL.
+function normalizedLinkAscii(value) {
+  const chars = [];
+  for (const char of value) {
+    chars.push(char);
+    while (chars.length >= 3 && chars.at(-3) === "%") {
+      const hex = chars.at(-2) + chars.at(-1);
+      if (!/^[0-7][0-9a-f]$/i.test(hex)) break;
+      chars.length -= 3;
+      chars.push(String.fromCharCode(Number.parseInt(hex, 16)));
+    }
+  }
+  return chars.join("").toLowerCase();
+}
+
 // Only body action slots may use the landing page's canonical purpose-specific fragment.
 function actionFragment(name, value, url) {
   const purpose =
@@ -87,7 +102,11 @@ function trustedLinks(origins, links, withManagement) {
     const value = name === "management" ? management : links[name];
     const url = link(value);
     if (!allowed.has(url.origin)) invalid();
-    if (managementToken && name !== "management" && decodedLink(url.href).includes(managementToken))
+    if (
+      managementToken &&
+      name !== "management" &&
+      normalizedLinkAscii(url.href).includes(managementToken)
+    )
       invalid();
     if (publicLink) {
       if (FOLLOW_TOKEN.test(decodedLink(url.href))) invalid();
@@ -132,8 +151,8 @@ function rejectManagementInRoleLinks(lines, managementToken) {
   for (let i = 1; i < lines.length; i += 2) {
     const url = new URL(lines[i]);
     if (
-      decodedLink(url.href).includes(managementToken) ||
-      (url.origin === MANAGEMENT_ORIGIN && decodedLink(url.pathname) === MANAGEMENT_PATH)
+      normalizedLinkAscii(url.href).includes(managementToken) ||
+      (url.origin === MANAGEMENT_ORIGIN && normalizedLinkAscii(url.pathname) === MANAGEMENT_PATH)
     )
       invalid();
   }
