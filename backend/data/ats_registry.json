@@ -9241,6 +9241,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-18"
+  },
+  "zotecpartners": {
+   "name": "Zotec Partners",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-11"
   }
  },
  "jobvite": {
@@ -17119,9 +17125,9 @@
   "marmon|wd501|Marmon_MSIP_Internships": {
    "name": "Marmon Holdings",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-09-13",
-   "last_fail": "2026-11-11"
+   "last_fail": "2026-11-12"
   },
   "mars|wd3|external": {
    "name": "Mars",
