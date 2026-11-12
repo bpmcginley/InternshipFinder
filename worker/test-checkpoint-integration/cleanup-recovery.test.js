@@ -19,18 +19,24 @@ const ordered = (v) =>
 const state = (object) => runInDurableObject(object, (i) => i.state());
 async function setup() {
   const object = env.CHECKPOINT.get(env.CHECKPOINT.newUniqueId());
-  const value = JSON.parse(golden.cases[0].checkpoint),
-    now = Date.now();
-  value.prepared_at = new Date(now - DAY + 500).toISOString().replace("Z", "000Z");
-  value.covers_after = new Date(now - 2 * DAY).toISOString().replace("Z", "000Z");
   await object.bootstrap();
+  // Exclude cold native storage startup from this deliberately short real lifetime.
+  const value = JSON.parse(golden.cases[0].checkpoint),
+    now = await runInDurableObject(object, (i) => i.now());
+  value.prepared_at = new Date(now - DAY + 2000).toISOString().replace("Z", "000Z");
+  value.covers_after = new Date(now - 2 * DAY).toISOString().replace("Z", "000Z");
   const { status, nonce } = await object.reservePending(
     new TextEncoder().encode(JSON.stringify(ordered(value))),
   );
   expect(status).toBe("reserved");
   const before = await state(object);
-  await new Promise((resolve) =>
-    setTimeout(resolve, Math.max(0, before.reservation.expires - Date.now()) + 10),
+  const remaining = await runInDurableObject(
+    object,
+    (i) => i.state().reservation.expires - i.now(),
+  );
+  await new Promise((resolve) => setTimeout(resolve, Math.max(0, remaining) + 10));
+  expect(await runInDurableObject(object, (i) => i.now())).toBeGreaterThanOrEqual(
+    before.reservation.expires,
   );
   return { object, nonce, before };
 }
