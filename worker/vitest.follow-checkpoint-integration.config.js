@@ -17,5 +17,7 @@ export default defineConfig({
       },
     }),
   ],
-  test: { include: ["test-checkpoint-integration/*.test.js"] },
+  // Allow for hosted CPU contention during native storage startup and real SQLite expiry waits.
+  // The normal Node wrapper still bounds the entire child suite to 120 seconds.
+  test: { include: ["test-checkpoint-integration/*.test.js"], testTimeout: 15000 },
 });
