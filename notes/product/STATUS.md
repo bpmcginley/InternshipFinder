@@ -411,6 +411,7 @@ The golden harness now covers static assets as well as generated pages. Each sit
 | D | P-2.1as offline upload reservations | audit_worker_extension | `codex/product-p2.1as-reservations` | [#476](https://github.com/bpmcginley/InternshipFinder/pull/476) | Merged as `26690242` after exact independent review and hosted checks | Native cutoff regressions pass, including immutable admitted cutoff after accepted retirement and cleanup. Malformed cutoff holds, genesis/linked-predecessor consistency and delayed-write fencing verified. Configured coverage and exact post-merge Tests passed. Test-only five-file scope; no activation. |
 
 | D | P-2.1at offline cleanup recovery | audit_growth_generated | `codex/product-p2.1at-cleanup-recovery` | [#478](https://github.com/bpmcginley/InternshipFinder/pull/478) | Merged as `7da316ac` after exact independent review and hosted checks | 58 native cases and configured Node 22 coverage pass after ordinary corrected #476 integration. Typed sidecar binds immutable reservation cutoff after predecessor retirement and physical cleanup; interrupted native recovery preserves original bounds without another write. No production/G3 changes or activation. |
+| D | P-2.1au native checkpoint test budget | audit_worker_extension | `codex/product-checkpoint-test-budget` | Draft claim | Qualification pending | Claim dedicated native checkpoint Vitest configuration only. Preserve real SQLite expiry assertions, single attempts and the 120-second outer wrapper. No production or activation changes. |
 
 ## Waiting for Bruce
 
@@ -425,6 +426,7 @@ Dates are when the item was recorded, not a claim that a separate message was se
 
 | Recorded | Item | Ready artifact / next action | Done |
 |---|---|---|---|
+| 2026-11-12 | P-2.1au native checkpoint test budget | Draft claim: isolated test wall-clock correction after hosted native contention. | Needs-bruce; independent review and exact hosted checks required. |
 | 2026-11-11 | P-2.1at offline cleanup recovery | [#478](https://github.com/bpmcginley/InternshipFinder/pull/478): test-only interrupted cleanup qualification on exact #476. | Merged after exact independent review and hosted checks. Provider retention, durable witness, restore and activation remain open. |
 | 2026-11-11 | P-2.1as offline upload reservations | [#476](https://github.com/bpmcginley/InternshipFinder/pull/476): native cutoff correction qualifies cleanup after predecessor retirement. | Merged and verified. Provider retention, durable witness and activation remain open. |
 | 2026-11-11 | P-2.1ao bounded R2 slots | [#468](https://github.com/bpmcginley/InternshipFinder/pull/468): offline conditional-write qualification passes; the malformed-header regression also rejects a leading UTF-8 BOM. | Storage choice, physical retention, control authority and restore witness remain unqualified. No activation. |
