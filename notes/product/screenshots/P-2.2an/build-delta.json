@@ -1,0 +1,16 @@
+{
+  "baseline": "daf27b524670566ebaf3ee4126d5bd9b46660ead",
+  "files": 836,
+  "changed": [
+    "index.html",
+    "js/app/allowance.mjs",
+    "js/core/account.mjs"
+  ],
+  "appGenerationAdded": 11,
+  "coreGenerationAdded": 7,
+  "generationPathsRemoved": 18,
+  "otherOutputByteIdentical": true,
+  "indexOnlyGraphReferencesChanged": true,
+  "heldGoldenPairUntouched": true,
+  "networkDeniedByBuildHarness": true
+}

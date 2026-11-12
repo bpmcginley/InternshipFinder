@@ -9,6 +9,7 @@ from datetime import datetime
 from urllib.parse import quote
 
 from ..listing import TrackerPage, KindPage
+from ..employer_posting_links import PostingLinks
 from ..text import plural
 from .layout import link_list, short_day, table
 
@@ -30,6 +31,7 @@ def listing_rows(
     go_aa: Callable[[dict], str],
     safe_url: Callable[[str], str | None],
     esc: Callable[[str], str],
+    posting_links: PostingLinks | None = None,
 ) -> str:
     rows = []
     for x in shown(items, state):
@@ -38,6 +40,7 @@ def listing_rows(
         new = fresh(x, now, baseline)
         new_tag = ' <span class="new">New</span>' if new else ""
         href = esc(safe_url(x["apply_url"]))
+        employer = posting_links.attribute(x) if posting_links is not None else ""
         # On a site Auto-Apply fills, a quiet second link to the install page (2026-10-04). Internal,
         # so a page of 40 rows is not 40 outbound store links; the page's one store link is autoapply_card.
         # It names the listing (listing=<id>, 2026-10-14, D21), so the install flow can carry this posting
@@ -69,7 +72,7 @@ def listing_rows(
             # The two actions sit on one line in .acts (2026-10-14, D21): "Open posting" a secondary button,
             # "Auto-Apply this" a quiet link after it, as on the dashboard's rows.
             # was: f'<a class="go"{go_aa(x)} href="{href}" rel="nofollow noopener" target="_blank">Open posting</a>{aa}'
-            f'<div class="acts"><a class="go"{go_aa(x)} href="{href}" rel="nofollow noopener" target="_blank">Open posting</a>{aa}</div>'
+            f'<div class="acts"><a class="go"{go_aa(x)}{employer} href="{href}" rel="nofollow noopener" target="_blank">Open posting</a>{aa}</div>'
             "</li>"
         )
     return "\n".join(rows)
@@ -180,6 +183,7 @@ def listing_body(
     listing_rows: Callable[..., str],
     chart_figure: Callable[..., str],
     esc: Callable[[str], str],
+    export_stamp: datetime | None = None,
 ) -> str:
     more = len(items) - per_page
     order = "newest" if state else "newest, Northeast and remote first,"
@@ -198,8 +202,13 @@ def listing_body(
         if detail_count
         else ""
     )
+    dated = (
+        f"As of {export_stamp:%B} {export_stamp.day}, {export_stamp.year}, InternScout lists "
+        if export_stamp is not None
+        else ""
+    )
     return (
-        f"<p class=\"lede\">{summary(items, what, where, tail, about)}</p>"
+        f"<p class=\"lede\">{esc(dated)}{summary(items, what, where, tail, about)}</p>"
         + fits_line(fits or [])
         + extra
         + f"<a class=\"cta\" href=\"{dash}\">Rank these for your major and year</a>"

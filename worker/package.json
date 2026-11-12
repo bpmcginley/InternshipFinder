@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler d1 execute internscout --remote --file=schema.sql && wrangler deploy",
+    "deploy": "wrangler d1 migrations apply internscout --remote && wrangler d1 execute internscout --remote --file=deploy-backfills.sql && wrangler deploy",
     "test": "node --test test/",
     "test:workers": "vitest run",
     "test:coverage": "cd .. && node worker/node_modules/c8/bin/c8.js --all --src=worker/src --src=extension --src=docs/js --include=worker/src/** --include=extension/** --include=docs/js/** --exclude=extension/test/** --exclude=extension/vendor/** --reporter=lcovonly --reporter=json-summary --reporter=text-summary --reports-dir=coverage/node node --import ./scripts/coverage-vm.mjs --test --test-reporter=dot worker/test/index.js extension/test/*.test.mjs tests/site/*.test.mjs"

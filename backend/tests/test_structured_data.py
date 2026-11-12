@@ -15,7 +15,11 @@ from urllib.parse import urlsplit
 
 import pytest
 
-from internscout import seo_pages
+from internscout.site import runtime
+from internscout.site.render import layout
+
+
+pytestmark = pytest.mark.without_seo_facade
 
 
 class _Visible(HTMLParser):
@@ -127,8 +131,8 @@ def _assert_collection_schema(html, path):
             # 2026-10-23: valid schema.org alone is insufficient for Google product snippets.
             # was: a Product without all three could pass. Revert: remove this required-field guard.
             assert any(node.get(key) for key in ("offers", "review", "aggregateRating")), path
-            assert node["brand"] == {"@id": seo_pages.ORG_ID}, path
-            assert node["url"] == seo_pages.SITE + "/pricing/", path
+            assert node["brand"] == {"@id": runtime.ORG_ID}, path
+            assert node["url"] == runtime.SITE + "/pricing/", path
             if "offers" in node:
                 assert isinstance(node["offers"], list) and node["offers"], path
                 assert all(offer.get("@type") == "Offer" for offer in node["offers"]), path
@@ -150,7 +154,7 @@ def _assert_collection_schema(html, path):
                 assert item["name"] and _plain(item["name"]) in visible, path
                 assert urlsplit(item["item"]).scheme == "https", path
                 assert urlsplit(item["item"]).netloc == "internscout.org", path
-            assert trail[-1]["item"] == seo_pages.SITE + path, path
+            assert trail[-1]["item"] == runtime.SITE + path, path
         if "FAQPage" in types:
             assert node["mainEntity"], path
             for question in node["mainEntity"]:
@@ -160,9 +164,9 @@ def _assert_collection_schema(html, path):
                 assert answer["@type"] == "Answer", path
                 assert answer["text"] and _plain(answer["text"]) in visible, path
         if "CollectionPage" in types:
-            assert node["url"] == seo_pages.SITE + path, path
+            assert node["url"] == runtime.SITE + path, path
             assert node["@id"] == node["url"], path
-            assert node["isPartOf"] == {"@id": seo_pages.SITE_ID}, path
+            assert node["isPartOf"] == {"@id": runtime.SITE_ID}, path
             assert node["name"] and _plain(node["name"]) in visible, path
             title = re.search(r"<h1[^>]*>(.*?)</h1>", html, re.S).group(1)
             parser = _Visible(title)
@@ -209,7 +213,10 @@ def collection_pages(tmp_path):
         encoding="utf-8",
     )
     (data / "majors.json").write_text('{"majors": []}', encoding="utf-8")
-    return {p["path"]: p for p in seo_pages.build(str(tmp_path))}
+    result = runtime.invoke(
+        runtime.BuildState(near_on=False), runtime.BuildHooks(), runtime.build_result, str(tmp_path)
+    )
+    return {p["path"]: p for p in result.pages}
 
 
 def test_all_generated_page_schemas_and_required_page_types(collection_pages):
@@ -255,13 +262,13 @@ def test_homepage_has_only_site_identity_and_pricing_keeps_visible_product_offer
 
 
 def test_product_without_google_required_offers_or_ratings_is_rejected():
-    product = {key: value for key, value in seo_pages.PRODUCT.items() if key != "offers"}
+    product = {key: value for key, value in runtime.PRODUCT.items() if key != "offers"}
     with pytest.raises(AssertionError):
-        _assert_collection_schema(seo_pages.ld_script(product), "/pricing/")
+        _assert_collection_schema(layout.ld_script(product), "/pricing/")
 
 
 def test_nested_job_posting_is_rejected():
-    bad = seo_pages.ld_script(
+    bad = layout.ld_script(
         {
             "@context": "https://schema.org",
             "@graph": [
@@ -277,7 +284,7 @@ def test_nested_job_posting_is_rejected():
 
 
 def test_invisible_faq_answer_is_rejected():
-    bad = seo_pages.ld_script(seo_pages.faq_ld([("A visible question?", "An invisible answer.")]))
+    bad = layout.ld_script(layout.faq_ld([("A visible question?", "An invisible answer.")]))
     with pytest.raises(AssertionError):
         _assert_collection_schema(bad + "<h2>A visible question?</h2>", "/internships/")
 
@@ -298,7 +305,7 @@ def test_invisible_faq_answer_is_rejected():
 )
 def test_faq_text_in_a_hidden_ancestor_is_rejected(attrs):
     question, answer = "A visible question?", "An answer readers cannot see."
-    ld = seo_pages.ld_script(seo_pages.faq_ld([(question, answer)]))
+    ld = layout.ld_script(layout.faq_ld([(question, answer)]))
     # The question is visible, but a nested paragraph's text inherits its ancestor's hidden state.
     html = ld + f'<h2>{question}</h2><div {attrs}><section><p>{answer}</p></section></div>'
     with pytest.raises(AssertionError):
@@ -318,5 +325,5 @@ def test_faq_text_in_a_hidden_ancestor_is_rejected(attrs):
 )
 def test_hidden_void_elements_and_closed_subtrees_do_not_hide_visible_siblings(prefix):
     question, answer = "A visible question?", "A visible answer."
-    ld = seo_pages.ld_script(seo_pages.faq_ld([(question, answer)]))
+    ld = layout.ld_script(layout.faq_ld([(question, answer)]))
     _assert_collection_schema(ld + prefix + f'<h2>{question}</h2><p>{answer}</p>', "/internships/")

@@ -38,6 +38,7 @@ from __future__ import annotations
 import hashlib
 import http.client
 import json
+import logging
 import os
 import re
 import sys
@@ -413,8 +414,10 @@ def main(argv: list[str]) -> int:
                 media_id = publish_reel(token, post["reel_url"], post["instagram_caption"])
             except (InstagramError, urllib.error.URLError, OSError) as e:
                 # Final publish uncertainty has its own exception and must bypass this fallback.
-                print(
-                    f"[instagram] reel failed ({type(e).__name__}: {e}); posting the card instead"
+                console(
+                    f"[instagram] reel failed ({type(e).__name__}); posting the card instead",
+                    level=logging.WARNING,
+                    exception_type=type(e).__name__,
                 )
                 fallback_reason = "reel_publish_failed"
             else:
@@ -435,8 +438,10 @@ def main(argv: list[str]) -> int:
                 )
             except (InstagramError, urllib.error.URLError, OSError) as e:
                 # As for a Reel: only a failure before the final publish falls back to the card.
-                print(
-                    f"[instagram] carousel failed ({type(e).__name__}: {e}); posting the card instead"
+                console(
+                    f"[instagram] carousel failed ({type(e).__name__}); posting the card instead",
+                    level=logging.WARNING,
+                    exception_type=type(e).__name__,
                 )
                 fallback_reason = "carousel_publish_failed"
             else:
@@ -457,8 +462,11 @@ def main(argv: list[str]) -> int:
         record_status(status_path, requested, "unknown", "final_publish_unconfirmed")
         return 1
     except (InstagramError, RuntimeError, KeyError, urllib.error.URLError) as e:
-        # Meta's message, never the token or a URL carrying it.
-        print(f"[instagram] failed: {type(e).__name__}: {e}")
+        console(
+            f"[instagram] failed: {type(e).__name__}",
+            level=logging.WARNING,
+            exception_type=type(e).__name__,
+        )
         print(f"[instagram] {advice(str(e))}")
         record_status(status_path, requested, "failed", "publishing_error")
         return 1
@@ -484,7 +492,7 @@ def advice(error: str) -> str:
             "the token is invalid or expired: generate a new one in Meta's app dashboard and replace "
             "the INSTAGRAM_TOKEN secret (growth/README.md, Instagram)"
         )
-    return "see Meta's message above (growth/README.md, Instagram)"
+    return "see the Instagram troubleshooting steps (growth/README.md)"
 
 
 if __name__ == "__main__":

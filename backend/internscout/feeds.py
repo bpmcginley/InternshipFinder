@@ -15,8 +15,10 @@ from __future__ import annotations
 import re
 from datetime import datetime, timezone
 from email.utils import format_datetime
+from functools import cache
 from html import escape
 
+from .site import assets
 from .site import feeds as _site_rss
 from .site import source
 from .site.text import safe_url
@@ -28,11 +30,12 @@ ITEMS = 25  # newest roles per feed; readers and bots only look at what is new s
 _BAD_XML = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f￾￿]")
 
 
-def _settings():
-    # The standalone API still consults canonical facade settings at the call site.
-    from . import seo_pages
+@cache
+def _standalone_settings() -> tuple[str, datetime | None]:
+    # Snapshot the site URL and configured build date on first use.
+    from .site import runtime
 
-    return seo_pages
+    return assets.SITE, runtime.GENERATED
 
 
 def _x(text) -> str:
@@ -58,7 +61,7 @@ def rss(
         now,
         state,
         limit,
-        site=_settings().SITE,
+        site=_standalone_settings()[0],
         place=source.place,
         pay_text=source.pay_text,
         safe_url=safe_url,
@@ -70,7 +73,7 @@ def rss(
 def write_all(site_dir: str, pages: list[dict], now: datetime | None = None) -> int:
     """feed.xml beside every landing page that lists roles (the hubs have none).
 
-    Dated from the data (seo_pages.GENERATED, set by build), not the clock: lastBuildDate is when a
-    feed's content last changed, and a clock date made every feed a new file on every deploy."""
-    now = now or _settings().GENERATED or datetime.now(timezone.utc)  # was: now = datetime.now(timezone.utc)
+    Prefer the supplied snapshot date, then the configured build date. Use the current UTC
+    time when neither is available."""
+    now = now or _standalone_settings()[1] or datetime.now(timezone.utc)
     return _site_rss.write_all(site_dir, pages, now, rss, ITEMS)

@@ -33,7 +33,7 @@ def payload(data: bytes, kib_per_second: float) -> dict:
 
 def asset(path: Path) -> bytes:
     data = path.read_bytes()
-    return data.replace(b"\r\n", b"\n") if path.suffix in {".html", ".js", ".json"} else data
+    return data.replace(b"\r\n", b"\n") if path.suffix in {".html", ".js", ".mjs", ".json"} else data
 
 
 def main() -> None:
@@ -65,13 +65,15 @@ def main() -> None:
         name: root / "docs" / name
         for name in (
             "index.html",
-            "js/core.js",
-            "js/app.js",
             "data/listings/index.json",
             "fonts/ibm-plex-sans-latin.woff2",
             "fonts/source-serif-4-latin.woff2",
         )
     }
+    for script in ("core", "app"):
+        files = sorted((root / f"docs/js/{script}").glob("*.mjs")) or [root / f"docs/js/{script}.js"]
+        for path in files:
+            assets[path.relative_to(root / "docs").as_posix()] = path
     assets["data/listings/index.json"] = index
     print(
         json.dumps(

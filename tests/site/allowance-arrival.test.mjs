@@ -1,7 +1,8 @@
+import { billingAction, copyInviteAction, createAskExtension, createLoadMe, openInviteAction } from "../../docs/js/app/allowance.mjs";
+import { createTestApp } from "./app-fixture.mjs";
+import { installCore } from "./core-fixture.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import vm from "node:vm";
 
 function harness() {
   const storage = new Map();
@@ -43,17 +44,9 @@ function harness() {
     document: { documentElement: { dataset: {} } },
   };
   ctx.window = ctx;
-  vm.createContext(ctx);
-  vm.runInContext(readFileSync(new URL("../../docs/js/core.js", import.meta.url), "utf8"), ctx);
-  const app = readFileSync(new URL("../../docs/js/app.js", import.meta.url), "utf8");
-  vm.runInContext(
-    app.replace(
-      'ReactDOM.createRoot(document.getElementById("root")).render(h(App));',
-      "window.components = { arrivalFlag, configuredPlans, allowanceArrival, clearArrivalKeys, runAllowance, validInvite, bounded, countArrivalOnce, focusArrival, visibleFocusAnchor, restoreArrivalAnchor, InviteBlock, AllowancePanel };",
-    ),
-    ctx,
-  );
-  return { ...ctx.components, IS: ctx.IS, storage, ctx };
+  installCore(ctx);
+  const components = createTestApp(ctx);
+  return { ...components, IS: ctx.IS, storage, ctx };
 }
 
 const plain = (x) => JSON.parse(JSON.stringify(x));
@@ -212,10 +205,7 @@ function loadHarness() {
     dropToken: () => {},
     IS: { fetchMe: () => new Promise((resolve) => pending.push(resolve)), authOk: () => true },
   };
-  vm.createContext(ctx);
-  const source = readFileSync(new URL("../../docs/js/app.js", import.meta.url), "utf8");
-  const fn = source.match(/const loadMe = useCallback\((async[\s\S]*?), \[dropToken\]\);/)[1];
-  vm.runInContext("load=" + fn, ctx);
+  ctx.load = createLoadMe(ctx);
   return { ...ctx, pending, updates };
 }
 test("late account responses cannot replace current account data", async () => {
@@ -324,15 +314,7 @@ test("old-account invite responses and clipboard failures cannot affect the new 
       count: () => {},
     },
   };
-  vm.createContext(ctx);
-  const source = readFileSync(new URL("../../docs/js/app.js", import.meta.url), "utf8");
-  vm.runInContext(
-    source.slice(
-      source.indexOf("    async function openInvite("),
-      source.indexOf("    // A good moment"),
-    ),
-    ctx,
-  );
+  ctx.openInvite = retry => openInviteAction(ctx, retry);
   const a = ctx.openInvite(true);
   authRef.current.token = "account-b";
   const b = ctx.openInvite(true);
@@ -361,13 +343,7 @@ test("old-account invite responses and clipboard failures cannot affect the new 
     },
   };
   ctx.document = { getElementById: () => ({ focus: () => focus++, select: () => {} }) };
-  vm.runInContext(
-    source.slice(
-      source.indexOf("    async function copyInvite()"),
-      source.indexOf("    async function billing("),
-    ),
-    ctx,
-  );
+  ctx.copyInvite = () => copyInviteAction({ ...ctx, browser: ctx });
   const copy = ctx.copyInvite(),
     noteCount = notes.length;
   authRef.current.token = "account-c";
@@ -407,11 +383,7 @@ test("an older extension sign-in request cannot replace a newer page sign-in", a
     setAuth: (v) => updates.push(v),
     signedIn: () => {},
   };
-  vm.createContext(ctx);
-  const source = readFileSync(new URL("../../docs/js/app.js", import.meta.url), "utf8");
-  const start = source.indexOf("    const askExtension = () => {");
-  const end = source.indexOf("    const { info, queue, profile: extProfile }", start);
-  vm.runInContext(source.slice(start, end) + ";this.ask=askExtension;", ctx);
+  ctx.ask = createAskExtension(ctx);
   const pending = ctx.ask();
   authRef.current = { token: "new-page-session", source: "page" };
   resolve({ token: "older-extension-session" });
@@ -457,11 +429,7 @@ test("bounded billing clears busy on timeout, requires explicit retry and ignore
     setNote: (v) => notes.push(v),
     location: { assign: (v) => redirects.push(v) },
   };
-  vm.createContext(ctx);
-  const source = readFileSync(new URL("../../docs/js/app.js", import.meta.url), "utf8");
-  const start = source.indexOf("    async function billing(");
-  const end = source.indexOf("    // profile sync with the extension", start);
-  vm.runInContext(source.slice(start, end), ctx);
+  ctx.billing = (...args) => billingAction({ ...ctx, browser: ctx }, ...args);
   await ctx.billing("checkout", "pro", true);
   assert.equal(busy.at(-1), "");
   assert.match(notes.at(-1), /Couldn't open billing/);

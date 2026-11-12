@@ -1,0 +1,162 @@
+[
+  {
+    "phase": "before",
+    "name": "field",
+    "width": 1280,
+    "colorScheme": "light",
+    "directLinks": 29,
+    "identicalLayoutAndLinks": false,
+    "keyboardPostingRequestIntercepted": true,
+    "externalRequestsAllowed": 0
+  },
+  {
+    "phase": "before",
+    "name": "pay",
+    "width": 1280,
+    "colorScheme": "light",
+    "directLinks": 24,
+    "identicalLayoutAndLinks": false,
+    "keyboardPostingRequestIntercepted": true,
+    "externalRequestsAllowed": 0
+  },
+  {
+    "phase": "before",
+    "name": "field",
+    "width": 1280,
+    "colorScheme": "dark",
+    "directLinks": 29,
+    "identicalLayoutAndLinks": false,
+    "keyboardPostingRequestIntercepted": true,
+    "externalRequestsAllowed": 0
+  },
+  {
+    "phase": "before",
+    "name": "pay",
+    "width": 1280,
+    "colorScheme": "dark",
+    "directLinks": 24,
+    "identicalLayoutAndLinks": false,
+    "keyboardPostingRequestIntercepted": true,
+    "externalRequestsAllowed": 0
+  },
+  {
+    "phase": "before",
+    "name": "field",
+    "width": 375,
+    "colorScheme": "light",
+    "directLinks": 29,
+    "identicalLayoutAndLinks": false,
+    "keyboardPostingRequestIntercepted": true,
+    "externalRequestsAllowed": 0
+  },
+  {
+    "phase": "before",
+    "name": "pay",
+    "width": 375,
+    "colorScheme": "light",
+    "directLinks": 24,
+    "identicalLayoutAndLinks": false,
+    "keyboardPostingRequestIntercepted": true,
+    "externalRequestsAllowed": 0
+  },
+  {
+    "phase": "before",
+    "name": "field",
+    "width": 375,
+    "colorScheme": "dark",
+    "directLinks": 29,
+    "identicalLayoutAndLinks": false,
+    "keyboardPostingRequestIntercepted": true,
+    "externalRequestsAllowed": 0
+  },
+  {
+    "phase": "before",
+    "name": "pay",
+    "width": 375,
+    "colorScheme": "dark",
+    "directLinks": 24,
+    "identicalLayoutAndLinks": false,
+    "keyboardPostingRequestIntercepted": true,
+    "externalRequestsAllowed": 0
+  },
+  {
+    "phase": "after",
+    "name": "field",
+    "width": 1280,
+    "colorScheme": "light",
+    "directLinks": 29,
+    "identicalLayoutAndLinks": true,
+    "keyboardPostingRequestIntercepted": true,
+    "externalRequestsAllowed": 0
+  },
+  {
+    "phase": "after",
+    "name": "pay",
+    "width": 1280,
+    "colorScheme": "light",
+    "directLinks": 24,
+    "identicalLayoutAndLinks": true,
+    "keyboardPostingRequestIntercepted": true,
+    "externalRequestsAllowed": 0
+  },
+  {
+    "phase": "after",
+    "name": "field",
+    "width": 1280,
+    "colorScheme": "dark",
+    "directLinks": 29,
+    "identicalLayoutAndLinks": true,
+    "keyboardPostingRequestIntercepted": true,
+    "externalRequestsAllowed": 0
+  },
+  {
+    "phase": "after",
+    "name": "pay",
+    "width": 1280,
+    "colorScheme": "dark",
+    "directLinks": 24,
+    "identicalLayoutAndLinks": true,
+    "keyboardPostingRequestIntercepted": true,
+    "externalRequestsAllowed": 0
+  },
+  {
+    "phase": "after",
+    "name": "field",
+    "width": 375,
+    "colorScheme": "light",
+    "directLinks": 29,
+    "identicalLayoutAndLinks": true,
+    "keyboardPostingRequestIntercepted": true,
+    "externalRequestsAllowed": 0
+  },
+  {
+    "phase": "after",
+    "name": "pay",
+    "width": 375,
+    "colorScheme": "light",
+    "directLinks": 24,
+    "identicalLayoutAndLinks": true,
+    "keyboardPostingRequestIntercepted": true,
+    "externalRequestsAllowed": 0
+  },
+  {
+    "phase": "after",
+    "name": "field",
+    "width": 375,
+    "colorScheme": "dark",
+    "directLinks": 29,
+    "identicalLayoutAndLinks": true,
+    "keyboardPostingRequestIntercepted": true,
+    "externalRequestsAllowed": 0
+  },
+  {
+    "phase": "after",
+    "name": "pay",
+    "width": 375,
+    "colorScheme": "dark",
+    "directLinks": 24,
+    "identicalLayoutAndLinks": true,
+    "keyboardPostingRequestIntercepted": true,
+    "externalRequestsAllowed": 0
+  }
+]
