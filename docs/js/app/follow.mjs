@@ -10,7 +10,12 @@ export function dashboardFollowSelection(filters, IS) {
     )
       return null;
     const keys = [...new Set(values)].sort();
-    return keys.length <= 64 ? keys.map((key) => ({ key, label: label(key) })) : null;
+    return keys.length <= 64
+      ? keys.map((key) => {
+          const text = label(key);
+          return { key, label: typeof text === "string" && text.trim() ? text : key };
+        })
+      : null;
   };
   const fields = dimension(filters?.fields, /^[a-z_]{2,32}$/, IS.fieldLabel);
   const picked = filters?.states;
@@ -39,13 +44,14 @@ export function dashboardFollowSession(auth, IS) {
 
 export function createDashboardFollowRequest(
   browser,
-  { enabled = false, selection, generation, getAuth, renderedToken },
+  { enabled = false, selection, generation, getAuth, renderedToken, isCurrent = () => true },
 ) {
   const scope = followSelection(selection)?.scope;
   return async (input, { signal } = {}) => {
     const unavailable = { status: "unavailable" };
     if (
       enabled !== true ||
+      !isCurrent() ||
       !scope ||
       signal?.aborted ||
       typeof input?.link !== "boolean" ||
@@ -69,6 +75,7 @@ export function createDashboardFollowRequest(
       const latest = getAuth();
       const elapsed = now() - start;
       return (
+        isCurrent() &&
         !controller.signal.aborted &&
         Number.isFinite(elapsed) &&
         elapsed >= 0 &&
@@ -131,21 +138,23 @@ export function createDashboardFollow(browser) {
   const Form = createFollowForm({ ...browser.React, h });
   const enabled =
     browser.document?.documentElement?.getAttribute?.("data-follow-signup-enabled") === "1";
-  return function DashboardFollow({ filters, auth, generation, getAuth }) {
-    if (!enabled) return null;
+  return function DashboardFollow({ filters, source, auth, generation, getAuth }) {
+    if (!enabled || !source.allowed(filters)) return null;
     const selection = dashboardFollowSelection(filters, browser.IS);
     if (!selection) return null;
+    const revision = source.revision;
     return h(Form, {
       enabled: true,
       selection,
       signedIn: dashboardFollowSession(auth, browser.IS),
-      sessionGeneration: generation,
+      sessionGeneration: JSON.stringify([generation, revision]),
       request: createDashboardFollowRequest(browser, {
         enabled,
         selection,
         generation,
         getAuth,
         renderedToken: auth?.token,
+        isCurrent: () => source.revision === revision && source.allowed(filters),
       }),
     });
   };

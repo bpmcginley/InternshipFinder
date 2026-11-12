@@ -2,6 +2,7 @@
 import { createAskExtension, createLoadMe, watchAllowanceReturns, openInviteAction, copyInviteAction, billingAction, topupEligible, createTopupActions, recoveryEligible, createRecoveryActions, PENDING_TOPUP_DELETION } from "./allowance.mjs";
 import { saveProfileAction, saveQuickProfileAction, finishQuickProfileAction } from "./setup.mjs";
 import { clearTrackerAction, createSetAppState, createToggleSaved, useManualAppState, showMyListAction } from "./tracker.mjs";
+import { createFollowSource } from "./follow-source.mjs";
 import { useDigestPrompt } from "./navigation.mjs";
 
 export function createDashboard(browser, {
@@ -51,6 +52,14 @@ export function createDashboard(browser, {
     const fromLink = () => IS.filtersFromUrl(browser.location.search);
     // The landing link, read once: its fields also prefill the setup card's Major (prefill below).
     const [link] = useState(fromLink);
+    const [followSource] = useState(() => createFollowSource(browser));
+    const [, refreshFollowNavigation] = useState(0);
+    useEffect(() => {
+      if (!followSource.enabled) return;
+      const navigate = () => { followSource.navigate(); refreshFollowNavigation(n => n + 1); };
+      browser.addEventListener("popstate", navigate);
+      return () => browser.removeEventListener("popstate", navigate);
+    }, []);
     const [f, setF] = useState(() => ({ q: "", fields: [], states: [], company: [], where: "", stage: "", year: "", sector: "", status: "open", app_state: "", new_only: false, eligible: false, ...initF(IS.loadProfile()), ...link }));
     const [appStates, setAppStates] = useState(() => IS.ls.get(LS_KEY, {}) || {});
     const [saved, setSaved] = useState(() => IS.ls.get(SAVED_KEY, []) || []);
@@ -342,6 +351,7 @@ export function createDashboard(browser, {
     // Defined after the Stripe effects above, which clear the address on their first run.
     useEffect(() => {
       try {
+        if (!followSource.canNormalize()) return;
         const search = IS.filterSearch(browser.location.search, f, initF(p));
         if (search !== browser.location.search) browser.history.replaceState(browser.history.state, "", browser.location.pathname + search + browser.location.hash);
       } catch (e) { }
@@ -524,7 +534,7 @@ export function createDashboard(browser, {
     // redrew every row on every keystroke. The ref reads the current notices when it fires.
     // was: const setManualAppState = (id, v) => { ... } (a new function each render, review of #123).
     const setManualAppState = useManualAppState({ useRef, offerDigestNudge, useCallback, appStatesRef, setAppState });
-    const upd = (k, v) => { setF(s => ({ ...s, [k]: v })); setLimit(PAGE); };
+    const upd = (k, v) => { followSource.correct(k, v); setF(s => ({ ...s, [k]: v })); setLimit(PAGE); };
     const myListRef = useRef(myList); myListRef.current = myList;
     const toggleSaved = useCallback(createToggleSaved({
       roleBookRef, keepRoleBook, publicRole, IS, appStatesRef, setManualAppState, setMySel,
@@ -542,13 +552,13 @@ export function createDashboard(browser, {
     const anyFilter = moreCount > 0 || !!f.q.trim() || f.fields.length > 0 || f.states.length > 0 || f.company.length > 0;
     // Only a search is set: the count line's button says "Clear search" (D17).
     const onlySearch = !!f.q.trim() && moreCount === 0 && !f.fields.length && !f.states.length && !f.company.length;
-    const clearFilters = () => { setF(s => ({ ...s, q: "", fields: [], states: [], company: [], where: "", stage: "", year: "", sector: "", status: "open", app_state: "", new_only: false, eligible: false, ...defaults })); setLimit(PAGE); };
+    const clearFilters = () => { followSource.correct("fields", []); followSource.correct("states", []); setF(s => ({ ...s, q: "", fields: [], states: [], company: [], where: "", stage: "", year: "", sector: "", status: "open", app_state: "", new_only: false, eligible: false, ...defaults })); setLimit(PAGE); };
     const st = id => appStates[id] || "none";
     const keepSaved = list => { setSaved(list); IS.ls.set(SAVED_KEY, list); };
     function onSaved(v) {
       if (v === "__save") { const name = (browser.prompt("Name this search") || "").trim(); if (name) keepSaved([...saved.filter(s => s.name !== name), { name, f }]); }
       else if (v.startsWith("del:")) keepSaved(saved.filter(s => s.name !== v.slice(4)));
-      else { const s = saved.find(x => x.name === v); if (s) setF(cur => ({ ...cur, ...s.f })); }
+      else { const s = saved.find(x => x.name === v); if (s) { for (const k of ["fields", "states"]) if (Object.hasOwn(s.f, k)) followSource.correct(k, s.f[k]); setF(cur => ({ ...cur, ...s.f })); } }
     }
 
     const jobs = useMemo(() => {
@@ -1338,7 +1348,7 @@ export function createDashboard(browser, {
         shareUrl && h(ShareSearch, { url: shareUrl }),
         onlySearch ? h("button", { type: "button", className: "btn quiet", onClick: () => upd("q", "") }, "Clear search")
           : anyFilter && h("button", { type: "button", className: "btn quiet", onClick: clearFilters }, "Clear filters")),
-      !myList && h(DashboardFollow, { filters: f, auth, generation: authGeneration.current, getAuth: () => ({ auth: authRef.current, generation: authGeneration.current }) }),
+      !myList && h(DashboardFollow, { filters: f, source: followSource, auth, generation: authGeneration.current, getAuth: () => ({ auth: authRef.current, generation: authGeneration.current }) }),
       h("div", { className: "sr", role: "status", "aria-live": "polite", "aria-atomic": "true" }, spoken),
 
       // was: `Searching titles, companies and fields in ${keys.length} states. `

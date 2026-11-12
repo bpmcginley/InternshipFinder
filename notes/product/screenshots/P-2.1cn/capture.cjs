@@ -269,6 +269,61 @@ async function scenario(browser, site, phase, width, theme, enabled, signedIn = 
       await page.getByText(summary, { exact: true }).waitFor();
     }
   }
+  if (enabled && !signedIn && width === 1280 && theme === "light") {
+    const malformed = [
+      "field=swe&state=bad",
+      "field=swe&state=bad#error=access_denied",
+      "field=swe,bad%20field&state=MA",
+      "field=swe&state=MA&state=remote",
+      "field=swe&state=" + [...Array(80).fill("MA"), "remote"].join(","),
+    ];
+    const priorCalls = calls.length;
+    for (const query of malformed) {
+      await page.goto(origin + "/?" + query);
+      await foot.waitFor();
+      assert.equal(await toggle.count(), 0, query.slice(0, 80));
+      await page.reload();
+      await foot.waitFor();
+      assert.equal(await toggle.count(), 0, "normalized reload");
+    }
+    await page.goto(origin + "/?field=swe&state=bad");
+    await foot.waitFor();
+    await page.goto(origin + "/?field=swe&state=MA");
+    await toggle.waitFor();
+    await page.goBack();
+    await foot.waitFor();
+    assert.equal(await toggle.count(), 0, "Back to ambiguous entry");
+    await page.goForward();
+    await toggle.waitFor();
+    await page.goto(origin + "/?field=swe,bad%20field&state=bad");
+    await foot.waitFor();
+    await page.getByRole("combobox", { name: "Sort", exact: true }).selectOption("company");
+    assert.equal(await toggle.count(), 0, "unrelated rerender");
+    const field = page.getByRole("combobox", { name: /^Field/ });
+    await field.fill("finance");
+    await page.getByRole("option").first().waitFor();
+    await field.press("Enter");
+    await field.press("Escape");
+    assert.equal(await toggle.count(), 0, "field correction cannot clear state ambiguity");
+    const state = page.getByRole("combobox", { name: /^State/ });
+    await state.fill("Massachusetts");
+    await page.getByRole("option").first().waitFor();
+    await state.press("Enter");
+    await state.press("Escape");
+    await toggle.waitFor();
+    await page.reload();
+    await toggle.waitFor();
+    await page.goto(origin + "/?field=constructor,__proto__&state=MA");
+    await toggle.waitFor();
+    await toggle.click();
+    await page
+      .getByText(
+        "Following: __proto__, constructor; Massachusetts (MA). Other search filters are not included.",
+        { exact: true },
+      )
+      .waitFor();
+    assert.equal(calls.length, priorCalls, "source qualification never submits");
+  }
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   assert.equal(external, 0);
   assert.deepEqual(errors, []);
@@ -282,6 +337,7 @@ async function scenario(browser, site, phase, width, theme, enabled, signedIn = 
 (async () => {
   const browser = await chromium.launch({
     headless: true,
+    args: ["--disable-features=BackForwardCache"],
     executablePath: "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe",
   });
   try {
