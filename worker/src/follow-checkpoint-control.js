@@ -46,11 +46,18 @@ export class FollowCheckpointControl {
     this.storage.sql.exec("INSERT OR REPLACE INTO control VALUES(1,?)", JSON.stringify(state));
   }
   async admitted() {
-    const before = this.state(),
-      witness = this.witness();
-    if (!before || !witness) return null;
     try {
+      return await this.#admitted(this.witness());
+    } catch {
+      return null;
+    }
+  }
+  async #admitted(witness) {
+    try {
+      const before = this.state();
       if (
+        !before ||
+        !witness ||
         classify(await witness.read(), position(before)) !== "current" ||
         !equal(before, this.state())
       )
@@ -60,23 +67,25 @@ export class FollowCheckpointControl {
       return null;
     }
   }
-  // Trusted synchronous action is evaluated twice. External effects never run inside SQLite.
+  // Trusted synchronous action is evaluated twice. External ports receive isolated copies.
   async change(action, effect = null) {
-    const before = await this.admitted();
-    if (!before || before.current.revision === Number.MAX_SAFE_INTEGER) return "held";
-    if (action(copy(before), this.now()) !== true) return "stale";
-    const witness = this.witness();
-    const intent = {
-      nonce: id(),
-      next: {
-        epoch: before.current.epoch,
-        revision: before.current.revision + 1,
-        token: id(),
-      },
-    };
     try {
-      if (!(await witness.prepare(before.current, intent))) return "held";
-      if (effect && !(await effect(before, intent))) return "held";
+      if (typeof action !== "function" || (effect !== null && typeof effect !== "function"))
+        return "held";
+      const witness = this.witness(),
+        before = await this.#admitted(witness);
+      if (!before || before.current.revision === Number.MAX_SAFE_INTEGER) return "held";
+      if (action(copy(before), this.now()) !== true) return "stale";
+      const intent = {
+        nonce: id(),
+        next: {
+          epoch: before.current.epoch,
+          revision: before.current.revision + 1,
+          token: id(),
+        },
+      };
+      if ((await witness.prepare(copy(before.current), copy(intent))) !== true) return "held";
+      if (effect && (await effect(copy(before), copy(intent))) !== true) return "held";
       if (this.beforeCommit) await this.beforeCommit();
       const committed = this.storage.transactionSync(() => {
         const state = this.state();
@@ -87,24 +96,25 @@ export class FollowCheckpointControl {
         return true;
       });
       if (!committed) return "held"; // A prepared predecessor cannot be automatically aborted.
-      if (!(await witness.finish(position(this.state())))) return "held";
-      return (await this.admitted()) ? "committed" : "held";
+      if ((await witness.finish(copy(position(this.state())))) !== true) return "held";
+      return (await this.#admitted(witness)) ? "committed" : "held";
     } catch {
       return "held";
     }
   }
   async recoverAcknowledgement() {
-    const state = this.state(),
-      witness = this.witness();
-    if (!state || !witness) return "held";
     try {
+      const state = this.state(),
+        witness = this.witness();
       if (
+        !state ||
+        !witness ||
         classify(await witness.read(), position(state)) !== "recover_ack" ||
         !equal(state, this.state())
       )
         return "held";
-      if (!(await witness.finish(position(state)))) return "held";
-      return (await this.admitted()) ? "recovered" : "held";
+      if ((await witness.finish(copy(position(state)))) !== true) return "held";
+      return (await this.#admitted(witness)) ? "recovered" : "held";
     } catch {
       return "held";
     }

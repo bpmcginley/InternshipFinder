@@ -58,6 +58,10 @@ test("source stale predicate and revision exhaustion never prepare external owne
       }),
     ).toBe("stale");
     expect(i.snapshot()).toBe(before);
+    for (const effect of [false, 0, "", {}, []])
+      expect(await i.control.change(() => true, effect)).toBe("held");
+    expect(i.snapshot()).toBe(before);
+    expect((await i.witness.read()).phase).toBe("stable");
     const state = i.state();
     state.current.revision = Number.MAX_SAFE_INTEGER;
     i.save(state);
@@ -142,5 +146,160 @@ test("source rejects invalid ports and noninteger database time", async () => {
     };
     const control = new FollowCheckpointControl(storage, { witness: () => i.witness });
     expect(() => control.capture()).toThrow("Checkpoint clock unavailable");
+  });
+});
+
+test("unknown prepare acknowledgement cannot run an effect or write SQLite", async () => {
+  const object = await fixture();
+  await runInDurableObject(object, async (i) => {
+    const before = i.snapshot();
+    let effects = 0;
+    i.witness.prepare = async () => ({ status: "unknown" });
+    expect(
+      await i.control.change(
+        (state) => {
+          state.initialized = true;
+          return true;
+        },
+        async () => {
+          effects++;
+          return true;
+        },
+      ),
+    ).toBe("held");
+    expect(effects).toBe(0);
+    expect(i.snapshot()).toBe(before);
+  });
+});
+
+test("external effect cannot mutate the privately captured successor or predecessor", async () => {
+  const object = await fixture();
+  await runInDurableObject(object, async (i) => {
+    const before = i.state();
+    expect(
+      await i.control.change(
+        (state) => {
+          state.initialized = true;
+          return true;
+        },
+        async (previous, intent) => {
+          previous.current.token = "0".repeat(32);
+          intent.next.token = "0".repeat(32);
+          intent.nonce = "0".repeat(32);
+          return true;
+        },
+      ),
+    ).toBe("committed");
+    const external = await i.witness.read();
+    expect(external.phase).toBe("stable");
+    expect(external.current).toEqual(i.state().current);
+    expect(i.state().receipt.previous).toEqual(before.current);
+    expect(i.state().receipt.nonce).not.toBe("0".repeat(32));
+  });
+});
+
+for (const port of ["effect", "finish", "recovery"])
+  test(`unknown ${port} acknowledgement never reports a committed operation`, async () => {
+    const object = await fixture();
+    await runInDurableObject(object, async (i) => {
+      const before = i.snapshot(),
+        action = (state) => {
+          state.initialized = true;
+          return true;
+        };
+      if (port === "effect") {
+        expect(await i.control.change(action, async () => ({ status: "unknown" }))).toBe("held");
+        expect(i.snapshot()).toBe(before);
+      } else {
+        const finish = i.witness.finish.bind(i.witness);
+        if (port === "recovery") {
+          i.witness.failFinish = "before";
+          expect(await i.control.change(action)).toBe("held");
+          i.witness.failFinish = null;
+        }
+        i.witness.finish = async (control) => {
+          await finish(control);
+          return { status: "unknown" };
+        };
+        expect(
+          await (port === "finish" ? i.control.change(action) : i.control.recoverAcknowledgement()),
+        ).toBe("held");
+        expect(await i.control.admitted()).toEqual(i.state());
+      }
+    });
+  });
+
+test("witness mutation of argument copies cannot change the private CAS or receipt", async () => {
+  const object = await fixture();
+  await runInDurableObject(object, async (i) => {
+    const before = i.state(),
+      prepare = i.witness.prepare.bind(i.witness),
+      finish = i.witness.finish.bind(i.witness);
+    i.witness.prepare = async (previous, intent) => {
+      const result = await prepare(previous, intent);
+      previous.token = "0".repeat(32);
+      intent.next.token = "0".repeat(32);
+      intent.nonce = "0".repeat(32);
+      return result;
+    };
+    i.witness.finish = async (control) => {
+      const result = await finish(control);
+      control.current.token = "0".repeat(32);
+      control.receipt.previous.token = "0".repeat(32);
+      return result;
+    };
+    expect(
+      await i.control.change((state) => {
+        state.initialized = true;
+        return true;
+      }),
+    ).toBe("committed");
+    expect(i.state().receipt.previous).toEqual(before.current);
+    expect((await i.witness.read()).current).toEqual(i.state().current);
+  });
+});
+
+for (const recover of [false, true])
+  test(`one pinned witness owns the complete operation (recovery=${recover})`, async () => {
+    const object = await fixture();
+    await runInDurableObject(object, async (i) => {
+      const action = (state) => {
+        state.initialized = true;
+        return true;
+      };
+      if (recover) {
+        i.witness.failFinish = "before";
+        expect(await i.control.change(action)).toBe("held");
+        i.witness.failFinish = null;
+      }
+      const first = i.witness,
+        second = new WitnessDouble(i.state().current),
+        other = await second.read();
+      let lookups = 0;
+      const control = new FollowCheckpointControl(i.ctx.storage, {
+        witness: () => (++lookups === 1 ? first : second),
+      });
+      expect(await (recover ? control.recoverAcknowledgement() : control.change(action))).toBe(
+        recover ? "recovered" : "committed",
+      );
+      expect(lookups).toBe(1);
+      expect((await first.read()).current).toEqual(i.state().current);
+      expect(await second.read()).toEqual(other);
+    });
+  });
+
+test("failed witness supplier keeps admission, change and recovery closed", async () => {
+  const object = await fixture();
+  await runInDurableObject(object, async (i) => {
+    const before = i.snapshot(),
+      control = new FollowCheckpointControl(i.ctx.storage, {
+        witness: () => {
+          throw new Error("synthetic supplier unavailable");
+        },
+      });
+    expect(await control.admitted()).toBeNull();
+    expect(await control.change(() => true)).toBe("held");
+    expect(await control.recoverAcknowledgement()).toBe("held");
+    expect(i.snapshot()).toBe(before);
   });
 });
