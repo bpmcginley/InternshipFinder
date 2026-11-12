@@ -56,6 +56,7 @@ it("0021 adds an empty queue to populated local D1 and preserves original scope 
     scope_key: legacy.scopeKey,
     queued_at: acceptedAt.toISOString(),
     expires_at: later(7 * DAY).toISOString(),
+    claim_id: null,
   });
 
   // Older in-flight request timestamps cannot present newer queued work as their own.
