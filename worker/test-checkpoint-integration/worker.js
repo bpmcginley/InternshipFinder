@@ -21,7 +21,14 @@ const codec = createFollowCheckpointPayloadCodec({
 });
 const live = (record, now) => record && record.starts <= now && now < record.expires;
 const validCutoff = (state, r) => {
-  if (!Number.isSafeInteger(r?.cutoff) || r.cutoff < r.starts || r.cutoff > r.expires) return false;
+  if (
+    !Number.isSafeInteger(r?.starts) ||
+    !Number.isSafeInteger(r?.expires) ||
+    !Number.isSafeInteger(r?.cutoff) ||
+    r.cutoff <= r.starts ||
+    r.cutoff > r.expires
+  )
+    return false;
   try {
     const prior = JSON.parse(r.header).predecessor;
     if (prior.checkpoint_sha256 === null) return !state.initialized && r.cutoff === r.expires;

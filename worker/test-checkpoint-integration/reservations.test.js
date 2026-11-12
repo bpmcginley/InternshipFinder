@@ -325,6 +325,11 @@ test.each([
   "after-expiry",
   "before-start",
   "wrong-genesis",
+  "equal-start",
+  "missing-start",
+  "missing-expiry",
+  "fraction-start",
+  "null-expiry",
 ])("malformed captured cutoff stays held (%s)", async (fault) => {
   const { object, nonce } = await setup();
   await runInDurableObject(object, (i) => {
@@ -335,6 +340,11 @@ test.each([
     else if (fault === "string") r.cutoff = String(r.cutoff);
     else if (fault === "fraction") r.cutoff += 0.5;
     else if (fault === "wrong-genesis") r.cutoff--;
+    else if (fault === "equal-start") r.cutoff = r.starts;
+    else if (fault === "missing-start") delete r.starts;
+    else if (fault === "missing-expiry") delete r.expires;
+    else if (fault === "fraction-start") r.starts += 0.5;
+    else if (fault === "null-expiry") r.expires = null;
     else r.cutoff = fault === "after-expiry" ? r.expires + 1 : r.starts - 1;
     i.save(s);
   });
