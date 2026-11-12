@@ -24,7 +24,12 @@ export function historicalTopupOffer(env, version, livemode) {
 }
 // At most one bounded GET per association step. No arbitrary path or provider writes.
 export async function readTopupAssociation(env, kind, id, fetchImpl) {
-  const prefix = { charges: "ch", payment_intents: "pi" }[kind];
+  const prefix = new Map([
+    ["charges", "ch"],
+    ["payment_intents", "pi"],
+    ["refunds", "re"],
+    ["disputes", "du"],
+  ]).get(kind);
   if (
     !topupRecoveryConfigured(env) ||
     !(kind === "checkout/sessions"

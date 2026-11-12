@@ -2,6 +2,8 @@
 import assert from "node:assert/strict";
 import { captureTopupSettlement, settleFirstTopup } from "../src/topup-first-settlement.js";
 import { observeVerifiedTopupEvent as observe } from "../src/topup-history-events.js";
+import { readVerifiedTopupPurchase } from "../src/topup-purchase-recovery.js";
+import { readTopupAssociation } from "../src/topup-stripe.js";
 import { attempt, session } from "./topup-stripe.js";
 const env = { STRIPE_SECRET_KEY: "fixture-not-a-key", TOPUPS_ENABLED: "0", PAYMENTS_ENABLED: "0" };
 const offer = {
@@ -148,7 +150,13 @@ async function setup(db) {
     if (path === "/v1/checkout/sessions/cs_fixture") value = f.checkout;
     else if (path === "/v1/payment_intents/pi_fixture") value = f.intent;
     else if (path === "/v1/charges/ch_fixture") value = f.charge;
-    else {
+    else if (/^\/v1\/(refunds|disputes)\//.test(path)) {
+      const [, , kind, id] = path.split("/");
+      value = f[kind].find((v) => v.id === id) ?? {
+        object: kind === "refunds" ? "refund" : "dispute",
+        id: "missing",
+      };
+    } else {
       const kind = path.slice(4);
       assert.ok(["refunds", "disputes"].includes(kind));
       assert.equal(new URL(url).searchParams.get("charge"), "ch_fixture");
@@ -230,7 +238,7 @@ export async function discoveryIsHintThenExactCaptureAndMembership(db) {
     } else assert.equal((await state(db)).revision, 2);
   };
   assert.deepEqual(await call(db, f, e), { status: "observed", revision: 3 });
-  assert.equal(f.calls.length, 10);
+  assert.equal(f.calls.length, 5);
 }
 export async function missingCrossedUnsupportedAndUnsettledNeverObserve(db) {
   for (const fault of [
@@ -521,8 +529,8 @@ export async function providerConfigurationIsPinnedBeforeDiscovery(db) {
     }),
     { status: "observed", revision: 2 },
   );
-  assert.equal(auth.length, 10);
-  assert.deepEqual(auth, Array(10).fill("Bearer fixture-before"));
+  assert.equal(auth.length, 5);
+  assert.deepEqual(auth, Array(5).fill("Bearer fixture-before"));
 }
 export async function oversizedLengthNeverPullsUpstreamBody(db) {
   const f = await setup(db);
@@ -552,6 +560,181 @@ export async function oversizedLengthNeverPullsUpstreamBody(db) {
   assert.deepEqual(await call(db, f, event(), { fetchImpl }), { status: "pending" });
   assert.equal(calls, 1);
   assert.equal(pulls, 0);
+  assert.equal(cancelled, 1);
+  assert.equal((await state(db)).receipts.length, 0);
+  assert.equal((await state(db)).revision, 1);
+}
+export async function targetedReadsMatchCanonicalFullVerifierWithoutInventory(db) {
+  for (const kind of ["refund", "dispute", "charge"]) {
+    const f = await setup(db);
+    f.refunds = [item("refund", "pending", 1)];
+    f.disputes = [item("dispute", "under_review", 1)];
+    f.charge.disputed = true;
+    const full = await readVerifiedTopupPurchase(db, env, f.key, offer, f.fetch);
+    assert.equal(full.status, "verified");
+    assert.equal(full.reversals.chargeId, "ch_fixture");
+    if (kind !== "charge")
+      assert.ok(full.reversals[kind + "s"].some((v) => v.id === event(kind).data.object.id));
+    f.calls = [];
+    assert.deepEqual(await call(db, f, event(kind)), { status: "observed", revision: 2 });
+    assert.equal(f.calls.length, kind === "charge" ? 3 : 4);
+    assert.deepEqual(
+      f.calls.map((url) => new URL(url).pathname),
+      [
+        "/v1/checkout/sessions/cs_fixture",
+        "/v1/payment_intents/pi_fixture",
+        "/v1/charges/ch_fixture",
+        ...(kind === "charge" ? [] : ["/v1/" + kind + "s/" + event(kind).data.object.id]),
+      ],
+    );
+  }
+}
+export async function authoritativeTargetReferencesMustMatchCanonicalCharge(db) {
+  for (const kind of ["refund", "dispute"])
+    for (const fault of [
+      "kind",
+      "id",
+      "charge_null",
+      "charge_cross",
+      "charge_expanded_mode",
+      "pi_cross",
+      "pi_expanded_mode",
+      "mode",
+    ]) {
+      const f = await setup(db);
+      f[kind + "s"] = [item(kind, kind === "refund" ? "pending" : "under_review", 1)];
+      f.alter = (value, path) => {
+        if (path !== "/v1/" + kind + "s/" + event(kind).data.object.id) return;
+        if (fault === "kind") value.object = "other";
+        if (fault === "id") value.id = "re_other";
+        if (fault === "charge_null") value.charge = null;
+        if (fault === "charge_cross") value.charge = "ch_other";
+        if (fault === "charge_expanded_mode")
+          value.charge = { object: "charge", id: "ch_fixture", livemode: true };
+        if (fault === "pi_cross") value.payment_intent = "pi_other";
+        if (fault === "pi_expanded_mode")
+          value.payment_intent = { object: "payment_intent", id: "pi_fixture", livemode: true };
+        if (fault === "mode") value.livemode = true;
+      };
+      assert.deepEqual(await call(db, f, event(kind)), { status: "pending" });
+      assert.equal((await state(db)).receipts.length, 0);
+      assert.equal((await state(db)).revision, 1);
+      assert.equal(f.calls.length, 4);
+    }
+  for (const kind of ["refund", "dispute"]) {
+    const f = await setup(db);
+    const target = item(kind, "pending", 1);
+    target.payment_intent = null;
+    f[kind + "s"] = [target];
+    assert.deepEqual(await call(db, f, event(kind)), { status: "observed", revision: 2 });
+  }
+}
+export async function historicalOrFailedChargeSharingPaymentNeverObserves(db) {
+  for (const fault of ["historical", "failed", "captured", "paid", "canonical_mismatch"]) {
+    const f = await setup(db);
+    f.refunds = [item("refund", "pending", 1)];
+    const e = event("charge");
+    if (fault === "historical") e.data.object.id = "ch_old";
+    if (fault === "failed") f.charge.status = "failed";
+    if (fault === "captured") f.charge.captured = false;
+    if (fault === "paid") f.charge.paid = false;
+    if (fault === "canonical_mismatch") f.intent.latest_charge = "ch_other";
+    if (fault !== "historical")
+      assert.notEqual(
+        (await readVerifiedTopupPurchase(db, env, f.key, offer, f.fetch)).status,
+        "verified",
+      );
+    f.calls = [];
+    const result = await call(db, f, e);
+    assert.ok(["pending", "unavailable"].includes(result.status));
+    assert.equal((await state(db)).receipts.length, 0);
+    assert.equal((await state(db)).revision, 1);
+    assert.ok(f.calls.length <= 3);
+  }
+}
+export async function directAssociationKindsAreFixedBeforeTransport(db) {
+  let calls = 0;
+  const config = { ...env, STRIPE_PRICE_TOPUP: "price_fixture" };
+  const fetchImpl = async (url) => {
+    calls++;
+    const response = new Response("{}");
+    Object.defineProperty(response, "url", { value: url });
+    return response;
+  };
+  for (const kind of ["constructor", "__proto__", "toString", "refunds/other", "events", {}, null])
+    await assert.rejects(() => readTopupAssociation(config, kind, "re_fixture", fetchImpl));
+  assert.equal(calls, 0);
+  for (const [kind, id] of [
+    ["charges", "ch_fixture"],
+    ["payment_intents", "pi_fixture"],
+    ["checkout/sessions", "cs_fixture"],
+    ["refunds", "re_fixture"],
+    ["disputes", "du_fixture"],
+  ])
+    assert.deepEqual(await readTopupAssociation(config, kind, id, fetchImpl), {});
+  assert.equal(calls, 5);
+}
+export async function historicalDiscoveryCannotSubstituteForCanonicalCharge(db) {
+  const f = await setup(db);
+  f.refunds = [item("refund", "pending", 1)];
+  const e = event();
+  e.data.object.charge = "ch_old";
+  delete e.data.object.payment_intent;
+  const base = f.fetch;
+  let discovery = 0;
+  const fetchImpl = async (url, init) => {
+    if (new URL(url).pathname === "/v1/charges/ch_old") {
+      discovery++;
+      const response = new Response(
+        JSON.stringify({
+          ...f.charge,
+          id: "ch_old",
+          status: "failed",
+          paid: false,
+          captured: false,
+        }),
+      );
+      Object.defineProperty(response, "url", { value: url });
+      return response;
+    }
+    return base(url, init);
+  };
+  assert.deepEqual(await call(db, f, e, { fetchImpl }), { status: "pending" });
+  assert.equal(discovery, 1);
+  assert.equal(f.calls.length, 3);
+  assert.equal((await state(db)).receipts.length, 0);
+}
+export async function lateTargetResponseCannotReachObservation(db) {
+  const f = await setup(db);
+  f.refunds = [item("refund", "pending", 1)];
+  const base = f.fetch;
+  let release,
+    cancelled = 0,
+    targetCalls = 0;
+  const fetchImpl = (url, init) => {
+    if (new URL(url).pathname !== "/v1/refunds/re_fixture") return base(url, init);
+    targetCalls++;
+    return new Promise((resolve) => {
+      release = () => {
+        const response = new Response(
+          new ReadableStream({
+            cancel() {
+              cancelled++;
+            },
+          }),
+        );
+        Object.defineProperty(response, "url", { value: url });
+        resolve(response);
+      };
+    });
+  };
+  assert.deepEqual(await call(db, f, event(), { fetchImpl, timeoutMs: 1000 }), {
+    status: "unavailable",
+  });
+  assert.equal(targetCalls, 1);
+  assert.equal(f.calls.length, 3);
+  release();
+  await new Promise((r) => setTimeout(r, 10));
   assert.equal(cancelled, 1);
   assert.equal((await state(db)).receipts.length, 0);
   assert.equal((await state(db)).revision, 1);
