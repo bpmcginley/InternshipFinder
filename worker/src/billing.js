@@ -7,7 +7,7 @@ import { HttpError } from "./http.js";
 import { countEvent } from "./visits.js";
 import { listingEvent } from "./orders/settlement.js";
 import { studentCheckout, completeStudentCheckout } from "./student-checkout.js";
-import { topupWebhook } from "./topup-webhook.js";
+import { topupWebhook, snapshotTopupHistoryInput } from "./topup-webhook.js";
 
 const API = "https://api.stripe.com/v1/";
 // The same version the webhook endpoint is set to, so events and API replies share one shape.
@@ -230,10 +230,14 @@ export function planFrom(env, config, o, fallback = "supporter") {
 }
 
 export async function applyEvent(db, env, config, event, now, fetchImpl, historyPolicy) {
+  let topupInput;
+  try { topupInput = snapshotTopupHistoryInput(env, event, historyPolicy); }
+  catch { throw billingRetry(); }
+  event = topupInput.event ?? event;
   const id = String(event.id || crypto.randomUUID());
   if (!(await firstTime(db, id, now))) return { ok: true, repeat: true };
   try {
-    return await applyFresh(db, env, config, event, now, fetchImpl, historyPolicy);
+    return await applyFresh(db, env, config, event, now, fetchImpl, topupInput);
   } catch (e) {
     // The id was recorded before the change was made. If the change then failed, forget the id, or
     // Stripe's retry would be waved through as a repeat and a student who paid would stay on free.
@@ -287,11 +291,11 @@ async function reversedStudentPayment(db, env, event, fetchImpl) {
   return null;
 }
 
-async function applyFresh(db, env, config, event, now, fetchImpl, historyPolicy) {
+async function applyFresh(db, env, config, event, now, fetchImpl, topupInput) {
   const o = (event.data && event.data.object) || {};
 
   // Known top-ups stay inside the existing receipt and must never reach other billing handlers.
-  const topup = await topupWebhook({ db, env, event, fetchImpl, clock: () => now, historyPolicy });
+  const topup = await topupWebhook({ db, env, event, fetchImpl, clock: () => now, ...topupInput });
   if (topup) {
     if (!["settled", "expired", "reconciled", "inactive", "ignored"].includes(topup.status)) throw billingRetry();
     return ["inactive", "ignored"].includes(topup.status) ? { ok: true, ignored: true } : { ok: true };
