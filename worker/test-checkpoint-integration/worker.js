@@ -5,6 +5,28 @@ import { createFollowCheckpointPayloadCodec } from "../src/follow-checkpoint-pay
 import { classifyFollowCheckpointWitness as classify } from "../src/follow-checkpoint-witness.js";
 
 const DAY = 86_400_000;
+const EMPTY_SHA = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+const fingerprint = async (value) =>
+  Array.from(
+    new Uint8Array(
+      await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(value))),
+    ),
+    (v) => v.toString(16).padStart(2, "0"),
+  ).join("");
+const reservationProof = (state) => {
+  const r = state.reservation;
+  return {
+    slot: r.slot,
+    nonce: r.nonce,
+    payloadSha: r.payloadSha,
+    digest: r.digest,
+    starts: r.starts,
+    expires: r.expires,
+    predecessorExpires: state.accepted?.expires ?? null,
+  };
+};
+const cutoff = (state) =>
+  Math.min(state.reservation.expires, state.accepted?.expires ?? state.reservation.expires);
 const encoder = new TextEncoder(),
   decoder = new TextDecoder();
 const copy = (value) => structuredClone(value);
@@ -26,6 +48,7 @@ const position = (state) => ({ current: state.current, receipt: state.receipt })
 export class WitnessDouble {
   constructor(current) {
     this.value = { version: 1, phase: "stable", current: copy(current), intent: null };
+    this.cleanup = null;
   }
   async read() {
     return copy(this.value);
@@ -37,10 +60,24 @@ export class WitnessDouble {
     if (this.failPrepare === "after") throw new Error("injected lost prepare acknowledgement");
     return true;
   }
+  async readCleanup() {
+    return copy(this.cleanup);
+  }
+  async bindCleanup(expected, next) {
+    if (
+      !equal(this.cleanup, expected) ||
+      this.value.phase !== "prepared" ||
+      !equal(next.transition, { previous: this.value.current, ...this.value.intent })
+    )
+      return false;
+    this.cleanup = copy(next); // Simulated external atomic CAS, outside restored SQLite.
+    return true;
+  }
   async finish(control) {
     if (this.failFinish === "before") throw new Error("injected lost finalization acknowledgement");
     if (classify(this.value, control) !== "recover_ack") return false;
     this.value = { version: 1, phase: "stable", current: copy(control.current), intent: null };
+    this.cleanup = null;
     if (this.failFinish === "after") throw new Error("injected lost stable acknowledgement");
     return true;
   }
@@ -239,12 +276,127 @@ export class CheckpointIntegration extends DurableObject {
         state.reservation = null;
         return true;
       },
-      async () => {
+      async (previous, intent) => {
+        const receipt = await this.slots.tombstone();
+        const journal = {
+          version: 1,
+          kind: "expired-reservation",
+          transition: { previous: previous.current, ...intent },
+          beforeHash: await fingerprint(previous),
+          reservation: reservationProof(previous),
+          cutoff: cutoff(previous),
+          sourceEtag: object.etag,
+          planned: copy(receipt),
+          forwarded: false,
+        };
+        if (!(await this.witness.bindCleanup(null, journal))) return false;
         if (this.beforeReservationCleanup) await this.beforeReservationCleanup();
-        const result = await this.slots.write(r.slot, object.etag, await this.slots.tombstone());
-        return result.status === "stored";
+        return (await this.forwardCleanup(journal, receipt)).status === "stored";
       },
     );
+  }
+  async forwardCleanup(journal, receipt) {
+    if (journal.forwarded || !equal(receipt, journal.planned)) return { status: "held" };
+    // This durable flag is conservative even if execution stops before the actual invocation.
+    if (!(await this.witness.bindCleanup(journal, { ...journal, forwarded: true })))
+      return { status: "held" };
+    if (this.beforeCleanupPut) await this.beforeCleanupPut();
+    return this.slots.write(journal.reservation.slot, journal.sourceEtag, receipt);
+  }
+  async recoverCleanup(allowFresh = true) {
+    try {
+      const before = this.state(),
+        external = await this.witness?.read();
+      if (classify(external, position(before ?? {})) === "recover_ack")
+        return this.recoverAcknowledgement();
+      const journal = await this.witness?.readCleanup(),
+        r = before?.reservation;
+      if (
+        !r ||
+        classify(external, position(before)) !== "ambiguous_predecessor" ||
+        journal?.version !== 1 ||
+        journal.kind !== "expired-reservation" ||
+        !equal(journal.transition, { previous: external.current, ...external.intent }) ||
+        journal.beforeHash !== (await fingerprint(before)) ||
+        !equal(journal.reservation, reservationProof(before)) ||
+        journal.cutoff !== cutoff(before) ||
+        !Number.isFinite(journal.cutoff) ||
+        this.now() < journal.cutoff ||
+        typeof journal.forwarded !== "boolean" ||
+        typeof journal.sourceEtag !== "string" ||
+        !/^[A-Za-z0-9_-]{1,128}$/.test(journal.sourceEtag) ||
+        !equal(journal.planned, {
+          kind: "tombstone",
+          nonce: journal.planned?.nonce,
+          sha256: EMPTY_SHA,
+          bytes: 0,
+        }) ||
+        typeof journal.planned.nonce !== "string" ||
+        !/^[a-f0-9]{32}$/.test(journal.planned.nonce) ||
+        journal.planned.nonce === r.nonce ||
+        journal.planned.nonce === r.fenceNonce ||
+        !equal(before, this.state())
+      )
+        return "held";
+      const object = await this.slots.read(r.slot);
+      if (object.status !== "present") return "held";
+      if (
+        object.kind === "tombstone" &&
+        object.nonce === journal.planned.nonce &&
+        object.sha256 === EMPTY_SHA &&
+        journal.forwarded
+      ) {
+        // Only this predetermined cleanup may complete a prepared predecessor. Never abort it.
+        if (
+          !equal(await this.witness.read(), external) ||
+          !equal(await this.witness.readCleanup(), journal)
+        )
+          return "held";
+        const committed = this.ctx.storage.transactionSync(() => {
+          const state = this.state();
+          if (!equal(state, before) || this.now() < journal.cutoff) return false;
+          state.reservation = null;
+          state.current = journal.transition.next;
+          state.receipt = {
+            nonce: journal.transition.nonce,
+            previous: journal.transition.previous,
+          };
+          this.save(state);
+          return true;
+        });
+        if (!committed) return "held";
+        return this.recoverAcknowledgement();
+      }
+      const payload =
+        object.kind === "payload" && object.nonce === r.nonce && object.sha256 === r.payloadSha;
+      const originalFence =
+        object.kind === "tombstone" && object.nonce === r.fenceNonce && object.etag === r.fenceEtag;
+      if (
+        !allowFresh ||
+        (!payload && !originalFence) ||
+        (journal.forwarded && (!payload || object.etag === journal.sourceEtag))
+      )
+        return "held";
+      // A prior attempted condition is dead, or sidecar CAS proves it was never forwarded.
+      // Generate a NEW one-use envelope. No receipt reconstruction or raw PUT replay.
+      const receipt = await this.slots.tombstone();
+      const next = {
+        ...journal,
+        sourceEtag: object.etag,
+        planned: copy(receipt),
+        forwarded: false,
+      };
+      if (
+        !equal(before, this.state()) ||
+        this.now() < journal.cutoff ||
+        !(await this.witness.bindCleanup(journal, next))
+      )
+        return "held";
+      if ((await this.forwardCleanup(next, receipt)).status !== "stored") return "held";
+      return this.recoverCleanup(false);
+    } catch {
+      return "held";
+    }
   }
   async change(action, effect = null) {
     const before = await this.admitted();
@@ -256,7 +408,7 @@ export class CheckpointIntegration extends DurableObject {
     };
     try {
       if (!(await this.witness.prepare(before.current, intent))) return "held";
-      if (effect && !(await effect())) return "held";
+      if (effect && !(await effect(before, intent))) return "held";
       if (this.beforeCommit) await this.beforeCommit(); // Explicit local failure/delay hook.
       const committed = this.ctx.storage.transactionSync(() => {
         const state = this.state();
