@@ -523,6 +523,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "conveo": {
+   "name": "Conveo.ai",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-12"
+  },
   "coram-ai": {
    "name": "Coram AI",
    "quant": false,
@@ -3825,6 +3831,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "cariadinc": {
+   "name": "CARIAD",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-12"
+  },
   "cartesiansystems": {
    "name": "Cartesian",
    "quant": false,
@@ -5919,6 +5931,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-17"
+  },
+  "nasdaq": {
+   "name": "Nasdaq",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-12"
   },
   "natera": {
    "name": "Natera",
@@ -10296,6 +10314,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-10-14"
+  },
+  "ribbon": {
+   "name": "Ribbon",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-12"
   },
   "rigetti": {
    "name": "Rigetti",
