@@ -215,6 +215,13 @@ jobs:
 
   deploy:
     needs: build
+    # A partial rerun can reuse a successful build from the original actor.
+    if: >-
+      github.event_name != 'repository_dispatch' ||
+      (github.ref == 'refs/heads/main' && github.actor == 'github-actions[bot]' &&
+      github.triggering_actor == 'github-actions[bot]' &&
+      github.event.sender.login == 'github-actions[bot]' &&
+      github.event.repository.full_name == github.repository)
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     environment:
@@ -240,6 +247,13 @@ jobs:
   # this deploy added, removed or changed within hours (growth/indexnow.py). Google reads the sitemap.
   notify:
     needs: deploy
+    # A notify-only rerun can reuse a successful deployment.
+    if: >-
+      github.event_name != 'repository_dispatch' ||
+      (github.ref == 'refs/heads/main' && github.actor == 'github-actions[bot]' &&
+      github.triggering_actor == 'github-actions[bot]' &&
+      github.event.sender.login == 'github-actions[bot]' &&
+      github.event.repository.full_name == github.repository)
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:

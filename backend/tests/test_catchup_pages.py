@@ -307,3 +307,20 @@ gh() {
         check=False,
     )
     assert (result.returncode == 0) is success
+
+
+def test_each_pages_job_rechecks_dispatch_actor_even_when_prior_jobs_are_reused():
+    workflow = (ROOT / ".github/workflows/pages.yml").read_text(encoding="utf-8")
+    expected = "\n".join(
+        (
+            "    if: >-",
+            "      github.event_name != 'repository_dispatch' ||",
+            "      (github.ref == 'refs/heads/main' && github.actor == 'github-actions[bot]' &&",
+            "      github.triggering_actor == 'github-actions[bot]' &&",
+            "      github.event.sender.login == 'github-actions[bot]' &&",
+            "      github.event.repository.full_name == github.repository)",
+        )
+    )
+    for job in ("build", "deploy", "notify"):
+        section = workflow.split(f"\n  {job}:\n", 1)[1].split("    runs-on:", 1)[0]
+        assert expected in section, job
