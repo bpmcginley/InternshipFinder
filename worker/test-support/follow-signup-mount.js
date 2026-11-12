@@ -193,11 +193,13 @@ export async function verifiedCatalogAndExistingSessionAreTheOnlyAdmissionAuthor
   );
   assert.deepEqual(await session(), before);
   const linked = shape({ email: "late@example.test", link: true });
+  let finishBody;
   const body = new ReadableStream({
-    pull(controller) {
-      current = release.expiresAt;
-      controller.enqueue(new TextEncoder().encode(JSON.stringify(linked)));
-      controller.close();
+    start(controller) {
+      finishBody = () => {
+        controller.enqueue(new TextEncoder().encode(JSON.stringify(linked)));
+        controller.close();
+      };
     },
   });
   const delayed = new Request(post(linked, { Authorization: `Bearer ${token}` }), {
@@ -209,11 +211,19 @@ export async function verifiedCatalogAndExistingSessionAreTheOnlyAdmissionAuthor
     lateReads++;
     throw new Error("Synthetic unexpected I/O");
   };
-  const late = await handle(delayed, { ...enabled, DB: { prepare: unexpected } }, undefined, {
+  let sampledPolicy = false;
+  const lateResponse = handle(delayed, { ...enabled, DB: { prepare: unexpected } }, undefined, {
     now: () => new Date(current),
-    followSignupRelease: () => policy,
+    followSignupRelease: () => {
+      sampledPolicy = true;
+      return policy;
+    },
     fetch: unexpected,
   });
+  assert.equal(sampledPolicy, true);
+  current = release.expiresAt;
+  finishBody();
+  const late = await lateResponse;
   assert.equal(late.status, 503);
   assert.equal(lateReads, 0);
   current = now;
