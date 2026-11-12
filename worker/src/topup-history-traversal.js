@@ -21,12 +21,39 @@ function copy(value) {
     Object.getOwnPropertySymbols(value).length
   )
     fail();
-  const result = {};
+  const result = Object.create(null);
   for (const [key, d] of Object.entries(Object.getOwnPropertyDescriptors(value))) {
     if (!d.enumerable || !Object.hasOwn(d, "value")) fail();
     result[key] = d.value;
   }
   return result;
+}
+// JSON.parse validates grammar first; this iterative pass rejects ambiguous decoded keys.
+// The streamed byte cap bounds both passes, including nesting and key sets.
+function uniqueJson(text) {
+  const value = JSON.parse(text),
+    stack = [];
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (c === "{" || c === "[") stack.push(c === "{" ? new Set() : null);
+    else if (c === "}" || c === "]") stack.pop();
+    else if (c === '"') {
+      const start = i;
+      for (i++; i < text.length; i++) {
+        if (text[i] === "\\") i++;
+        else if (text[i] === '"') break;
+      }
+      let next = i + 1;
+      while (/\s/.test(text[next] ?? "") && next < text.length) next++;
+      if (text[next] === ":") {
+        const key = JSON.parse(text.slice(start, i + 1)),
+          keys = stack.at(-1);
+        if (!keys || keys.has(key)) fail();
+        keys.add(key);
+      }
+    }
+  }
+  return value;
 }
 const same = (a, b) =>
   Object.keys(a).sort().join(",") === Object.keys(b).sort().join(",") &&
@@ -167,7 +194,7 @@ export async function validateTopupHistoryTraversal(db, input, options = {}) {
         text += decoder.decode(part.value, { stream: true });
       }
       if (length !== null && size !== Number(length)) fail();
-      return JSON.parse(text + decoder.decode());
+      return uniqueJson(text + decoder.decode());
     } finally {
       cancel();
       reader = null;

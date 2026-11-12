@@ -78,9 +78,14 @@ export async function terminalTraversalIsOnlyUnprovenAndEqualTimesUseIds(db) {
     ...f.options,
     readPage: async (q) => {
       queries.push(q);
-      return reply(
-        queries.length === 1 ? page([f.event("z"), f.event("a")], true) : page([f.event("b")]),
-      );
+      const value =
+        queries.length === 1 ? page([f.event("z"), f.event("a")], true) : page([f.event("b")]);
+      value.padding = [
+        'braces { [ and escaped quote " and slash \\',
+        { repeated: 1 },
+        { repeated: 2 },
+      ];
+      return new Response(JSON.stringify(value).replace('"has_more"', '"has_\\u006dore"'));
     },
   });
   assert.deepEqual(result, { status: "unproven" });
@@ -338,3 +343,61 @@ export async function stalledBodyIsCancelledAndNoPrefixEscapes(db) {
   assert.equal(response.body.locked, false);
   assert.equal((await current(db)).revision, 2);
 }
+
+export async function ownPrototypeKeysNeverReadPages(db) {
+  const f = await fixture(db);
+  let calls = 0;
+  for (const nested of [false, true]) {
+    const input = { ...f.input, expected: { ...f.input.expected } };
+    Object.defineProperty(nested ? input.expected : input, "__proto__", {
+      enumerable: true,
+      value: { injected: true },
+    });
+    assert.deepEqual(
+      await scan(db, input, {
+        ...f.options,
+        readPage: async () => {
+          calls++;
+          return reply(page());
+        },
+      }),
+      { status: "held" },
+    );
+  }
+  assert.equal(calls, 0);
+  assert.deepEqual(await current(db), f.input.expected);
+}
+async function duplicateMembers(db, kind) {
+  const f = await fixture(db);
+  await db
+    .prepare("UPDATE topup_history_coverage SET health='qualified', covered_through=?")
+    .bind(new Date(f.input.to * 1000).toISOString())
+    .run();
+  f.input.expected = await current(db);
+  let raw = JSON.stringify(page([f.event()]));
+  if (kind === "pagination")
+    raw = raw.replace('"has_more":false', '"has_more":true,"has_more":false');
+  if (kind === "escaped")
+    raw = raw.replace('"has_more":false', '"has_more":true,"has_\\u006dore":false');
+  if (kind === "event") raw = raw.replace('"livemode":false', '"livemode":true,"livemode":false');
+  if (kind === "nested")
+    raw = raw.replace('"id":"ch_synthetic"', '"id":"other","id":"ch_synthetic"');
+  let calls = 0;
+  assert.deepEqual(
+    await scan(db, f.input, {
+      ...f.options,
+      readPage: async () => {
+        calls++;
+        return new Response(raw);
+      },
+    }),
+    { status: "closed" },
+  );
+  assert.equal(calls, 1);
+  assert.deepEqual(await current(db), { ...f.input.expected, health: "closed", revision: 2 });
+}
+export const duplicatePaginationMembersCloseQualifiedEpoch = (db) =>
+  duplicateMembers(db, "pagination");
+export const escapedDuplicateMembersCloseQualifiedEpoch = (db) => duplicateMembers(db, "escaped");
+export const duplicateEventMembersCloseQualifiedEpoch = (db) => duplicateMembers(db, "event");
+export const duplicateNestedMembersCloseQualifiedEpoch = (db) => duplicateMembers(db, "nested");
