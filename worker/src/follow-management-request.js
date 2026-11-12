@@ -101,14 +101,26 @@ export async function enqueueFollowManagementRequest(db, input, options = {}) {
            AND EXISTS(SELECT 1 FROM follow_subscriptions s WHERE s.subscriber_id=u.id)
          ON CONFLICT(subscriber_id) DO UPDATE SET id=excluded.id,
            queued_at=excluded.queued_at,expires_at=excluded.expires_at,claim_id=NULL
-         WHERE follow_management_outbox.expires_at<=${NOW}`,
+         WHERE follow_management_outbox.expires_at<=${NOW} RETURNING 1 AS changed`,
           )
           .bind(crypto.randomUUID(), ttlMs / 1000, email, day),
         clock(),
       ]),
       2,
     );
-    writeReceipt(rows[0]);
+    // At most one returned constant proves direct upsert work, excluding cursor triggers.
+    const write = rows[0];
+    if (
+      !Number.isSafeInteger(write.meta?.changes) ||
+      write.meta.changes < 0 ||
+      !Array.isArray(write.results) ||
+      write.results.length > 1 ||
+      write.meta.changes < write.results.length ||
+      write.results.some(
+        (r) => !r || Array.isArray(r) || Object.keys(r).join(",") !== "changed" || r.changed !== 1,
+      )
+    )
+      return unavailable();
     if (dayReceipt(rows[1]) !== day) return unavailable();
     return result("accepted");
   } catch {

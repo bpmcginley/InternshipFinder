@@ -366,21 +366,20 @@ export async function managementExpiryAcknowledgementsAndLostCommitNeverRetry(db
     {},
     { success: false },
     { success: true, meta: { changes: 0 } },
-    { success: true, results: [], meta: { changes: -1 } },
-    { success: true, results: [], meta: { changes: 1.5 } },
-    { success: true, results: [], meta: { changes: 2 } },
+    { success: true, results: [], meta: { changes: 0 } },
+    { success: true, results: [{ removed: -1 }], meta: { changes: 0 } },
+    { success: true, results: [{ removed: 1.5 }], meta: { changes: 0 } },
+    { success: true, results: [{ removed: 2 }], meta: { changes: 0 } },
+    { success: true, results: [{ removed: 1 }], meta: { changes: 1 } },
     { success: true, results: [1], meta: { changes: 0 } },
   ]) {
     let calls = 0;
     const malformed = {
-      prepare: () => ({
-        bind: () => ({
-          run: async () => {
-            calls++;
-            return receipt;
-          },
-        }),
-      }),
+      prepare: () => ({ bind: () => ({}) }),
+      batch: async () => {
+        calls++;
+        return [{ success: true, results: [], meta: { changes: 1 } }, receipt];
+      },
     };
     assert.deepEqual(
       await expireFollowManagementRequests(malformed, { enabled: true, maxRows: 1 }),
@@ -393,18 +392,12 @@ export async function managementExpiryAcknowledgementsAndLostCommitNeverRetry(db
   await managementJob(db, "uncertain-second", now - 10000);
   let writes = 0;
   const lost = {
-    prepare: (sql) => ({
-      bind: (...args) => ({
-        run: async () => {
-          await db
-            .prepare(sql)
-            .bind(...args)
-            .run();
-          writes++;
-          throw new Error("synthetic lost reply");
-        },
-      }),
-    }),
+    prepare: (sql) => db.prepare(sql),
+    batch: async (statements) => {
+      await db.batch(statements);
+      writes++;
+      throw new Error("synthetic lost reply");
+    },
   };
   assert.deepEqual(await expireFollowManagementRequests(lost, { enabled: true, maxRows: 1 }), {
     status: "unavailable",
@@ -450,18 +443,13 @@ export async function managementExpiryIndexedSyntheticBacklog(db) {
   let sql, receipt;
   const measured = {
     prepare(query) {
-      sql = query;
-      return {
-        bind: (...args) => ({
-          run: async () => {
-            receipt = await db
-              .prepare(query)
-              .bind(...args)
-              .run();
-            return receipt;
-          },
-        }),
-      };
+      if (query.startsWith("DELETE")) sql = query;
+      return db.prepare(query);
+    },
+    batch: async (statements) => {
+      const result = await db.batch(statements);
+      receipt = result[0];
+      return result;
     },
   };
   assert.deepEqual(await expireFollowManagementRequests(measured, { enabled: true, maxRows: 7 }), {

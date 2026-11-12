@@ -41,6 +41,7 @@ const migrationNames = [
   "0028_follow_link_dispatch.sql",
   "0029_topup_history_observation.sql",
   "0030_topup_history_coverage.sql",
+  "0031_follow_delivery_owner.sql",
 ];
 const legacySql = [...env.TEST_SCHEMA_SQL, ...env.TEST_EXTRA_SCHEMA_SQL];
 const databases = [env.LEGACY_DB, env.MIGRATION_DB];
@@ -48,6 +49,7 @@ const tableNames = env.TEST_SCHEMA_SQL.flatMap((sql) => {
   const match = sql.match(/CREATE TABLE IF NOT EXISTS "?(\w+)"?\s*\(/);
   return match ? [match[1]] : [];
 });
+if (!tableNames.includes("follow_delivery_owner")) tableNames.push("follow_delivery_owner");
 const run = (db, queries) => db.batch(queries.map((sql) => db.prepare(sql)));
 const rows = async (db, sql) => (await db.prepare(sql).all()).results;
 const apply = () => applyD1Migrations(env.MIGRATION_DB, env.TEST_MIGRATIONS);
@@ -66,6 +68,7 @@ beforeEach(async () => {
       // Wrangler can group late CREATE statements with a trigger. Reset both altered
       // tables explicitly so their migrations replay against the actual prior shape.
       [
+        "follow_delivery_owner",
         "topup_history_coverage",
         "topup_history_receipts",
         "follow_management_outbox",
@@ -110,9 +113,9 @@ it("migrations create the complete legacy schema, including constraints and trig
   await initialize();
   const expected = await schema(env.LEGACY_DB);
   expect(await schema(env.MIGRATION_DB)).toEqual(expected);
-  expect(expected.objects.filter((row) => row.type === "table")).toHaveLength(67);
+  expect(expected.objects.filter((row) => row.type === "table")).toHaveLength(68);
   expect(expected.objects.filter((row) => row.type === "index")).toHaveLength(39);
-  expect(expected.objects.filter((row) => row.type === "trigger")).toHaveLength(16);
+  expect(expected.objects.filter((row) => row.type === "trigger")).toHaveLength(20);
   expect(expected.objects.filter((row) => row.type === "view")).toHaveLength(4);
   expect(await ledger()).toEqual(migrationNames.map((name) => ({ name })));
 });
@@ -386,4 +389,25 @@ it("0027 preserves a populated management queue and starts it unclaimed", async 
     ...before,
     claim_id: null,
   });
+});
+
+it("0031 adoption preserves a running or held owner on schema replay", async () => {
+  await initialize();
+  for (const phase of ["running", "held"]) {
+    for (const db of databases) {
+      await db
+        .prepare("UPDATE follow_delivery_owner SET phase=?,next_kind='management'")
+        .bind(phase)
+        .run();
+    }
+    const before = await Promise.all(
+      databases.map((db) => db.prepare("SELECT * FROM follow_delivery_owner").first()),
+    );
+    await initialize();
+    expect(
+      await Promise.all(
+        databases.map((db) => db.prepare("SELECT * FROM follow_delivery_owner").first()),
+      ),
+    ).toEqual(before);
+  }
 });

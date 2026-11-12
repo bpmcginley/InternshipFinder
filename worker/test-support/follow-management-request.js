@@ -189,7 +189,7 @@ export async function ambiguousCommittedReceiptsNeverRetryOrRevealInbox(db) {
         if (++calls === 2) {
           if (fault === "missing") r.pop();
           if (fault === "false") r[0].success = false;
-          if (fault === "changes") r[0].meta.changes = 2;
+          if (fault === "changes") r[0].results[0].changed = 2;
           if (fault === "results") delete r[0].results;
           if (fault === "hole") delete r[0];
           if (fault === "duplicate") r[1].results.push(r[1].results[0]);
