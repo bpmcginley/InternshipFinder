@@ -255,7 +255,7 @@ def scan_boards(
     return out
 
 
-def main(*, follow_capture=None):
+def main(argv=None, *, follow_capture=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--lists", action="store_true", help="GitHub lists only")
     ap.add_argument("--ats", action="store_true", help="registered ATS boards only")
@@ -270,7 +270,7 @@ def main(*, follow_capture=None):
         metavar="PATH",
         help="write ingestion counts (defaults to export directory when exporting)",
     )
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
     metrics = IngestMetrics()
     raw: list[dict] = []

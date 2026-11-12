@@ -1,7 +1,7 @@
 """Prepare and publish one complete ingest snapshot on the existing data branch."""
 
 import argparse
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from hashlib import sha256
@@ -442,12 +442,23 @@ def publish(checkout, state, message):
     return result
 
 
-def publish_with_follow_provenance(checkout, state, message, follow_provenance):
+def publish_with_follow_provenance(
+    checkout, state, message, follow_provenance, *, before_first_push=None
+):
     """Return the ordinary publication result and an optional immutable follow receipt."""
-    return _publish(checkout, state, message, follow_provenance)
+    return _publish(
+        checkout, state, message, follow_provenance, before_first_push=before_first_push
+    )
 
 
-def _publish(checkout, state, message, follow_provenance):
+def _publish(
+    checkout,
+    state,
+    message,
+    follow_provenance,
+    *,
+    before_first_push: Callable[[str, _StagedFollowProvenance], None] | None = None,
+):
     base = data_base(checkout)
     git(checkout, "ls-remote", "--exit-code", "--heads", "origin", BRANCH)
     if not state.is_dir() or state.is_symlink():
@@ -472,6 +483,8 @@ def _publish(checkout, state, message, follow_provenance):
     if revision(checkout, "HEAD^{tree}") != tree:
         raise ValueError("Committed tree differs from the validated snapshot")
     candidate = revision(checkout, "HEAD")
+    if before_first_push is not None and staged is not None:
+        before_first_push(candidate, staged)
     expected = base
     for attempt in range(3):
         attempted = None
