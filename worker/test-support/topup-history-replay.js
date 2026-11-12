@@ -219,7 +219,10 @@ async function setup(db) {
     assert.equal(q.get("limit"), "100");
     assert.equal(q.get("created[gte]"), String(input.from));
     assert.equal(q.get("created[lt]"), String(input.to));
-    assert.equal(q.get("starting_after"), n % f.pages.length ? "evt_other" : null);
+    assert.equal(
+      q.get("starting_after"),
+      n % f.pages.length ? f.pages[(n - 1) % f.pages.length].at(-1).id : null,
+    );
     await f.pageHook(n);
     const data = f.pages[n % f.pages.length],
       r = new Response(
@@ -282,6 +285,7 @@ export async function missingDuplicateModeAccountAndTerminalFaultsNeverObserve(d
       f.pages[1] = [{ ...f.target, id: "evt_later", created: f.input.to }];
     }
     assert.equal((await f.run()).status, "closed", fault);
+    if (fault === "terminal") assert.equal(f.pageCalls, 2);
     assert.equal(f.calls.length, 0);
     assert.equal(await count(db, "topup_history_receipts"), 0);
     assert.equal(await revision(db), 1);
@@ -317,7 +321,7 @@ export async function deadlineAndLateProviderCannotReachObservation(db) {
       f.before = async (url) => {
         if (url.includes("/refunds/")) f.time += 10000;
       };
-    assert.equal((await f.run()).status, "closed");
+    assert.ok(["closed", "held"].includes((await f.run()).status));
     assert.equal(await count(db, "topup_history_receipts"), 0);
     assert.equal(await revision(db), 1);
   }
@@ -438,5 +442,121 @@ export async function observationAdmissionRequiresExactTrue(db) {
     assert.ok(["pending", "unavailable"].includes(result.status));
     assert.equal(await count(db, "topup_history_receipts"), 0);
     assert.equal(await revision(db), 1);
+  }
+}
+
+export async function closureHasOneOwnerAcrossDeadlineAndDelayedCommittedAck(db) {
+  for (const fault of ["503", "throw", "stall"]) {
+    const f = await setup(db);
+    let attempts = 0,
+      release,
+      latePage,
+      cancelled = 0,
+      captures = 0;
+    f.options.timeoutMs = 500;
+    f.options.fetchImpl = async () => {
+      if (fault === "throw") throw Error("synthetic read failure");
+      if (fault === "stall")
+        return new Promise((resolve) => {
+          latePage = resolve;
+        });
+      return new Response(null, { status: 503 });
+    };
+    const wrapped = {
+      prepare: (s) => db.prepare(s),
+      batch: async (s) => {
+        const result = await db.batch(s);
+        if (fault === "stall" && s.length === 1 && captures++ === 0)
+          await new Promise((resolve) => setTimeout(resolve, 250));
+        if (s.length === 2) {
+          attempts++;
+          await new Promise((resolve) => {
+            release = resolve;
+          });
+        }
+        return result;
+      },
+    };
+    assert.equal((await f.run(wrapped)).status, "held");
+    // The real D1 commit can precede its unavailable acknowledgement.
+    for (let n = 0; !release && n < 50; n++) await new Promise((resolve) => setTimeout(resolve, 1));
+    assert.equal(typeof release, "function");
+    assert.equal(attempts, 1);
+    assert.equal((await capture(db, false, on)).coverage.revision, f.input.expected.revision + 1);
+    release();
+    if (fault === "stall") {
+      assert.equal(typeof latePage, "function");
+      latePage(
+        new Response(
+          new ReadableStream(
+            {
+              cancel() {
+                cancelled++;
+              },
+            },
+            { highWaterMark: 0 },
+          ),
+        ),
+      );
+    }
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.equal(attempts, 1);
+    if (fault === "stall") assert.equal(cancelled, 1);
+    assert.equal(await count(db, "topup_history_receipts"), 0);
+  }
+}
+export async function observationAckCannotReportSuccessForReplacementEpoch(db) {
+  const f = await setup(db);
+  let writes = 0;
+  const wrapped = {
+    prepare: (s) => db.prepare(s),
+    batch: async (s) => {
+      if (s.length === 4) {
+        writes++;
+        await rotate(
+          db,
+          { livemode: false, schemaKey: "replacement", expected: f.input.expected },
+          on,
+        );
+      }
+      return db.batch(s);
+    },
+  };
+  assert.equal((await f.run(wrapped)).status, "held");
+  assert.equal(writes, 1);
+  assert.equal(await count(db, "topup_history_receipts"), 1);
+  assert.equal(await revision(db), 2);
+  const epoch = (await capture(db, false, on)).coverage;
+  assert.equal(epoch.schema_key, "replacement");
+  assert.equal(epoch.health, "unproven");
+  assert.deepEqual(await balance(db), [25, 0, 0, 0]);
+}
+export async function noClosureAuthorityBeforeValidatedCaptureAndRequestVersion(db) {
+  for (const fault of ["cross-mode", "version", "date", "malformed", "window"]) {
+    const f = await setup(db);
+    await rotate(db, { livemode: true, schemaKey: "synthetic", expected: null }, on);
+    const live = (await capture(db, true, on)).coverage,
+      test = (await capture(db, false, on)).coverage;
+    if (fault === "cross-mode") f.input.expected = live;
+    if (fault === "version") delete f.options.requestVersion;
+    if (fault === "date") f.options.requestVersion = "2026-02-30";
+    if (fault === "malformed") f.options.requestVersion = "invalid";
+    if (fault === "window") f.input.from = f.input.to;
+    let samples = 0,
+      closeCalls = 0;
+    f.options.clock = () => f.time + (samples++ ? 10000 : 0);
+    const wrapped = {
+      prepare: (s) => db.prepare(s),
+      batch: async (s) => {
+        if (s.length === 2) closeCalls++;
+        return db.batch(s);
+      },
+    };
+    assert.equal((await f.run(wrapped)).status, "held");
+    assert.equal(closeCalls, 0);
+    assert.equal(f.pageCalls, 0);
+    assert.deepEqual((await capture(db, true, on)).coverage, live);
+    assert.deepEqual((await capture(db, false, on)).coverage, test);
+    assert.equal(await count(db, "topup_history_receipts"), 0);
   }
 }

@@ -1,5 +1,8 @@
 // Dormant one-target replay. Valid pagination is not proof of continuous history coverage.
-import { createTopupHistoryPageReader } from "./topup-history-page.js";
+import {
+  createTopupHistoryPageReader,
+  validTopupHistoryRequestVersion,
+} from "./topup-history-page.js";
 import {
   validateTopupHistoryTraversal,
   HISTORY_TRAVERSAL_BOUNDS,
@@ -78,6 +81,7 @@ export async function replayTopupHistoryTarget(db, env, input, options = {}) {
       !provider.STRIPE_SECRET_KEY ||
       (provider.STRIPE_PRICE_TOPUP !== undefined &&
         typeof provider.STRIPE_PRICE_TOPUP !== "string") ||
+      !validTopupHistoryRequestVersion(requestVersion) ||
       typeof targetEventId !== "string" ||
       !/^evt_[A-Za-z0-9_]{1,250}$/.test(targetEventId) ||
       typeof fetchImpl !== "function" ||
@@ -99,7 +103,10 @@ export async function replayTopupHistoryTarget(db, env, input, options = {}) {
   const started = performance.now(),
     controller = new AbortController();
   let last = initial,
-    timer;
+    timer,
+    authorized,
+    closure,
+    closureResult;
   const remaining = () => {
     const now = clock();
     if (!Number.isSafeInteger(now)) {
@@ -135,11 +142,17 @@ export async function replayTopupHistoryTarget(db, env, input, options = {}) {
         headers: { ...init.headers, Authorization: "Bearer " + provider.STRIPE_SECRET_KEY },
       }),
   });
+  const closeOnce = () => {
+    if (!authorized) return Promise.resolve({ status: "unavailable" });
+    return (closure ??= closeTopupCoverage(db, authorized, on).then(
+      (result) => (closureResult = result),
+    ));
+  };
   const current = async () => {
     remaining();
     const captured = await captureTopupCoverage(db, config.livemode, on);
     remaining();
-    return captured.status === "captured" && same(captured.coverage, config.expected);
+    return captured.status === "captured" && authorized && same(captured.coverage, authorized);
   };
   async function run() {
     const traversed = await validateTopupHistoryTraversal(db, config, {
@@ -148,6 +161,12 @@ export async function replayTopupHistoryTarget(db, env, input, options = {}) {
       clock,
       timeoutMs: remaining(),
       targetEventId,
+      onCaptured: (expected) => {
+        remaining();
+        authorized = Object.freeze({ ...expected });
+        return true;
+      },
+      closeCoverage: closeOnce,
     });
     if (traversed.status !== "unproven") return traversed;
     remaining();
@@ -163,25 +182,32 @@ export async function replayTopupHistoryTarget(db, env, input, options = {}) {
     });
     remaining();
     if (!["observed", "duplicate", "inactive"].includes(observed.status)) fail();
+    if (!(await current())) fail();
     return observed;
   }
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      controller.abort();
+      reject(new Error("History replay unavailable"));
+    }, timeoutMs);
+  });
   try {
-    const result = await Promise.race([
-      run(),
-      new Promise((_, reject) => {
-        timer = setTimeout(() => {
-          controller.abort();
-          reject(new Error("History replay unavailable"));
-        }, timeoutMs);
-      }),
-    ]);
+    const result = await Promise.race([run(), timeout]);
     if (["closed", "held"].includes(result.status)) return result;
     remaining();
     return result;
   } catch {
+    let live = false;
+    try {
+      remaining();
+      live = true;
+    } catch {}
     controller.abort();
-    const closed = await closeTopupCoverage(db, config.expected, on);
-    return closed.status === "committed" ? { status: "closed" } : held();
+    const pending = closeOnce();
+    // A closure already admitted may commit after timeout; never issue another attempt.
+    if (!live) return closureResult?.status === "committed" ? { status: "closed" } : held();
+    const closed = await Promise.race([pending, timeout.catch(() => null)]);
+    return closed?.status === "committed" ? { status: "closed" } : held();
   } finally {
     clearTimeout(timer);
     controller.abort();
