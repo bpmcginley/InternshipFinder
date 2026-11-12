@@ -34,7 +34,7 @@ export function createAllowance(browser, {
     const table = cfg && cfg.allowance, tier = me.plan === "free" ? me.tier : me.tier === "edu" ? me.plan : null;
     const disabled = a.limit === 0 || !!(tier && table && table[tier] && table[tier].autofill === 0);
     const summary = `${a.used.toLocaleString()} Auto-Apply runs used this month; ` + (unlimited ? "no monthly run limit." : `${left.toLocaleString()} runs left in your allowance.`);
-    return { summary, left, unlimited, disabled, exhausted: !disabled && !me.paused && a.limit > 0 && left === 0, bonus: Number.isFinite(a.bonus) && a.bonus > 0 ? a.bonus : 0 };
+    return { summary, left, unlimited, disabled, exhausted: !disabled && !me.paused && a.limit > 0 && left === 0, purchased: Number.isSafeInteger(a.purchased) && a.purchased > 0 ? a.purchased : 0, bonus: Number.isFinite(a.bonus) && a.bonus > 0 ? a.bonus : 0 };
   }
   const bounded = promise => new Promise(resolve => {
     const timer = browser.setTimeout(() => resolve(null), 8000);
@@ -86,7 +86,8 @@ export function createAllowance(browser, {
         : !allowance ? status !== "loading" && h("button", { type: "button", className: "btn", onClick: onRetry }, "Retry allowance")
         : h(F, null,
           allowance.exhausted && h("p", null, `Monthly allowance resets on ${resetDay} (UTC).`),
-          allowance.bonus > 0 && h("p", null, `Includes ${allowance.bonus.toLocaleString()} extra runs. Extra runs do not expire.`),
+          allowance.bonus > 0 && h("p", null, `Includes ${allowance.bonus.toLocaleString()} extra runs from invites. Invite credits do not expire.`),
+          status === "ready" && allowance.purchased > 0 && h("p", { role: "status", "aria-live": "polite" }, `Purchased Auto-Apply runs remaining: ${allowance.purchased.toLocaleString()}. Purchased runs do not expire. Service limits and temporary pauses still apply.`),
           h("p", { className: "muted" }, me.paused ? "AI use is temporarily paused. Search still works." : allowance.disabled ? "Auto-Apply is currently unavailable for this account." : "Per-run and other service limits can still apply."),
           !allowance.disabled && !me.paused && inviteBlock),
       topup && h("section", { "aria-label": "Extra Auto-Apply runs" },
@@ -124,17 +125,56 @@ export function createAskExtension({
 }
 
 export function createLoadMe({
-  authRef, meRequest, setMeResult, bounded, IS, runAllowance, dropToken,
+  authRef, authGeneration = { current: 0 }, meRequest, setMeResult, bounded, IS, runAllowance, dropToken,
 }) {
   return async (token = authRef.current.token) => {
     if (!token || token !== authRef.current.token) return null;
-    const seq = ++meRequest.current;
-    setMeResult(previous => ({ token, data: previous && previous.token === token ? previous.data : null, status: "loading" }));
-    const data = await bounded(IS.fetchMe(token));
-    if (token !== authRef.current.token || seq !== meRequest.current) return null;
-    setMeResult({ token, data, status: runAllowance(data) ? "ready" : "error" });
+    const seq = ++meRequest.current, generation = authGeneration.current;
+    setMeResult(previous => ({ token, generation, data: previous && previous.token === token && previous.generation === generation ? previous.data : null, status: "loading" }));
+    const current = () => token === authRef.current.token && generation === authGeneration.current && seq === meRequest.current;
+    let active = true, data;
+    try { data = await bounded(IS.fetchMe(token, () => active && current())); }
+    finally { active = false; } // A late response after timeout must not mutate Core auth.
+    if (!current()) return null;
+    setMeResult({ token, generation, data, status: runAllowance(data) ? "ready" : "error" });
     if (!data && !IS.authOk(authRef.current.who)) dropToken();
     return data;
+  };
+}
+
+// One read per return episode, including BFCache. A return during an in-flight read
+// schedules one trailing fresh read; paired pageshow/visibility events coalesce.
+export function watchAllowanceReturns(browser, load) {
+  let away = false, episode = 0, requested = -1;
+  let stopped = false, active = false, pending = false;
+  const run = async () => {
+    active = true;
+    try { await load(); } catch { /* The loader owns its error state; keep later returns usable. */ } finally {
+      active = false;
+      if (pending && !stopped) { pending = false; void run(); }
+    }
+  };
+  const request = () => {
+    if (stopped || requested === episode) return;
+    requested = episode;
+    if (active) pending = true; else void run();
+  };
+  const leave = () => { if (!away) { away = true; episode++; } };
+  const visible = () => {
+    if (browser.document.visibilityState === "hidden") leave();
+    else if (away) { away = false; request(); }
+  };
+  const show = event => { if (event.persisted) { away = false; request(); } };
+  browser.document.addEventListener("visibilitychange", visible);
+  browser.addEventListener("pagehide", leave);
+  browser.addEventListener("pageshow", show);
+  request();
+  if (browser.document.visibilityState === "hidden") leave();
+  return () => {
+    stopped = true;
+    browser.document.removeEventListener("visibilitychange", visible);
+    browser.removeEventListener("pagehide", leave);
+    browser.removeEventListener("pageshow", show);
   };
 }
 

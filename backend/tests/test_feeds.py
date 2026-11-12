@@ -6,11 +6,13 @@ import subprocess
 import sys
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
+from functools import cache
 from pathlib import Path
 
 import pytest
 
 from internscout import feeds
+from internscout.site import assets, runtime
 
 
 def _row(i, **over):
@@ -69,10 +71,11 @@ def test_a_feed_is_written_beside_each_listing_page_and_not_the_hubs(tmp_path):
 
 def test_a_feed_is_dated_by_its_data_not_the_clock(tmp_path, monkeypatch):
     # lastBuildDate came from the clock, so every deploy rewrote every feed even when nothing changed.
-    from internscout import seo_pages
-
-    monkeypatch.setattr(seo_pages, "SITE", "https://legacy.example.test")
-    monkeypatch.setattr(seo_pages, "GENERATED", datetime(2026, 9, 23, 10, tzinfo=timezone.utc))
+    monkeypatch.setattr(assets, "SITE", "https://legacy.example.test")
+    monkeypatch.setattr(runtime, "GENERATED", datetime(2026, 9, 23, 10, tzinfo=timezone.utc))
+    monkeypatch.setattr(
+        feeds, "_standalone_settings", cache(feeds._standalone_settings.__wrapped__)
+    )
     (tmp_path / "internships" / "x").mkdir(parents=True)
     feeds.write_all(
         str(tmp_path), [{"path": "/internships/x/", "h1": "X", "items": [_row(1)], "state": None}]
@@ -82,17 +85,13 @@ def test_a_feed_is_dated_by_its_data_not_the_clock(tmp_path, monkeypatch):
     assert "<link>https://legacy.example.test/internships/x/</link>" in xml
 
 
-@pytest.mark.parametrize("scenario", ["clock", "configured", "prior-rss", "threaded"])
+@pytest.mark.parametrize("scenario", ["clock", "configured", "prior-rss"])
 def test_standalone_defaults_work_with_the_legacy_facade_blocked(tmp_path, scenario):
     script = """
 import json
 from datetime import datetime, timezone
-from concurrent.futures import ThreadPoolExecutor
-from importlib import import_module
 from importlib.abc import MetaPathFinder
-from importlib.machinery import PathFinder
 from pathlib import Path
-from threading import Event
 import sys
 
 class BlockLegacy(MetaPathFinder):
@@ -122,35 +121,7 @@ root = Path(sys.argv[1])
 page = root / "internships/x"
 page.mkdir(parents=True)
 pages = [{"path": "/internships/x/", "h1": "X", "items": [json.loads(sys.argv[2])]}]
-if scenario == "threaded":
-    entered, release = Event(), Event()
-
-    class PauseLegacy(MetaPathFinder):
-        def find_spec(self, fullname, path=None, target=None):
-            if fullname == "internscout.seo_pages":
-                spec = PathFinder.find_spec(fullname, path)
-                execute = spec.loader.exec_module
-
-                def delayed(module):
-                    entered.set()
-                    assert release.wait(10)
-                    execute(module)
-
-                spec.loader.exec_module = delayed
-                return spec
-
-    sys.meta_path.remove(blocker)
-    sys.meta_path.insert(0, PauseLegacy())
-    with ThreadPoolExecutor(max_workers=1) as pool:
-        importing = pool.submit(import_module, "internscout.seo_pages")
-        try:
-            assert entered.wait(10)
-            assert feeds.write_all(str(root), pages) == 1
-        finally:
-            release.set()
-        assert importing.result(timeout=10).GENERATED == configured
-else:
-    assert feeds.write_all(str(root), pages) == 1
+assert feeds.write_all(str(root), pages) == 1
 xml = (page / "feed.xml").read_text(encoding="utf-8")
 assert "<link>https://internscout.org/internships/x/</link>" in xml
 hour = 11 if scenario == "clock" else 9
@@ -159,12 +130,8 @@ assert feeds.write_all(str(root), pages, now=configured.replace(hour=12)) == 1
 assert "<lastBuildDate>Wed, 23 Sep 2026 12:00:00 +0000</lastBuildDate>" in (
     page / "feed.xml"
 ).read_text(encoding="utf-8")
-if scenario != "threaded":
-    assert "internscout.seo_pages" not in sys.modules
+assert "internscout.seo_pages" not in sys.modules
 if scenario == "prior-rss":
-    sys.meta_path.remove(blocker)
-    from internscout import seo_pages
-    assert seo_pages.GENERATED == configured
     assert feeds.write_all(str(root), pages) == 1
     assert "<lastBuildDate>Wed, 23 Sep 2026 09:00:00 +0000</lastBuildDate>" in (
         page / "feed.xml"

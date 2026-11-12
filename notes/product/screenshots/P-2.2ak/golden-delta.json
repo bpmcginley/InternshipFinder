@@ -1,0 +1,16 @@
+{
+  "parent": "9de5b9848e65351d73d8d5198125aac07f4ac1b6",
+  "files": 836,
+  "archiveHashesMatchManifest": true,
+  "changed": [
+    "index.html",
+    "js/app/allowance.mjs",
+    "js/app/controls.mjs",
+    "js/app/dashboard.mjs"
+  ],
+  "appGenerationAdded": 11,
+  "appGenerationRemoved": 11,
+  "otherOutputsByteIdentical": true,
+  "indexOnlyAppGenerationReferenceChanged": true,
+  "classicCoreBuyDataUnchanged": true
+}

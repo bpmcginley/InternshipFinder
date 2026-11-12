@@ -1,0 +1,72 @@
+[
+  {
+    "phase": "before",
+    "width": 1280,
+    "theme": "light",
+    "meReads": 1,
+    "errors": [],
+    "externalRequests": 0
+  },
+  {
+    "phase": "before",
+    "width": 1280,
+    "theme": "dark",
+    "meReads": 1,
+    "errors": [],
+    "externalRequests": 0
+  },
+  {
+    "phase": "before",
+    "width": 375,
+    "theme": "light",
+    "meReads": 1,
+    "errors": [],
+    "externalRequests": 0
+  },
+  {
+    "phase": "before",
+    "width": 375,
+    "theme": "dark",
+    "meReads": 1,
+    "errors": [],
+    "externalRequests": 0
+  },
+  {
+    "phase": "after",
+    "width": 1280,
+    "theme": "light",
+    "meReads": 1,
+    "errors": [],
+    "externalRequests": 0
+  },
+  {
+    "phase": "after",
+    "width": 1280,
+    "theme": "dark",
+    "meReads": 1,
+    "errors": [],
+    "externalRequests": 0
+  },
+  {
+    "phase": "after",
+    "width": 375,
+    "theme": "light",
+    "meReads": 1,
+    "errors": [],
+    "externalRequests": 0
+  },
+  {
+    "phase": "after",
+    "width": 375,
+    "theme": "dark",
+    "meReads": 1,
+    "errors": [],
+    "externalRequests": 0
+  },
+  {
+    "scenario": "ordinary root return, paired BFCache events, hold/removal, stale failure and recovery",
+    "meReads": 6,
+    "externalRequests": 0,
+    "errors": []
+  }
+]

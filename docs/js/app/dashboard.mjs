@@ -1,5 +1,5 @@
 // Dashboard state, effects and React controller.
-import { createAskExtension, createLoadMe, openInviteAction, copyInviteAction, billingAction, topupEligible, createTopupActions } from "./allowance.mjs";
+import { createAskExtension, createLoadMe, watchAllowanceReturns, openInviteAction, copyInviteAction, billingAction, topupEligible, createTopupActions } from "./allowance.mjs";
 import { saveProfileAction, saveQuickProfileAction, finishQuickProfileAction } from "./setup.mjs";
 import { clearTrackerAction, createSetAppState, createToggleSaved, useManualAppState, showMyListAction } from "./tracker.mjs";
 import { useDigestPrompt } from "./navigation.mjs";
@@ -255,8 +255,8 @@ export function createDashboard(browser, {
     // was: const who = auth.token ? (IS.decodeJwt(auth.token) || {}) : null;
     const who = auth.token ? auth.who : null;
     const [meResult, setMeResult] = useState(null), meRequest = useRef(0);
-    const me = meResult && meResult.token === auth.token ? meResult.data : null;
-    const meStatus = meResult && meResult.token === auth.token ? meResult.status : "loading";
+    const me = meResult && meResult.token === auth.token && meResult.generation === authGeneration.current ? meResult.data : null;
+    const meStatus = meResult && meResult.token === auth.token && meResult.generation === authGeneration.current ? meResult.status : "loading";
     // An ID token lasts about an hour, a session until sign-out or a year unused. When either runs out
     // (or the Worker refuses it), stop showing "Signed in": take a fresh one from the extension if it
     // has one, otherwise show the sign-in buttons again.
@@ -266,16 +266,15 @@ export function createDashboard(browser, {
       if (info.installed) askExtension();
     }, [info.installed]);
     const loadMe = useCallback(createLoadMe({
-      authRef, meRequest, setMeResult, bounded, IS, runAllowance, dropToken,
+      authRef, authGeneration, meRequest, setMeResult, bounded, IS, runAllowance, dropToken,
     }), [dropToken]);
     useEffect(() => {
       setMeResult(null); setInviteState(null); setInviteNote(""); inviteRequest.current++;
       if (!auth.token) return;
-      let last = browser.Date.now();
       // was: ... else if (!IS.tokenOk(auth.token)) dropToken(); });
       // authOk is also false once the Worker has answered 401 for this token (a session it ended).
       const load = () => loadMe(auth.token);
-      load();
+      const stopReturns = watchAllowanceReturns(browser, load);
       // was: const ms = ((IS.decodeJwt(auth.token) || {}).exp || 0) * 1000 - Date.now() - 60000;
       // was: const timer = setTimeout(dropToken, Math.max(0, Math.min(ms, 2 ** 31 - 1)));
       // An ID token ends within the hour. A session ends up to a year out, past the longest delay
@@ -284,11 +283,8 @@ export function createDashboard(browser, {
       // Worker's 401 is what ends it.
       const ms = ((auth.who && auth.who.exp) || 0) - browser.Date.now() - 60000;
       const timer = ms <= 2 ** 31 - 1 ? browser.setTimeout(dropToken, Math.max(0, ms)) : 0;
-      // Coming back to the tab after an Auto-Apply run: the "left this month" text should be current.
-      const onVis = () => { if (browser.document.visibilityState === "visible" && browser.Date.now() - last > 60000) { last = browser.Date.now(); load(); } };
-      browser.document.addEventListener("visibilitychange", onVis);
-      return () => { meRequest.current++; browser.clearTimeout(timer); browser.document.removeEventListener("visibilitychange", onVis); };
-    }, [auth.token, loadMe]);
+      return () => { meRequest.current++; browser.clearTimeout(timer); stopReturns(); };
+    }, [auth.token, auth.source, authGeneration.current, loadMe]);
 
     // The extension's Upgrade button (a job paused on a used-up allowance) opens /?upgrade=<plan>.
     // Kept as a notice rather than sent straight on to Stripe: the student sees the plan and what it
@@ -1149,6 +1145,8 @@ export function createDashboard(browser, {
             email: who && who.email,
             planLabel: auth.token ? (me && me.plan && me.plan !== "free" ? `${IS.PLAN_LABELS[me.plan] || me.plan} plan` : me && me.tier === "edu" ? "Free plan, school (.edu) allowance" : "Free plan") : "Not signed in",
             // The same lines the allowance tooltip used to hold, now visible.
+            hasPurchased: !!(allowance && allowance.purchased > 0),
+            purchased: meStatus === "ready" && allowance ? allowance.purchased : 0,
             allowLines: auth.token && me && me.allowance ? IS.allowanceText(me).split("\n") : [],
             resetDay: auth.token && me && me.allowance ? resetDay : null,
             spendText: info.spend && info.spend.calls > 0 ? `Estimated AI cost: $${info.spend.month_usd.toFixed(2)}${info.spend.budget ? ` of $${info.spend.budget}` : ""}` : null,
