@@ -102,6 +102,7 @@ function trustedLinks(origins, links, withManagement) {
     const value = name === "management" ? management : links[name];
     const url = link(value);
     if (!allowed.has(url.origin)) invalid();
+    const managementPath = normalizedLinkAscii(url.pathname) === MANAGEMENT_PATH;
     if (
       managementToken &&
       name !== "management" &&
@@ -109,11 +110,11 @@ function trustedLinks(origins, links, withManagement) {
     )
       invalid();
     if (publicLink) {
-      if (FOLLOW_TOKEN.test(decodedLink(url.href))) invalid();
+      if (managementPath || FOLLOW_TOKEN.test(decodedLink(url.href))) invalid();
     } else {
       const path = decodedLink(url.pathname);
       if (
-        path === MANAGEMENT_PATH ||
+        managementPath ||
         (name === "management" && (url.origin === MANAGEMENT_ORIGIN || value.includes("#")))
       ) {
         if (name !== "management" || !managementToken) invalid();

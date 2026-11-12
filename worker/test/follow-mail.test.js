@@ -387,6 +387,11 @@ test("management links reject normalized variants and stay out of every other li
     );
     await assert.rejects(mail("digest", "publicShare", `${SITE}/share?value=${token}`), invalid);
   }
+  for (const path of ["/FOLLOWS/manage.html", "/follows/man%2561ge.html"]) {
+    const wrongRoute = `https://internscout.org${path}?token=${TOKEN}`;
+    await assert.rejects(mail("manage", "unsubscribe", wrongRoute), invalid);
+    await assert.rejects(mail("digest", "matchingPage", wrongRoute), invalid);
+  }
 
   for (const apply_url of [
     MANAGEMENT_LINK,
