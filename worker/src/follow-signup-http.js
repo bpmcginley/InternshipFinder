@@ -42,7 +42,14 @@ export function createFollowSignupHttp({
       return unavailable();
     try {
       const origin = request.headers.get("Origin");
-      if (!origin || origin === "null" || originAllowed(request) !== true) return empty(403);
+      if (!origin || origin === "null") return empty(403);
+      const allowed = originAllowed(request);
+      if (allowed !== true) {
+        // An accidental asynchronous predicate cannot authorize admission or
+        // leave a rejected Promise outside the generic response boundary.
+        void Promise.prototype.then.call(Promise.resolve(allowed), undefined, () => {});
+        return empty(403);
+      }
       if (new URL(request.url).search) return empty(400);
       const contentType = request.headers.get("Content-Type")?.trim();
       if (!contentType || !JSON_TYPE.test(contentType)) return empty(415);

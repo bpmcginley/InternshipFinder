@@ -89,6 +89,26 @@ test("only bounded, exact-shape UTF-8 JSON reaches signup admission", async () =
   assert.equal(cancelled, 1);
 });
 
+test("asynchronous origin predicates cannot admit or escape as rejected promises", async () => {
+  for (const originAllowed of [
+    async () => true,
+    async () => {
+      throw new Error("synthetic origin details");
+    },
+    () => ({
+      then(_resolve, reject) {
+        reject(new Error("synthetic thenable details"));
+      },
+    }),
+  ]) {
+    const post = request();
+    const endpoint = createFollowSignupHttp({ enabled: true, originAllowed, admit: never });
+    await expectResponse(await endpoint(post), 403);
+    assert.equal(post.bodyUsed, false);
+  }
+  await new Promise((resolve) => setImmediate(resolve));
+});
+
 test("accepted signup returns an empty acknowledgement and keeps linked intent exact", async () => {
   const linked = { ...input, link: true };
   const exact = JSON.stringify(linked);
