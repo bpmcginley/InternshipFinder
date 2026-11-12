@@ -58,7 +58,7 @@ export function createControls(browser, {
   // month's allowance, invites, plans and sign-out. It used to sit in the header as a dozen buttons and
   // labels in one row that wrapped into a long second line. A disclosure (a button that shows a panel),
   // closed by Escape, a click outside, or choosing an item.
-  function AccountMenu({ email, planLabel, allowLines, resetDay, spendText, items, admin }) {
+  function AccountMenu({ email, planLabel, allowLines, resetDay, spendText, items, admin, purchased = 0, hasPurchased = purchased > 0 }) {
     const [open, setOpen] = useState(false);
     const ref = useRef(), btn = useRef();
     useEffect(() => {
@@ -81,10 +81,14 @@ export function createControls(browser, {
           email && h("div", { className: "acct-email" }, email),
           h("div", { className: "acct-plan" }, planLabel)),
         (allowLines.length > 0 || spendText) && h("div", { className: "acct-sec" },
-          h("div", { className: "acct-k" }, "This month"),
+          h("div", { className: "acct-k" }, hasPurchased ? "Allowance" : "This month"),
           allowLines.map((l, i) => h("div", { key: i, className: "acct-line" }, l)),
           spendText && h("div", { className: "acct-line muted" }, spendText),
-          resetDay && h("div", { className: "acct-line muted" }, `Resets ${resetDay}.`)),
+          resetDay && h("div", { className: "acct-line muted" }, `${hasPurchased ? "Monthly allowance resets" : "Resets"} ${resetDay}.`)),
+        purchased > 0 && h("div", { className: "acct-sec", role: "status", "aria-live": "polite" },
+          h("div", { className: "acct-k" }, "Purchased Auto-Apply runs"),
+          h("div", { className: "acct-line" }, `${purchased.toLocaleString()} remaining. Purchased runs do not expire.`),
+          h("div", { className: "acct-line muted" }, "Service limits and temporary pauses still apply.")),
         groups.map((g, i) => h("div", { key: i, className: "acct-sec acct-list" }, g.map(item)))));
   }
 

@@ -1,6 +1,6 @@
 """The site build's record of each live paid listing (added 2026-10-14).
 
-seo_pages --placements-report writes what one build kept and dropped (placements.report); the pages
+The publisher's --placements-report writes what one build kept and dropped (placements.report); the pages
 workflow then runs `python -m internscout.placements record FILE`, which adds it to the Worker's
 placement_runs table over the D1 HTTP API (placements.record_runs), so refunds for days a paid box was
 not on the site can be worked out. That step can never fail or block a deploy. Tested against the real
@@ -15,12 +15,16 @@ import subprocess
 import sys
 import urllib.error
 from datetime import datetime, timezone
+from functools import partial
 
 import pytest
 
-from internscout import placements, seo_pages
+from internscout import placements
 from internscout.placements import resolve
+from internscout.site import publish, runtime
 from tests.test_seo_pages import _files, _placement_site, _pl as _site_pl
+
+pytestmark = pytest.mark.without_seo_facade
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.join(HERE, "..", "..")
@@ -109,8 +113,13 @@ def test_report_lists_kept_ids_and_dropped_ids_with_reasons_and_skips_unreadable
     }
 
 
+def _freeze_publisher(monkeypatch):
+    monkeypatch.setattr(publish, "_today_utc", lambda: "2026-09-23")
+    monkeypatch.setattr(runtime, "BuildState", partial(runtime.BuildState, near_on=False))
+
+
 def test_the_build_writes_its_placements_report_outside_the_site(tmp_path, monkeypatch, capsys):
-    monkeypatch.setattr(seo_pages, "today_utc", lambda: "2026-09-23")
+    _freeze_publisher(monkeypatch)
     site = _placement_site(tmp_path, "rep")
     f = tmp_path / "placements.json"
     f.write_text(
@@ -127,7 +136,7 @@ def test_the_build_writes_its_placements_report_outside_the_site(tmp_path, monke
         encoding="utf-8",
     )
     report = tmp_path / "placements-report.json"
-    seo_pages.main(["seo_pages", site, "--placements-report", str(report), "--placements", str(f)])
+    publish.main(["publish", site, "--placements-report", str(report), "--placements", str(f)])
     assert json.loads(report.read_text(encoding="utf-8")) == {
         "day": "2026-09-23",
         "kept": ["p-2026-09-tie-1"],
@@ -146,28 +155,24 @@ def test_the_build_writes_its_placements_report_outside_the_site(tmp_path, monke
     assert "::warning::placement p-gone dropped: listing_gone (listing nope)" in out
     # Without --placements there is no report.
     plain = tmp_path / "plain-report.json"
-    seo_pages.main(
-        ["seo_pages", _placement_site(tmp_path, "plain"), "--placements-report", str(plain)]
-    )
+    publish.main(["publish", _placement_site(tmp_path, "plain"), "--placements-report", str(plain)])
     assert not plain.exists()
     # A report that cannot be written (here a folder) is a warning, and the site is still built.
     capsys.readouterr()
     site2 = _placement_site(tmp_path, "nowrite")
-    seo_pages.main(
-        ["seo_pages", site2, "--placements", str(f), "--placements-report", str(tmp_path)]
-    )
+    publish.main(["publish", site2, "--placements", str(f), "--placements-report", str(tmp_path)])
     assert "::warning::placements report not written" in capsys.readouterr().out
     assert "data/placements.json" in _files(site2)
 
 
 def test_the_report_changes_no_page(tmp_path, monkeypatch):
-    monkeypatch.setattr(seo_pages, "today_utc", lambda: "2026-09-23")
+    _freeze_publisher(monkeypatch)
     f = tmp_path / "placements.json"
     f.write_text(json.dumps({"placements": [_site_pl()]}), encoding="utf-8")
     a, b = _placement_site(tmp_path, "a"), _placement_site(tmp_path, "b")
-    seo_pages.main(["seo_pages", a, "--placements", str(f)])
-    seo_pages.main(
-        ["seo_pages", b, "--placements", str(f), "--placements-report", str(tmp_path / "r.json")]
+    publish.main(["publish", a, "--placements", str(f)])
+    publish.main(
+        ["publish", b, "--placements", str(f), "--placements-report", str(tmp_path / "r.json")]
     )
     assert _files(a) == _files(b)
 

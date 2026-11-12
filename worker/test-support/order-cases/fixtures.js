@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { TERMS_VERSION, reviewSig } from "../../src/orders.js";
+import { TERMS_VERSION } from "../../src/orders/shared.js";
+import { reviewSig } from "../../src/orders/templates.js";
 import { NOW, setup } from "../../test/helpers.js";
 
 const ADMIN = "admin-test-token";
