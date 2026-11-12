@@ -15,7 +15,7 @@ export function createDashboard(browser, {
     restoreArrivalAnchor, focusArrival, Setup, QuickProfile, STATE_LABEL, useNarrow, factsLine,
     matchControl, Why, prevent, PLACE_NOTICE_KEY, PlaceNotice, F, installUrl, SiteNav, ADMIN,
     AccountMenu, noCount, NOCOUNT_KEY, AllowancePanel, InviteBlock, Sel, opt, APP_STATES,
-    SearchBox, MultiSelect, ShareSearch, ListTable, Digest, Row, sinceVisit, Landing, DashboardFollow,
+    SearchBox, MultiSelect, ShareSearch, ListTable, Digest, Row, sinceVisit, Landing, DashboardFollow, CompanyFollow,
   }) {
   function App() {
     const store = useRef(null); if (!store.current) store.current = IS.createStore();
@@ -670,6 +670,7 @@ export function createDashboard(browser, {
     const limit = myList ? myLimit : browseLimit;
     const pageRows = rows.slice(0, limit);
     const { shown, moreAfter } = companyRuns(pageRows, myList ? { sort: "company", q: "" } : f, expandedRuns);
+    const companyView = useRef({ revision: 0 }); companyView.current = { ...companyView.current, openId, shown };
     // Every file loaded: the list itself is the whole country.
     const allLoaded = everything && !loading;
     // was: stats.open, else the sum of index.files[].open, which counts a role filed in two states twice
@@ -706,7 +707,11 @@ export function createDashboard(browser, {
       if (on && !n.has(id) && n.size >= IS.SELECT_MAX) { flashSelNote(`Select up to ${IS.SELECT_MAX} applications at a time. Queue these first, then select more.`); return; }
       on ? n.add(id) : n.delete(id); selectionRef.current = n; selectionSetter.current(n);
     }, []);
-    const onWhy = useCallback(id => setOpenId(o => o === id ? null : id), []);
+    const onWhy = useCallback(id => {
+      if (!followSource.enabled) { setOpenId(o => o === id ? null : id); return; }
+      const next = companyView.current.openId === id ? null : id;
+      companyView.current.openId = next; companyView.current.revision++; setOpenId(next);
+    }, []);
     // was: rows with no job of their own. A row whose apply link a job already holds is skipped by the
     // extension too, so the header checkbox no longer picks it.
     const held = useMemo(() => IS.heldUrls(queue), [queue]);
@@ -1379,6 +1384,9 @@ export function createDashboard(browser, {
               renderRow: r => h(Row, { key: r.id, r, sc: r._savedMissing ? { score: 0, parts: {} } : scoreOf(r), ctx, keys: keySet, state: st(r.id), onState: setManualAppState, job: jobs[String(r.id)],
                 saved: !!(roleBook.roles[String(r.id)] && roleBook.roles[String(r.id)].saved), onSave: toggleSaved, myList, fresh: sinceVisit(r, previousVisit, visitStart), missingText,
                 checked: sel.has(r.id), onCheck: check, canAuto, canTry, onAuto: onAutoRow, queueBusy: queuing, open: !r._savedMissing && openId === r.id, onWhy, onRank: openSetup, elig: r._savedMissing ? null : elig, patterns: stats && stats.skill_patterns,
+                follow: openId === r.id && h(CompanyFollow, { row: r, auth, generation: authGeneration.current, getAuth: () => ({ auth: authRef.current, generation: authGeneration.current }),
+                  getCurrent: () => ({ active: companyView.current.openId === r.id && companyView.current.shown.includes(r), revision: companyView.current.revision,
+                    authoritative: store.current.base() === (C.dataUrl || "./data/") && store.current.index()?._dir === "listings/", row: store.current.all().find(x => x.id === r.id), index: store.current.index(), legacy: store.current.isLegacy() }) }),
                 ask: askId === r.id, onOpen, onAnswer }) })),
 
       // was: narrow && promoEls

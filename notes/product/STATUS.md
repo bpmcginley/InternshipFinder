@@ -526,6 +526,8 @@ The golden harness now covers static assets as well as generated pages. Each sit
 
 ## Waiting for Bruce
 
+- **P-2.1ct company Details Follow mount**: [#572](https://github.com/bpmcginley/InternshipFinder/pull/572) qualified offline; draft awaiting independent review/CI. #570 same-export identity publication and existing Follow release/provider gates remain. [Scope](P-2.1ct-company-details.md).
+
 - **Follow confirmation rollout** remains held after [#508](https://github.com/bpmcginley/InternshipFinder/pull/508) and the [#506 queue](https://github.com/bpmcginley/InternshipFinder/pull/506) merged to source. Migrations 0021–0023 are applied; dispatch and sending remain held.
 
 - **Chrome 0.6.0 install instructions** remain held. Publish only after the signed Chrome 0.6.0 extension is publicly verifiable in the Chrome Web Store. [Staged install instructions #494](https://github.com/bpmcginley/InternshipFinder/pull/494).
@@ -806,3 +808,9 @@ Merged #430 adds an authenticated, default-off Worker offer with exact Stripe Pr
 ## Chrome 0.6.0 strict Worker SSE parsing (historical pre-merge validation)
 
 Draft needs-bruce [#443](https://github.com/bpmcginley/InternshipFinder/pull/443) normally refreshed on published #426 merge 3947e237, rejects malformed/truncated/oversized Worker SSE before model content can be dispatched, preserves valid multiline/UTF-8/signature/finish/cancellation behavior and bounds accumulation to 4 MiB body / 1 MiB event. Incremental raw-byte framing passes the deterministic fragmentation regression; only recognized terminal/block reasons complete the response and malformed function-call arguments fail closed. The original exact 381 extension tests passed. Fresh Node 22 focused tests pass 49 cases and scoped ESLint passes. Fresh hosted checks and independent integration review remain pending. Existing retry/admission policy is unchanged; ambiguous duplicate-generation handling and compatibility with operator-configured Worker bounds remain separate release gates. Guard, permissions, manifest and version unchanged. [Package evidence](P-0.6.0-strict-sse.md).
+
+## P-2.1ct company Details Follow mount
+
+| Package | Owner | Branch | State |
+|---|---|---|---|
+| P-2.1ct | audit_growth_generated | `codex/product-p2.1ct-company-details` | [#572](https://github.com/bpmcginley/InternshipFinder/pull/572) draft; 473 site / 6 golden-link / 20 Edge scenarios; default-off, #570 publication prerequisite; independent review/CI pending |
