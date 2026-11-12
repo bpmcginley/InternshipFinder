@@ -141,3 +141,24 @@ test("invalid enabled runtime bounds fail before native witness or object I/O", 
     expect(i.state()).toBeNull();
   });
 });
+
+test("invalid limit and missing metadata never acquire a witness", async () => {
+  const object = env.CHECKPOINT.get(env.CHECKPOINT.newUniqueId());
+  await runInDurableObject(object, async (i) => {
+    let calls = 0;
+    const runtime = createFollowCheckpointRuntime({
+      enabled: true,
+      ...bounds,
+      codec,
+      control: i.control,
+      slots: i.slots,
+      witness: () => {
+        calls++;
+        throw new Error("must not run");
+      },
+    });
+    expect(await runtime.read(0)).toEqual({ state: "unavailable" });
+    expect(await runtime.read(bounds.maxBytes)).toEqual({ state: "unavailable" });
+    expect(calls).toBe(0);
+  });
+});

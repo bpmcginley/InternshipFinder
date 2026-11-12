@@ -27,10 +27,10 @@ export function createFollowCheckpointRuntime(options = {}) {
     codec,
     witness,
   });
-  const reader = (port) =>
+  const reader = (readWitness) =>
     createFollowCheckpointSnapshotReader({
       capture: () => control.capture(),
-      readWitness: () => port?.read(),
+      readWitness,
       slots,
       codec,
       maxBytes,
@@ -38,11 +38,19 @@ export function createFollowCheckpointRuntime(options = {}) {
       maxControlBytes,
     });
   // Validate dependencies/bounds without calling storage or the witness supplier.
-  reader(null);
+  reader(() => null);
   const read = async (limit) => {
     try {
       // Both witness checks in one paired read use the same provider object.
-      return await reader(witness())(limit);
+      let pinned = false,
+        port;
+      return await reader(() => {
+        if (!pinned) {
+          port = witness();
+          pinned = true;
+        }
+        return port?.read();
+      })(limit);
     } catch {
       return unavailable();
     }
