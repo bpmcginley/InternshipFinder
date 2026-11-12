@@ -49,6 +49,7 @@ import "./follow-catalog-loader.test.js";
 import "./follow-management.test.js";
 import "./follow-management-http.test.js";
 import "./follow-management-request.test.js";
+import "./follow-management-claim.test.js";
 import "./follow-outbox.test.js";
 import "./follow-retention.test.js";
 import "./follow-unsubscribe.test.js";
