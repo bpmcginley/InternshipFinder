@@ -102,6 +102,7 @@ jobs:
         env:
           INTERNSCOUT_PUBLIC_DATA: ${{ steps.public-data.outputs.directory }}
           EMPLOYER_POSTING_MODE: ${{ vars.INTERNSCOUT_EMPLOYER_POSTING_MODE }}
+          ADVISOR_SIGNUP_MODE: ${{ vars.INTERNSCOUT_ADVISOR_SIGNUP_MODE }}
           # A backstop: the publisher breaks every tie itself so two builds of the same data are the same
           # bytes, and a fixed hash seed keeps any tie it missed from moving between deploys.
           PYTHONHASHSEED: "0"
@@ -114,6 +115,13 @@ jobs:
             capture) employer_args=(--employer-postings --employer-posting-capture) ;;
             *) echo "::error::Invalid employer posting mode."; exit 1 ;;
           esac
+          # Paired form/privacy output stays off until G3 and provider qualification.
+          advisor_args=()
+          case "${ADVISOR_SIGNUP_MODE:-}" in
+            ""|off) ;;
+            enabled) advisor_args=(--advisor-signup) ;;
+            *) echo "::error::Invalid advisor signup mode."; exit 1 ;;
+          esac
           cp -r docs _site
           if [ "$INTERNSCOUT_PUBLIC_DATA" != "$GITHUB_WORKSPACE/docs/data" ]; then
             rm -rf -- _site/data
@@ -124,7 +132,7 @@ jobs:
           rm -f _site/CNAME        # the custom domain lives in the Pages settings for an Actions deploy
           # --placements-report (2026-10-14): what this build kept and dropped, for the next step. Written
           # outside _site, so it is never published.
-          (cd backend && INTERNSCOUT_PUBLIC_DATA="$GITHUB_WORKSPACE/_site/data" PYTHONPATH="..:." python -m scripts.make_og_image --site ../_site ../live-sitemap.xml ../live-noindex.txt --placements ../placements.json --placements-report ../placements-report.json "${employer_args[@]}")
+          (cd backend && INTERNSCOUT_PUBLIC_DATA="$GITHUB_WORKSPACE/_site/data" PYTHONPATH="..:." python -m scripts.make_og_image --site ../_site ../live-sitemap.xml ../live-noindex.txt --placements ../placements.json --placements-report ../placements-report.json "${employer_args[@]}" "${advisor_args[@]}")
           # 2026-10-23: fail before publishing missing links/canonicals or directory redirects.
           (cd backend && python -m internscout.site_links ../_site)
           # For the notify job: what was live before this deploy, and what this deploy publishes.

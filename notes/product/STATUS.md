@@ -371,7 +371,7 @@ The golden harness now covers static assets as well as generated pages. Each sit
 
 | E | P-4.4d paired advisor artifact | audit_growth_generated | `codex/product-p4.4d-advisor-artifact` | [#486](https://github.com/bpmcginley/InternshipFinder/pull/486) | Draft; local qualification passed; review/CI pending | Same existing flag pairs exact approved privacy with weekly forms. 115 advisor/widget/golden checks and 16 new paired screenshots pass. Fresh rollback qualified; G3/provider release remain open. |
 
-| E | P-4.4e dormant advisor Pages mode | audit_growth_generated | `codex/product-p4.4e-advisor-pages-mode` | Draft claim | In progress; needs-bruce | Strict unset/off or enabled value appends existing paired advisor flag. No variable setting, dispatch or activation; G3/provider gates remain. |
+| E | P-4.4e dormant advisor Pages mode | audit_growth_generated | `codex/product-p4.4e-advisor-pages-mode` | [#491](https://github.com/bpmcginley/InternshipFinder/pull/491) | Draft; local checks pass; review/CI pending | Strict unset/off or enabled mode; 61 actual Bash, 115 paired/golden and three workflow contract checks pass. No variables, dispatch or activation; G3/provider gates remain. |
 
 ## Waiting for Bruce
 
@@ -388,7 +388,7 @@ Dates are when the item was recorded, not a claim that a separate message was se
 
 | Recorded | Item | Ready artifact / next action | Done |
 |---|---|---|---|
-| 2026-11-12 | P-4.4e dormant advisor Pages mode | Draft on exact #486; separate default-off workflow transport only. | G3, provider qualification, parent integration and review remain open. |
+| 2026-11-12 | P-4.4e dormant advisor Pages mode | [#491](https://github.com/bpmcginley/InternshipFinder/pull/491) on exact #486; separate default-off workflow transport only. | G3, provider qualification, parent integration and review remain open. |
 | 2026-11-12 | P-4.4d paired advisor artifact | [#486](https://github.com/bpmcginley/InternshipFinder/pull/486) on exact #479; approved #328 wording only, default-off artifact qualification. | G3, provider Tags/no automation, review and coordinated publication remain open. |
 | 2026-11-11 | Chrome 0.6.0 verified final-review handoff | [#455](https://github.com/bpmcginley/InternshipFinder/pull/455) normally refreshed on exact #440 69eb5e9c. All reviewed source, tests and screenshot bytes match 393a1ff0. Fresh Node 22 qualification passed 122 focused tests and scoped ESLint passed. Prior Node 22 qualification on the byte-identical extension tree passed 381 tests. Synthetic Chrome evidence is in [the package note](P-0.6.0-final-review.md). Fresh hosted checks, independent integration review and owner release remain pending. | Draft needs-bruce |
 | 2026-11-11 | P-2.2an dashboard session freshness | [#466](https://github.com/bpmcginley/InternshipFinder/pull/466) published reviewed stale-auth fencing with both-width evidence and exact Pages and Tests. | Exact production publication verified. |
