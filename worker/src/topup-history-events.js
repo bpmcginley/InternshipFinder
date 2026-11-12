@@ -25,6 +25,7 @@ export async function observeVerifiedTopupEvent(db, env, event, options = {}) {
     livemode,
     apiVersions,
     timeoutMs = PAYMENT_EVIDENCE_BOUNDS.timeoutMs,
+    beforeObserve,
   } = options;
   let e, object, kind, paymentId, chargeId, config;
   try {
@@ -72,6 +73,7 @@ export async function observeVerifiedTopupEvent(db, env, event, options = {}) {
       !id(object.id, { refund: "re", dispute: "du", charge: "ch" }[kind]) ||
       (kind !== "refund" && object.livemode !== livemode) ||
       (object.livemode !== undefined && object.livemode !== livemode) ||
+      (beforeObserve !== undefined && typeof beforeObserve !== "function") ||
       typeof fetchImpl !== "function" ||
       typeof resolveOffer !== "function" ||
       !Number.isInteger(timeoutMs) ||
@@ -232,6 +234,7 @@ export async function observeVerifiedTopupEvent(db, env, event, options = {}) {
       )
         return pending();
     }
+    if (beforeObserve !== undefined && (await beforeObserve()) !== true) return pending();
     live();
     return observeTopupHistory(
       db,
