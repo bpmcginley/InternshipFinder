@@ -6,6 +6,8 @@ const ROLE_ID = /^[a-f0-9]{16}$/;
 const EMAIL = /^[^\s@<>,\x00-\x1f\x7f]+@[^\s@<>,\x00-\x1f\x7f]+\.[^\s@<>,\x00-\x1f\x7f]+$/;
 const FOLLOW_TOKEN = /[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}\.[a-f0-9]{64}/i;
 const ACTION_TOKEN = /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}\.[a-f0-9]{64}$/;
+const MANAGEMENT_PATH = "/follows/manage.html";
+const MANAGEMENT_PREFIX = `https://internscout.org${MANAGEMENT_PATH}#token=`;
 const invalid = () => {
   throw new Error("Invalid follow message input");
 };
@@ -78,8 +80,19 @@ function trustedLinks(origins, links) {
     if (!allowed.has(url.origin)) invalid();
     if (publicLink) {
       if (FOLLOW_TOKEN.test(decodedLink(url.href))) invalid();
-    } else if (decodedLink(url.pathname) === "/follows/action.html" || value.includes("#"))
-      actionFragment(name, value, url);
+    } else {
+      const path = decodedLink(url.pathname);
+      if (path === MANAGEMENT_PATH || (name === "management" && value.includes("#"))) {
+        if (
+          name !== "management" ||
+          !value.startsWith(MANAGEMENT_PREFIX) ||
+          !ACTION_TOKEN.test(value.slice(MANAGEMENT_PREFIX.length))
+        )
+          invalid();
+      } else if (path === "/follows/action.html" || value.includes("#")) {
+        actionFragment(name, value, url);
+      }
+    }
     return url.href;
   };
 }
