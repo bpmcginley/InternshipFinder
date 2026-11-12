@@ -100,7 +100,7 @@ export async function enqueueFollowManagementRequest(db, input, options = {}) {
          FROM follow_subscribers u WHERE u.email=? AND date('now')=?
            AND EXISTS(SELECT 1 FROM follow_subscriptions s WHERE s.subscriber_id=u.id)
          ON CONFLICT(subscriber_id) DO UPDATE SET id=excluded.id,
-           queued_at=excluded.queued_at,expires_at=excluded.expires_at
+           queued_at=excluded.queued_at,expires_at=excluded.expires_at,claim_id=NULL
          WHERE follow_management_outbox.expires_at<=${NOW}`,
           )
           .bind(crypto.randomUUID(), ttlMs / 1000, email, day),

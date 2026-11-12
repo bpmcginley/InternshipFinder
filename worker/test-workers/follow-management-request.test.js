@@ -24,7 +24,7 @@ it("SQLite-expired requests are replaceable without a Worker clock", async () =>
   ).run();
   const now = "strftime('%Y-%m-%dT%H:%M:%fZ','now')";
   await env.DB.prepare(
-    `INSERT INTO follow_management_outbox VALUES('old','equality',strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 second'),${now})`,
+    `INSERT INTO follow_management_outbox(id,subscriber_id,queued_at,expires_at) VALUES('old','equality',strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 second'),${now})`,
   ).run();
   expect(
     await enqueueFollowManagementRequest(
