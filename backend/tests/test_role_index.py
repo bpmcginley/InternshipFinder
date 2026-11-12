@@ -7,8 +7,15 @@ import json
 import os
 import random
 from datetime import datetime, timezone
+from functools import partial
 
-from internscout import role_index, seo_pages
+import pytest
+
+from internscout import role_index
+from internscout.site import publish, runtime
+from internscout.site.source import place
+
+pytestmark = pytest.mark.without_seo_facade
 
 NOW = datetime(2026, 10, 19, 15, 37, 28, tzinfo=timezone.utc)
 DAY = "2026-10-19"
@@ -100,7 +107,7 @@ def test_a_row_carries_what_the_site_shows():
         "f": ["data", "swe"],
         "unpaid": False,
     }
-    assert r["loc"] == seo_pages.place(x)
+    assert r["loc"] == place(x)
     [r] = role_index.roles([_row(2, field_tags=[], regions=[], is_remote=True)], DAY)
     assert r["f"] == [] and r["loc"] == "Remote"
 
@@ -201,7 +208,7 @@ def test_sort_orders(tmp_path):
 
 def test_a_role_posted_on_two_boards_is_offered_once():
     # Boeing's JR2026520392 and JR2026520392-1: same title and place, two ids. The newer posting stays,
-    # as on the employer's page (seo_pages.dedupe_roles).
+    # as on the employer's page (runtime.dedupe_roles).
     a = _row(1, company="Boeing", title="Engineering Intern", posted_at="2026-10-01T00:00:00")
     b = _row(
         2,
@@ -284,14 +291,15 @@ def _site(tmp_path, rows):
 
 
 def test_the_site_build_writes_it_and_build_alone_does_not(tmp_path, monkeypatch):
-    monkeypatch.setattr(seo_pages, "today_utc", lambda: DAY)
+    monkeypatch.setattr(publish, "_today_utc", lambda: DAY)
+    monkeypatch.setattr(runtime, "BuildState", partial(runtime.BuildState, near_on=False))
     rows = [_row(1), _row(2, company="Zeta", insights={"deadline": "2026-10-18"})]
     site = _site(tmp_path / "a", rows)
-    seo_pages.build(site)
+    runtime.build_snapshot(site)
     assert not os.path.exists(
         os.path.join(site, "data", "roles")
     )  # growth/report.py builds on docs/
-    seo_pages.main(["seo_pages", site])
+    publish.main(["publish", site])
     got = _bytes(site)
     assert list(got) == ["a.json", "index.json"]
     ix = json.loads(got["index.json"])
@@ -301,5 +309,5 @@ def test_the_site_build_writes_it_and_build_alone_does_not(tmp_path, monkeypatch
     }
     # The same data built again: the same files.
     again = _site(tmp_path / "b", rows)
-    seo_pages.main(["seo_pages", again])
+    publish.main(["publish", again])
     assert _bytes(again) == got

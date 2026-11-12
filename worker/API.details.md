@@ -152,6 +152,7 @@ its own Stripe price id is set. When paid plans are on, `payments` looks like
 and otherwise it is `{ "enabled": false, "plans": [] }`.
 
 ### `GET /me` (auth)
+The authenticated response is served with `Cache-Control: no-store`.
 ```json
 { "month": "2026-09", "plan": "free", "plan_renews": null, "tier": "edu", "paused": false,
   "can_upgrade": true, "can_manage": false,
@@ -167,10 +168,17 @@ and otherwise it is `{ "enabled": false, "plans": [] }`.
   this student (at their own tier, so a non-.edu account sees its share), or `null` when there is none.
   The dashboard and the extension's Upgrade button quote it.
 - **`can_manage`** is true when they have a Stripe customer, so the dashboard can show "Manage subscription".
-- **Invite units** (see `GET /invite`) are already in `limit`: it is the month's allowance, or what was
-  used if invite units took the student past it, plus the invite units left. So `limit - used` is always
-  what they can still run, and an older client needs no change. A task with invite units left also
-  carries `"bonus": 3`.
+- **Invite units** (see `GET /invite`) are already in `limit`. A task with invite units left also
+  carries `"bonus": 3`, which always refers to invite units.
+- **Purchased Auto-Apply runs** appear as an optional positive `allowance.autofill.purchased` count.
+  It reflects unused purchased runs that clear the ledger's hold, refund and revocation checks.
+  The count stays visible when sales or funded creation are off. When funded purchased creation is
+  ready and the Auto-Apply allowance is enabled and finite, these runs are already included in
+  `limit - used`. Clients can show the separate balance without adding it to that remainder again.
+
+- **`can_recover_topup`** is present and true only when historical recovery is configured
+  and the current signed-in session owns an attached open Checkout. It carries no Checkout
+  identifier or payment information and requires no provider request.
 
 ### `GET /invite` (auth)
 The student's own invite link, made on first ask:
@@ -514,7 +522,7 @@ current status does not allow (or a row that changed while it was being saved).
 
 ## Paid listing orders (bought on the site; off until `EMPLOYER_CHECKOUT` is `"1"`)
 
-Added 2026-10-19 (`src/orders.js`, `src/mail.js`; the design is `worker/ORDERS.md`). An employer buys a
+Added 2026-10-19 (`src/orders/`, `src/mail.js`; the design is `worker/ORDERS.md`). An employer buys a
 paid listing for 1 or 3 of its open roles on `internscout.org/employers/buy/`; Bruce approves or refuses
 each order from a signed link in his email. Approving runs the same placement steps as the admin routes
 above (`update` if the start day has passed, `check` with all eight checks, `on`), by `"bruce"`, so every
@@ -633,6 +641,73 @@ token. Not tied to `EMPLOYER_CHECKOUT`, so pilot codes can be made before buying
 Deletes orders never confirmed after 7 days (always, even while orders are off). While on: sends a review
 email that failed, reminds Bruce once about an order waiting more than a day, ends closed roles and makes
 the offer above, sends an offer email that failed, and refunds offers unanswered after 30 days.
+
+## Signed top-up event recovery
+
+The existing `POST /billing/webhook` signature and `stripe_events` receipt boundary also
+accepts configured historical top-ups. The existing Stripe secret, webhook secret and
+validated dedicated `STRIPE_PRICE_TOPUP` configure this path independently of current sales.
+The fixed `topup-v1` terms and authenticated mode are checked by the existing authoritative
+Checkout/payment readers. Inactive Prices and disabled sales do not suppress recovery.
+No extra Price request is required.
+
+Marked or durably associated top-up events never fall through to subscription or employer
+handling. Pending recovery returns the existing generic billing error and releases the
+receipt for Stripe retry. Confirmed settlement, expiry, reconciliation and terminal replay
+use existing typed helpers and durable claim/revision checks. Unknown reversals can use
+at most one bounded Charge GET to resolve a missing PaymentIntent and one bounded
+PaymentIntent GET to classify its metadata. Each uses the existing 10-second/256-KiB
+pinned Stripe reader with manual redirects and no provider writes. Known employer payment
+associations need no discovery GET. No top-up configuration means no extra database or
+provider work for unrelated historical billing events. No event fields or redirects grant
+credit directly, and no new receipt or storage is introduced.
+
+## One-time Auto-Apply checkout
+
+`GET /billing/topup/offer` uses the same origin, current-session and configuration gates
+as checkout. The optional `topups: true` in `GET /config` is a configuration hint only.
+It requires no provider request and carries no price or account information. The
+authenticated offer route checks current Auto-Apply availability, verifies the configured
+one-time Price and product, rechecks service availability and session identity, and returns
+200 with `{enabled: true, offer: {amount, currency, units}}` and `Cache-Control: no-store`.
+Amount is in minor currency units. The response contains no provider references.
+
+`POST /billing/topup/checkout` defaults off. It requires the exact `TOPUPS_ENABLED` and
+`PAYMENTS_ENABLED` opt-ins and the existing private Stripe configuration. It accepts the
+two existing HTTPS dashboard Origins, `https://internscout.org` and
+`https://bpmcginley.github.io`, only when permitted by the configured CORS list.
+
+An existing session bearer authorizes the request without sliding its expiry. The server
+validates current Auto-Apply availability and the configured offer before reserving a
+checkout. The configured first-party
+dashboard root is the return destination for both completion and cancellation. The handler
+ignores request body and query fields. The existing reservation permits one active checkout
+attempt per account.
+
+Responses use `Cache-Control: no-store`. A verified open checkout returns 200 with
+`{status: "open", url}`. An unresolved attempt returns 202 with `{status: "pending"}`.
+Missing or invalid sessions return 401, disallowed Origins return 403, and disabled or
+unavailable checkout returns 503. Checkout does not itself grant purchased runs.
+
+### Attached checkout recovery
+
+`POST /billing/topup/recover` takes an existing session bearer and an allowed dashboard
+Origin. Send an empty request without a query. Historical recovery needs the server's
+historical Stripe configuration and the configured first-party dashboard root. The
+sales switches do not gate it. The existing attempt is selected by account.
+
+The no-store response returns 200 with `{status: "open", url}` only for a verified
+unexpired hosted Checkout. The exact attempt, revision and session are checked again.
+A verified terminal attempt returns 200 with `{status: "settled"}` or `{status: "expired"}`.
+No active attempt returns 200 with `{status: "inactive"}`. Uncertain evidence or an
+attempt with no attached Checkout returns 202 with `{status: "pending"}`.
+
+A malformed request returns 400, confirmed invalid auth returns 401, and a disallowed
+Origin returns 403. Unsupported methods return 405, except the common OPTIONS preflight.
+Missing recovery configuration returns 503 with `{status: "disabled"}`. A recovery
+budget of three requests per account and 30 globally per UTC minute returns 429 with
+`Retry-After: 60` when exhausted. Recovery only reads from Stripe and never creates a
+checkout. Refresh `GET /me` after recovery for the current spendable balance.
 
 ## Paid plans (optional, off by default)
 

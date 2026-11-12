@@ -7,13 +7,26 @@ from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
-from internscout import seo_pages as sp
+from internscout.site import runtime
+
+
+pytestmark = pytest.mark.without_seo_facade
 
 
 @pytest.mark.parametrize("digest", ["", "enabled"])
-def test_footer_has_exact_distribution_links_without_losing_existing_routes(monkeypatch, digest):
-    monkeypatch.setattr(sp, "DIGEST_FORM", digest)
-    html = sp.page("/internships/arts/", "Arts", "Arts", "Arts", [], "", "November 10, 2026")
+def test_footer_has_exact_distribution_links_without_losing_existing_routes(digest):
+    html = runtime.invoke(
+        runtime.BuildState(digest_form=digest),
+        runtime.BuildHooks(),
+        runtime.page,
+        "/internships/arts/",
+        "Arts",
+        "Arts",
+        "Arts",
+        [],
+        "",
+        "November 10, 2026",
+    )
     footer = re.search(r"<footer>.*?</footer>", html, re.S)[0]
     nav = ET.fromstring(re.search(r'<nav class="distribution-links".*?</nav>', footer, re.S)[0])
     assert nav.get("aria-label") == "More ways to use InternScout"
@@ -33,7 +46,7 @@ def test_footer_has_exact_distribution_links_without_losing_existing_routes(monk
 
 @pytest.mark.parametrize("tag", ["mechanical", "swe", 'field&"<x>/ #'])
 def test_widget_link_roundtrips_canonical_tag_without_injected_markup(tag):
-    root = ET.fromstring(sp.widget_follow(tag))
+    root = ET.fromstring(runtime.widget_follow(tag))
     assert len(root) == 1 and root[0].tag == "a" and len(root[0]) == 0
     assert set(root[0].attrib) == {"href", "data-distribution"}
     url = urlsplit(root[0].get("href"))
@@ -69,7 +82,10 @@ def test_only_field_landing_pages_get_a_preselected_widget_link(tmp_path):
         encoding="utf-8",
     )
     (data.parent / "majors.json").write_text('{"majors": []}', encoding="utf-8")
-    pages = {page["path"]: page["html"] for page in sp.build(str(tmp_path))}
+    result = runtime.invoke(
+        runtime.BuildState(near_on=False), runtime.BuildHooks(), runtime.build_result, str(tmp_path)
+    )
+    pages = {page["path"]: page["html"] for page in result.pages}
     selected = 'href="/widget/builder.html?field=mechanical"'
     assert pages["/internships/mechanical-engineering/"].count(selected) == 1
     assert all(

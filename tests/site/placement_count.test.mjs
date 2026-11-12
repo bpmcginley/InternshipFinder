@@ -97,7 +97,7 @@ test("nothing is sent with ?nocount=1, on a local copy, in an automated browser,
 test("the dashboard box and the landing box both carry the placement id; count.js names nothing else", () => {
   assert.match(read("docs/js/placements.js"), /"data-placement": plId \|\| undefined/);
   assert.match(read("docs/js/placements.js"), /\(window\.ISPlacementQ = window\.ISPlacementQ \|\| \[\]\)\.push\(box\.current\)/);
-  assert.match(read("backend/internscout/seo_pages.py"), /<li class="paid" data-placement="\{esc\(pl\.get\("id"\) or ""\)\}"/);
+  assert.match(read("backend/internscout/site/publish.py"), /<li class="paid" data-placement="\{esc\(pl\.get\("id"\) or ""\)\}"/);
   const code = COUNT.replace(/^\s*\/\/.*$/gm, "");
   assert.match(code, /beacon\(\{ s: id, e: e, p: location\.pathname \}\)/);
 });

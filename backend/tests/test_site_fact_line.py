@@ -8,12 +8,21 @@ from pathlib import Path
 
 import pytest
 
-from internscout import page_dates, seo_pages
-from test_seo_pages import _row, _site
+from internscout import page_dates
+from internscout.site import publish, runtime
+from tests.seo_fixture_data import _row, _site
+
+pytestmark = pytest.mark.without_seo_facade
 
 
-def build(site):
-    return {p["path"]: p for p in seo_pages.build(site, earning=frozenset())}
+def build(site, *, write=False):
+    state = runtime.BuildState(near_on=False)
+    hooks = runtime.BuildHooks()
+    built = runtime.invoke(state, hooks, runtime.build, site, earning=frozenset())
+    pages = {p["path"]: p for p in built}
+    if write:
+        publish._write_site(site, list(pages.values()), state, hooks)
+    return pages
 
 
 def stamp(site, value):
@@ -92,8 +101,8 @@ def test_valid_export_calendar_date_follows_existing_timestamp_parser(tmp_path, 
 def test_optional_body_date_keeps_zero_singular_and_full_counts(count):
     rows = [dict(_row(i), keys={"MA"}) for i in range(count)]
     when = datetime(2026, 11, 11, tzinfo=timezone.utc)
-    plain = seo_pages.listing_body(rows, "at Example Labs", "", when, "")
-    dated = seo_pages.listing_body(rows, "at Example Labs", "", when, "", export_stamp=when)
+    plain = runtime.listing_body(rows, "at Example Labs", "", when, "")
+    dated = runtime.listing_body(rows, "at Example Labs", "", when, "", export_stamp=when)
     assert dated == plain.replace(
         '<p class="lede">', '<p class="lede">As of November 11, 2026, InternScout lists ', 1
     )
@@ -103,12 +112,10 @@ def test_optional_body_date_keeps_zero_singular_and_full_counts(count):
 def test_date_only_rollover_keeps_lastmod_but_changed_count_advances_it(tmp_path, monkeypatch):
     site = fixture(tmp_path)
     monkeypatch.setattr(page_dates, "observed_day", lambda: "2026-09-23")
-    before = build(site)
-    seo_pages.write(site, list(before.values()))
+    before = build(site, write=True)
     monkeypatch.setattr(page_dates, "observed_day", lambda: "2026-09-24")
     stamp(site, "2026-09-24T10:00:00Z")
-    after = build(site)
-    seo_pages.write(site, list(after.values()))
+    after = build(site, write=True)
     for path in ("/internships/mechanical-engineering/", "/internships/at/example-labs/"):
         assert before[path]["lastmod"] == after[path]["lastmod"]
         assert "September 24, 2026" in lead(after[path])
@@ -116,8 +123,7 @@ def test_date_only_rollover_keeps_lastmod_but_changed_count_advances_it(tmp_path
     rows = json.loads(file.read_text(encoding="utf-8"))
     rows.append(_row(999, company_name="Example Labs"))
     file.write_text(json.dumps(rows), encoding="utf-8")
-    changed = build(site)
-    seo_pages.write(site, list(changed.values()))
+    changed = build(site, write=True)
     assert changed["/internships/at/example-labs/"]["lastmod"] == "2026-09-24"
 
 
