@@ -9,6 +9,26 @@ import {
 import { renderFollowMail } from "./follow-mail.js";
 import { followBudgetStamp, validFollowSendCap } from "./follow-send-budget.js";
 
+// Bind the strings actually handed to the renderer to the hashes in the final fence.
+function boundLinks(links, { confirm, deletion, unsubscribe }) {
+  const checked = {};
+  for (const [name, token, purpose] of [
+    ["confirmation", confirm.raw, "confirm"],
+    ["deleteRequest", deletion.raw, "delete-request"],
+    ["unsubscribe", unsubscribe.raw, null],
+  ]) {
+    const link = links?.[name];
+    if (typeof link !== "string") throw new Error("Invalid confirmation links");
+    const url = new URL(link);
+    const matches = link.includes("#")
+      ? purpose && !url.search && url.hash === `#purpose=${purpose}&token=${token}`
+      : url.search === `?token=${token}`;
+    if (!matches) throw new Error("Invalid confirmation links");
+    checked[name] = link;
+  }
+  return checked;
+}
+
 export async function deliverFollowConfirmation({ db, jobId, cap, clock, present, transport }) {
   const unavailable = () => ({ status: "unavailable" });
   if (!validFollowSendCap(cap) || [clock, present, transport].some((f) => typeof f !== "function"))
@@ -19,13 +39,17 @@ export async function deliverFollowConfirmation({ db, jobId, cap, clock, present
     if (!job) return unavailable();
     const prepared = await prepareFollowConfirmationClaim();
     // Render before spending either the job or capacity. The port receives no recipient address.
-    const presentation = await present({
+    const { links, ...presentation } = await present({
       scopeKey: job.scope_key,
       confirmation: prepared.confirm.raw,
       deleteRequest: prepared.deletion.raw,
       unsubscribe: prepared.unsubscribe.raw,
     });
-    envelope = renderFollowMail("confirm", { ...presentation, to: job.email });
+    envelope = renderFollowMail("confirm", {
+      ...presentation,
+      links: boundLinks(links, prepared),
+      to: job.email,
+    });
     const started = followBudgetStamp(clock());
     if (!started || started >= job.expires_at) return unavailable();
     const at = await readFollowConfirmationClock(db);

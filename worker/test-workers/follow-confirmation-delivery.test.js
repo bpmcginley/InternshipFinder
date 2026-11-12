@@ -116,6 +116,44 @@ it("malformed presentation leaves both the claim and budget untouched", async ()
   expect(transport).not.toHaveBeenCalled();
 });
 
+it.each(["other scope", "swapped purpose", "duplicate token"])(
+  "a presentation with %s cannot spend the claim or capacity",
+  async (fault) => {
+    const pending = await queue();
+    const other = await requestFollowConfirmation(
+      env.DB,
+      "other@example.test",
+      { kind: "company", company: "two" },
+      catalog,
+      new Date(Date.now() - 1_000),
+    );
+    const previous = await job(other);
+    const borrowed = await mintFollowToken(env.DB, other.subscriberId, "confirm", {
+      scopeKey: other.scopeKey,
+    });
+    const transport = vi.fn(async () => {});
+    const presentation = (input) => {
+      const output = present(input);
+      const link = `${origin}/confirm?token=${borrowed}`;
+      output.links.confirmation =
+        fault === "other scope"
+          ? link
+          : fault === "swapped purpose"
+            ? output.links.deleteRequest
+            : `${output.links.confirmation}&token=${borrowed}`;
+      return output;
+    };
+    expect(await delivery(pending, { present: presentation, transport })).toEqual(
+      status("unavailable"),
+    );
+    expect((await job(pending)).claim_id).toBeNull();
+    expect(await budget()).toBeNull();
+    expect(await count("follow_tokens")).toBe(1);
+    expect(await job(other)).toEqual(previous);
+    expect(transport).not.toHaveBeenCalled();
+  },
+);
+
 it.each(["newer confirmation", "scope replacement", "expired scope"])(
   "%s during presentation prevents the exact claim and debit",
   async (change) => {
