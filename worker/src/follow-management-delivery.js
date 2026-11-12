@@ -15,6 +15,15 @@ const stamp = (v) =>
   v.length === 24 &&
   Number.isFinite(Date.parse(v)) &&
   new Date(v).toISOString() === v;
+function sampleClock(clock) {
+  const value = clock();
+  if (!(value instanceof Date)) {
+    // Observe an accidentally async rejection without awaiting or admitting it.
+    Promise.resolve(value).catch(() => {});
+    throw new Error();
+  }
+  return followBudgetStamp(value);
+}
 // A public endpoint/fragment grammar is not selected here. Bind exact credentials to the existing renderer's private slots.
 function boundLinks(buildLinks, credentials) {
   const values = buildLinks(Object.freeze({ ...credentials }));
@@ -27,8 +36,10 @@ function boundLinks(buildLinks, credentials) {
     const value = values?.[name],
       token = credentials[name];
     if (typeof value !== "string" || value.length > 2000) throw new Error();
-    const matches = decodeURIComponent(value).match(TOKENS) || [];
-    if (matches.length !== 1 || matches[0] !== token) throw new Error();
+    for (const representation of [value, new URL(value).href]) {
+      const matches = decodeURIComponent(representation).match(TOKENS) || [];
+      if (matches.length !== 1 || matches[0] !== token) throw new Error();
+    }
     links[name] = value;
   }
   return links;
@@ -155,11 +166,11 @@ export async function deliverFollowManagement({
     };
     const previewLinks = boundLinks(buildLinks, probe);
     renderFollowMail("manage", { ...config, to: "preview@example.test", links: previewLinks });
-    let previous = followBudgetStamp(clock());
+    let previous = sampleClock(clock);
     if (!previous) return unavailable();
     const started = previous;
     const current = () => {
-      const value = followBudgetStamp(clock());
+      const value = sampleClock(clock);
       if (!value || value < previous) throw new Error();
       previous = value;
       return value;

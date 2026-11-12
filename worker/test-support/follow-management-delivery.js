@@ -294,3 +294,57 @@ export async function lateOrRegressedAppClockBlocksHandoff(db) {
     assert.equal((await rows(db, "follow_send_budget"))[0].attempts, 1);
   }
 }
+
+export async function rejectingClockSamplesAreDrainedWithoutHandoff(db) {
+  for (const phase of [1, 3, 4]) {
+    for (const thenable of [false, true]) {
+      await reset(db);
+      const jobId = await seed(db);
+      let samples = 0,
+        sends = 0;
+      const clock = () => {
+        if (++samples !== phase) return new Date();
+        if (thenable)
+          return {
+            then(_resolve, reject) {
+              reject(Error("synthetic-clock-rejection"));
+            },
+          };
+        return Promise.reject(Error("synthetic-clock-rejection"));
+      };
+      assert.deepEqual(
+        await deliver({ ...config(db), jobId, clock, transport: async () => sends++ }),
+        { status: "unavailable" },
+      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      assert.equal(sends, 0);
+      const budget = await rows(db, "follow_send_budget");
+      assert.equal(budget[0]?.attempts ?? 0, phase === 1 ? 0 : 1);
+    }
+  }
+}
+export async function canonicalLinksRetainTheirExactCapability(db) {
+  for (const slot of ["management", "unsubscribe"]) {
+    for (const parent of ["..", "%2e%2e"]) {
+      await reset(db);
+      const jobId = await seed(db);
+      let sends = 0;
+      const builder = (credentials) => ({
+        ...buildLinks(credentials),
+        [slot]: `https://follow.example.test/${credentials[slot]}/${parent}/action`,
+      });
+      assert.deepEqual(
+        await deliver({
+          ...config(db),
+          jobId,
+          buildLinks: builder,
+          transport: async () => sends++,
+        }),
+        { status: "unavailable" },
+      );
+      assert.equal(sends, 0);
+      assert.deepEqual(await rows(db, "follow_send_budget"), []);
+      assert.equal((await rows(db, "follow_management_outbox"))[0].claim_id, null);
+    }
+  }
+}
