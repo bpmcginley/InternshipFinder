@@ -370,6 +370,9 @@ The golden harness now covers static assets as well as generated pages. Each sit
 
 ## Waiting for Bruce
 
+- **P-2.2ap native checkout recovery UI [#475](https://github.com/bpmcginley/InternshipFinder/pull/475)**: audit_site, `codex/product-p2.2ap-recovery-ui`, on published `82c3c429`. Draft needs-bruce; conditional Account/allowance recovery and exact pending-checkout deletion guidance implemented. 16 focused and 400 site tests, two golden tests and 24 paired synthetic screenshots. Session, refresh and cross-tab deletion races corrected. #472 is deployed with recovery off pending provider configuration. Independent review and hosted checks remain.
+
+
 P-2.1u [#341](https://github.com/bpmcginley/InternshipFinder/pull/341) remains owner-gated after archive-reader integration. Publication, scheduling and activation remain pending.
 
 P-2.1s [#330](https://github.com/bpmcginley/InternshipFinder/pull/330) dormant archive reader remains owner-gated for configuration, publication and activation; no deployment or sending.
