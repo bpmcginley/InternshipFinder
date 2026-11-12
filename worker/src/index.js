@@ -27,8 +27,15 @@ import { MAX_ADMIN_BYTES, checkPlacement, createPlacement, endExpiredPlacements,
   livePlacements, pausePlacement, placementReport, refusePlacement, requireAdmin, rollupPlacementCounts, switchOn,
   updatePlacement } from "./placements.js";
 import { applyEvent, blocksDeletion, canUpgrade, checkout, deletePlan, paymentsInfo, paymentsOn, planOf, portal, siteUrl, verifyWebhook, reconcileStudentBilling, STUDENT_BILLING_CRON } from "./billing.js";
-import { MAX_ORDER_BYTES, availability, chooseCredit, confirmOrder, createPilotCode, creditInfo, listOrders, orderConfig,
-  notePlacementFields, ordersCron, ordersOn, requireOrders, reviewDecision, reviewPage, takeOrder } from "./orders.js";
+import { listOrders } from "./orders/admin.js";
+import { createPilotCode } from "./orders/pilot.js";
+import { availability, notePlacementFields } from "./orders/capacity.js";
+import { MAX_ORDER_BYTES } from "./orders/shared.js";
+import { ordersCron } from "./orders/cron.js";
+import { chooseCredit, creditInfo } from "./orders/refunds.js";
+import { reviewDecision, reviewPage } from "./orders/review.js";
+import { confirmOrder, takeOrder } from "./orders/checkout.js";
+import { orderConfig, ordersOn, requireOrders } from "./orders/access.js";
 
 const RUN_ID = /^[A-Za-z0-9_-]{1,64}$/;
 // InternScout's own extension IDs, named here instead of trusting every chrome-extension:// origin.
