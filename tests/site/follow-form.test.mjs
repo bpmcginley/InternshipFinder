@@ -169,6 +169,10 @@ test("one callback, explicit unchecked consent and generic accepted response; sc
   f.render();
   assert.equal(calls, 1);
   assert.equal(all(f.tree, "form")[0].props["aria-busy"], true);
+  all(f.tree, "button")[0].props.onClick();
+  f.render();
+  assert.equal(all(f.tree, "form").length, 1);
+  assert.equal(all(f.tree, "input")[1].props.checked, true);
   assert.deepEqual(payload, {
     email: "example@example.test",
     link: true,
@@ -237,5 +241,28 @@ test("scope, account generation and disabling abort pending UI and reset consent
       const checkbox = all(f.tree, "input").find((v) => v.props.type === "checkbox");
       if (checkbox) assert.equal(checkbox.props.checked, false);
     }
+  }
+});
+
+test("dismiss and reopen clears email, explicit linkage and every feedback state", async () => {
+  for (const outcome of ["invalid", "accepted", "unavailable", "typed"]) {
+    const f = fixture({ signedIn: true, request: async () => ({ status: outcome }) });
+    f.open();
+    f.email(outcome === "invalid" ? "invalid@" : "synthetic@example.test");
+    all(f.tree, "input")[1].props.onChange({ target: { checked: true } });
+    f.render();
+    if (outcome !== "typed") {
+      await f.submit();
+      f.render();
+    }
+    all(f.tree, "button")[0].props.onClick();
+    f.render();
+    assert.equal(all(f.tree, "form").length, 0);
+    f.open();
+    const inputs = all(f.tree, "input");
+    assert.equal(inputs[0].props.value, "");
+    assert.equal(inputs[0].props["aria-invalid"], false);
+    assert.equal(inputs[1].props.checked, false);
+    assert.equal(words(all(f.tree, "p").find((v) => v.props.role === "status")), "");
   }
 });

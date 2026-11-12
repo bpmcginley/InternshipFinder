@@ -66,6 +66,10 @@ export function createFollowForm({ h, useState, useRef, useEffect, useId }) {
     }, [open]);
     const close = () => {
       if (!flight.current) {
+        setEmail("");
+        setLink(false);
+        setInvalid(false);
+        setMessage("");
         setOpen(false);
         control.current?.focus();
       }
