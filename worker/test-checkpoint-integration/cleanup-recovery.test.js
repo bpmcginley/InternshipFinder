@@ -55,6 +55,83 @@ async function restart(object) {
   });
   return retained;
 }
+
+test.each(["lost-write", "before-sql"])(
+  "recovery preserves original cutoff after predecessor physical cleanup (%s)",
+  async (point) => {
+    const object = env.CHECKPOINT.get(env.CHECKPOINT.newUniqueId()),
+      now = await runInDurableObject(object, (i) => i.now()),
+      wire = (ms) => new Date(ms).toISOString().replace("Z", "000Z"),
+      bytes = (value) => new TextEncoder().encode(JSON.stringify(ordered(value))),
+      accepted = JSON.parse(golden.cases[1].checkpoint),
+      pending = JSON.parse(golden.cases[0].checkpoint);
+    for (const value of [accepted, pending]) {
+      value.covers_after = wire(now - 10 * DAY);
+      for (const row of value.rows) {
+        row[1] = wire(now - 9 * DAY).replace(/Z$/, "");
+        row[3] = wire(now - 9 * DAY);
+      }
+    }
+    accepted.accepted_at = wire(now - 7 * DAY + 2000);
+    pending.prepared_at = wire(now - 1000);
+    const acceptedBytes = bytes(accepted);
+    pending.predecessor = {
+      commit: accepted.accepted_commit,
+      public_tree: accepted.public_tree,
+      checkpoint_sha256: Array.from(
+        new Uint8Array(await crypto.subtle.digest("SHA-256", acceptedBytes)),
+        (v) => v.toString(16).padStart(2, "0"),
+      ).join(""),
+    };
+    await object.bootstrap(acceptedBytes);
+    const reserved = await object.reservePending(bytes(pending));
+    expect(reserved.status).toBe("reserved");
+    const before = await state(object),
+      originalCutoff = before.accepted.expires,
+      originalPendingExpiry = before.reservation.expires,
+      remaining = await runInDurableObject(object, (i) => originalCutoff - i.now());
+    expect(originalCutoff).toBeLessThan(originalPendingExpiry);
+    await new Promise((resolve) => setTimeout(resolve, Math.max(0, remaining) + 10));
+    expect(await object.retireExpired("accepted")).toBe("committed");
+    expect(await object.cleanupRetired()).toBe("committed");
+    const cleaned = await state(object);
+    expect(cleaned.accepted).toBeNull();
+    expect(cleaned.retired).toBeNull();
+    expect(cleaned.reservation).toEqual(before.reservation);
+    expect((await runInDurableObject(object, (i) => i.slots.read(1))).kind).toBe("tombstone");
+    expect(await runInDurableObject(object, (i) => i.now())).toBeLessThan(originalPendingExpiry);
+    await runInDurableObject(object, (i) => {
+      if (point === "lost-write") {
+        const write = i.slots.write;
+        i.slots.write = async (...args) => {
+          expect((await write(...args)).status).toBe("stored");
+          return { status: "uncertain" };
+        };
+      } else i.beforeCommit = () => { throw new Error("stop"); };
+    });
+    expect(await object.reconcileReserved(reserved.nonce)).toBe("held");
+    const retained = await restart(object);
+    expect(retained.cleanup).not.toBeNull();
+    expect(retained.cleanup.cutoff).toBe(originalCutoff);
+    expect(retained.cleanup.reservation.cutoff).toBe(originalCutoff);
+    expect(retained.cleanup.reservation.expires).toBe(originalPendingExpiry);
+    expect(retained.cleanup.reservation).not.toHaveProperty("predecessorExpires");
+    const etag = (await env.SLOTS.head(key)).etag;
+    await runInDurableObject(object, (i) => {
+      i.slots.write = () => { throw new Error("no replay"); };
+    });
+    expect(await object.recoverCleanup()).toBe("recovered");
+    expect(await runInDurableObject(object, (i) => i.now())).toBeLessThan(originalPendingExpiry);
+    const after = await state(object);
+    expect(after.reservation).toBeNull();
+    expect(after.pending).toBeNull();
+    expect(after.accepted).toBeNull();
+    expect(after.current).toEqual(retained.value.intent.next);
+    expect((await env.SLOTS.head(key)).etag).toBe(etag);
+    expect(await object.recoverCleanup()).toBe("held");
+    expect(await state(object)).toEqual(after);
+  },
+);
 beforeEach(async () => {
   await env.SLOTS.delete([key, "follow-checkpoint-slot-1"]);
 });

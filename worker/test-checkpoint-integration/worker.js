@@ -22,11 +22,10 @@ const reservationProof = (state) => {
     digest: r.digest,
     starts: r.starts,
     expires: r.expires,
-    predecessorExpires: state.accepted?.expires ?? null,
+    cutoff: r.cutoff,
   };
 };
-const cutoff = (state) =>
-  Math.min(state.reservation.expires, state.accepted?.expires ?? state.reservation.expires);
+const cutoff = (state) => state.reservation.cutoff;
 const encoder = new TextEncoder(),
   decoder = new TextDecoder();
 const copy = (value) => structuredClone(value);
