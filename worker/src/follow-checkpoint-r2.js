@@ -65,7 +65,9 @@ export function createFollowCheckpointR2Slots(bucket, { maxPayloadBytes, maxEnve
       }
       const end = body.indexOf(10);
       if (end < 0 || end > 255) throw new Error();
-      const text = new TextDecoder("utf-8", { fatal: true }).decode(body.subarray(0, end));
+      const text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(
+        body.subarray(0, end),
+      );
       const header = JSON.parse(text);
       const { v, kind, nonce, sha256, bytes } = header;
       if (
