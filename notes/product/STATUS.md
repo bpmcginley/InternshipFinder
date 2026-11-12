@@ -243,6 +243,8 @@ Queued means not started, not approved for release. A dash means no branch or PR
 | C | P-2.3j Employer catalog projection | Product session | `codex/product-p2.3j-employer-catalog` | [#331](https://github.com/bpmcginley/InternshipFinder/pull/331) | Reviewed, nine-green; included in draft #398 | Exact `29739ff1`; dormant canonical key projection and offline parser parity. Mapping approved through #336; source integration and collection activation remain separate. |
 | D | P-2.1 Follow build | Product session | - | - | Partial implementation; no activation | Storage, management, outbox and deletion helpers remain unpublished needs-bruce. Matching #255, mail envelopes #256 and scoped deletion #261 are reviewed/green; actual HTTP endpoint #266 is independently reviewed but security-held. Parent integration, owner merges, dispatch/sender/configuration and deployment remain pending. |
 | D | P-2.1ab Follow lineage continuity decision | Product session | `codex/product-p2.1z-lineage-decision` | [#358](https://github.com/bpmcginley/InternshipFinder/pull/358) | Draft needs-bruce | Forward seed and restricted cross-run checkpoint proposal, including closed lineage and recovery. No storage, workflow or publication changes. |
+| D | P-2.1al Detached follow checkpoint Worker | Product session | `codex/product-p2.1al-checkpoint-worker` | [#444](https://github.com/bpmcginley/InternshipFinder/pull/444) | Offline qualification only | Six exact #388/#427 blobs for local-only storage and HTTPS tests. The private Worker, production bindings, private access/PITR and G3 writer release remain pending. |
+| D | P-2.1am Separate private follow checkpoint Worker | Product session | `codex/product-p2.1am-checkpoint-runtime` | [#446](https://github.com/bpmcginley/InternshipFinder/pull/446) | Offline qualification only | Dedicated local entry and route-less Wrangler config on #444. Private origin/access, credential bindings, PITR and G3 writer integration remain pending. |
 | D | P-2.1q Fixed-export snapshot adapter | Product session | `codex/product-p2.1q-follow-snapshot-source` | [#320](https://github.com/bpmcginley/InternshipFinder/pull/320) | Independently reviewed, nine checks green, ready and open needs-bruce | Exact `0a4b05a8`, [review 5854243810](https://github.com/bpmcginley/InternshipFinder/pull/320#pullrequestreview-5854243810). On #315. Verifies one complete fixed export and projects exact UTC boundaries. Production capture integrity, immutable publication, retention and sending remain gated. |
 | D | P-2.1a Follow lifecycle | audit_worker_extension | `codex/product-p2.1a-follow-lifecycle` | [#224](https://github.com/bpmcginley/InternshipFinder/pull/224) | Reviewed; green; dormant; open needs-bruce | Storage/token lifecycle only. No route, mail/outbox, cron or deployed collection; implementation merge, final integration and owner deployment remain gates. |
 | D | P-2.1b Follow management | audit_worker_extension | `codex/product-p2.1b-follow-management` | [#228](https://github.com/bpmcginley/InternshipFinder/pull/228) | Reviewed; green; dormant; open needs-bruce | Stacked on #224. Management tokens and explicit deletion only; parent merge, retarget/fresh checks, future route/dispatch authorization and deployment remain pending. |
@@ -369,7 +371,8 @@ The golden harness now covers static assets as well as generated pages. Each sit
 
 ## Waiting for Bruce
 
-[#440](https://github.com/bpmcginley/InternshipFinder/pull/440) validates Auto-Apply tool inputs for the planned Chrome 0.6.0 release. Fresh hosted checks and independent integration review remain pending.
+- **P-2.2ap native checkout recovery UI [#475](https://github.com/bpmcginley/InternshipFinder/pull/475)**: audit_site, `codex/product-p2.2ap-recovery-ui`, on published `82c3c429`. Draft needs-bruce; conditional Account/allowance recovery and exact pending-checkout deletion guidance implemented. 16 focused and 400 site tests, two golden tests and 24 paired synthetic screenshots. Session, refresh and cross-tab deletion races corrected. #472 is deployed with recovery off pending provider configuration. Independent review and hosted checks remain.
+
 
 P-2.1u [#341](https://github.com/bpmcginley/InternshipFinder/pull/341) remains owner-gated after archive-reader integration. Publication, scheduling and activation remain pending.
 
@@ -525,6 +528,10 @@ Dates are when the item was recorded, not a claim that a separate message was se
 
 After each package has been live for 14 days, assess its named aggregate counter using owner-provided read-only evidence. Record qualitative findings here; keep private business numbers out of this public repository. Do not infer results before the observation period. No automated production query or scheduled task has been created.
 
+## Chrome 0.6.0 Auto-Apply tool input validation
+
+Draft needs-bruce [#440](https://github.com/bpmcginley/InternshipFinder/pull/440) checks required fields and declared types before form actions. Explicit false stays false, and invalid calls return a tool error without changing the form. The ordinary refresh on published main e1614a23 preserves both reviewed extension files from 4b33ae18. Node 22 passed 114 focused agent, guard and Worker-client tests, and scoped ESLint passed. Fresh hosted checks and independent exact review remain pending.
+
 ## P-1.2 stamped-main integration (historical pre-merge validation)
 
 Normally integrated published main `0e63c13b`, including #208 and cache stamping #205. Dashboard HTML/app.js, all three P-1.2 test files and every P-1.2 screenshot/evidence file remain byte-identical to reviewed `6a08f631`. Current main data, install/count, SEO generator, cache helper, build harness/workflow and golden inputs are preserved. Both output artifacts were rebuilt from this integrated tree: all 695 archive entries match the manifest; only `index.html` and `js/app.js` differ from this main baseline. Asset versions are generated by the current build; no source `?v` tag was edited.
@@ -574,9 +581,3 @@ Normally integrated published dashboard main `2a8176db`, preserving reviewed pri
 ## P-2.2af verified display offer
 
 Merged #430 adds an authenticated, default-off Worker offer with exact Stripe Price verification and a public configuration hint. The session, allowed dashboard Origin and current Auto-Apply service are fenced before the provider read and checked again before presenting the offer. Checkout reuses the service check before reservation. The projected display terms contain no provider references. Local 744 Node and 322 actual Workers/D1 tests passed. Independent review and hosted checks passed. The disabled route is live. Settlement, dashboard integration and activation remain pending.
-
-## Chrome 0.6.0 Auto-Apply tool input validation
-
-The agent checks required fields and declared types before taking action. An explicit false stays false and invalid calls return a tool error without mutating the form. The two targeted offline regressions fail on the original code and pass with the change. All 358 extension tests and scoped lint pass. Draft for post-refactor 0.6.0 qualification.
-
-Normal merge of published main 3947e237 after #426 preserves both exact reviewed extension files from f53b7ae4 and all inherited changes. Only this tracker required conflict resolution. Node 22 focused agent, guard and Worker-client tests pass 114 cases, and scoped ESLint passes. Main-relative scope remains the two extension files and this tracker. Fresh hosted checks and independent integration review remain pending; #440 stays draft needs-bruce with no release or activation.
