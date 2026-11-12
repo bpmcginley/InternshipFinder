@@ -7463,6 +7463,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "usinternshipspubliccareerssite": {
+   "name": "US Internships Public Careers Site",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-12"
+  },
   "uvimco": {
    "name": "University of Virginia Investment Management Company (UVIMCO)",
    "quant": false,
@@ -15730,12 +15736,6 @@
    "sector": "economic_consulting"
   },
   "fticonsulting|wd108|FTIConsultingCareers": {
-   "name": "FTI Consulting",
-   "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
-  },
-  "fticonsulting|wd108|FTIConsultingCareersPrivate": {
    "name": "FTI Consulting",
    "quant": false,
    "fails": 0,
