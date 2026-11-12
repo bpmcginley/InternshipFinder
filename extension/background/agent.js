@@ -10,6 +10,7 @@ import { canTailor } from "../lib/tailoring.js";
 import { getJob, updateJob, appendLog, saveMsgs, loadMsgs, getTailoredFile, tailorChoice } from "./queue.js";
 import { spend, money } from "../lib/usage.js";
 import { recordStep } from "./evalrec.js";
+import { confirmFinalReview } from "./review-handoff.js";
 // Side-effect import: guard.js is an IIFE that hangs ISGuard off globalThis. We want detectGate
 // here (in the worker) as well as in the page, and this keeps one copy with one set of tests.
 import "../agent/guard.js";
@@ -139,7 +140,7 @@ async function pageMark(tabId) {
 }
 export const noChange = (before, after) => !!before && !!after && before === after;
 
-async function act(tabId, fullRef, action, payload) {
+async function act(tabId, fullRef, action, payload, observeDocument) {
   const [fid, local] = String(fullRef).split(":");
   try {
     const [r] = await toPage(chrome.scripting.executeScript({
@@ -147,6 +148,7 @@ async function act(tabId, fullRef, action, payload) {
       func: (ref, a, p) => (window.ISDom ? window.ISDom.act(ref, a, p) : { ok: false, error: "Page changed. Use the new snapshot." }),
       args: [local, action, payload],
     }));
+    if (r?.result) observeDocument?.(r.documentId);
     return (r && r.result) || { ok: false, error: "No result (frame navigated?)" };
   } catch (e) {
     return { ok: false, error: "Could not reach the page: " + e.message };
@@ -413,7 +415,9 @@ async function loop(id, run) {
   // with a password box) do not count: the posting's own Apply button often comes after them.
   let runFilled = !!job.run_filled;
   const noteFilled = async () => { if (!runFilled) { runFilled = true; await updateJob(id, { run_filled: true }); } };
-  const shot = () => inFrames(tabId, (o) => window.ISDom && window.ISDom.snapshot(o), [{ runFilled }]);
+  const shot = async () => (await inFrames(tabId, (o) => window.ISDom && window.ISDom.snapshot(o), [{ runFilled }]))
+    .map((r) => ({ ...r.result, frameId: r.frameId, documentId: r.documentId }));
+  let reviewAfter = null;
 
   while (true) {
     job = await getJob(id);
@@ -464,7 +468,7 @@ async function loop(id, run) {
     let pre = (await inFrames(tabId, (f, file, g) => window.ISDom && window.ISDom.fastFill(f, file, { gen: g }), [facts, resume, gen]))
       .flatMap((r) => r.result || []);
 
-    let frames = (await shot()).map((r) => ({ frameId: r.frameId, ...r.result }));
+    let frames = await shot();
     // Single-page apps (Workday, Oracle, SuccessFactors) show a spinner for several seconds after the tab
     // reports "complete". A model turn spent on an empty loading page is wasted, so wait it out here.
     //
@@ -488,7 +492,7 @@ async function loop(id, run) {
       if (i >= 3 && still >= 2) break;
       await sleep(i ? 2000 : 2500);
       await inject(tabId);
-      frames = (await shot()).map((r) => ({ frameId: r.frameId, ...r.result }));
+      frames = await shot();
     }
     // fastFill ran before that wait, so on a page that had not drawn itself yet it was handed an empty
     // form and filled nothing. Now that the fields exist, give the rules their turn: every field the
@@ -498,7 +502,7 @@ async function loop(id, run) {
       if (!(await active())) return;
       pre = (await inFrames(tabId, (f, file, g) => window.ISDom && window.ISDom.fastFill(f, file, { gen: g }), [facts, resume, gen]))
         .flatMap((r) => r.result || []);
-      if (pre.length) frames = (await shot()).map((r) => ({ frameId: r.frameId, ...r.result }));
+      if (pre.length) frames = await shot();
     }
     // A page Chrome has put to sleep answers every snapshot with whatever was on screen when the
     // student left, so acting on it would be acting on a photograph. Say so instead of guessing.
@@ -508,7 +512,7 @@ async function loop(id, run) {
     if (asleep) {
       await sleep(2500);
       await inject(tabId);
-      frames = (await shot()).map((r) => ({ frameId: r.frameId, ...r.result }));
+      frames = await shot();
       asleep = frames.some((f) => f.frozen);
     }
 
@@ -530,6 +534,7 @@ async function loop(id, run) {
     // stopping progress: the page has come back unchanged three snapshots running while asleep.
     if (asleep) { sleepy = snap.text === sleepText ? sleepy + 1 : 0; sleepText = snap.text; }
     else { sleepy = 0; sleepText = null; }
+    const priorProgress = progress;
     const check = progressCheck(progress, snap.text, pageKey(url, frames), asleep);
     progress = check.state;
     const stuckAsleep = asleep && sleepy >= 2;
@@ -589,6 +594,29 @@ async function loop(id, run) {
       await own({ status: "needs_you", reason: NO_PROGRESS_HELP, question: "", steps: 0, pending, activity: "" });
       await saveMsgs(id, msgs);
       return;
+    }
+
+    const previousReview = reviewAfter;
+    reviewAfter = null;
+    const review = frames[0];
+    if (previousReview && runFilled && !accountPage && frames.length === 1 && review?.frameId === 0 &&
+        review.documentId === previousReview.documentId && tabId === previousReview.tabId &&
+        review.url === previousReview.url && review.reviewStep && !review.frozen && !review.busy &&
+        !review.captcha && !review.captchaFrame && !review.errors.length && !review.elements.length &&
+        review.buttons.length === 1 && review.buttons[0].blocked && !review.buttons[0].consent &&
+        /^submit application$/i.test(review.buttons[0].text)) {
+      const execute = (func, world, args) => toPage(chrome.scripting.executeScript({
+        target: { tabId, documentIds: [review.documentId] }, func, world, args,
+      }), world === "ISOLATED" ? 1000 : undefined);
+      if (await confirmFinalReview({ execute, documentId: review.documentId, gen, active })) {
+        await own({ status: "ready_to_submit", activity: "", pending, double_check: [],
+          summary: "Check every answer before you submit." });
+        return;
+      }
+      if (!(await active())) return;
+      // A changed page must go through the existing gates on fresh evidence before another call.
+      progress = priorProgress;
+      continue;
     }
 
     // The account the password box belongs to, which is an ATS iframe's own when the form is embedded.
@@ -651,6 +679,16 @@ async function loop(id, run) {
 
     const results = [];
     let stop = null, stopped = false;
+    // Only an actual, immediately preceding fill and Next on this document can qualify.
+    const [fill, next] = uses;
+    const initial = frames[0];
+    let reviewTransition = uses.length === 2 && !accountPage && frames.length === 1 &&
+      initial?.frameId === 0 && typeof initial.documentId === "string" && initial.documentId &&
+      fill.name === "fill" && typeof fill.input?.ref === "string" &&
+      snap.index[fill.input.ref]?.kind === "text" && typeof fill.input.text === "string" &&
+      fill.input.text.trim() &&
+      next.name === "click" && initial.buttons.some((button) =>
+        next.input?.ref === "0:" + button.ref && !button.blocked && /^next$/i.test(button.text));
     for (const u of uses) {
       if (stop) { results.push(toolResult(u.id, "Not run: the job paused.")); continue; }
       // Checked before every action, not once per turn: the student can press Pause or Take over while
@@ -658,7 +696,11 @@ async function loop(id, run) {
       if (!stopped && !owns(await getJob(id), gen)) stopped = true;
       if (stopped) { results.push(toolResult(u.id, "Not run: the student paused the job or took over the tab.")); continue; }
       if (tabId !== snap.tabId) { results.push(toolResult(u.id, "Not run: the application opened in a new tab. Continue from the new snapshot.")); continue; }
-      const r = await execTool(u, { tabId, index: snap.index, hasFinal: snap.hasFinal, reviewStep: snap.reviewStep, consentOnly: snap.consentOnly, runFilled, store, job, fails, url, active, gen });
+      let actionDocument;
+      const observeDocument = reviewTransition ? (documentId) => { actionDocument = documentId; } : undefined;
+      const r = await execTool(u, { tabId, index: snap.index, hasFinal: snap.hasFinal, reviewStep: snap.reviewStep, consentOnly: snap.consentOnly, runFilled, store, job, fails, url, active, gen, observeDocument });
+      if (reviewTransition && (actionDocument !== initial.documentId || r.isError || r.newTab ||
+          r.content?.ok !== true || r.content.note || r.content.field_error)) reviewTransition = false;
       if (["fill", "select", "check", "upload"].includes(u.name) && !r.isError && !accountPage) await noteFilled();
       if (r.newTab) {
         tabId = r.newTab;
@@ -675,6 +717,7 @@ async function loop(id, run) {
     }
 
     if (!stop) {
+      if (reviewTransition && !stopped) reviewAfter = { documentId: initial.documentId, tabId, url: initial.url };
       pending = { results };
       await updateJob(id, { pending });
       await saveMsgs(id, msgs);
@@ -733,7 +776,7 @@ async function execTool(u, ctx) {
   // gen goes with every action, so the page refuses one from a run the student has stopped (dom.js halt).
   const checkedAct = async (tab, ref, action, payload = {}) => {
     if (ctx.active && !(await ctx.active())) return { ok: false, cancelled: true, error: "The student stopped this run." };
-    return act(tab, ref, action, ctx.gen == null ? payload : { ...payload, gen: ctx.gen });
+    return act(tab, ref, action, ctx.gen == null ? payload : { ...payload, gen: ctx.gen }, ctx.observeDocument);
   };
   const needsRef = schema.required.includes("ref");
   const t = needsRef && Object.hasOwn(index, input.ref) ? index[input.ref] : null;

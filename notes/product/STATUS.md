@@ -382,6 +382,7 @@ Dates are when the item was recorded, not a claim that a separate message was se
 
 | Recorded | Item | Ready artifact / next action | Done |
 |---|---|---|---|
+| 2026-11-11 | Chrome 0.6.0 verified final-review handoff | [#455](https://github.com/bpmcginley/InternshipFinder/pull/455) normally refreshed on exact #440 69eb5e9c. All reviewed source, tests and screenshot bytes match 393a1ff0. Fresh Node 22 qualification passed 122 focused tests and scoped ESLint passed. Prior Node 22 qualification on the byte-identical extension tree passed 381 tests. Synthetic Chrome evidence is in [the package note](P-0.6.0-final-review.md). Fresh hosted checks, independent integration review and owner release remain pending. | Draft needs-bruce |
 | 2026-11-11 | P-2.2an dashboard session freshness | [#466](https://github.com/bpmcginley/InternshipFinder/pull/466) published reviewed stale-auth fencing with both-width evidence and exact Pages and Tests. | Exact production publication verified. |
 | 2026-11-11 | P-2.2ao checkout recovery route and P-2.2ap dashboard controls | The [route #472](https://github.com/bpmcginley/InternshipFinder/pull/472) is live with sales off. The [native dashboard #475](https://github.com/bpmcginley/InternshipFinder/pull/475) is qualifying independently. | Dashboard draft. |
 | 2026-11-11 | P-2.2al Top-up public disclosures | [#463](https://github.com/bpmcginley/InternshipFinder/pull/463) publishes the reviewed conditional terms and privacy wording. Exact Pages and live checks passed. | Published with sales off. |
