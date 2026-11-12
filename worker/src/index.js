@@ -15,6 +15,8 @@ import { cleanStates, demandCounts, dropStale, setDemand, touchSeen } from "./de
 import { countEvent, countHit } from "./visits.js";
 import { followUnsubscribeEndpoint } from "./follow-unsubscribe-endpoint.js";
 import { topupCheckoutResponse, topupOfferResponse } from "./topup-checkout-http.js";
+import { canRecoverAttachedTopup } from "./topup-attached-recovery.js";
+import { topupRecoveryResponse } from "./topup-recovery-http.js";
 import { prepareTopupStripe, topupConfigured, topupRecoveryConfigured } from "./topup-stripe.js";
 import { createEmployerPostingRuntime, employerPostingReport } from "./employer-posting-runtime.js";
 const employerPostingRuntime = createEmployerPostingRuntime();
@@ -84,6 +86,21 @@ const dashboardTopupConfigured = (env) =>
   topupConfigured(env) &&
   DASHBOARD_ORIGINS.includes(siteUrl(env)) &&
   fundedPurchaseCreationReady(env);
+
+const dashboardRecoveryRoot = (env) => {
+  const root = siteUrl(env);
+  return DASHBOARD_ORIGINS.includes(root) ? root + "/" : undefined;
+};
+
+const recoverDashboardTopup = ({ request, env, d }) =>
+  topupRecoveryResponse({
+    request,
+    env,
+    fetchImpl: d.fetch,
+    clock: d.now,
+    originAllowed: topupOriginAllowed,
+    returnUrl: dashboardRecoveryRoot(env),
+  });
 
 function prepareDashboardTopup({ db, env, d }) {
   const salesReady = () => dashboardTopupConfigured(env) && globalRpm(env, d.config) > 0;
@@ -303,6 +320,9 @@ const safeRouteHandlers = {
     const used = await usageFor(db, user, month);
     const mine = await planOf(db, user);
     const [extra, purchased] = await Promise.all([bonusFor(db, user), purchasedRunsFor(db, user)]);
+    const token = bearerOf(request);
+    const canRecover = topupRecoveryConfigured(env) && dashboardRecoveryRoot(env) &&
+      isSessionToken(token) && await canRecoverAttachedTopup(db, user, token);
     const usablePurchased = purchased > 0 && fundedPurchaseCreationReady(env) ? purchased : 0;
     const body = {
       month,
@@ -312,6 +332,7 @@ const safeRouteHandlers = {
       // The next plan up and its allowances at this student's tier (null when there is none).
       upgrade_offer: upgradeOffer(env, d.config, tier(), mine.plan, now),
       can_manage: paymentsOn(env, d.config) && !!mine.customer,
+      ...(canRecover ? { can_recover_topup: true } : {}),
       tier: tier(),
       // isPaused takes a plan because the day's stop only applies to free accounts (limits.js).
       // `mine.plan` is already loaded above for plan/can_upgrade/allowance, so without passing it
@@ -383,6 +404,8 @@ const safeRouteHandlers = {
       prepareAdapter: prepareDashboardTopup({ db, env, d }),
     });
   },
+
+  "POST /billing/topup/recover": recoverDashboardTopup,
 
   "POST /billing/portal": async ({ db, env, d, signIn }) => {
     const user = await signIn();
@@ -606,6 +629,7 @@ async function route(request, env, ctx, d) {
   const key = `${request.method} ${path}`;
   const handler = exactRoutes.get(key);
   if (handler) return handler({ request, env, db, now, ctx, d, url, path, signIn, tier: () => who.tier });
+  if (path === "/billing/topup/recover") return recoverDashboardTopup({ request, env, d });
   throw new HttpError(404, "not_found", "No such endpoint");
 }
 
@@ -628,6 +652,9 @@ export async function handle(request, env, ctx, deps = {}) {
     res.headers.set("Cache-Control", "no-store");
   }
   for (const [k, v] of Object.entries(corsHeaders(request, env))) res.headers.set(k, v);
+  if (res.status === 429 && res.headers.has("Access-Control-Allow-Origin") &&
+      new URL(request.url).pathname.replace(/\/+$/, "") === "/billing/topup/recover")
+    res.headers.append("Access-Control-Expose-Headers", "Retry-After");
   return res;
 }
 
