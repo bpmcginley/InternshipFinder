@@ -51,7 +51,7 @@ export async function callClaude({
   thinking,
   signal,
 }) {
-  if (!apiKey) throw new Error("No Anthropic API key. Open Auto-Apply setup â†’ Setup.");
+  if (!apiKey) throw new Error("No Anthropic API key. Open Auto-Apply setup → Setup.");
   const body = { model, max_tokens, messages };
   if (system) body.system = system;
   if (tools) body.tools = tools;
