@@ -229,11 +229,11 @@ export function planFrom(env, config, o, fallback = "supporter") {
   return fallback;
 }
 
-export async function applyEvent(db, env, config, event, now, fetchImpl) {
+export async function applyEvent(db, env, config, event, now, fetchImpl, historyPolicy) {
   const id = String(event.id || crypto.randomUUID());
   if (!(await firstTime(db, id, now))) return { ok: true, repeat: true };
   try {
-    return await applyFresh(db, env, config, event, now, fetchImpl);
+    return await applyFresh(db, env, config, event, now, fetchImpl, historyPolicy);
   } catch (e) {
     // The id was recorded before the change was made. If the change then failed, forget the id, or
     // Stripe's retry would be waved through as a repeat and a student who paid would stay on free.
@@ -287,11 +287,11 @@ async function reversedStudentPayment(db, env, event, fetchImpl) {
   return null;
 }
 
-async function applyFresh(db, env, config, event, now, fetchImpl) {
+async function applyFresh(db, env, config, event, now, fetchImpl, historyPolicy) {
   const o = (event.data && event.data.object) || {};
 
   // Known top-ups stay inside the existing receipt and must never reach other billing handlers.
-  const topup = await topupWebhook({ db, env, event, fetchImpl, clock: () => now });
+  const topup = await topupWebhook({ db, env, event, fetchImpl, clock: () => now, historyPolicy });
   if (topup) {
     if (!["settled", "expired", "reconciled", "inactive", "ignored"].includes(topup.status)) throw billingRetry();
     return ["inactive", "ignored"].includes(topup.status) ? { ok: true, ignored: true } : { ok: true };

@@ -1,5 +1,5 @@
 // Dormant authenticated-event association. No coverage authority or balance transition.
-import { topupReversalObject } from "./topup-reversal-events.js";
+import { topupReversalObject } from "./topup-reversal-types.js";
 import { readTopupAssociation, readHistoricalTopupTarget } from "./topup-stripe.js";
 import { readVerifiedTopupPayment } from "./topup-purchase-recovery.js";
 import { PAYMENT_EVIDENCE_BOUNDS } from "./topup-payment-evidence.js";

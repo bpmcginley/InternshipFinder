@@ -1,6 +1,9 @@
 // Called only after existing raw-body signature verification and receipt acquisition.
 import { recoverVerifiedTopupCheckoutEvent } from "./topup-checkout-events.js";
-import { recoverVerifiedTopupReversalEvent } from "./topup-reversal-events.js";
+import {
+  recoverVerifiedTopupReversalEvent,
+  snapshotTopupHistoryPolicy,
+} from "./topup-reversal-events.js";
 import {
   topupRecoveryConfigured,
   historicalTopupOffer,
@@ -31,7 +34,7 @@ const reference = (value, kind, mode) =>
 
 // null means positively outside this boundary. pending MUST release the existing receipt
 // for retry, never fall through to employer/subscription handling or acknowledge success.
-export async function topupWebhook({ db, env, event, fetchImpl, clock }) {
+export async function topupWebhook({ db, env, event, fetchImpl, clock, historyPolicy }) {
   const o = event?.data?.object,
     checkout = typeof event?.type === "string" && event.type.startsWith("checkout.session."),
     expected = objectTypes.get(event?.type),
@@ -56,6 +59,18 @@ export async function topupWebhook({ db, env, event, fetchImpl, clock }) {
     resolveOffer: (version, livemode) => historicalTopupOffer(env, version, livemode),
   };
   try {
+    if (expected && historyPolicy?.enabled === true) {
+      try {
+        args.historyPolicy = snapshotTopupHistoryPolicy(historyPolicy);
+      } catch {
+        args.historyPolicy = { enabled: true };
+      } // Only a known granted purchase needs this policy.
+      env = Object.freeze({
+        STRIPE_SECRET_KEY: env?.STRIPE_SECRET_KEY,
+        STRIPE_PRICE_TOPUP: env?.STRIPE_PRICE_TOPUP,
+      });
+      args.env = env;
+    }
     if (checkout) {
       const result = await recoverVerifiedTopupCheckoutEvent(args);
       return result.status === "unclassified" ? (tagged ? pending() : null) : result;
