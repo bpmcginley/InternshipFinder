@@ -19,7 +19,7 @@ export function createFollowCheckpointR2Slots(bucket, { maxPayloadBytes, maxEnve
   async function prepare(payload, kind = "payload") {
     if (!(payload instanceof Uint8Array) || payload.byteLength > maxPayloadBytes) return null;
     // Copy before the first await; caller mutation cannot change the committed identity.
-    const copy = payload.slice();
+    const copy = new Uint8Array(payload);
     const nonce = hex(crypto.getRandomValues(new Uint8Array(16)));
     const sha256 = await digest(copy);
     const header = { v: 1, kind, nonce, sha256, bytes: copy.byteLength };

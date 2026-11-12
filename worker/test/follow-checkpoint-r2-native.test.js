@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -41,7 +42,13 @@ test("actual local workerd R2: two bounded slots, conditional races and lost ack
     const payload = new Uint8Array(bounds.maxPayloadBytes).fill(65);
     const second = payload.slice();
     second[second.length - 1] = 66;
-    const prepared = await Promise.all([slots.prepare(payload), slots.prepare(second)]);
+    const input = Buffer.from(second);
+    const preparing = slots.prepare(input);
+    input.fill(0); // Mutate during the digest await, then again before the native PUT.
+    const prepared = await Promise.all([slots.prepare(payload), preparing]);
+    input.fill(255);
+    const expected = createHash("sha256").update(second).digest("hex");
+    assert.equal(prepared[1].sha256, expected);
     const initial = await Promise.all(
       prepared.map((value, slot) => slots.write(slot, initialized[slot].etag, value)),
     );
@@ -54,6 +61,7 @@ test("actual local workerd R2: two bounded slots, conditional races and lost ack
       assert.deepEqual(current.payload, slot ? second : payload);
       assert.equal(current.nonce, prepared[slot].nonce);
       assert.equal(current.sha256, prepared[slot].sha256);
+      if (slot === 1) assert.equal(current.sha256, expected);
     }
     const contenders = await Promise.all([slots.prepare(payload), slots.prepare(payload)]);
     const race = await Promise.all(contenders.map((v) => slots.write(0, initial[0].etag, v)));

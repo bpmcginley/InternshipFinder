@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { test } from "node:test";
 import { createFollowCheckpointR2Slots } from "../src/follow-checkpoint-r2.js";
 
@@ -45,6 +46,21 @@ test("R2 slots copy caller bytes, restrict keys, and require opaque single-attem
   assert.equal((await slots.write(0, null, receipt)).status, "invalid");
   assert.equal((await slots.read(2)).status, "invalid");
   assert.deepEqual([...bucket.values.keys()], ["follow-checkpoint-slot-0"]);
+});
+
+test("R2 slots intrinsically copy Buffer input across digest and write awaits", async () => {
+  const slots = createFollowCheckpointR2Slots(memory(), bounds);
+  const input = Buffer.from(bytes);
+  const expected = createHash("sha256").update(bytes).digest("hex");
+  const pending = slots.prepare(input);
+  input.fill(0); // Buffer.slice would share these bytes while digest is pending.
+  const receipt = await pending;
+  assert.equal(receipt.sha256, expected);
+  input.fill(255);
+  assert.equal((await slots.write(0, null, receipt)).status, "stored");
+  const current = await slots.read(0);
+  assert.equal(current.sha256, expected);
+  assert.deepEqual(current.payload, bytes);
 });
 
 test("R2 slots reject corrupt, oversized and truncated reads and cancel the body", async () => {

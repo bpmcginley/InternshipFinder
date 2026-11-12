@@ -326,7 +326,7 @@ The golden harness now covers static assets as well as generated pages. Each sit
 
 | C | P-2.3u Optional employer publication | audit_site | `codex/product-p2.3u-publication` | [#410](https://github.com/bpmcginley/InternshipFinder/pull/410) | Draft needs-bruce; review/CI pending | Explicit publisher option stages and renders one captured selected export. Default artifacts unchanged; browser/Worker collection stays off. |
 
-| C | P-2.1ao bounded R2 slots | audit_growth_generated | `codex/product-p2.1ao-r2-slots` | [#468](https://github.com/bpmcginley/InternshipFinder/pull/468) | Draft; local qualification passed; review/CI pending | Two fixed payload slots; 751 Node checks include actual isolated workerd R2, two 2.54 MB payloads, CAS/stale cleanup/lost acknowledgement. No control authority, routes, live bindings or activation. |
+| C | P-2.1ao bounded R2 slots | audit_growth_generated | `codex/product-p2.1ao-r2-slots` | [#468](https://github.com/bpmcginley/InternshipFinder/pull/468) | Draft; local qualification passed; review/CI pending | Two fixed payload slots; 752 Node checks include actual isolated workerd R2, two 2.54 MB payloads, CAS/stale cleanup/lost acknowledgement. No control authority, routes, live bindings or activation. |
 
 ## Waiting for Bruce
 
