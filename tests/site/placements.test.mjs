@@ -360,8 +360,8 @@ test("T8: headed Paid listing, Ad before the company name, and a sponsored link"
   }
   // Never the words the plan rules out.
   assert.doesNotMatch(PLACE_SRC.replace(/^\s*\/\/.*$/gm, ""), /Sponsored|Promoted|Featured/);
-  // The same words as the landing pages' box (backend/internscout/seo_pages.py placement_box).
-  const seo = read("backend/internscout/seo_pages.py");
+  // The same words as the landing pages' box (backend/internscout/site/publish.py _placement_box).
+  const seo = read("backend/internscout/site/publish.py");
   for (const w of ["Paid listing", '"ad">Ad<', "Why am I seeing this?", "Open posting", 'rel="sponsored noopener"']) assert.ok(seo.includes(w), w);
   for (const w of ['"Paid listing"', '"Ad"', '"Why am I seeing this?"', '"Open posting"', '"sponsored noopener"']) assert.ok(PLACE_SRC.includes(w), w);
   // Both boxes link to the ad disclosure, #paid-listings, never #paid (the paid plans section).
