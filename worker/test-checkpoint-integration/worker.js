@@ -1,5 +1,6 @@
 // Test-only protocol rehearsal. No production entry point or selected witness provider.
 import { DurableObject } from "cloudflare:workers";
+import { FollowCheckpointControl } from "../src/follow-checkpoint-control.js";
 import { createFollowCheckpointSnapshotReader } from "../src/follow-checkpoint-snapshot.js";
 import { createFollowCheckpointStage } from "../src/follow-checkpoint-stage.js";
 import { createFollowCheckpointPromotion } from "../src/follow-checkpoint-promotion.js";
@@ -118,42 +119,28 @@ export class CheckpointIntegration extends DurableObject {
       maxPayloadBytes: 2_900_000,
       maxEnvelopeBytes: 2_900_256,
     });
-    ctx.storage.sql.exec(
-      "CREATE TABLE IF NOT EXISTS control (id INTEGER PRIMARY KEY CHECK(id=1), metadata TEXT NOT NULL)",
-    );
+    this.control = new FollowCheckpointControl(ctx.storage, {
+      witness: () => this.witness,
+      beforeCommit: () => this.beforeCommit?.(),
+    });
     // Witness is injected by the local test; restart without it must fail closed.
     this.witness = null;
     this.uploads = new Map(); // Single-use upload bodies never enter SQLite or survive eviction.
   }
   now() {
-    return this.ctx.storage.sql
-      .exec("SELECT CAST(ROUND(unixepoch('subsec')*1000) AS INTEGER) AS now")
-      .one().now;
+    return this.control.now();
   }
   snapshot() {
-    return this.ctx.storage.sql.exec("SELECT metadata FROM control WHERE id=1").toArray()[0]
-      ?.metadata;
+    return this.control.snapshot();
   }
   state() {
-    const raw = this.snapshot();
-    return raw ? JSON.parse(raw) : null;
+    return this.control.state();
   }
   save(state) {
     this.ctx.storage.sql.exec("INSERT OR REPLACE INTO control VALUES(1,?)", JSON.stringify(state));
   }
-  async admitted() {
-    const before = this.state();
-    if (!before || !this.witness) return null;
-    try {
-      if (
-        classify(await this.witness.read(), position(before)) !== "current" ||
-        !equal(before, this.state())
-      )
-        return null;
-      return before;
-    } catch {
-      return null;
-    }
+  admitted() {
+    return this.control.admitted();
   }
   readSnapshot(maxBytes = 3_000_000) {
     return createFollowCheckpointSnapshotReader({
@@ -488,32 +475,8 @@ export class CheckpointIntegration extends DurableObject {
       return "held";
     }
   }
-  async change(action, effect = null) {
-    const before = await this.admitted();
-    if (!before) return "held";
-    if (!action(copy(before), this.now())) return "stale";
-    const intent = {
-      nonce: id(),
-      next: { epoch: before.current.epoch, revision: before.current.revision + 1, token: id() },
-    };
-    try {
-      if (!(await this.witness.prepare(before.current, intent))) return "held";
-      if (effect && !(await effect(before, intent))) return "held";
-      if (this.beforeCommit) await this.beforeCommit(); // Explicit local failure/delay hook.
-      const committed = this.ctx.storage.transactionSync(() => {
-        const state = this.state();
-        if (!equal(state, before) || !action(state, this.now())) return false;
-        state.current = intent.next;
-        state.receipt = { nonce: intent.nonce, previous: before.current };
-        this.save(state);
-        return true;
-      });
-      if (!committed) return "held"; // Prepared predecessor cannot be auto-aborted safely.
-      if (!(await this.witness.finish(position(this.state())))) return "held";
-      return (await this.admitted()) ? "committed" : "held";
-    } catch {
-      return "held";
-    }
+  change(action, effect = null) {
+    return this.control.change(action, effect);
   }
   async read(phase) {
     if (phase !== "pending" && phase !== "accepted") return { status: "held" };
@@ -611,20 +574,8 @@ export class CheckpointIntegration extends DurableObject {
       return true;
     });
   }
-  async recoverAcknowledgement() {
-    const state = this.state();
-    if (!state || !this.witness) return "held";
-    try {
-      if (
-        classify(await this.witness.read(), position(state)) !== "recover_ack" ||
-        !equal(state, this.state())
-      )
-        return "held";
-      if (!(await this.witness.finish(position(state)))) return "held";
-      return (await this.admitted()) ? "recovered" : "held";
-    } catch {
-      return "held";
-    }
+  recoverAcknowledgement() {
+    return this.control.recoverAcknowledgement();
   }
   async retireExpired(phase) {
     if (phase !== "pending" && phase !== "accepted") return "held";
