@@ -440,7 +440,7 @@ The golden harness now covers static assets as well as generated pages. Each sit
 
 ## Waiting for Bruce
 
-- **Follow action-page wording** is awaiting approval in [#503](https://github.com/bpmcginley/InternshipFinder/pull/503). The six new strings appear in the draft. Production publication and activation are separately gated.
+- **Follow action-page wording** is awaiting approval. The [exact copy inventory](https://github.com/bpmcginley/InternshipFinder/blob/20ee1571f45be56d517b6b986d013b4e011d444f/notes/product/P-2.1ba-follow-landing.md#exact-newly-presented-text) lists the new wording in [#503](https://github.com/bpmcginley/InternshipFinder/pull/503). Production publication and activation are separately gated.
 - **Follow confirmation rollout** remains held after [#508](https://github.com/bpmcginley/InternshipFinder/pull/508) and the [#506 queue](https://github.com/bpmcginley/InternshipFinder/pull/506) merged to source. Production migration, dispatch and sending remain held.
 
 - **Chrome 0.6.0 install instructions** remain held. Publish only after the signed Chrome 0.6.0 extension is publicly verifiable in the Chrome Web Store. [Staged install instructions #494](https://github.com/bpmcginley/InternshipFinder/pull/494).
