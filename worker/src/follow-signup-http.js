@@ -36,7 +36,7 @@ export function createFollowSignupHttp({
   timers = { setTimeout, clearTimeout, monotonicNow: () => performance.now() },
 } = {}) {
   let active = 0;
-  return async (request) => {
+  return async (request, context) => {
     if (request.method !== "POST") return empty(405, { Allow: "POST" });
     if (enabled !== true || typeof originAllowed !== "function" || typeof admit !== "function")
       return unavailable();
@@ -79,7 +79,7 @@ export function createFollowSignupHttp({
         });
         if (input === FOLLOW_BODY_TIMEOUT) return unavailable();
         if (!input) return empty(400);
-        const outcome = await admit(input, request);
+        const outcome = await admit(input, request, context);
         if (outcome?.status === "accepted") return empty(202);
         return outcome?.status === "invalid" ? empty(400) : unavailable();
       } finally {
