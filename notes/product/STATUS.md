@@ -369,7 +369,7 @@ The golden harness now covers static assets as well as generated pages. Each sit
 
 ## Waiting for Bruce
 
-Chrome 0.6.0 release preparation: claims only `extension/manifest.json`, the pinned version assertion in `extension/test/held_install.test.mjs`, and its owned Product evidence. Draft needs-bruce; final combined integration and signed Store delivery remain pending after both refactors. No tag, upload, deployment or release.
+[#477](https://github.com/bpmcginley/InternshipFinder/pull/477) Chrome 0.6.0 release preparation: claims only `extension/manifest.json`, the pinned version assertion in `extension/test/held_install.test.mjs`, and its owned Product evidence. Draft needs-bruce; final combined integration and signed Store delivery remain pending after both refactors. No tag, upload, deployment or release.
 
 P-2.1u [#341](https://github.com/bpmcginley/InternshipFinder/pull/341) remains owner-gated after archive-reader integration. Publication, scheduling and activation remain pending.
 
@@ -574,3 +574,7 @@ Normally integrated published dashboard main `2a8176db`, preserving reviewed pri
 ## P-2.2af verified display offer
 
 Merged #430 adds an authenticated, default-off Worker offer with exact Stripe Price verification and a public configuration hint. The session, allowed dashboard Origin and current Auto-Apply service are fenced before the provider read and checked again before presenting the offer. Checkout reuses the service check before reservation. The projected display terms contain no provider references. Local 744 Node and 322 actual Workers/D1 tests passed. Independent review and hosted checks passed. The disabled route is live. Settlement, dashboard integration and activation remain pending.
+
+## Chrome 0.6.0 version preparation
+
+Draft needs-bruce [#477](https://github.com/bpmcginley/InternshipFinder/pull/477) changes only the manifest version to `0.6.0` and the exact reviewed install-version fixture from rehearsal `66ca934f`, on published main `3947e237`. Offline install tests pass 11 cases and packaging tests pass six; both 60-entry ZIP formats rebuild byte-identically and differ from main only in the manifest version. All permissions, identities, Store URLs, guard and runtime bytes are unchanged. Final combined integration and signed Store delivery remain pending after both refactors. Independent review and hosted checks remain required. [Evidence](P-0.6.0-version-preparation.md).
