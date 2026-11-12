@@ -5,6 +5,13 @@
 // Its own storage key, like the usage meter, so a write here never races the big store write.
 const KEY = "tailor_cache";
 const MAX = 12;
+// The background worker owns this cache. Serialize mutations only, leaving reads and model
+// requests independent. A rejected storage operation must not strand later cache writes.
+let mutations = Promise.resolve();
+function mutate(action) {
+  mutations = mutations.then(action).catch(() => {});
+  return mutations;
+}
 
 export async function tailorKey(model, system, prompt) {
   // Length-prefixed so no combination of the three parts can hash to the same key as another.
@@ -26,7 +33,7 @@ export async function readTailored(key, store = chrome.storage.local) {
 }
 
 export async function writeTailored(key, value, store = chrome.storage.local) {
-  try {
+  return mutate(async () => {
     const all = (await store.get(KEY))[KEY] || {};
     all[key] = { at: Date.now(), value };
     // Oldest evicted. A dozen writes can land in the same millisecond and tie on `at`, and a stable
@@ -42,15 +49,9 @@ export async function writeTailored(key, value, store = chrome.storage.local) {
       .map(([entry]) => entry)
       .reverse();
     await store.set({ [KEY]: Object.fromEntries(keep) });
-  } catch {
-    /* nothing to do: the caller already has the tailored resume */
-  }
+  });
 }
 
 export async function clearTailored(store = chrome.storage.local) {
-  try {
-    await store.remove(KEY);
-  } catch {
-    /* already gone */
-  }
+  return mutate(() => store.remove(KEY));
 }
