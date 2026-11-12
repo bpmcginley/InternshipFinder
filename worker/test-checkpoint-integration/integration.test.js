@@ -184,8 +184,9 @@ test("lost prepare acknowledgement and rolled-back prepared predecessor stay amb
 
 test("native SQLite cutoffs refuse expired pending, preserve live predecessor and fence cleanup", async () => {
   const object = stub(),
-    value = await records({ old: true, pendingAge: DAY + 1000 });
+    value = await records({ old: true, pendingAge: DAY - 1000 });
   await object.initialize(value.pending, value.old);
+  await new Promise((resolve) => setTimeout(resolve, 1100));
   const before = await etags();
   expect((await object.read("pending")).status).toBe("expired");
   expect((await object.read("accepted")).bytes).toEqual(value.old);
@@ -235,8 +236,9 @@ test("fresh native SQLite transaction blocks promotion crossing the original pen
 
 test("seven-day predecessor cutoff cannot promote or retire the live pending slot", async () => {
   const object = stub(),
-    value = await records({ old: true, oldAge: 7 * DAY + 1000 });
+    value = await records({ old: true, oldAge: 7 * DAY - 1000 });
   await object.initialize(value.pending, value.old);
+  await new Promise((resolve) => setTimeout(resolve, 1100));
   const before = await etags();
   expect((await object.read("accepted")).status).toBe("expired");
   expect((await object.read("pending")).bytes).toEqual(value.pending);
