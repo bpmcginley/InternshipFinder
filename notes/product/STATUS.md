@@ -585,6 +585,7 @@ Dates are when the item was recorded, not a claim that a separate message was se
 | 2026-11-11 | Employer catalog projection | Reviewed [#331](https://github.com/bpmcginley/InternshipFinder/pull/331) is carried into draft [#398](https://github.com/bpmcginley/InternshipFinder/pull/398) unchanged. Approved mapping does not activate publication or collection. | Source integration and later activation pending |
 | 2026-11-11 | Employer posting-key mapping | Bruce approved the exact [#336](https://github.com/bpmcginley/InternshipFinder/pull/336) complete organic catalog, direct-link coverage including closed listings and 256 KiB bound on November 11. Draft [#398](https://github.com/bpmcginley/InternshipFinder/pull/398) integrates the unchanged decision note. | Approved decision; publication and activation remain separate |
 | 2026-11-12 | P-3.6 Deep Dive interview turn ownership | [#489](https://github.com/bpmcginley/InternshipFinder/pull/489) keeps a single pending reply per conversation in one onboarding document. [Paired browser evidence](screenshots/P-3.6/README.md) covers 1280 and 375 pixels in light and dark. | Draft needs-bruce. Independent review and exact hosted checks pending. |
+| 2026-11-12 | P-3.7 Cloud Sync restore ordering | `codex/product-extension-restore-order` claims `extension/lib/sync.js`, `extension/lib/store.js` and their focused tests. | Draft needs-bruce. Independent review and exact checks pending. |
 
 ## Chrome 0.6.0 tailoring factual anchors
 
