@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { createFollowManagementHttp } from "../src/follow-management-http.js";
-import { requestFollow, mintFollowToken, confirmFollow } from "../src/follows.js";
+import {
+  requestFollow,
+  requestFollowConfirmation,
+  mintFollowToken,
+  confirmFollow,
+} from "../src/follows.js";
 
 export const post = (tuple, headers = {}, url = "https://api.example.test/manage") =>
   new Request(url, {
@@ -226,6 +231,33 @@ export const cases = [
       } finally {
         await db.prepare("DROP TRIGGER fixture_management_rollback").run();
       }
+    },
+  ],
+  [
+    "last-scope removal cascades only its inbox and preserves invalid replay",
+    async (db) => {
+      const { a, b, token, now, http } = await fixture(db);
+      await requestFollowConfirmation(
+        db,
+        "reader@example.test",
+        { kind: "company", company: "alpha" },
+        catalog,
+        now,
+      );
+      await mintFollowToken(db, a.subscriberId, "confirm", { scopeKey: a.scopeKey }, now);
+      assert.deepEqual(await (await http.remove(post([token, a.scopeKey]))).json(), {
+        removed: true,
+      });
+      assert.equal((await rows(db, "follow_confirmation_outbox")).length, 0);
+      assert.deepEqual(await (await http.remove(post([token, b.scopeKey]))).json(), {
+        removed: true,
+      });
+      for (const table of ["follow_subscribers", "follow_subscriptions", "follow_tokens"])
+        assert.deepEqual(await rows(db, table), []);
+      assert.deepEqual(await (await http.remove(post([token, b.scopeKey]))).json(), {
+        removed: false,
+      });
+      assert.equal((await http.list(post([token, null]))).status, 410);
     },
   ],
 ];

@@ -3,7 +3,34 @@ import assert from "node:assert/strict";
 import { fakeD1 } from "./helpers.js";
 import { createFollowManagementHttp } from "../src/follow-management-http.js";
 import { cases, post, handler, fixture } from "../test-support/follow-management-http.js";
-for (const [name, run] of cases) test(name, () => run(fakeD1()));
+// Model native D1 changes including INSTEAD OF trigger effects, using a serialized local batch.
+function managementDb() {
+  const db = fakeD1();
+  return {
+    ...db,
+    prepare(query) {
+      if (!query.startsWith("INSERT INTO follow_management_removals")) return db.prepare(query);
+      return {
+        bind(...args) {
+          return {
+            async run() {
+              const [before, result, after] = await db.batch([
+                db.prepare("SELECT total_changes() AS n"),
+                db.prepare(query).bind(...args),
+                db.prepare("SELECT total_changes() AS n"),
+              ]);
+              return {
+                ...result,
+                meta: { ...result.meta, changes: after.results[0].n - before.results[0].n },
+              };
+            },
+          };
+        },
+      };
+    },
+  };
+}
+for (const [name, run] of cases) test(name, () => run(managementDb()));
 const token = "11111111-1111-4111-8111-111111111111." + "a".repeat(64);
 const never = () => assert.fail("Unexpected database access");
 const db = { prepare: never, batch: never };
@@ -105,11 +132,36 @@ test("four in-flight bodies share one limit and expired streams cancel without S
 test("malformed D1 page acknowledgements return a generic unavailable response", async () => {
   const real = fakeD1(),
     { token } = await fixture(real);
-  for (const result of [[], new Array(2), [{ success: true, results: [] }]]) {
+  for (const result of [
+    [],
+    new Array(1),
+    [{ success: false, results: [] }],
+    [{ success: true, results: [{ subscriber_id: null }] }],
+    [{ success: true, results: [{ present: 0, scope_key: null, created: null }] }],
+    [{ success: true, results: new Array(1) }],
+  ]) {
     const response = await handler({ prepare: real.prepare, batch: async () => result }).list(
       post([token, null]),
     );
     assert.equal(response.status, 503);
     assert.equal(await response.text(), "");
   }
+});
+
+test("typed mutation receipts reject uncertain success and preserve generic errors", async () => {
+  for (const operation of ["remove", "deleteAll"])
+    for (const receipt of [
+      undefined,
+      { success: false, meta: { changes: 1 } },
+      { success: true, meta: { changes: "1" } },
+      { success: true, meta: { changes: -1 } },
+      { success: true, meta: { changes: Number.MAX_SAFE_INTEGER + 1 } },
+    ]) {
+      const fake = { prepare: () => ({ bind: () => ({ run: async () => receipt }) }) };
+      const r = await handler(fake)[operation](
+        post(operation === "remove" ? [token, "scope"] : [token]),
+      );
+      assert.equal(r.status, 503);
+      assert.equal(await r.text(), "");
+    }
 });

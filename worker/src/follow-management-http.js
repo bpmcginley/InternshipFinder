@@ -80,7 +80,7 @@ export function createFollowManagementHttp({
           return page === null ? empty(410) : json(page);
         }
         return kind === "remove"
-          ? json({ removed: await removeManagedFollow(db, tuple[0], tuple[1], at) })
+          ? json({ removed: await removeManagedFollow(db, tuple[0], tuple[1], at, true) })
           : json({ deleted: await deleteManagedFollows(db, tuple[0], at, true) });
       } finally {
         active--;

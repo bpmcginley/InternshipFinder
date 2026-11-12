@@ -268,38 +268,41 @@ export async function listManagedFollows(db, raw, now = new Date()) {
   return result[0].results.length ? result[1].results : null;
 }
 
-// Bounded keyset read for the dormant management HTTP facade. Existing full-list API remains.
+// One SQL statement admits the capability and reads its bounded page at the same UTC instant.
 export async function listManagedFollowsPage(db, raw, after, now = new Date()) {
-  const digest = await tokenHash(raw),
-    at = stamp(now);
-  const eligible = liveToken + " AND expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now')";
   const result = await db.batch([
-    db.prepare(eligible).bind(digest, "manage", at),
     db
       .prepare(
-        "SELECT scope_key,created,confirmed_at FROM follow_subscriptions WHERE subscriber_id IN (" +
-          eligible +
-          ") AND scope_key>? ORDER BY scope_key LIMIT 51",
+        "SELECT CASE WHEN s.scope_key IS NULL THEN 0 ELSE 1 END AS present," +
+          "s.scope_key,s.created,s.confirmed_at FROM follow_tokens t LEFT JOIN follow_subscriptions s " +
+          "ON s.subscriber_id=t.subscriber_id AND s.scope_key>? WHERE t.token_hash=? AND t.purpose='manage' " +
+          "AND t.expires_at>? AND t.expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now') ORDER BY s.scope_key LIMIT 51",
       )
-      .bind(digest, "manage", at, after ?? ""),
+      .bind(after ?? "", await tokenHash(raw), stamp(now)),
   ]);
   if (
     !Array.isArray(result) ||
-    result.length !== 2 ||
+    result.length !== 1 ||
     result[0]?.success !== true ||
-    result[1]?.success !== true ||
     !Array.isArray(result[0].results) ||
-    result[0].results.length > 1 ||
-    !Array.isArray(result[1].results) ||
-    result[1].results.length > 51
+    result[0].results.length > 51
   )
     throw new Error("Follow management unavailable");
-  if (!result[0].results.length) return null;
-  const scopes = result[1].results;
-  for (const row of scopes) {
+  const rows = result[0].results;
+  if (!rows.length) return null;
+  if (
+    rows.length === 1 &&
+    rows[0]?.present === 0 &&
+    rows[0].scope_key === null &&
+    rows[0].created === null &&
+    rows[0].confirmed_at === null
+  )
+    return { scopes: [], next: null };
+  for (const row of rows) {
     if (
-      !row ||
+      row?.present !== 1 ||
       typeof row.scope_key !== "string" ||
+      !row.scope_key.length ||
       encoder.encode(row.scope_key).length > 4096 ||
       typeof row.created !== "string" ||
       row.created.length > 32 ||
@@ -309,19 +312,44 @@ export async function listManagedFollowsPage(db, raw, after, now = new Date()) {
       throw new Error("Follow management unavailable");
   }
   return {
-    scopes: scopes
+    scopes: rows
       .slice(0, 50)
       .map(({ scope_key, created, confirmed_at }) => ({ scope_key, created, confirmed_at })),
-    next: scopes.length > 50 ? scopes[49].scope_key : null,
+    next: rows.length > 50 ? rows[49].scope_key : null,
   };
+}
+
+function checkedManagementReceipt(result) {
+  if (
+    result?.success !== true ||
+    !Number.isSafeInteger(result.meta?.changes) ||
+    result.meta.changes < 0
+  )
+    throw new Error("Follow management unavailable");
 }
 
 // Explicit management action. Keep the token for further actions within its original 30-minute
 // lifetime, unless the last scope is removed. Tokens for the removed scope cannot confirm it later.
-export async function removeManagedFollow(db, raw, scopeKey, now = new Date()) {
+export async function removeManagedFollow(
+  db,
+  raw,
+  scopeKey,
+  now = new Date(),
+  databaseClock = false,
+) {
   if (typeof scopeKey !== "string") invalid();
   const digest = await tokenHash(raw),
     at = stamp(now);
+  if (databaseClock) {
+    const receipt = await db
+      .prepare(
+        "INSERT INTO follow_management_removals (token_hash,scope_key,admitted_at) VALUES (?,?,?)",
+      )
+      .bind(digest, scopeKey, at)
+      .run();
+    checkedManagementReceipt(receipt);
+    return receipt.meta.changes > 0;
+  }
   const result = await db.batch([
     db
       .prepare(
@@ -356,6 +384,7 @@ export async function deleteManagedFollows(db, raw, now = new Date(), databaseCl
     .prepare("DELETE FROM follow_subscribers WHERE id IN (" + eligible + ")")
     .bind(await tokenHash(raw), "manage", stamp(now))
     .run();
+  if (databaseClock) checkedManagementReceipt(result);
   return result.meta.changes > 0;
 }
 
