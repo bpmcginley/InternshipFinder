@@ -1,0 +1,61 @@
+{
+  "source": "6dbabb259a70615c9a9d09b28000c8979e58efcd",
+  "cases": [
+    {
+      "name": "closed-and-open-pending",
+      "phase": "pending",
+      "checkpoint": "{\"candidate_commit\":\"d7bde18f4fb3d9603dfb79377ada6599b7e2ccb9\",\"candidate_tree\":\"6dbe7571c7f40aced34a0be888fc09af58df2d03\",\"covers_after\":\"2026-11-11T17:00:00.000000Z\",\"index_sha256\":\"8f05587805f82e8857c69a71b50b46a52b37bc9914cf05d9eaf5a5ab40b7d9ac\",\"predecessor\":{\"checkpoint_sha256\":null,\"commit\":\"53cdc0e303325b295547dbe925fa2044d262e751\",\"public_tree\":\"ff48cbad32da1d20b03626fdc9f6ee48f7e6c8de\"},\"prepared_at\":\"2026-11-11T18:00:00.000000Z\",\"public_tree\":\"77ad7a3c31ae3505f4b5733a88072a5a398bf619\",\"rows\":[[\"8169a8bfe1afbc1c\",\"2026-11-11T18:00:00\",\"verified_utc\",\"2026-11-11T18:00:00.000000Z\"],[\"d4f8427f609be761\",\"2026-11-11T18:00:00\",\"verified_utc\",\"2026-11-11T18:00:00.000000Z\"]],\"shard_sha256\":{\"MA\":\"dd5cb8a6348d5f1cc5daa7140c8e7dcf650e9a07d46cda4ed5746da195e4b880\"},\"version\":1}",
+      "sha256": "bff65a499b883559324454aa1e362d117f8a39eb9edd25a8064257490ab1ae93",
+      "closed_id": "8169a8bfe1afbc1c",
+      "payload": "{\"covers_after\":\"2026-11-11T17:00:00.000000Z\",\"index_sha256\":\"8f05587805f82e8857c69a71b50b46a52b37bc9914cf05d9eaf5a5ab40b7d9ac\",\"rows\":[[\"8169a8bfe1afbc1c\",\"2026-11-11T18:00:00\",\"verified_utc\",\"2026-11-11T18:00:00.000000Z\"],[\"d4f8427f609be761\",\"2026-11-11T18:00:00\",\"verified_utc\",\"2026-11-11T18:00:00.000000Z\"]],\"shard_sha256\":{\"MA\":\"dd5cb8a6348d5f1cc5daa7140c8e7dcf650e9a07d46cda4ed5746da195e4b880\"},\"version\":1}",
+      "header": "{\"candidate_commit\":\"d7bde18f4fb3d9603dfb79377ada6599b7e2ccb9\",\"candidate_tree\":\"6dbe7571c7f40aced34a0be888fc09af58df2d03\",\"predecessor\":{\"checkpoint_sha256\":null,\"commit\":\"53cdc0e303325b295547dbe925fa2044d262e751\",\"public_tree\":\"ff48cbad32da1d20b03626fdc9f6ee48f7e6c8de\"},\"prepared_at\":\"2026-11-11T18:00:00.000000Z\",\"public_tree\":\"77ad7a3c31ae3505f4b5733a88072a5a398bf619\"}",
+      "payload_sha256": "3a6409178350eec0ae5a825036ccedc4b43ef3f2f23821586926747be696137b"
+    },
+    {
+      "name": "closed-and-open-accepted",
+      "phase": "accepted",
+      "checkpoint": "{\"accepted_at\":\"2026-11-11T18:01:00.000000Z\",\"accepted_commit\":\"77cf4d3c6352f7257dd1ac558e1f5bc9423f5424\",\"covers_after\":\"2026-11-11T17:00:00.000000Z\",\"index_sha256\":\"8f05587805f82e8857c69a71b50b46a52b37bc9914cf05d9eaf5a5ab40b7d9ac\",\"public_tree\":\"77ad7a3c31ae3505f4b5733a88072a5a398bf619\",\"rows\":[[\"8169a8bfe1afbc1c\",\"2026-11-11T18:00:00\",\"verified_utc\",\"2026-11-11T18:00:00.000000Z\"],[\"d4f8427f609be761\",\"2026-11-11T18:00:00\",\"verified_utc\",\"2026-11-11T18:00:00.000000Z\"]],\"shard_sha256\":{\"MA\":\"dd5cb8a6348d5f1cc5daa7140c8e7dcf650e9a07d46cda4ed5746da195e4b880\"},\"version\":1}",
+      "sha256": "e50c9e5e934f9167cb1940fffef96e1ee47a014d000cb6e2cf0bead8fcaf8e12",
+      "closed_id": "8169a8bfe1afbc1c",
+      "payload": "{\"covers_after\":\"2026-11-11T17:00:00.000000Z\",\"index_sha256\":\"8f05587805f82e8857c69a71b50b46a52b37bc9914cf05d9eaf5a5ab40b7d9ac\",\"rows\":[[\"8169a8bfe1afbc1c\",\"2026-11-11T18:00:00\",\"verified_utc\",\"2026-11-11T18:00:00.000000Z\"],[\"d4f8427f609be761\",\"2026-11-11T18:00:00\",\"verified_utc\",\"2026-11-11T18:00:00.000000Z\"]],\"shard_sha256\":{\"MA\":\"dd5cb8a6348d5f1cc5daa7140c8e7dcf650e9a07d46cda4ed5746da195e4b880\"},\"version\":1}",
+      "header": "{\"accepted_at\":\"2026-11-11T18:01:00.000000Z\",\"accepted_commit\":\"77cf4d3c6352f7257dd1ac558e1f5bc9423f5424\",\"public_tree\":\"77ad7a3c31ae3505f4b5733a88072a5a398bf619\"}",
+      "payload_sha256": "3a6409178350eec0ae5a825036ccedc4b43ef3f2f23821586926747be696137b"
+    },
+    {
+      "name": "empty-pending",
+      "phase": "pending",
+      "checkpoint": "{\"candidate_commit\":\"d7bde18f4fb3d9603dfb79377ada6599b7e2ccb9\",\"candidate_tree\":\"6dbe7571c7f40aced34a0be888fc09af58df2d03\",\"covers_after\":\"2026-11-11T17:00:00.000000Z\",\"index_sha256\":\"8f05587805f82e8857c69a71b50b46a52b37bc9914cf05d9eaf5a5ab40b7d9ac\",\"predecessor\":{\"checkpoint_sha256\":\"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\",\"commit\":\"53cdc0e303325b295547dbe925fa2044d262e751\",\"public_tree\":\"ff48cbad32da1d20b03626fdc9f6ee48f7e6c8de\"},\"prepared_at\":\"2026-11-11T18:00:00.000000Z\",\"public_tree\":\"77ad7a3c31ae3505f4b5733a88072a5a398bf619\",\"rows\":[],\"shard_sha256\":{\"Canada\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"MA\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"remote\":\"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\"},\"version\":1}",
+      "sha256": "dde07bc5b6682fd133c5f4dda6abf579ee9950b3ef2d5d40a1e57d3a6e9c0630",
+      "payload": "{\"covers_after\":\"2026-11-11T17:00:00.000000Z\",\"index_sha256\":\"8f05587805f82e8857c69a71b50b46a52b37bc9914cf05d9eaf5a5ab40b7d9ac\",\"rows\":[],\"shard_sha256\":{\"Canada\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"MA\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"remote\":\"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\"},\"version\":1}",
+      "header": "{\"candidate_commit\":\"d7bde18f4fb3d9603dfb79377ada6599b7e2ccb9\",\"candidate_tree\":\"6dbe7571c7f40aced34a0be888fc09af58df2d03\",\"predecessor\":{\"checkpoint_sha256\":\"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\",\"commit\":\"53cdc0e303325b295547dbe925fa2044d262e751\",\"public_tree\":\"ff48cbad32da1d20b03626fdc9f6ee48f7e6c8de\"},\"prepared_at\":\"2026-11-11T18:00:00.000000Z\",\"public_tree\":\"77ad7a3c31ae3505f4b5733a88072a5a398bf619\"}",
+      "payload_sha256": "4f662a04e218239bc0fe2a816069dfc1af40f21ad0a0826d87076434c73c1788"
+    },
+    {
+      "name": "empty-accepted",
+      "phase": "accepted",
+      "checkpoint": "{\"accepted_at\":\"2026-11-11T18:01:00.000000Z\",\"accepted_commit\":\"77cf4d3c6352f7257dd1ac558e1f5bc9423f5424\",\"covers_after\":\"2026-11-11T17:00:00.000000Z\",\"index_sha256\":\"8f05587805f82e8857c69a71b50b46a52b37bc9914cf05d9eaf5a5ab40b7d9ac\",\"public_tree\":\"77ad7a3c31ae3505f4b5733a88072a5a398bf619\",\"rows\":[],\"shard_sha256\":{\"Canada\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"MA\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"remote\":\"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\"},\"version\":1}",
+      "sha256": "a72637d9173850b8158b27ed8cae4f115aa4628962ac6cbc8cb9e1242f2d1747",
+      "payload": "{\"covers_after\":\"2026-11-11T17:00:00.000000Z\",\"index_sha256\":\"8f05587805f82e8857c69a71b50b46a52b37bc9914cf05d9eaf5a5ab40b7d9ac\",\"rows\":[],\"shard_sha256\":{\"Canada\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"MA\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"remote\":\"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\"},\"version\":1}",
+      "header": "{\"accepted_at\":\"2026-11-11T18:01:00.000000Z\",\"accepted_commit\":\"77cf4d3c6352f7257dd1ac558e1f5bc9423f5424\",\"public_tree\":\"77ad7a3c31ae3505f4b5733a88072a5a398bf619\"}",
+      "payload_sha256": "4f662a04e218239bc0fe2a816069dfc1af40f21ad0a0826d87076434c73c1788"
+    },
+    {
+      "name": "microseconds-observed-pending",
+      "phase": "pending",
+      "checkpoint": "{\"candidate_commit\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"candidate_tree\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"covers_after\":\"2026-11-11T17:00:00.000000Z\",\"index_sha256\":\"8f05587805f82e8857c69a71b50b46a52b37bc9914cf05d9eaf5a5ab40b7d9ac\",\"predecessor\":{\"checkpoint_sha256\":\"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\",\"commit\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"public_tree\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"},\"prepared_at\":\"2026-11-11T18:01:00.123456Z\",\"public_tree\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"rows\":[[\"0000000000000000\",\"2026-11-11T16:00:00.123456+02:00\",\"observed_by\",\"2026-11-11T14:00:00.123456Z\"]],\"shard_sha256\":{\"MA\":\"dd5cb8a6348d5f1cc5daa7140c8e7dcf650e9a07d46cda4ed5746da195e4b880\"},\"version\":1}",
+      "sha256": "60efe495d8802be34fc7fedb8d9313747c9331dc74e2f368c08dcd8e64509a55",
+      "payload": "{\"covers_after\":\"2026-11-11T17:00:00.000000Z\",\"index_sha256\":\"8f05587805f82e8857c69a71b50b46a52b37bc9914cf05d9eaf5a5ab40b7d9ac\",\"rows\":[[\"0000000000000000\",\"2026-11-11T16:00:00.123456+02:00\",\"observed_by\",\"2026-11-11T14:00:00.123456Z\"]],\"shard_sha256\":{\"MA\":\"dd5cb8a6348d5f1cc5daa7140c8e7dcf650e9a07d46cda4ed5746da195e4b880\"},\"version\":1}",
+      "header": "{\"candidate_commit\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"candidate_tree\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"predecessor\":{\"checkpoint_sha256\":\"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\",\"commit\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"public_tree\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"},\"prepared_at\":\"2026-11-11T18:01:00.123456Z\",\"public_tree\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\"}",
+      "payload_sha256": "154faacddee23a640ede18b9d6ec313cebebb1cb859aaa1e048f7e83f6f30b8b"
+    },
+    {
+      "name": "microseconds-observed-accepted",
+      "phase": "accepted",
+      "checkpoint": "{\"accepted_at\":\"2026-11-11T18:01:00.123456Z\",\"accepted_commit\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"covers_after\":\"2026-11-11T17:00:00.000000Z\",\"index_sha256\":\"8f05587805f82e8857c69a71b50b46a52b37bc9914cf05d9eaf5a5ab40b7d9ac\",\"public_tree\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"rows\":[[\"0000000000000000\",\"2026-11-11T16:00:00.123456+02:00\",\"observed_by\",\"2026-11-11T14:00:00.123456Z\"]],\"shard_sha256\":{\"MA\":\"dd5cb8a6348d5f1cc5daa7140c8e7dcf650e9a07d46cda4ed5746da195e4b880\"},\"version\":1}",
+      "sha256": "b3d2ba83193884d78eac319c6c46311c6d3014b056f859cb6a73e8979e5753a3",
+      "payload": "{\"covers_after\":\"2026-11-11T17:00:00.000000Z\",\"index_sha256\":\"8f05587805f82e8857c69a71b50b46a52b37bc9914cf05d9eaf5a5ab40b7d9ac\",\"rows\":[[\"0000000000000000\",\"2026-11-11T16:00:00.123456+02:00\",\"observed_by\",\"2026-11-11T14:00:00.123456Z\"]],\"shard_sha256\":{\"MA\":\"dd5cb8a6348d5f1cc5daa7140c8e7dcf650e9a07d46cda4ed5746da195e4b880\"},\"version\":1}",
+      "header": "{\"accepted_at\":\"2026-11-11T18:01:00.123456Z\",\"accepted_commit\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"public_tree\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\"}",
+      "payload_sha256": "154faacddee23a640ede18b9d6ec313cebebb1cb859aaa1e048f7e83f6f30b8b"
+    }
+  ]
+}

@@ -398,6 +398,8 @@ The golden harness now covers static assets as well as generated pages. Each sit
 
 | C | P-2.1ao bounded R2 slots | audit_growth_generated | `codex/product-p2.1ao-r2-slots` | [#468](https://github.com/bpmcginley/InternshipFinder/pull/468) | Offline qualification only | Two fixed payload slots passed five synthetic checks and isolated workerd R2 with two 2.54 MB payloads, conditional writes, stale cleanup and lost acknowledgements. No control authority, routes, live bindings or activation. |
 
+| C | P-2.1aq checkpoint payload codec | audit_growth_generated | `codex/product-p2.1aq-payload-codec` | [#471](https://github.com/bpmcginley/InternshipFinder/pull/471) | Offline qualification only | Exact Python canonical byte and digest parity, including closed lineage. Fifteen focused Node checks and seven Python checks pass. No storage/control/witness integration. |
+
 ## Waiting for Bruce
 
 - **P-2.2ap native checkout recovery UI [#475](https://github.com/bpmcginley/InternshipFinder/pull/475)**: audit_site, `codex/product-p2.2ap-recovery-ui`, on published `82c3c429`. Draft needs-bruce; conditional Account/allowance recovery and exact pending-checkout deletion guidance implemented. 16 focused and 400 site tests, two golden tests and 24 paired synthetic screenshots. Session, refresh and cross-tab deletion races corrected. #472 is deployed with recovery off pending provider configuration. Independent review and hosted checks remain.
@@ -407,12 +409,13 @@ P-2.1u [#341](https://github.com/bpmcginley/InternshipFinder/pull/341) remains o
 
 P-2.1s [#330](https://github.com/bpmcginley/InternshipFinder/pull/330) dormant archive reader remains owner-gated for configuration, publication and activation; no deployment or sending.
 
-Dates are when the item was recorded, not a claim that a separate message was sent. Completion remains blank until verified.
+Dates are when the item was recorded, not a claim that a separate message was sent. Completion remains blank until verified. The #455 row records its pre-merge refresh. Its current status appears in the [source evidence](#chrome-060-and-detached-follow-source-evidence).
 
 | Recorded | Item | Ready artifact / next action | Done |
 |---|---|---|---|
 | 2026-11-11 | P-2.1ao bounded R2 slots | [#468](https://github.com/bpmcginley/InternshipFinder/pull/468): offline conditional-write qualification passes; the malformed-header regression also rejects a leading UTF-8 BOM. | Storage choice, physical retention, control authority and restore witness remain unqualified. No activation. |
-| 2026-11-11 | Chrome 0.6.0 verified final-review handoff | [#455](https://github.com/bpmcginley/InternshipFinder/pull/455) normally refreshed on exact #440 69eb5e9c. All reviewed source, tests and screenshot bytes match 393a1ff0. Fresh Node 22 qualification passed 122 focused tests and scoped ESLint passed. Prior Node 22 qualification on the byte-identical extension tree passed 381 tests. Synthetic Chrome evidence is in [the package note](P-0.6.0-final-review.md). Source merged as `79d9329e` with exact review and green checks. | Store delivery held |
+| 2026-11-11 | P-2.1aq checkpoint payload codec | [#471](https://github.com/bpmcginley/InternshipFinder/pull/471): pure bounded split/reassembly and cross-language fixtures pass locally; timestamp regressions pass in both phases and directions. | Storage selection, activation and restore qualification remain pending. |
+| 2026-11-11 | Chrome 0.6.0 verified final-review handoff | [#455](https://github.com/bpmcginley/InternshipFinder/pull/455) normally refreshed on exact #440 69eb5e9c. All reviewed source, tests and screenshot bytes match 393a1ff0. Fresh Node 22 qualification passed 122 focused tests and scoped ESLint passed. Prior Node 22 qualification on the byte-identical extension tree passed 381 tests. Synthetic Chrome evidence is in [the package note](P-0.6.0-final-review.md). Fresh hosted checks, independent integration review and owner release remain pending. | Draft needs-bruce |
 | 2026-11-11 | P-2.2an dashboard session freshness | [#466](https://github.com/bpmcginley/InternshipFinder/pull/466) published reviewed stale-auth fencing with both-width evidence and exact Pages and Tests. | Exact production publication verified. |
 | 2026-11-11 | P-2.2ao checkout recovery route and P-2.2ap dashboard controls | The [route #472](https://github.com/bpmcginley/InternshipFinder/pull/472) is live with sales off. The [native dashboard #475](https://github.com/bpmcginley/InternshipFinder/pull/475) is qualifying independently. | Dashboard draft. |
 | 2026-11-11 | P-2.2al Top-up public disclosures | [#463](https://github.com/bpmcginley/InternshipFinder/pull/463) publishes the reviewed conditional terms and privacy wording. Exact Pages and live checks passed. | Published with sales off. |
