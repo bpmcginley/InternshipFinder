@@ -1106,6 +1106,6 @@ const startup = loadProfileWithRestore().then((profile) => {
   // The Setup email saved as its first letter by 0.5.6 and earlier (U3): put the whole address back.
   if (repairSetupEmail(S)) { pendingResumeImport = pendingResumeReview(S); save(true); }
   render();
-  refreshSignIn();
 });
 await startup;
+refreshSignIn();
