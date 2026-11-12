@@ -15,6 +15,11 @@ const release = () => ({
   notBefore: 1000,
   expiresAt: 2000,
 });
+const reply = (body, init) => {
+  const response = new Response(body, init);
+  Object.defineProperty(response, "url", { value: release().url, configurable: true });
+  return response;
+};
 const prior = () => Object.fromEntries(Object.entries(wire.valid).map(([k, v]) => [k, new Set(v)]));
 const options = (extra = {}) => ({
   enabled: true,
@@ -25,7 +30,7 @@ const options = (extra = {}) => ({
   maxKeys: 100,
   deadlineMs: 100,
   now: () => 1100,
-  fetch: async () => new Response(bytes),
+  fetch: async () => reply(bytes),
   ...extra,
 });
 const deferred = () => {
@@ -39,7 +44,7 @@ test("catalog loader is off by default and rejects bad release/config before fet
   let calls = 0;
   const fetch = async () => {
     calls++;
-    return new Response(bytes);
+    return reply(bytes);
   };
   assert.deepEqual(await loadFollowCatalog(), { status: "disabled" });
   assert.deepEqual(await loadFollowCatalog(null), { status: "disabled" });
@@ -52,6 +57,11 @@ test("catalog loader is off by default and rejects bad release/config before fet
     { release: { ...release(), expiresAt: 1100 } },
     { release: { ...release(), notBefore: 1200 } },
     { previousValid: {} },
+    { previousValid: { ...prior(), fields: new Set(["not a field"]) } },
+    { previousValid: { ...prior(), companies: new Set([" padded"]) } },
+    { previousValid: { ...prior(), states: new Set(["REMOTE"]) } },
+    { previousValid: { ...prior(), states: new Set([null]) } },
+
     { maxBytes: 0 },
     { deadlineMs: 2147483648 },
   ]) {
@@ -65,6 +75,8 @@ test("catalog loader rejects cross-origin and normalization aliases without a re
   for (const url of [
     "https://other.example.test/qualified.json",
     origin + "/qualified.json?q=x",
+    origin + "/qualified.json?",
+    origin + "/qualified.json#",
     origin + "/qualified.json#x",
     "https://user@catalog.example.test/qualified.json",
     "https:///catalog.example.test/qualified.json",
@@ -88,7 +100,7 @@ test("exact response gives fresh private Sets with pinned continuity and constra
     assert.equal(init.credentials, "omit");
     assert.equal(init.cache, "no-store");
     assert.equal(init.signal.aborted, false);
-    return new Response(bytes, { headers: { "content-length": String(bytes.length) } });
+    return reply(bytes, { headers: { "content-length": String(bytes.length) } });
   };
   const first = await loadFollowCatalog(options({ fetch }));
   assert.equal(first.status, "available");
@@ -107,7 +119,7 @@ test("pins and previous sets are copied before fetch await", async () => {
   config.release.catalogSha256 = "0".repeat(64);
   config.release.expiresAt = 0;
   config.previousValid.companies.add("unknown changed while loading");
-  wait.resolve(new Response(bytes));
+  wait.resolve(reply(bytes));
   assert.equal((await pending).status, "available");
 });
 
@@ -115,6 +127,7 @@ test("redirects bad status mismatched URL and body length fail closed and cancel
   for (const kind of [
     "redirect",
     "redirected",
+    "blank",
     "url",
     "status",
     "declared",
@@ -133,7 +146,7 @@ test("redirects bad status mismatched URL and body length fail closed and cancel
         cancelled++;
       },
     });
-    const response = new Response(body, {
+    const response = reply(body, {
       status: kind === "redirect" ? 302 : kind === "status" ? 503 : 200,
       headers:
         kind === "declared"
@@ -143,12 +156,13 @@ test("redirects bad status mismatched URL and body length fail closed and cancel
             : {},
     });
     if (kind === "redirected") Object.defineProperty(response, "redirected", { value: true });
+    if (kind === "blank") Object.defineProperty(response, "url", { value: "" });
     if (kind === "url") Object.defineProperty(response, "url", { value: origin + "/other.json" });
     // Short/empty finish immediately; long/other rejection cancels without draining.
     const get =
       kind === "short"
         ? async () =>
-            new Response(bytes.subarray(1), { headers: { "content-length": String(bytes.length) } })
+            reply(bytes.subarray(1), { headers: { "content-length": String(bytes.length) } })
         : async () => response;
     const config = options({ fetch: get, maxBytes: bytes.length });
     assert.deepEqual(await loadFollowCatalog(config), { status: "unavailable" });
@@ -160,7 +174,7 @@ test("bad payload pin source pin canonical shape UTF8 or continuity never become
   for (const kind of ["payload", "source", "shape", "utf8", "continuity"]) {
     const body =
       kind === "utf8" ? Buffer.from([255]) : kind === "shape" ? Buffer.from("{}") : bytes;
-    const config = options({ maxBytes: bytes.length, fetch: async () => new Response(body) });
+    const config = options({ maxBytes: bytes.length, fetch: async () => reply(body) });
     if (kind === "payload") config.release.catalogSha256 = "0".repeat(64);
     else config.release.catalogSha256 = hash(body);
     if (kind === "source") config.release.sourceSha256 = "0".repeat(64);
@@ -175,7 +189,7 @@ test("one absolute deadline cancels stalled body and late fetch; later invocatio
       signal,
       cancelled = 0;
     const wait = deferred();
-    const response = new Response(
+    const response = reply(
       new ReadableStream({
         cancel() {
           cancelled++;
@@ -206,6 +220,7 @@ test("one absolute deadline cancels stalled body and late fetch; later invocatio
       await Promise.resolve();
     }
     assert.equal(cancelled, 1);
+    assert.equal(response.body.locked, false);
   }
   assert.equal((await loadFollowCatalog(options())).status, "available");
 });
@@ -220,7 +235,7 @@ test("fresh clock rejects release expiry rollback and deadline even before timer
         cancel: () => {},
         fetch: async () => {
           at = next;
-          return new Response(bytes);
+          return reply(bytes);
         },
       }),
     );
@@ -251,7 +266,7 @@ test("expiration during digest parsing is rechecked before availability", async 
 });
 test("stream byte cap and elapsed deadline hold without timer callback delivery", async () => {
   let cancelled = 0;
-  const oversize = new Response(
+  const oversize = reply(
     new ReadableStream({
       start(c) {
         c.enqueue(bytes);
@@ -267,7 +282,7 @@ test("stream byte cap and elapsed deadline hold without timer callback delivery"
   );
   assert.equal(cancelled, 1);
   let at = 1100;
-  const stream = new Response(
+  const stream = reply(
     new ReadableStream({
       pull(c) {
         at += 1;
@@ -291,4 +306,36 @@ test("stream byte cap and elapsed deadline hold without timer callback delivery"
     { status: "unavailable" },
   );
   assert.equal(cancelled, 2);
+});
+
+test("outer result fence rejects expiry queued immediately after inner parser check", async () => {
+  const original = crypto.subtle.digest.bind(crypto.subtle);
+  const own = Object.getOwnPropertyDescriptor(crypto.subtle, "digest");
+  let at = 1100,
+    parsed = false,
+    queued = false;
+  Object.defineProperty(crypto.subtle, "digest", {
+    configurable: true,
+    value: async (...args) => {
+      const result = await original(...args);
+      parsed = true;
+      return result;
+    },
+  });
+  const now = () => {
+    if (parsed && !queued) {
+      queued = true;
+      queueMicrotask(() => {
+        at = 2000;
+      });
+    }
+    return at;
+  };
+  try {
+    assert.deepEqual(await loadFollowCatalog(options({ now })), { status: "unavailable" });
+  } finally {
+    if (own) Object.defineProperty(crypto.subtle, "digest", own);
+    else delete crypto.subtle.digest;
+  }
+  assert(queued);
 });

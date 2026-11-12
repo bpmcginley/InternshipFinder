@@ -21,6 +21,19 @@ const invalid = () => {
   throw new Error("Follow catalog unavailable");
 };
 
+export function copyFollowCatalogPrevious(previousValid, maxKeys) {
+  if (!Number.isSafeInteger(maxKeys) || maxKeys <= 0 || !shape(previousValid, kinds))
+    return invalid();
+  const previous = {};
+  for (const kind of kinds) {
+    const values = previousValid[kind];
+    if (!(values instanceof Set) || values.size > maxKeys || [...values].some((v) => !key(v, kind)))
+      return invalid();
+    previous[kind] = new Set(values);
+  }
+  return previous;
+}
+
 export async function parseFollowCatalog(input, options) {
   try {
     const { maxBytes, maxKeys, sourceSha256, catalogSha256, previousValid } = options;
@@ -36,17 +49,7 @@ export async function parseFollowCatalog(input, options) {
       return invalid();
     // Capture caller-owned Buffer/Uint8Array and prior Sets before the hashing await.
     const bytes = new Uint8Array(input);
-    const previous = {};
-    for (const kind of kinds) {
-      const values = previousValid[kind];
-      if (
-        !(values instanceof Set) ||
-        values.size > maxKeys ||
-        [...values].some((v) => !key(v, kind))
-      )
-        return invalid();
-      previous[kind] = new Set(values);
-    }
+    const previous = copyFollowCatalogPrevious(previousValid, maxKeys);
     const hash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))]
       .map((value) => value.toString(16).padStart(2, "0"))
       .join("");

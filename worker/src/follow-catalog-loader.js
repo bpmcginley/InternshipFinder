@@ -1,5 +1,5 @@
 // Dormant one-shot reader: trusted release metadata only; no default fetch/URL or cache.
-import { parseFollowCatalog } from "./follow-catalog.js";
+import { copyFollowCatalogPrevious, parseFollowCatalog } from "./follow-catalog.js";
 
 const positive = (n) => Number.isSafeInteger(n) && n > 0;
 const digest = (s) => typeof s === "string" && /^[a-f0-9]{64}$/.test(s);
@@ -16,14 +16,25 @@ export async function loadFollowCatalog(options = {}) {
     timer,
     stopped = false;
   const { fetch: get, now = Date.now, schedule = setTimeout, cancel = clearTimeout } = options;
+  const releaseReader = () => {
+    try {
+      reader?.releaseLock();
+      reader = null;
+    } catch {
+      /* Pending cancellation retries release when it settles. */
+    }
+  };
   const discard = () => {
     stopped = true;
     controller?.abort();
     try {
-      void Promise.resolve(reader ? reader.cancel() : response?.body?.cancel()).catch(() => {});
+      void Promise.resolve(reader ? reader.cancel() : response?.body?.cancel())
+        .catch(() => {})
+        .finally(releaseReader);
     } catch {
       /* Discard a malformed or already closed body without exposing details. */
     }
+    releaseReader();
   };
   try {
     const { origin, maxBytes, maxKeys, deadlineMs } = options;
@@ -35,6 +46,8 @@ export async function loadFollowCatalog(options = {}) {
       allowed.protocol !== "https:" ||
       allowed.origin !== origin ||
       typeof release.url !== "string" ||
+      release.url.includes("?") ||
+      release.url.includes("#") ||
       target.href !== release.url ||
       target.origin !== origin ||
       target.username ||
@@ -54,18 +67,7 @@ export async function loadFollowCatalog(options = {}) {
       [get, now, schedule, cancel].some((value) => typeof value !== "function")
     )
       fail();
-    const previousValid = {};
-    if (
-      Object.keys(options.previousValid || {})
-        .sort()
-        .join(",") !== "companies,fields,states"
-    )
-      fail();
-    for (const kind of ["companies", "fields", "states"]) {
-      const set = options.previousValid[kind];
-      if (!(set instanceof Set) || set.size > maxKeys) fail();
-      previousValid[kind] = new Set(set);
-    }
+    const previousValid = copyFollowCatalogPrevious(options.previousValid, maxKeys);
     let last = -Infinity;
     const clock = () => {
       const at = now();
@@ -104,7 +106,7 @@ export async function loadFollowCatalog(options = {}) {
         !(response instanceof Response) ||
         response.status !== 200 ||
         response.redirected ||
-        (response.url && response.url !== target.href) ||
+        response.url !== target.href ||
         !response.body
       )
         fail();
@@ -146,13 +148,15 @@ export async function loadFollowCatalog(options = {}) {
       return { status: "available", catalog };
     };
     // Rejected/late work is always observed; it cannot escape after the one deadline.
-    return await Promise.race([
+    const result = await Promise.race([
       operation().catch(() => {
         discard();
         return unavailable();
       }),
       timeout,
     ]);
+    if (result.status === "available") check();
+    return result;
   } catch {
     return unavailable();
   } finally {
