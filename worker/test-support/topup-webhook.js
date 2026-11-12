@@ -722,3 +722,44 @@ export async function signedHistoryDisabledPolicyCannotEnableAfterPreclaim(db) {
     assert.equal(await revision(db), 2);
   }
 }
+
+export async function signedHistoryUnrelatedFamilyCannotChangeAfterPreclaim(db) {
+  const f = await fixture(db);
+  assert.equal((await f.post()).status, 200);
+  f.refunds = [item("refund", "succeeded")];
+  f.charge.amount_refunded = 327;
+  f.charge.refunded = true;
+  f.calls = [];
+  const event = f.event("charge.succeeded", { ...f.charge, metadata: {} }, "evt_unrelated_signed");
+  const wrapped = {
+    batch: (s) => db.batch(s),
+    prepare(sql) {
+      const statement = db.prepare(sql);
+      if (!sql.startsWith("INSERT OR IGNORE INTO stripe_events")) return statement;
+      return {
+        bind(...args) {
+          const bound = statement.bind(...args);
+          return {
+            async run() {
+              const result = await bound.run();
+              f.verified.type = "refund.updated";
+              f.verified.data.object = item("refund", "succeeded");
+              return result;
+            },
+          };
+        },
+      };
+    },
+  };
+  assert.deepEqual(await signedApply(wrapped, f, event, historyPolicy), {
+    ok: true,
+    ignored: true,
+  });
+  assert.equal(f.calls.length, 0);
+  assert.equal(await revision(db), 1);
+  assert.equal(await count(db, "topup_history_receipts"), 0);
+  assert.deepEqual(await balance(db), { available: 25, held: 0, consumed: 0, revoked: 0 });
+  assert.equal(await receipt(db, "evt_unrelated_signed"), 1);
+  assert.equal(await count(db, "plans"), 0);
+  assert.equal(await count(db, "employer_orders"), 0);
+}

@@ -34,8 +34,9 @@ const reference = (value, kind, mode) =>
 
 // Capture before receipt/discovery awaits. Only this top-up branch receives the pinned env.
 export function snapshotTopupHistoryInput(env, event, historyPolicy) {
-  if (historyPolicy?.enabled !== true || !objectTypes.has(event?.type))
-    return { historyPolicy: null };
+  if (historyPolicy?.enabled !== true) return { historyPolicy: null };
+  event = structuredClone(event);
+  if (!objectTypes.has(event?.type)) return { event, historyPolicy: null };
   let policy;
   try {
     policy = snapshotTopupHistoryPolicy(historyPolicy);
@@ -44,7 +45,7 @@ export function snapshotTopupHistoryInput(env, event, historyPolicy) {
     policy = Object.freeze({ enabled: true }); // Invalid opt-in must not become legacy recovery.
   }
   return {
-    event: structuredClone(event),
+    event,
     historyPolicy: policy,
     env: Object.freeze({
       STRIPE_SECRET_KEY: env?.STRIPE_SECRET_KEY,
