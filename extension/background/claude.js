@@ -53,8 +53,10 @@ export async function callClaude({
   if (system) body.system = system;
   if (tools) body.tools = tools;
   if (thinking && !/haiku/.test(model)) body.thinking = thinking;
+  const maxAttempts = 5;
   let lastErr = "";
-  for (let attempt = 0; attempt < 5; attempt++) {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const hasNextAttempt = attempt + 1 < maxAttempts;
     throwIfAborted(signal);
     let res;
     try {
@@ -72,14 +74,14 @@ export async function callClaude({
     } catch (e) {
       if (signal?.aborted || e.name === "AbortError") throw e;
       lastErr = e.message;
-      await sleep(1500 * 2 ** attempt, signal);
+      if (hasNextAttempt) await sleep(1500 * 2 ** attempt, signal);
       continue;
     }
     throwIfAborted(signal);
     if (res.status === 429 || res.status === 529 || res.status >= 500) {
       lastErr = `${res.status}`;
       const ra = +res.headers.get("retry-after");
-      await sleep(ra ? ra * 1000 : 1500 * 2 ** attempt, signal);
+      if (hasNextAttempt) await sleep(ra ? ra * 1000 : 1500 * 2 ** attempt, signal);
       continue;
     }
     const data = await res.json().catch((e) => {

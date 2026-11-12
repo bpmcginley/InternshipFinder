@@ -134,8 +134,10 @@ export async function callGemini({
 }) {
   if (!apiKey) throw new Error("No Gemini API key. Open Auto-Apply setup → Setup.");
   const body = buildGeminiBody({ system, messages, tools, max_tokens, thinking });
+  const maxAttempts = 5;
   let lastErr = "";
-  for (let attempt = 0; attempt < 5; attempt++) {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const hasNextAttempt = attempt + 1 < maxAttempts;
     throwIfAborted(signal);
     let res;
     try {
@@ -148,13 +150,13 @@ export async function callGemini({
     } catch (e) {
       if (signal?.aborted || e.name === "AbortError") throw e;
       lastErr = e.message;
-      await sleep(1500 * 2 ** attempt, signal);
+      if (hasNextAttempt) await sleep(1500 * 2 ** attempt, signal);
       continue;
     }
     throwIfAborted(signal);
     if (res.status === 429 || res.status >= 500) {
       lastErr = `${res.status}`;
-      await sleep(2000 * 2 ** attempt, signal);
+      if (hasNextAttempt) await sleep(2000 * 2 ** attempt, signal);
       continue;
     }
     const data = await res.json().catch((e) => {
