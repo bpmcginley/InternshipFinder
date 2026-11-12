@@ -166,6 +166,7 @@ test("offline routes match the original capture and signed-in cache policy", asy
     "POST /follows/manage/remove",
     "POST /follows/manage/delete",
     "POST /follows/manage/request",
+    "POST /follows/signup",
     "GET /billing/topup/offer",
     "POST /billing/topup/checkout",
     "POST /billing/topup/recover",
