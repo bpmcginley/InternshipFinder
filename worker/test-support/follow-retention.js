@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { enqueueFollowSnapshot } from "../src/follow-enqueue.js";
 import { beginFollowSnapshotAttempt, leaseFollowDigest } from "../src/follow-outbox.js";
-import { maintainFollowRetention } from "../src/follow-retention.js";
+import {
+  maintainFollowRetention,
+  expireFollowManagementRequests,
+} from "../src/follow-retention.js";
 import { confirmFollow, mintFollowToken, requestFollow } from "../src/follows.js";
 
 const CLOCK_SQL = "SELECT strftime('%Y-%m-%dT%H:%M:%fZ','now') AS at";
@@ -275,4 +278,209 @@ export async function invalidSampleAndUnverifiedResult(db) {
   };
   assert.deepEqual(await maintainFollowRetention(ambiguous), { status: "unavailable" });
   assert.equal(batches, 1);
+}
+
+export async function managementExpiryDisabledAndInvalidBoundsNeverAccessStorage() {
+  let calls = 0;
+  const db = {
+    prepare() {
+      calls++;
+      throw new Error();
+    },
+  };
+  assert.deepEqual(await expireFollowManagementRequests(db, null), { status: "disabled" });
+  for (const enabled of [undefined, false, "true", 1])
+    assert.deepEqual(await expireFollowManagementRequests(db, { enabled, maxRows: 1 }), {
+      status: "disabled",
+    });
+  for (const maxRows of [undefined, null, "1", 0, -1, 1.5, Infinity, Number.MAX_SAFE_INTEGER + 1])
+    assert.deepEqual(await expireFollowManagementRequests(db, { enabled: true, maxRows }), {
+      status: "unavailable",
+    });
+  assert.equal(calls, 0);
+}
+
+async function managementJob(db, id, expires, claim = null) {
+  await db
+    .prepare("INSERT INTO follow_subscribers(id,email,created) VALUES(?,?,?)")
+    .bind(id, id + "@example.test", iso(expires - day))
+    .run();
+  await db
+    .prepare(
+      "INSERT INTO follow_subscriptions(subscriber_id,scope_key,created) VALUES(?,'public-scope',?)",
+    )
+    .bind(id, iso(expires - day))
+    .run();
+  await db
+    .prepare(
+      "INSERT INTO follow_management_outbox(id,subscriber_id,queued_at,expires_at,claim_id) VALUES(?,?,?,?,?)",
+    )
+    .bind(id, id, iso(expires - day), iso(expires), claim)
+    .run();
+}
+
+export async function managementExpiryUsesSqlClockCapAndStableTies(db) {
+  const now = await actualClock(db);
+  await managementJob(db, "tie-first", now - 10000);
+  await managementJob(db, "earliest", now - 20000, crypto.randomUUID());
+  await managementJob(db, "tie-second", now - 10000, crypto.randomUUID());
+  await managementJob(db, "live", now + day);
+  await managementJob(db, "live-claimed", now + day, crypto.randomUUID());
+  await mintFollowToken(db, "tie-first", "manage", {}, date(now));
+  await mintFollowToken(db, "tie-second", "unsubscribe", {}, date(now));
+  await putBudget(db, now, 7);
+  const preserved = [
+    "follow_subscribers",
+    "follow_subscriptions",
+    "follow_tokens",
+    "follow_send_budget",
+    "follow_digest_days",
+    "rate",
+  ];
+  const before = await Promise.all(preserved.map((t) => rows(db, t)));
+  const live = (await rows(db, "follow_management_outbox")).filter((r) => r.id.startsWith("live"));
+  const options = { enabled: true, maxRows: 2 };
+  assert.deepEqual(await expireFollowManagementRequests(db, options), {
+    status: "maintained",
+    removed: 2,
+  });
+  assert.deepEqual(
+    (await rows(db, "follow_management_outbox")).map((r) => r.id),
+    ["live", "live-claimed", "tie-second"],
+  );
+  assert.deepEqual(await expireFollowManagementRequests(db, options), {
+    status: "maintained",
+    removed: 1,
+  });
+  assert.deepEqual(await expireFollowManagementRequests(db, options), {
+    status: "maintained",
+    removed: 0,
+  });
+  assert.deepEqual(await rows(db, "follow_management_outbox"), live);
+  assert.deepEqual(await Promise.all(preserved.map((t) => rows(db, t))), before);
+}
+
+export async function managementExpiryAcknowledgementsAndLostCommitNeverRetry(db) {
+  for (const receipt of [
+    null,
+    {},
+    { success: false },
+    { success: true, meta: { changes: 0 } },
+    { success: true, results: [], meta: { changes: -1 } },
+    { success: true, results: [], meta: { changes: 1.5 } },
+    { success: true, results: [], meta: { changes: 2 } },
+    { success: true, results: [1], meta: { changes: 0 } },
+  ]) {
+    let calls = 0;
+    const malformed = {
+      prepare: () => ({
+        bind: () => ({
+          run: async () => {
+            calls++;
+            return receipt;
+          },
+        }),
+      }),
+    };
+    assert.deepEqual(
+      await expireFollowManagementRequests(malformed, { enabled: true, maxRows: 1 }),
+      { status: "unavailable" },
+    );
+    assert.equal(calls, 1);
+  }
+  const now = await actualClock(db);
+  await managementJob(db, "uncertain-first", now - 10000);
+  await managementJob(db, "uncertain-second", now - 10000);
+  let writes = 0;
+  const lost = {
+    prepare: (sql) => ({
+      bind: (...args) => ({
+        run: async () => {
+          await db
+            .prepare(sql)
+            .bind(...args)
+            .run();
+          writes++;
+          throw new Error("synthetic lost reply");
+        },
+      }),
+    }),
+  };
+  assert.deepEqual(await expireFollowManagementRequests(lost, { enabled: true, maxRows: 1 }), {
+    status: "unavailable",
+  });
+  assert.equal(writes, 1);
+  assert.deepEqual(
+    (await rows(db, "follow_management_outbox")).map((r) => r.id),
+    ["uncertain-second"],
+  );
+}
+
+export async function managementExpiryFailureRollsBackWholeBoundedStatement(db) {
+  const now = await actualClock(db);
+  await managementJob(db, "rollback-first", now - 10000);
+  await managementJob(db, "rollback-second", now - 10000, crypto.randomUUID());
+  const before = await rows(db, "follow_management_outbox");
+  await db
+    .prepare(
+      "CREATE TRIGGER management_expiry_abort BEFORE DELETE ON follow_management_outbox WHEN OLD.id='rollback-second' BEGIN SELECT RAISE(ABORT,'fixture failure'); END",
+    )
+    .run();
+  try {
+    assert.deepEqual(await expireFollowManagementRequests(db, { enabled: true, maxRows: 2 }), {
+      status: "unavailable",
+    });
+    assert.deepEqual(await rows(db, "follow_management_outbox"), before);
+  } finally {
+    await db.prepare("DROP TRIGGER management_expiry_abort").run();
+  }
+}
+
+export async function managementExpiryIndexedSyntheticBacklog(db) {
+  await db
+    .prepare(
+      "WITH RECURSIVE n(v) AS (VALUES(1) UNION ALL SELECT v+1 FROM n WHERE v<20000) INSERT INTO follow_subscribers(id,email,created) SELECT printf('backlog-%05d',v),printf('backlog-%05d@example.test',v),strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 day') FROM n",
+    )
+    .run();
+  await db
+    .prepare(
+      "INSERT INTO follow_management_outbox(id,subscriber_id,queued_at,expires_at) SELECT id,id,created,strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 second') FROM follow_subscribers WHERE id LIKE 'backlog-%'",
+    )
+    .run();
+  let sql, receipt;
+  const measured = {
+    prepare(query) {
+      sql = query;
+      return {
+        bind: (...args) => ({
+          run: async () => {
+            receipt = await db
+              .prepare(query)
+              .bind(...args)
+              .run();
+            return receipt;
+          },
+        }),
+      };
+    },
+  };
+  assert.deepEqual(await expireFollowManagementRequests(measured, { enabled: true, maxRows: 7 }), {
+    status: "maintained",
+    removed: 7,
+  });
+  const plan = (
+    await db
+      .prepare("EXPLAIN QUERY PLAN " + sql)
+      .bind(7)
+      .all()
+  ).results
+    .map((r) => r.detail)
+    .join("; ");
+  assert.match(plan, /USING COVERING INDEX follow_management_outbox_expiry/);
+  assert.doesNotMatch(plan, /TEMP B-TREE/);
+  assert.equal(
+    await db.prepare("SELECT COUNT(*) AS n FROM follow_management_outbox").first("n"),
+    19993,
+  );
+  return { rowsRead: receipt.meta.rows_read, rowsWritten: receipt.meta.rows_written, plan };
 }
