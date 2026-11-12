@@ -266,10 +266,21 @@ def test_explicit_forward_seed_uses_exact_source(attempt):
     assert store.calls.count('stage') == store.calls.count('cas') == 1
 
 
-def test_wrong_state_stops_before_checkpoint_and_ingest(attempt, tmp_path, monkeypatch):
+@pytest.mark.parametrize('fault', ['different', 'missing', 'symlink'])
+def test_wrong_state_stops_before_checkpoint_and_ingest(attempt, tmp_path, monkeypatch, fault):
     repo, state, _, _, _, store, context, args, *_ = attempt
     wrong = tmp_path / 'wrong-state'
-    wrong.mkdir()
+    if fault == 'different':
+        wrong.mkdir()
+    elif fault == 'missing':
+        state.rmdir()
+        wrong = state
+    else:
+        try:
+            wrong.symlink_to(state, target_is_directory=True)
+        except OSError:
+            pytest.skip('Creating a directory symlink requires local privileges')
+        monkeypatch.setattr(publication, 'DATA_DIR', str(wrong))
     monkeypatch.setattr(run_ingest, 'main', lambda *_a, **_k: pytest.fail('Ingest started'))
     with pytest.raises(ValueError, match='configured ingestion state'):
         ingest_and_publish(repo, wrong, 'Rejected', ingest_args=args, follow=context)
@@ -321,7 +332,7 @@ if str(mode) == 'reject':
     else:
         raise AssertionError('Mismatched state accepted')
 else:
-    result = ingest_and_publish(repo, configured / '.', 'Synthetic valid state', ingest_args=args)
+    result = ingest_and_publish(repo, configured / '..' / configured.name, 'Synthetic valid state', ingest_args=args)
     assert result.follow == 'disabled'
 """
     database_path = tmp_path / 'child.db'

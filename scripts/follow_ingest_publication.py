@@ -63,7 +63,12 @@ def ingest_and_publish(
     Unexpected ingest/Git errors propagate. Lost mutation replies are never blindly retried.
     An outer process deadline remains required before production integration.
     """
-    if Path(state).resolve() != Path(DATA_DIR).resolve():
+    state = Path(state)
+    if (
+        not state.is_dir()
+        or state.is_symlink()
+        or state.resolve(strict=True) != Path(DATA_DIR).resolve(strict=True)
+    ):
         raise ValueError('Publication state must match configured ingestion state')
     if any(arg == '--export' or arg.startswith('--export=') for arg in ingest_args):
         raise ValueError('The publication checkout owns the export destination')
