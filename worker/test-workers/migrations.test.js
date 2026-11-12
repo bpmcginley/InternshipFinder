@@ -49,6 +49,8 @@ const ledger = () => rows(env.MIGRATION_DB, "SELECT name FROM d1_migrations ORDE
 beforeEach(async () => {
   // Explicit cleanup also makes the proof independent of test-runner storage isolation defaults.
   for (const db of databases) {
+    await db.prepare("DROP VIEW IF EXISTS follow_link_requests").run();
+    await db.prepare("DROP TRIGGER IF EXISTS follow_link_consumed").run();
     await db.prepare("DROP TRIGGER IF EXISTS follow_confirmation_scope_changed").run();
     await run(
       db,
@@ -98,8 +100,8 @@ it("migrations create the complete legacy schema, including constraints and trig
   expect(await schema(env.MIGRATION_DB)).toEqual(expected);
   expect(expected.objects.filter((row) => row.type === "table")).toHaveLength(64);
   expect(expected.objects.filter((row) => row.type === "index")).toHaveLength(35);
-  expect(expected.objects.filter((row) => row.type === "trigger")).toHaveLength(12);
-  expect(expected.objects.filter((row) => row.type === "view")).toHaveLength(1);
+  expect(expected.objects.filter((row) => row.type === "trigger")).toHaveLength(14);
+  expect(expected.objects.filter((row) => row.type === "view")).toHaveLength(2);
   expect(await ledger()).toEqual(migrationNames.map((name) => ({ name })));
 });
 

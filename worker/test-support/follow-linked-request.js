@@ -5,6 +5,7 @@ import {
   requestFollowConfirmation,
   confirmFollow,
   inspectFollowToken,
+  mintFollowToken,
   expireFollows,
 } from "../src/follows.js";
 import {
@@ -87,6 +88,7 @@ export async function confirmedUnlinkedPreservesWatermark(db) {
   const next = await claimFollowConfirmation(db, job.confirmationJobId);
   assert.ok(next);
   assert.equal(await confirmFollow(db, next.confirmation), true);
+  assert.deepEqual(await rows(db, "follow_confirmation_outbox"), []);
   assert.deepEqual(await rows(db, "follow_scope_progress"), before);
   assert.equal((await rows(db, "follow_subscriptions"))[0].confirmed_at, sub.confirmed_at);
 }
@@ -220,8 +222,11 @@ export async function confirmedLinkCancellationAndExpiryPreserveScope(db) {
   const pending = await request(db),
     issued = await claimFollowConfirmation(db, pending.confirmationJobId);
   assert.equal(await deleteFollowRequest(db, issued.deleteRequest), true);
+  assert.deepEqual(await rows(db, "follow_confirmation_outbox"), []);
   assert.equal(await confirmFollow(db, issued.confirmation), false);
   assert.equal((await rows(db, "follow_subscriptions"))[0].owner_user_hash, null);
+  const expiring = await request(db);
+  assert.ok(expiring);
   await db
     .prepare(
       "UPDATE follow_confirmation_outbox SET queued_at=strftime('%Y-%m-%dT%H:%M:%fZ','now','-8 days'),expires_at=strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 day')",
@@ -267,4 +272,106 @@ export async function malformedCommittedReceiptDoesNotAuthorizeRetry(db) {
   const before = await rows(db, "follow_confirmation_outbox");
   assert.equal((await request(db)).confirmationJobId, before[0].id);
   assert.deepEqual(await rows(db, "follow_confirmation_outbox"), before);
+}
+
+export async function missingCommittedAcknowledgementFailsClosed(db) {
+  await setup(db);
+  const sparse = {
+    prepare: db.prepare.bind(db),
+    async batch(statements) {
+      const result = await db.batch(statements);
+      delete result[0];
+      return result;
+    },
+  };
+  await assert.rejects(request(sparse), /Follow linkage unavailable/);
+  const job = (await rows(db, "follow_confirmation_outbox"))[0];
+  assert.equal((await request(db)).confirmationJobId, job.id);
+}
+
+export async function expiryAfterAtomicAdmissionNeverLeavesPartialState(db) {
+  await setup(db);
+  // The fixture shortens the session during the one admission step, then burns real SQLite
+  // time between that step and the receipt. It does not override production's SQL clock.
+  await db
+    .prepare(
+      `CREATE TRIGGER short_session BEFORE INSERT ON follow_subscribers BEGIN
+    UPDATE sessions SET expires=strftime('%Y-%m-%dT%H:%M:%fZ','now','+0.001 seconds'); END`,
+    )
+    .run();
+  const delayed = {
+    prepare: db.prepare.bind(db),
+    async batch(statements) {
+      const result = await db.batch([
+        statements[0],
+        db.prepare(`WITH RECURSIVE n(x) AS
+      (VALUES(0) UNION ALL SELECT x+1 FROM n WHERE x<100000) SELECT sum(x) FROM n`),
+        statements[1],
+      ]);
+      return [result[0], result[2]];
+    },
+  };
+  try {
+    assert.equal(await request(delayed), null);
+    assert.deepEqual(
+      await Promise.all(
+        ["follow_subscribers", "follow_subscriptions", "follow_confirmation_outbox"].map(
+          async (t) => (await rows(db, t)).length,
+        ),
+      ),
+      [1, 1, 1],
+    );
+    assert.deepEqual(await rows(db, "follow_link_requests"), []);
+    assert.equal((await rows(db, "follow_subscriptions"))[0].owner_user_hash, null);
+  } finally {
+    await db.prepare("DROP TRIGGER short_session").run();
+  }
+}
+
+export async function oldTokenCannotDeleteUnclaimedOrDifferentExpiryJob(db) {
+  await setup(db);
+  const job = await request(db);
+  await db
+    .prepare(
+      `INSERT INTO follow_tokens(token_hash,subscriber_id,purpose,scope_key,generation,expires_at,owner_user_hash)
+    SELECT ?,subscriber_id,'confirm',scope_key,?,expires_at,owner_user_hash FROM follow_confirmation_outbox`,
+    )
+    .bind("e".repeat(64), crypto.randomUUID())
+    .run();
+  await db.prepare("DELETE FROM follow_tokens").run();
+  assert.equal((await rows(db, "follow_confirmation_outbox"))[0].id, job.confirmationJobId);
+  const issued = await claimFollowConfirmation(db, job.confirmationJobId);
+  assert.ok(issued);
+  await db
+    .prepare(
+      "UPDATE follow_confirmation_outbox SET expires_at=strftime('%Y-%m-%dT%H:%M:%fZ',expires_at,'+1 second')",
+    )
+    .run();
+  await db.prepare("DELETE FROM follow_tokens").run();
+  assert.equal((await rows(db, "follow_confirmation_outbox"))[0].id, job.confirmationJobId);
+}
+
+export async function anotherConfirmedOwnerCannotReceiveStaleReceipt(db) {
+  await setup(db);
+  const original = await requestFollowConfirmation(
+    db,
+    email,
+    scope,
+    catalog,
+    new Date(Date.now() - 1000),
+  );
+  await confirmFollow(
+    db,
+    (await claimFollowConfirmation(db, original.confirmationJobId)).confirmation,
+  );
+  const pending = await request(db);
+  const other = await mintFollowToken(db, pending.subscriberId, "confirm", {
+    scopeKey: pending.scopeKey,
+    ownerUserHash: "c".repeat(64),
+  });
+  assert.equal(await request(db), null);
+  await confirmFollow(db, other);
+  assert.equal(await request(db), null);
+  assert.equal(await claimFollowConfirmation(db, pending.confirmationJobId), null);
+  assert.equal((await rows(db, "follow_subscriptions"))[0].owner_user_hash, "c".repeat(64));
 }
