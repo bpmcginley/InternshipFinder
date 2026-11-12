@@ -160,6 +160,8 @@ test("offline routes match the original capture and signed-in cache policy", asy
   // offline HTTP/D1 tests; future additions must be named explicitly here.
   const added = new Set([
     "POST /follows/unsubscribe",
+    "POST /follows/confirm",
+    "POST /follows/delete-request",
     "GET /billing/topup/offer",
     "POST /billing/topup/checkout",
     "POST /billing/topup/recover",

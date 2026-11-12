@@ -567,6 +567,7 @@ export async function callWorker({
   task,
   run_id,
   signal,
+  verifySession,
   fetchImpl = fetch,
   sleepImpl = sleep,
   ...opts
@@ -579,6 +580,10 @@ export async function callWorker({
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const hasNextAttempt = attempt + 1 < maxAttempts;
     throwIfAborted(signal);
+    if (verifySession) {
+      await verifySession();
+      throwIfAborted(signal);
+    }
     let res;
     try {
       res = await fetchImpl(`${url}/ai?stream=1`, {

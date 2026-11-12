@@ -1,12 +1,19 @@
 // Dormant storage primitive only. A separate control authority must fence visibility and cleanup.
+import { decodeFollowCheckpointWitnessText } from "./follow-checkpoint-witness-cas.js";
+
 const KEYS = ["follow-checkpoint-slot-0", "follow-checkpoint-slot-1"];
+const WITNESS_KEYS = ["follow-checkpoint-witness"];
+const MAX_WITNESS_BYTES = 2048;
 const encoder = new TextEncoder();
 const hex = (bytes) => Array.from(bytes, (v) => v.toString(16).padStart(2, "0")).join("");
 const digest = async (bytes) => hex(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)));
 const etag = (value) => typeof value === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(value);
-const validSlot = (slot) => slot === 0 || slot === 1;
 
 export function createFollowCheckpointR2Slots(bucket, { maxPayloadBytes, maxEnvelopeBytes }) {
+  return createR2Records(bucket, KEYS, maxPayloadBytes, maxEnvelopeBytes);
+}
+
+function createR2Records(bucket, keys, maxPayloadBytes, maxEnvelopeBytes) {
   if (
     !Number.isSafeInteger(maxPayloadBytes) ||
     maxPayloadBytes < 1 ||
@@ -15,6 +22,7 @@ export function createFollowCheckpointR2Slots(bucket, { maxPayloadBytes, maxEnve
   )
     throw new TypeError("Invalid checkpoint bounds");
   const prepared = new WeakMap();
+  const validSlot = (slot) => Number.isInteger(slot) && slot >= 0 && slot < keys.length;
 
   async function prepare(payload, kind = "payload") {
     if (!(payload instanceof Uint8Array) || payload.byteLength > maxPayloadBytes) return null;
@@ -36,7 +44,7 @@ export function createFollowCheckpointR2Slots(bucket, { maxPayloadBytes, maxEnve
     if (!validSlot(slot)) return { status: "invalid" };
     let reader;
     try {
-      const object = await bucket.get(KEYS[slot]);
+      const object = await bucket.get(keys[slot]);
       if (!object) return { status: "missing" }; // Not proof an uncertain write cannot arrive.
       reader = object.body.getReader();
       if (
@@ -107,7 +115,7 @@ export function createFollowCheckpointR2Slots(bucket, { maxPayloadBytes, maxEnve
     // One attempt per envelope. Uncertainty requires explicit read/reconciliation, never retry.
     prepared.delete(receipt);
     try {
-      const object = await bucket.put(KEYS[slot], body, {
+      const object = await bucket.put(keys[slot], body, {
         onlyIf: expectedEtag === null ? { etagDoesNotMatch: "*" } : { etagMatches: expectedEtag },
       });
       if (object === null) return { status: "conflict" };
@@ -133,4 +141,54 @@ export function createFollowCheckpointR2Slots(bucket, { maxPayloadBytes, maxEnve
     read,
     write,
   };
+}
+
+function witnessText(text) {
+  const record = decodeFollowCheckpointWitnessText(text);
+  return record && { text, version: record.version, closed: record.value.phase === "closed" };
+}
+
+// Dormant, dedicated object. The injected bucket must provide uncached, exact R2 operations.
+export function createFollowCheckpointR2WitnessPort(bucket) {
+  if (typeof bucket?.get !== "function" || typeof bucket?.put !== "function")
+    throw new TypeError("Invalid checkpoint witness bucket");
+  const records = createR2Records(bucket, WITNESS_KEYS, MAX_WITNESS_BYTES, MAX_WITNESS_BYTES + 256);
+
+  async function current() {
+    const record = await records.read(0);
+    if (record.status !== "present" || record.kind !== "payload") return null;
+    const decoded = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(
+      record.payload,
+    );
+    const value = witnessText(decoded);
+    return value && { ...value, tag: record.etag, nonce: record.nonce };
+  }
+
+  async function readRecord() {
+    try {
+      const record = await current();
+      return record && { tag: record.tag, text: record.text };
+    } catch {
+      return null;
+    }
+  }
+
+  async function compareAndSwap(tag, text) {
+    try {
+      if (!etag(tag)) return false;
+      const replacement = witnessText(text);
+      if (!replacement || replacement.closed) return false;
+      const before = await current();
+      if (!before || before.closed || before.tag !== tag || before.version !== replacement.version)
+        return false;
+      const receipt = await records.prepare(encoder.encode(replacement.text));
+      if (!receipt || receipt.nonce === before.nonce) return false;
+      const result = await records.write(0, tag, receipt);
+      return result.status === "stored" && result.etag !== tag;
+    } catch {
+      return false;
+    }
+  }
+
+  return { readRecord, compareAndSwap };
 }
