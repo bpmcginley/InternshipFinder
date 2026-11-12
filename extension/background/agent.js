@@ -3,80 +3,30 @@
 import { callAI } from "./claude.js";
 import { NEEDS_YOU_CODES } from "./gemini.js";
 import { hasHostAccess, hostOf } from "../lib/hosts.js";
-import { loadStore, updateStore, profileForModel, confirmedFacts, accountFor, domainOf, hasKey, isGemini, isWorker, modelFor, hasLocalResume, autoApplyReady, manualDetailsMissing } from "../lib/store.js";
+import { loadStore, updateStore, confirmedFacts, accountFor, domainOf, hasKey, isGemini, isWorker, modelFor, hasLocalResume, autoApplyReady, manualDetailsMissing } from "../lib/store.js";
 import { ensureToken } from "../lib/auth.js";
 import { tailorResume } from "./tailor.js";
 import { canTailor } from "../lib/tailoring.js";
 import { getJob, updateJob, appendLog, saveMsgs, loadMsgs, getTailoredFile, tailorChoice } from "./queue.js";
 import { spend, money } from "../lib/usage.js";
 import { recordStep } from "./evalrec.js";
+import { confirmFinalReview } from "./review-handoff.js";
 // Side-effect import: guard.js is an IIFE that hangs ISGuard off globalThis. We want detectGate
 // here (in the worker) as well as in the page, and this keeps one copy with one set of tests.
 import "../agent/guard.js";
 
+import { pageGone, postingGone, pageBulk, deadPage } from "./page-state.js";
+export { pageGone, postingGone, pageBulk, deadPage };
+
+import { TOOLS, trimHistory, toolResult, buildSystem } from "./agent-prompt.js";
+import { MAX_FIELD_FAILS, formatSnapshot, preFilledLine, NO_PROGRESS_HELP, freshProgress, progressCheck, pageKey } from "./agent-snapshot.js";
+export { TOOLS, trimHistory, buildSystem };
+export { formatSnapshot, preFilledLine, SAME_SNAPSHOTS_MAX, TURNS_PER_PAGE_MAX, NO_PROGRESS_HELP, freshProgress, progressCheck } from "./agent-snapshot.js";
+
 const MAX_STEPS = 40;
-const MAX_FIELD_FAILS = 3;
 const PAGE_FILES = ["agent/guard.js", "agent/actions.js", "agent/dom.js"];
+const TOOL_INPUT_SCHEMAS = new Map(TOOLS.map(({ name, input_schema }) => [name, input_schema]));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-const RULES = `You are InternScout's application agent. You operate a real browser tab to complete an internship application for the candidate below, one page at a time, up to but NEVER including the final submission.
-
-HOW IT WORKS
-- Each turn you get a SNAPSHOT: fields ([ref] kind *required "label" = current value, options), buttons, headings, errors. Act with tools using refs from the LATEST snapshot. You may call several tools in one turn; they run in order, then you get a fresh snapshot.
-- Contact fields may already be filled by a fast pre-fill; check values and fix anything wrong.
-
-FILLING
-- Fill every field the profile supports, required and optional. Leave optional fields blank only when nothing in the profile fits.
-- Use the candidate's real facts only. Never invent employers, dates, GPAs, awards, skills, or links. If a REQUIRED answer is missing and cannot be reasonably derived, call ask_user (one clear question).
-- Choice fields (select, react_select, listbox, combobox, radio_group): pass the option text that matches the profile's meaning. If a select fails, the result lists real options; retry with one of them. A react_select marked searchable loads options from a search (school, city, discipline): pass the full proper name, e.g. the school's official name.
-- Work authorization and visa sponsorship are different questions. Read each label carefully.
-- EEO / demographic / veteran / disability questions: use the profile facts (default "decline to self-identify").
-- Dates: match the field format (type=date needs YYYY-MM-DD; month/year splits need separate values).
-- Uploads: use upload with resume for resume/CV fields; cv, transcript, cover_letter when those files exist. If a cover letter file is required but missing and there is a text box, write one instead.
-- Free-text questions (why this company, describe a project, cover letter text, additional info): write in the candidate's VOICE, grounded in their stories/experience and the job description. Specific, honest, plain, no clichés or filler. Default 80-180 words; respect any character or word limit. Never mention being an AI.
-
-NAVIGATION
-- On a job description page, click Apply / Apply now / I'm interested.
-- On Workday prefer "Apply Manually" (or "Autofill with Resume" only if manual is absent). After finishing a page click Next / Continue / Save and Continue.
-- "Add" buttons (Add Work Experience, Add Education) open sub-forms; add the candidate's entries (most recent first, at most 3 jobs and all current schools).
-- If validation errors appear, fix them before moving on.
-
-ACCOUNTS
-- If the site needs an account, follow the ACCOUNT line: sign in if one exists, otherwise create one with the given email. Use fill_secret for EVERY password and confirm-password field; never type a password with fill. Tick required account terms/privacy checkboxes.
-- Always take the email route ("Sign in with email", "Use your email"), never "Sign in with Google/Apple/LinkedIn/Facebook". Those need the student's own Google or Apple password, which InternScout does not have and must never ask for, and they open the provider's own window where nothing here can follow.
-- Email verification, SMS or 2FA → pause_for_user with a short instruction.
-- CAPTCHA PRESENT on a form: it is the human's to solve at submit time. Fill everything else, then call ready_to_submit and put "solve the CAPTCHA" in double_check. Only pause_for_user if the CAPTCHA must be solved before you can continue (e.g. before Next or Sign in).
-
-FINISHING
-- The final submit button is reserved for the human and is blocked in code. Buttons marked BLOCKED must not be clicked.
-- The final button is not always called Submit. Once the application has answers in it, a button saying Apply, Send, Finish, Done or Confirm on the last page or a review page is the final one: never click it, call ready_to_submit.
-- An empty or unconfirmed factual profile value is UNKNOWN. Ask the student for required eligibility answers; never infer authorization, sponsorship, citizenship, age, or consent from a resume or other facts.
-- When all pages are complete and only final submission remains (review page, or the last page whose main button is Submit), call ready_to_submit with a one-line summary and anything worth double-checking.
-- If stuck (same page three times with no progress, broken widget, site error, page not an application), call pause_for_user and say what the human should do.
-Keep any text outside tool calls to one short line.`;
-
-export const TOOLS = [
-  { name: "fill", description: "Type text into a text/textarea/rich_text field (also works for choice fields by option text).",
-    input_schema: { type: "object", properties: { ref: { type: "string" }, text: { type: "string" } }, required: ["ref", "text"] } },
-  { name: "select", description: "Choose an option in a select, react_select, listbox, combobox or radio_group by visible option text.",
-    input_schema: { type: "object", properties: { ref: { type: "string" }, option: { type: "string" } }, required: ["ref", "option"] } },
-  { name: "check", description: "Set a checkbox on or off.",
-    input_schema: { type: "object", properties: { ref: { type: "string" }, checked: { type: "boolean" } }, required: ["ref", "checked"] } },
-  { name: "upload", description: "Attach one of the candidate's saved files to a file field.",
-    input_schema: { type: "object", properties: { ref: { type: "string" }, file: { type: "string", enum: ["resume", "cv", "transcript", "cover_letter"] } }, required: ["ref", "file"] } },
-  { name: "click", description: "Click a button or link (Apply, Next, Continue, Add, Sign in, Create account). Final submit buttons are blocked.",
-    input_schema: { type: "object", properties: { ref: { type: "string" } }, required: ["ref"] } },
-  { name: "fill_secret", description: "Fill a password or confirm-password field with the stored account password for this site. The password is never shown to you.",
-    input_schema: { type: "object", properties: { ref: { type: "string" }, secret: { type: "string", enum: ["account_password"] } }, required: ["ref", "secret"] } },
-  { name: "wait", description: "Wait for the page to load or a spinner to finish.",
-    input_schema: { type: "object", properties: { seconds: { type: "number" } }, required: ["seconds"] } },
-  { name: "ask_user", description: "Ask the human for a missing fact needed to answer a required question. The job pauses until they answer.",
-    input_schema: { type: "object", properties: { question: { type: "string" }, why: { type: "string" } }, required: ["question"] } },
-  { name: "pause_for_user", description: "Hand control to the human (CAPTCHA, email verification, 2FA, broken page, anything you cannot do).",
-    input_schema: { type: "object", properties: { reason: { type: "string" } }, required: ["reason"] } },
-  { name: "ready_to_submit", description: "Everything is filled and only the final submit remains. Ends the run.",
-    input_schema: { type: "object", properties: { summary: { type: "string" }, double_check: { type: "array", items: { type: "string" } } }, required: ["summary"] } },
-];
 
 // ---------- tab + page plumbing ----------
 async function ensureTab(job) {
@@ -190,7 +140,7 @@ async function pageMark(tabId) {
 }
 export const noChange = (before, after) => !!before && !!after && before === after;
 
-async function act(tabId, fullRef, action, payload) {
+async function act(tabId, fullRef, action, payload, observeDocument) {
   const [fid, local] = String(fullRef).split(":");
   try {
     const [r] = await toPage(chrome.scripting.executeScript({
@@ -198,86 +148,11 @@ async function act(tabId, fullRef, action, payload) {
       func: (ref, a, p) => (window.ISDom ? window.ISDom.act(ref, a, p) : { ok: false, error: "Page changed. Use the new snapshot." }),
       args: [local, action, payload],
     }));
+    if (r?.result) observeDocument?.(r.documentId);
     return (r && r.result) || { ok: false, error: "No result (frame navigated?)" };
   } catch (e) {
     return { ok: false, error: "Could not reach the page: " + e.message };
   }
-}
-
-// A dropdown that already holds an answer only needs its option count: the model reads the value, and
-// a full list of countries or schools repeated on every step was a large share of each snapshot. An
-// empty one, or one that has failed, keeps its list, because those are the ones the model must choose for.
-const LISTED_CHOICES = ["select", "react_select"];
-const hasValue = (v) => v !== undefined && v !== null && v !== "" && v !== false;
-// A native <select> whose placeholder option carries a value ("-1", "0") reads back as "Select One"
-// (dom.js valueOf), yet it holds no answer and its real options are what the model needs. Close
-// to the test dom.js uses to drop that option from the list, with a word boundary so "Selected" is an answer.
-const PLACEHOLDER_VALUE = /^[-–—.\s]*(select|choose|please select)\b|^\s*--/i;
-const answered = (v) => hasValue(v) && !PLACEHOLDER_VALUE.test(String(v));
-
-export function formatSnapshot(frames, fails = {}) {
-  const index = {};
-  const lines = [];
-  // Labels of fields this snapshot already shows with a value; see preFilledLine.
-  const shown = new Set();
-  let hasFinal = false;
-  // Every blocked button seen, for consentOnly below.
-  const blocked = [];
-  // A frame whose heading or step indicator says review / confirm (guard.js pageContext).
-  const reviewStep = frames.some((f) => f.reviewStep);
-  const top = frames.find((f) => f.frameId === 0) || frames[0];
-  if (!top) return { text: "(page not readable yet)", index, top: null, hasFinal, shown, reviewStep, consentOnly: false };
-  lines.push(`URL: ${top.url}`, `TITLE: ${top.title}`);
-  for (const f of frames) {
-    if (f.frameId !== 0 && !f.elements.length && !f.buttons.length) continue;
-    if (f.frameId !== 0) lines.push(`--- iframe: ${f.url}`);
-    if (f.headings.length) lines.push(`HEADINGS: ${f.headings.join(" | ")}`);
-    if (f.step) lines.push(`STEP: ${f.step}`);
-    if (f.captcha) lines.push("CAPTCHA PRESENT");
-    if (f.errors.length) lines.push(`ERRORS: ${f.errors.join(" | ")}`);
-    lines.push("FIELDS:");
-    if (!f.elements.length) lines.push("(none)");
-    for (const e of f.elements) {
-      const ref = `${f.frameId}:${e.ref}`;
-      index[ref] = { kind: e.kind, label: e.label || e.question || "", url: f.url };
-      let s = `[${ref}] ${e.kind}${e.type && e.type !== "text" ? `(${e.type})` : ""}${e.required ? " *" : ""} "${e.label}"`;
-      if (e.question) s += ` in "${e.question}"`;
-      s += ` = ${JSON.stringify(e.value === undefined ? "" : e.value)}`;
-      if (answered(e.value) && e.label) shown.add(e.label);
-      // was: every choice field listed all its options and its placeholder, filled or not.
-      const brief = LISTED_CHOICES.includes(e.kind) && answered(e.value) && !fails[ref];
-      if (e.options && e.options.length) s += brief ? ` (${e.options.length} options)` : ` options: ${e.options.join(" | ")}`;
-      if (e.placeholder && !brief) s += ` placeholder=${JSON.stringify(e.placeholder)}`;
-      if (e.maxlength) s += ` maxlength=${e.maxlength}`;
-      if (e.error) s += ` ERROR: ${e.error}`;
-      if ((fails[ref] || 0) >= MAX_FIELD_FAILS) s += " (failed 3 times: skip it or pause_for_user if required)";
-      lines.push(s);
-    }
-    lines.push("BUTTONS:");
-    for (const b of f.buttons) {
-      const ref = `${f.frameId}:${b.ref}`;
-      index[ref] = { kind: "button", label: b.text, url: f.url };
-      if (b.blocked) { hasFinal = true; blocked.push(b); }
-      lines.push(`[${ref}] "${b.text}"${b.blocked ? (b.consent ? " BLOCKED (asks the student to agree; human only)" : " BLOCKED (final submit, human only)") : ""}${b.menu === "open" ? " (menu already open: click one of its items, not this again)" : ""}`);
-    }
-    if (f.text) lines.push(`PAGE TEXT: ${f.text}`);
-  }
-  // The only buttons held back are bare Accept / I agree buttons (guard.js isConsent), and the page does
-  // not say it is the review step: a page asking the student to agree to something, not a finished
-  // application. The run pauses there rather than saying "Ready to submit" (PR #99, 2026-10-14).
-  const consentOnly = !reviewStep && blocked.length > 0 && blocked.every((b) => b.consent);
-  return { text: lines.join("\n"), index, top, hasFinal, shown, reviewStep, consentOnly };
-}
-
-// fastFill reports "Label = value" for each field it filled, and the snapshot right after it shows the
-// same fields with the same values, so the line said everything twice. Name only what the snapshot
-// does not show (a field that lost its value again, a file chip the page doesn't read back).
-// was: `Pre-filled: ${pre.join("; ")}`
-export function preFilledLine(pre, shown) {
-  if (!pre.length) return "";
-  const rest = pre.filter((p) => !shown.has(String(p).split(" = ")[0]));
-  if (!rest.length) return `Pre-filled ${pre.length} field(s) from the profile; their values are in the snapshot.`;
-  return `Pre-filled: ${rest.join("; ")}`;
 }
 
 // A code sitting in your inbox is yours to fetch, so the agent stops there and hands the tab
@@ -292,155 +167,12 @@ const GATE_HELP = {
 // index.js resumes a job paused for this reason by itself once its tab is brought to the front.
 export const BACKGROUND_TAB_HELP = GATE_HELP.background_tab;
 
-// A posting that has been filled or pulled almost never 404s. Breezy, Lever and Greenhouse all
-// bounce the student to the company's list of other openings instead, and the run would then be
-// looking at a page full of Apply buttons for jobs nobody chose — fill one of those and the
-// student is handed a finished application for a job they never picked. VetsEZ's Full Stack
-// Developer Intern did exactly this: its apply URL landed on the board root, fifteen other roles.
-// Two things have to be true before saying so, because a real application also moves between
-// pages: the posting's own id or slug is gone from the URL, and not one distinctive word of its
-// title is anywhere on the page. A Workday or iCIMS step still names the job it belongs to.
-const TITLE_NOISE_RE = /^(a|an|the|and|for|with|our|new|us|usa|united|states|intern|interns|internship|internships|co|op|coop|summer|fall|spring|winter|remote|hybrid|onsite|student|students|program|programs|programme|position|positions|role|roles|opportunity|opportunities|full|part|time|year|level|entry|grad|graduate|undergraduate|\d+)$/i;
-
-// The distinctive part of an apply URL is its longest path segment: a posting id or slug. The words
-// every careers site shares are not distinctive, and taking the longest without dropping them first
-// picked "careers" out of /careers/131/ — so when Fullbay's Software Engineer Intern closed and
-// BambooHR bounced the run to /careers, the board root still "contained" the key and the closed
-// posting went unnoticed. A bare number is a posting id as much as a slug is.
-const KEY_NOISE_RE = /^(jobs?|careers?|apply|application|openings?|positions?|posting|details?|view|list|board|search|index|en|us|en-us|p)$/i;
-// The name of the page that draws the posting is not the posting either, whatever the server writes
-// its templates in. Taleo's URL is /careersection/<company>/jobdetail.ftl?job=343181: the id is in the
-// query string, which leaves "careersection" and "jobdetail.ftl" tied at thirteen characters for the
-// longest segment. "careersection" happens to win that tie today, and it is in the login URL Taleo
-// redirects to, so the posting reads as still there — but the tie is decided by the order the
-// segments happen to appear in, and had it gone the other way every Taleo application would have
-// been abandoned as a dead posting at the login wall.
-const PAGE_FILE_RE = /\.(html?|aspx?|php|jsp|ftl|jsf|jss|cfm|do|action)$/i;
-function postingKey(u) {
-  try {
-    return new URL(u).pathname.split("/").filter(Boolean)
-      .filter((s) => !KEY_NOISE_RE.test(s) && !PAGE_FILE_RE.test(s))
-      .sort((a, b) => b.length - a.length)[0] || "";
-  } catch (e) { return ""; }
-}
-
-// Some postings do not redirect anywhere: the link simply 404s, and the site says so. AcreTrader's
-// Data Intern on Rippling answers with "404 | Page Not Found", a footer and a site-search box — one
-// field, so there is something to fill and nothing worth filling, which is how it slipped past both
-// the redirect check and the empty-page check. Take the page at its word, but only when it is not
-// also asking for an application: a form that mentions "not found" in an error is still a form.
-const NOT_FOUND_RE = /\b(404|page not found|job not found|no longer (available|accepting|posted|open)|position (has been )?(filled|closed)|posting (is )?(closed|expired|removed|no longer))\b/i;
-const APPLICATION_FIELD_RE = /e-?mail|r[eé]sum[eé]|\bcv\b|first name|last name|full name|phone/i;
-
-export function pageGone(frames) {
-  const top = frames.find((f) => f.frameId === 0) || frames[0];
-  if (!top) return false;
-  if (!NOT_FOUND_RE.test(top.title || "") && !(top.headings || []).some((h) => NOT_FOUND_RE.test(h))) return false;
-  return !frames.some((f) => (f.elements || []).some((e) => e.kind === "file" || APPLICATION_FIELD_RE.test(e.label || "")));
-}
-
-export function postingGone(job, snap, frames) {
-  const key = postingKey(job.apply_url);
-  const here = (snap.top && snap.top.url) || "";
-  if ((key.length < 6 && !/^\d{2,}$/.test(key)) || here.includes(key)) return false;
-  const words = String(job.title || "").split(/[^A-Za-z0-9]+/).filter((w) => w.length >= 4 && !TITLE_NOISE_RE.test(w));
-  if (!words.length) return false;
-  const hay = (here + " " + frames.map((f) => [f.title, (f.headings || []).join(" "),
-    (f.buttons || []).map((b) => b.text).join(" "), f.text || ""].join(" ")).join(" ")).toLowerCase();
-  return !words.some((w) => hay.includes(w.toLowerCase()));
-}
-
-// A dead link is not a rare accident: postings get pulled, a career centre link loses the tenant id
-// it needs, a whole site answers from behind a cookie wall. Mathtech's Web Application Developer
-// Intern on ADP draws a OneTrust banner and nothing else - no job, no form, no Apply - and the run
-// would have spent a turn, and a slice of the student's allowance, asking a model what to make of
-// it. Nothing to fill and no way forward is not a page worth thinking about.
-const FORWARD_RE = /appl|start|begin|continue|next|proceed|submit|sign ?(in|up)|log ?in|register|create|upload|autofill|r[eé]sum[eé]|interested/i;
-
-// A rough measure of how much page there is, used only to tell "still arriving" from "this is all
-// there is". It does not matter what the number means, only whether it is still changing.
-export function pageBulk(frames) {
-  return frames.reduce((n, f) => n + (f.elements || []).length + (f.buttons || []).length + String(f.text || "").length, 0);
-}
-
-export function deadPage(frames) {
-  return frames.length > 0
-    && !frames.some((f) => (f.elements || []).length)
-    && !frames.some((f) => (f.buttons || []).some((b) => FORWARD_RE.test(b.text || "")))
-    && !frames.some((f) => f.busy || f.captcha || f.captchaFrame);
-}
-
 function gateIn(frames) {
   for (const f of frames) {
     const g = globalThis.ISGuard.detectGate(f);
     if (g) return g;
   }
   return null;
-}
-
-// Old snapshots are the bulk of the context; keep only the latest (was: the last two). The tool
-// results after each step already say what was filled and what failed, so the page before this one
-// only repeated fields the model had seen, at full price on every later step of the run.
-const KEEP_SNAPSHOTS = 1;
-// Tool results from before the last two model turns are cut to "ok" or the start of the error
-// (2026-10-04). A failed select returns every real option, and act() echoes back what it set, so old
-// results were the next-largest thing re-sent at full price on every step. Each tool_result keeps its
-// tool_use_id, so every tool call still has its answer and the request stays valid.
-const KEEP_RESULT_TURNS = 2;
-function shortResult(b) {
-  const raw = typeof b.content === "string" ? b.content : JSON.stringify(b.content);
-  if (!b.is_error) {
-    // A human's answer to ask_user, and the other short notes, are plain strings worth keeping;
-    // what act() returns is a JSON object, and only the fact that it worked matters later.
-    try { const o = JSON.parse(raw); if (o && typeof o === "object") return "ok"; } catch (e) {}
-    return raw;
-  }
-  if (raw.startsWith("failed: ")) return raw;   // already trimmed on an earlier step
-  let err = raw;
-  try { const o = JSON.parse(raw); if (o && typeof o === "object") err = String(o.error || o.message || raw); } catch (e) {}
-  return "failed: " + err.slice(0, 120);
-}
-export function trimHistory(msgs) {
-  let seen = 0, turns = 0;
-  for (let i = msgs.length - 1; i >= 0; i--) {
-    const m = msgs[i];
-    if (m.role === "assistant") { turns++; continue; }
-    if (m.role !== "user" || !Array.isArray(m.content)) continue;
-    for (const b of m.content) {
-      if (b.type === "text" && b.text.startsWith("SNAPSHOT")) {
-        seen++;
-        if (seen > KEEP_SNAPSHOTS) b.text = "SNAPSHOT (older page state removed)";
-      }
-      // The results in a user message answer the assistant turn before it, so a message with two or
-      // more assistant turns after it answers a turn older than the last two.
-      if (b.type === "tool_result" && turns >= KEEP_RESULT_TURNS) b.content = shortResult(b);
-    }
-  }
-}
-
-const toolResult = (id, content, isError) => ({ type: "tool_result", tool_use_id: id, content: typeof content === "string" ? content : JSON.stringify(content), ...(isError ? { is_error: true } : {}) });
-
-// was: .slice(0, 5000). The description now sits in the fixed opening of every request (buildSystem),
-// where after the first step it is read from Gemini's cache at a tenth of the price, so more of it
-// costs little and grounds the free-text answers better.
-function jobIntro(job) {
-  return `JOB\nCompany: ${job.company}\nTitle: ${job.title}\nLocation: ${job.location || ""}\nApply URL: ${job.apply_url}\n` +
-    `Description:\n${(job.description || "(read it from the page)").slice(0, 8000)}`;
-}
-
-// The part of every request that stays the same for a whole run: rules, the candidate, the job.
-// Gemini 3.x serves a request's repeated opening from its cache (a tenth of the input price) only
-// once that opening is about 4,096 tokens long. Rules, tools and profile came to roughly 3,000, so in
-// September under 1% of Auto-Apply's 1.25M input tokens were cached and every step paid full price
-// for the same text. The job used to open the first message instead (was: content.push(jobIntro(job))
-// on the first turn), after the part the cache can match; here it lifts the fixed opening past the
-// threshold. Nothing in it may change between steps of a run, or the cache misses from that point.
-export function buildSystem(store, job) {
-  return [
-    { type: "text", text: RULES },
-    { type: "text", text: `CANDIDATE PROFILE (JSON)\n${JSON.stringify(profileForModel(store))}` },
-    { type: "text", text: jobIntro(job), cache_control: { type: "ephemeral" } },
-  ];
 }
 
 function accountLine(store, url) {
@@ -513,29 +245,6 @@ async function tailorStep(id, job, store, own = (patch) => updateJob(id, patch))
   }
   return job;
 }
-
-// ---------- no-progress breaker ----------
-// A run that keeps clicking a button that does nothing, or circles one page, spends a model turn on
-// every pass until MAX_STEPS, and on the InternScout AI every turn is the student's allowance. Pause
-// instead, before the next model call, once the page has come back identical three times running or
-// one page has had twelve turns. Only a pause: nothing here clicks or submits anything.
-// "One page" is the URL plus the step the page says it is on, because Workday keeps one URL for every
-// step of its application and a long one would otherwise read as twelve turns on the same page.
-export const SAME_SNAPSHOTS_MAX = 3;
-export const TURNS_PER_PAGE_MAX = 12;
-export const NO_PROGRESS_HELP = "The page isn't changing after several tries. Finish this step by hand, then press Resume.";
-export const freshProgress = () => ({ stuckSame: 0, lastText: null, turnsHere: 0, lastUrl: null });
-export function progressCheck(state, snapText, url, asleep = false) {
-  const next = {
-    // A sleeping tab answers with the same picture whatever happened; the sleepy gate in loop() owns that case.
-    stuckSame: !asleep && snapText === state.lastText ? state.stuckSame + 1 : 0,
-    lastText: snapText,
-    turnsHere: url === state.lastUrl ? state.turnsHere + 1 : 0,
-    lastUrl: url,
-  };
-  return { stop: next.stuckSame >= SAME_SNAPSHOTS_MAX || next.turnsHere >= TURNS_PER_PAGE_MAX, state: next };
-}
-const pageKey = (url, frames) => [url, ...frames.map((f) => f.step || "").filter(Boolean)].join(" | ");
 
 // ---------- main loop ----------
 export const RESUME_REVIEW_HELP = "Finish reviewing your resume in Auto-Apply setup, then press Resume.";
@@ -651,17 +360,17 @@ async function loop(id, run) {
   // resumed, can run after the resume was replaced. Nothing is filled with a profile that isn't ready.
   // was: checked only when jobs were added.
   if (!autoApplyReady(store)) {
-    await own({ status: "needs_you", activity: "", question: "", reason: notReadyHelp(store) });
+    await own({ status: "needs_you", activity: "", question: "", allowanceLimited: false, reason: notReadyHelp(store) });
     return;
   }
   if (!hasKey(store)) {
-    await own({ status: "needs_you", reason: `Add your ${isGemini(store.ai) ? "Gemini" : "Anthropic"} API key (Auto-Apply setup → Setup), then Resume.` });
+    await own({ status: "needs_you", allowanceLimited: false, reason: `Add your ${isGemini(store.ai) ? "Gemini" : "Anthropic"} API key (Auto-Apply setup → Setup), then Resume.` });
     return;
   }
   if (isWorker(store.ai) && !(await ensureToken())) {
     // needs_auth gives the card a "Sign in & resume" button. A plain Resume only re-ran this check, and an
     // expired sign-in (they last an hour) that could not refresh silently stayed stuck here.
-    await own({ status: "needs_you", needs_auth: true, needs_host: "", reason: "Your InternScout sign-in has expired (they last an hour). Sign in again to keep going.", activity: "" });
+    await own({ status: "needs_you", allowanceLimited: false, needs_auth: true, needs_host: "", reason: "Your InternScout sign-in has expired (they last an hour). Sign in again to keep going.", activity: "" });
     return;
   }
   // The manifest only covers the big applicant-tracking systems. An employer that runs its own careers
@@ -671,7 +380,7 @@ async function loop(id, run) {
   if (!(await hasHostAccess(job.apply_url))) {
     // Flags outlive the pause that set them, and the side panel checks needs_auth before needs_host,
     // so clear the other one here or a sign-in that expired earlier hides the Allow button.
-    await own({ status: "needs_you", needs_host: job.apply_url, needs_auth: false, activity: "",
+    await own({ status: "needs_you", allowanceLimited: false, needs_host: job.apply_url, needs_auth: false, activity: "",
       reason: `InternScout needs your permission to work on ${hostOf(job.apply_url)}. Allow it below, then Resume.` });
     return;
   }
@@ -690,7 +399,7 @@ async function loop(id, run) {
   let tabId = await ensureTab(job);
   // was: { tabId, status: "working", ... } written whatever had happened meanwhile, which undid a
   // Pause pressed while the resume was being tailored or the tab was opening.
-  const fresh = { status: "working", reason: "", question: "", needs_host: "", needs_auth: false, upgrade: null };
+  const fresh = { status: "working", reason: "", question: "", needs_host: "", needs_auth: false, upgrade: null, allowanceLimited: false };
   job = await updateJob(id, (j) => (owns(j, gen) ? { tabId, ...fresh } : { tabId }));
   if (!owns(job, gen)) return;
   const msgs = await loadMsgs(id);
@@ -706,7 +415,9 @@ async function loop(id, run) {
   // with a password box) do not count: the posting's own Apply button often comes after them.
   let runFilled = !!job.run_filled;
   const noteFilled = async () => { if (!runFilled) { runFilled = true; await updateJob(id, { run_filled: true }); } };
-  const shot = () => inFrames(tabId, (o) => window.ISDom && window.ISDom.snapshot(o), [{ runFilled }]);
+  const shot = async () => (await inFrames(tabId, (o) => window.ISDom && window.ISDom.snapshot(o), [{ runFilled }]))
+    .map((r) => ({ ...r.result, frameId: r.frameId, documentId: r.documentId }));
+  let reviewAfter = null;
 
   while (true) {
     job = await getJob(id);
@@ -757,7 +468,7 @@ async function loop(id, run) {
     let pre = (await inFrames(tabId, (f, file, g) => window.ISDom && window.ISDom.fastFill(f, file, { gen: g }), [facts, resume, gen]))
       .flatMap((r) => r.result || []);
 
-    let frames = (await shot()).map((r) => ({ frameId: r.frameId, ...r.result }));
+    let frames = await shot();
     // Single-page apps (Workday, Oracle, SuccessFactors) show a spinner for several seconds after the tab
     // reports "complete". A model turn spent on an empty loading page is wasted, so wait it out here.
     //
@@ -781,7 +492,7 @@ async function loop(id, run) {
       if (i >= 3 && still >= 2) break;
       await sleep(i ? 2000 : 2500);
       await inject(tabId);
-      frames = (await shot()).map((r) => ({ frameId: r.frameId, ...r.result }));
+      frames = await shot();
     }
     // fastFill ran before that wait, so on a page that had not drawn itself yet it was handed an empty
     // form and filled nothing. Now that the fields exist, give the rules their turn: every field the
@@ -791,7 +502,7 @@ async function loop(id, run) {
       if (!(await active())) return;
       pre = (await inFrames(tabId, (f, file, g) => window.ISDom && window.ISDom.fastFill(f, file, { gen: g }), [facts, resume, gen]))
         .flatMap((r) => r.result || []);
-      if (pre.length) frames = (await shot()).map((r) => ({ frameId: r.frameId, ...r.result }));
+      if (pre.length) frames = await shot();
     }
     // A page Chrome has put to sleep answers every snapshot with whatever was on screen when the
     // student left, so acting on it would be acting on a photograph. Say so instead of guessing.
@@ -801,7 +512,7 @@ async function loop(id, run) {
     if (asleep) {
       await sleep(2500);
       await inject(tabId);
-      frames = (await shot()).map((r) => ({ frameId: r.frameId, ...r.result }));
+      frames = await shot();
       asleep = frames.some((f) => f.frozen);
     }
 
@@ -823,6 +534,7 @@ async function loop(id, run) {
     // stopping progress: the page has come back unchanged three snapshots running while asleep.
     if (asleep) { sleepy = snap.text === sleepText ? sleepy + 1 : 0; sleepText = snap.text; }
     else { sleepy = 0; sleepText = null; }
+    const priorProgress = progress;
     const check = progressCheck(progress, snap.text, pageKey(url, frames), asleep);
     progress = check.state;
     const stuckAsleep = asleep && sleepy >= 2;
@@ -884,6 +596,29 @@ async function loop(id, run) {
       return;
     }
 
+    const previousReview = reviewAfter;
+    reviewAfter = null;
+    const review = frames[0];
+    if (previousReview && runFilled && !accountPage && frames.length === 1 && review?.frameId === 0 &&
+        review.documentId === previousReview.documentId && tabId === previousReview.tabId &&
+        review.url === previousReview.url && review.reviewStep && !review.frozen && !review.busy &&
+        !review.captcha && !review.captchaFrame && !review.errors.length && !review.elements.length &&
+        review.buttons.length === 1 && review.buttons[0].blocked && !review.buttons[0].consent &&
+        /^submit application$/i.test(review.buttons[0].text)) {
+      const execute = (func, world, args) => toPage(chrome.scripting.executeScript({
+        target: { tabId, documentIds: [review.documentId] }, func, world, args,
+      }), world === "ISOLATED" ? 1000 : undefined);
+      if (await confirmFinalReview({ execute, documentId: review.documentId, gen, active })) {
+        await own({ status: "ready_to_submit", activity: "", pending, double_check: [],
+          summary: "Check every answer before you submit." });
+        return;
+      }
+      if (!(await active())) return;
+      // A changed page must go through the existing gates on fresh evidence before another call.
+      progress = priorProgress;
+      continue;
+    }
+
     // The account the password box belongs to, which is an ATS iframe's own when the form is embedded.
     const pwFrame = frames.find((f) => (f.elements || []).some((e) => e.kind === "password"));
     const content = [];
@@ -911,7 +646,8 @@ async function loop(id, run) {
       // was: await updateJob(id, { status: "needs_you", reason: e.message, pending: prevPending, activity: "", needs_auth: e.code === "auth" });
       // `upgrade` (a used-up allowance with a bigger plan on offer) puts an Upgrade button on the job card.
       await own({ status: "needs_you", reason: e.message, pending: prevPending, activity: "", needs_auth: e.code === "auth",
-        upgrade: e.code === "cap" && e.offer ? e.offer : null });
+        upgrade: e.code === "cap" && e.offer ? e.offer : null,
+        allowanceLimited: e.code === "cap" && e.allowanceLimited === true });
       await saveMsgs(id, msgs);
       return;
     }
@@ -943,6 +679,16 @@ async function loop(id, run) {
 
     const results = [];
     let stop = null, stopped = false;
+    // Only an actual, immediately preceding fill and Next on this document can qualify.
+    const [fill, next] = uses;
+    const initial = frames[0];
+    let reviewTransition = uses.length === 2 && !accountPage && frames.length === 1 &&
+      initial?.frameId === 0 && typeof initial.documentId === "string" && initial.documentId &&
+      fill.name === "fill" && typeof fill.input?.ref === "string" &&
+      snap.index[fill.input.ref]?.kind === "text" && typeof fill.input.text === "string" &&
+      fill.input.text.trim() &&
+      next.name === "click" && initial.buttons.some((button) =>
+        next.input?.ref === "0:" + button.ref && !button.blocked && /^next$/i.test(button.text));
     for (const u of uses) {
       if (stop) { results.push(toolResult(u.id, "Not run: the job paused.")); continue; }
       // Checked before every action, not once per turn: the student can press Pause or Take over while
@@ -950,7 +696,11 @@ async function loop(id, run) {
       if (!stopped && !owns(await getJob(id), gen)) stopped = true;
       if (stopped) { results.push(toolResult(u.id, "Not run: the student paused the job or took over the tab.")); continue; }
       if (tabId !== snap.tabId) { results.push(toolResult(u.id, "Not run: the application opened in a new tab. Continue from the new snapshot.")); continue; }
-      const r = await execTool(u, { tabId, index: snap.index, hasFinal: snap.hasFinal, reviewStep: snap.reviewStep, consentOnly: snap.consentOnly, runFilled, store, job, fails, url, active, gen });
+      let actionDocument;
+      const observeDocument = reviewTransition ? (documentId) => { actionDocument = documentId; } : undefined;
+      const r = await execTool(u, { tabId, index: snap.index, hasFinal: snap.hasFinal, reviewStep: snap.reviewStep, consentOnly: snap.consentOnly, runFilled, store, job, fails, url, active, gen, observeDocument });
+      if (reviewTransition && (actionDocument !== initial.documentId || r.isError || r.newTab ||
+          r.content?.ok !== true || r.content.note || r.content.field_error)) reviewTransition = false;
       if (["fill", "select", "check", "upload"].includes(u.name) && !r.isError && !accountPage) await noteFilled();
       if (r.newTab) {
         tabId = r.newTab;
@@ -967,6 +717,7 @@ async function loop(id, run) {
     }
 
     if (!stop) {
+      if (reviewTransition && !stopped) reviewAfter = { documentId: initial.documentId, tabId, url: initial.url };
       pending = { results };
       await updateJob(id, { pending });
       await saveMsgs(id, msgs);
@@ -997,31 +748,53 @@ async function loop(id, run) {
 // Names no button that could be the final one: only the ways to a next page.
 export const EARLY_READY_PUSHBACK = "No blocked final button is visible yet, so there may be more pages. If there is a Next, Continue or Save and Continue button, use it and keep filling. If this page only shows your answers for review, or nothing is left but the final button, call ready_to_submit again.";
 
+function matchesToolArgument(value, { type, enum: choices, items }) {
+  if (choices && !choices.includes(value)) return false;
+  if (type === "number") return Number.isFinite(value);
+  if (type === "array")
+    return Array.isArray(value) && value.every((item) => matchesToolArgument(item, items));
+  return typeof value === type;
+}
+
+function acceptsToolInput(schema, input) {
+  return (
+    input !== null && typeof input === "object" && !Array.isArray(input) &&
+    schema.required.every((key) => Object.hasOwn(input, key)) &&
+    Object.entries(schema.properties).every(
+      ([key, property]) => !Object.hasOwn(input, key) || matchesToolArgument(input[key], property),
+    )
+  );
+}
+
 async function execTool(u, ctx) {
-  const { name, input = {} } = u;
+  const { name, input } = u;
+  const schema = TOOL_INPUT_SCHEMAS.get(name);
+  if (!schema) return { content: `Unknown tool ${name}`, isError: true };
+  if (!acceptsToolInput(schema, input))
+    return { content: `Invalid arguments for ${name}. Use the tool's required fields and declared types.`, isError: true };
   const { tabId, index, store, job, fails } = ctx;
   // gen goes with every action, so the page refuses one from a run the student has stopped (dom.js halt).
   const checkedAct = async (tab, ref, action, payload = {}) => {
     if (ctx.active && !(await ctx.active())) return { ok: false, cancelled: true, error: "The student stopped this run." };
-    return act(tab, ref, action, ctx.gen == null ? payload : { ...payload, gen: ctx.gen });
+    return act(tab, ref, action, ctx.gen == null ? payload : { ...payload, gen: ctx.gen }, ctx.observeDocument);
   };
-  const needsRef = ["fill", "select", "check", "upload", "click", "fill_secret"].includes(name);
-  const t = needsRef ? index[input.ref] : null;
+  const needsRef = schema.required.includes("ref");
+  const t = needsRef && Object.hasOwn(index, input.ref) ? index[input.ref] : null;
   if (needsRef && !t) return { content: `Unknown ref ${input.ref}. Use refs from the latest snapshot.`, isError: true };
   if (needsRef && (fails[input.ref] || 0) >= MAX_FIELD_FAILS) return { content: "This field already failed 3 times. Skip it, or pause_for_user if it is required.", isError: true };
 
   let r;
   switch (name) {
     case "fill":
-      r = await checkedAct(tabId, input.ref, "fill", { text: String(input.text ?? "") });
+      r = await checkedAct(tabId, input.ref, "fill", { text: input.text });
       if (r.ok) await logAnswer(job, t.label, input.text, t.kind);
       break;
     case "select":
-      r = await checkedAct(tabId, input.ref, "select", { option: String(input.option ?? "") });
+      r = await checkedAct(tabId, input.ref, "select", { option: input.option });
       if (r.ok) await logAnswer(job, t.label, r.chosen || input.option, t.kind);
       break;
     case "check":
-      r = await checkedAct(tabId, input.ref, "check", { checked: !!input.checked });
+      r = await checkedAct(tabId, input.ref, "check", { checked: input.checked });
       break;
     case "upload": {
       // Was: ... && job.tailored.file; the bytes now live off the job (see queue.js).
@@ -1078,7 +851,7 @@ async function execTool(u, ctx) {
       break;
     }
     case "wait":
-      await sleep(Math.min(10, Math.max(1, Number(input.seconds) || 2)) * 1000);
+      await sleep(Math.min(10, Math.max(1, input.seconds || 2)) * 1000);
       return { content: "Waited." };
     case "ask_user":
       return { stop: true, kind: "ask", question: input.question, why: input.why };

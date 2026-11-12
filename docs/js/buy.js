@@ -265,7 +265,62 @@
   root.ISBuy = B;
 
   var doc = root.document;
-  if (doc && doc.getElementById && doc.getElementById("buy")) start();
+  var main = doc && doc.getElementById && doc.getElementById("buy");
+  if (main && !main.__internscoutCheckoutBoot) {
+    main.__internscoutCheckoutBoot = true;
+    boot();
+  }
+
+  function boot() {
+    var state = landingState(root.location.search);
+    var cleared = !hasToken(state);
+    if (!cleared && root.history && root.history.replaceState) {
+      try {
+        root.history.replaceState(null, "", root.location.pathname);
+        cleared = !root.location.search;
+      } catch (e) {}
+    }
+    var ui = state.kind === "buy" ? null : prepareLanding(state);
+    var request;
+    if (state.kind === "confirm") {
+      request = call("POST", "/employer/order/confirm", { order: state.order, token: state.token });
+    } else if (state.kind === "credit") {
+      var qs = new URLSearchParams({ credit: state.credit, t: state.token }).toString();
+      request = call("GET", "/employer/credit?" + qs);
+    } else if (state.kind === "buy") request = call("GET", "/employer/config");
+    else return; // The complete static return state is already on screen.
+
+    // Start the first request once at the original point, even if the renderer is still loading.
+    request.catch(function () {});
+    var marker = doc.getElementById("buy-native-entry");
+    var entry = marker && marker.getAttribute("data-src");
+    if (!cleared || !/^\/js\/(?:buy|buy-modules\/[a-f0-9]{64})\/entry\.mjs$/.test(entry || "")) {
+      start(state, request, ui);
+      return;
+    }
+    var script = doc.createElement("script");
+    // Browsers that can run modules but lack noModule use the existing classic path too.
+    if (!("noModule" in script)) { start(state, request, ui); return; }
+
+    var claimed = false, timer;
+    function run(mount) {
+      if (claimed) return;
+      claimed = true;
+      clearTimeout(timer);
+      // Claim the renderer once. Both paths consume the same first request.
+      if (typeof mount === "function") {
+        mount(root, state, { rules: B, contact: CONTACT, call: call, dataJson: dataJson, request: request, ui: ui });
+      } else start(state, request, ui);
+    }
+    script.id = "buy-module-script";
+    script.type = "module";
+    script.referrerPolicy = "no-referrer";
+    script.startCheckout = run;
+    script.onload = script.onerror = function () { run(); };
+    script.src = entry;
+    timer = setTimeout(function () { run(); }, 2000);
+    try { doc.head.appendChild(script); } catch (e) { run(); }
+  }
 
   // 2026-10-23: bound both response headers and body reads, including fetches that ignore abort (SITE-1).
   // was: a stalled config, role or order request could keep the page waiting forever.
@@ -295,7 +350,7 @@
   }
 
   // ---------- the page ----------
-  function start() {
+  function start(state, request, ui) {
     // 2026-10-23: count only fixed anonymous intent names; ISCount retains opt-out and bot suppression.
     // No form value, query, employer key or order ID is sent. Revert: remove these calls and countStep.
     function countStep(event) {
@@ -321,19 +376,14 @@
     }
     function show(id, on) { var n = $(id); if (n) n.hidden = !on; }
 
-    // ----- where Stripe and our emails send people back to -----
-    var state = landingState(root.location.search);
-    if (hasToken(state) && root.history && root.history.replaceState) {
-      try { root.history.replaceState(null, "", root.location.pathname); } catch (e) {}
-    }
-    if (state.kind !== "buy") { landing(state); return; }
+    if (state.kind !== "buy") { landing(state, request, ui); return; }
 
     // ----- the order form -----
     var S = { cfg: null, index: null, emp: null, roles: [], picked: [], pub: false, avail: null, rseq: 0, aseq: 0, timer: 0, shards: {}, prefill: "", matches: [], active: -1 };
     var form = $("order"), q = $("co-q"), list = $("co-list"), coMsg = $("co-msg"), roleList = $("role-list"), pickMsg = $("pick-msg");
     var pub = $("pub"), startIn = $("start"), availBox = $("avail"), send = $("send"), status = $("status");
 
-    call("GET", "/employer/config").then(function (res) {
+    request.then(function (res) {
       if (!res.ok) return unavailable();
       if (!configOk(res.out)) return closed();
       S.cfg = res.out;
@@ -642,7 +692,7 @@
   }
 
   // ----- the pages Stripe and our emails link to -----
-  function landing(state) {
+  function prepareLanding(state) {
     var $ = function (id) { return doc.getElementById(id); };
     var box = $("landing"), head = $("landing-h"), body = $("landing-body");
     ["boot", "order", "how"].forEach(function (id) { if ($(id)) $(id).hidden = true; });
@@ -663,6 +713,20 @@
     var again = el("p", {}, el("a", { href: "/employers/buy/" }, "Start a new order"));
     var failed = "We couldn't read the result. Reopen the original link from your email to check its status, or email " + CONTACT + ".";
 
+    if (state.kind === "badlink") {
+      say("This link doesn't look complete", "Open the link from your email again. If you copied it, check you copied all of it.", contact("If it still doesn't work, email "));
+    } else if (state.kind === "paid") {
+      say("Payment received", "We review every paid listing before it goes live, usually within 2 business days. You'll get an email when it's approved, with its dates.",
+        "If we can't run it, you get a full refund.");
+    } else if (state.kind === "cancelled") {
+      say("Nothing was charged", "You left the payment page before paying. The link in your email still works for 48 hours from when we sent it, so you can open it again to pay.", again);
+    } else if (state.kind === "confirm") say("Confirming your email", "One moment.");
+    else if (state.kind === "credit") say("Your unused days", "Loading your offer.");
+    return { el: el, say: say, contact: contact, again: again, failed: failed };
+  }
+
+  function landing(state, request, ui) {
+    var el = ui.el, say = ui.say, contact = ui.contact, again = ui.again, failed = ui.failed;
     function choicePending() {
       say("Your choice is being checked", "The result of your earlier choice is still being confirmed. Please don't choose again or try the other option.",
         "Reopen the original unused-days offer email link later to check the status.", contact("Questions? Email "));
@@ -672,16 +736,8 @@
         "Reopen the original unused-days offer email link to check the current status before doing anything else.", contact("If you can't find that email, contact "));
     }
 
-    if (state.kind === "badlink") {
-      say("This link doesn't look complete", "Open the link from your email again. If you copied it, check you copied all of it.", contact("If it still doesn't work, email "));
-    } else if (state.kind === "paid") {
-      say("Payment received", "We review every paid listing before it goes live, usually within 2 business days. You'll get an email when it's approved, with its dates.",
-        "If we can't run it, you get a full refund.");
-    } else if (state.kind === "cancelled") {
-      say("Nothing was charged", "You left the payment page before paying. The link in your email still works for 48 hours from when we sent it, so you can open it again to pay.", again);
-    } else if (state.kind === "confirm") {
-      say("Confirming your email", "One moment.");
-      call("POST", "/employer/order/confirm", { order: state.order, token: state.token }).then(function (res) {
+    if (state.kind === "confirm") {
+      request.then(function (res) {
         var url = res.ok ? safeCheckoutUrl(res.out.url) : null;
         if (url) {
           say("Email confirmed", el("p", {}, "Taking you to Stripe to pay. If nothing happens, ", el("a", { href: url }, "open the payment page"), "."));
@@ -695,9 +751,7 @@
         }
       }).catch(function () { say("We couldn't confirm this link", failed); });
     } else if (state.kind === "credit") {
-      say("Your unused days", "Loading your offer.");
-      var qs = new URLSearchParams({ credit: state.credit, t: state.token }).toString();
-      call("GET", "/employer/credit?" + qs).then(function (res) {
+      request.then(function (res) {
         if (!res.ok) return say("This link doesn't work any more", serverMessage(res.out) || "It may have expired or already been used.", contact("Questions? Email "));
         var c = readCredit(res.out);
         if (c.processing) return choicePending();

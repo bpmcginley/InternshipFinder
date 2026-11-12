@@ -11,7 +11,9 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "growth"))
 import title_discovery as td  # noqa: E402
-from test_seo_pages import _row, _site  # noqa: E402
+from tests.seo_fixture_data import _row, _site  # noqa: E402
+
+pytestmark = pytest.mark.without_seo_facade
 
 NOW = datetime(2026, 11, 2, 20, tzinfo=timezone.utc)
 

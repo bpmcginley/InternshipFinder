@@ -41,6 +41,33 @@
   var beacon = function (data) {
     try { navigator.sendBeacon(API, new Blob([JSON.stringify(data)], { type: "text/plain" })); } catch (e) {}
   };
+  // Dormant until a reviewed release explicitly marks this script. No page currently does.
+  // Keys come from the same public release as the posting links; never derive one from a name/URL.
+  var employerPostingEnabled = live && document.currentScript &&
+    document.currentScript.getAttribute("data-employer-posting-counts") === "1" &&
+    window.top === window && !/^\/widget(?:[/.]|$)/i.test(location.pathname || "") &&
+    typeof Set === "function" && typeof TextEncoder === "function";
+  var employerPostingSeen = employerPostingEnabled ? new Set() : null;
+  var employerPostingOpen = function (ev, a) {
+    if (!employerPostingEnabled || !ev || ev.isTrusted !== true || document.prerendering ||
+        (ev.type === "auxclick" ? ev.button !== 1 : ev.button !== 0) || !a ||
+        !a.matches("a.go[href][data-employer-key], a.open-link[href][data-employer-key]") ||
+        a.closest(".paid, [data-placement], [data-employer-posting-exclude]") ||
+        /(^|\s)sponsored(\s|$)/i.test(a.getAttribute("rel") || "")) return;
+    var key = a.getAttribute("data-employer-key"), href = a.getAttribute("href");
+    if (typeof key !== "string" || !key || key.length > 200 || key !== key.trim() ||
+        /[\u0000-\u001f\u007f\ud800-\udfff]/u.test(key) ||
+        new TextEncoder().encode(key).length > 200 || employerPostingSeen.has(key) ||
+        employerPostingSeen.size >= 10000 || !/^https?:\/\//i.test(href || "") ||
+        /[\u0000-\u001f\u007f\\]/.test(href)) return;
+    try {
+      var target = new URL(href);
+      if (!target.hostname || target.username || target.password || /^https?:\/\/[^/?#]*@/i.test(href)) return;
+    } catch (e) { return; }
+    // One attempt per employer per page load, even if the beacon queue rejects it. No retry/storage.
+    employerPostingSeen.add(key);
+    beacon({ e: "employer_posting_open", c: key });
+  };
   // 2026-10-27: keep only bounded UTM slugs, never a URL, form value or visitor id. Revert: remove
   // ATTR_KEY/campaignContext and send ordinary event beacons again.
   var ATTR_KEY = "internscout.campaign", safeTag = function (value) {
@@ -183,6 +210,7 @@
     // was: var a = ev.target && ev.target.closest ? ev.target.closest("a[href]") : null;
     var t = ev.target && ev.target.closest ? ev.target : null;
     var a = t ? t.closest("a[href]") : null;
+    employerPostingOpen(ev, a);
     if (a) digestCount("click", a);
     if (a) employerCount("click", a);
     // Only these two marked distribution links use the product's daily totals.
@@ -201,6 +229,10 @@
     // A paid listing's own posting link (rel="sponsored"), not its "Why am I seeing this?" link.
     var box = a && a.closest && a.getAttribute ? a.closest("[data-placement]") : null;
     if (box && /(^|\s)sponsored(\s|$)/.test(a.getAttribute("rel") || "")) plSend(box.getAttribute("data-placement"), "open");
+  }, true);
+  if (employerPostingEnabled) document.addEventListener("auxclick", function (ev) {
+    var t = ev.target && ev.target.closest ? ev.target : null;
+    employerPostingOpen(ev, t ? t.closest("a[href]") : null);
   }, true);
   // A sign-up form sent. "submit" fires only once the browser has passed the form's own checks (the
   // email box is required), and the form still posts to Buttondown in its new tab as before.

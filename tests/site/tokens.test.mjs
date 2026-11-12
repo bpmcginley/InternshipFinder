@@ -1,11 +1,80 @@
-// The design tokens (A2 design spec section 1, 2026-10-14). There is no build step, so the same :root block is
-// copied into four places: the dashboard (docs/index.html, the source), the landing pages (CSS in
-// backend/internscout/seo_pages.py), /employers/ (docs/employers/index.html) and the extension
-// (extension/lib/theme.css, and the colours in extension/agent/overlay.js). These tests fail when a copy
-// drifts, when a colour pair falls under WCAG AA, or when a size, face or focus rule slips back.
+import { readAppSource } from "./app-fixture.mjs";
+// tokens.css owns the shared light, dark and touch rules. The generated copies stay inline.
+// The existing design checks cover WCAG AA, type and controls, plus the local overlay subset.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, existsSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { updateTokenCopies } from "../../scripts/generate_tokens.mjs";
+
+test("the generated token blocks are current with tokens.css", () => {
+  assert.deepEqual(updateTokenCopies(), [], "run node scripts/generate_tokens.mjs");
+});
+
+function withTokenFixture(run) {
+  const dir = mkdtempSync(join(tmpdir(), "internscout-tokens-"));
+  const script = "scripts/generate_tokens.mjs";
+  const targets = [
+    "docs/index.html",
+    "docs/employers/index.html",
+    "docs/employers/buy/index.html",
+    "backend/internscout/site/assets.py",
+    "extension/lib/theme.css",
+  ];
+  try {
+    for (const path of [script, "tokens.css", ...targets]) {
+      const file = join(dir, path);
+      mkdirSync(dirname(file), { recursive: true });
+      copyFileSync(new URL("../../" + path, import.meta.url), file);
+    }
+    run(dir, script, targets);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test("the generator validates the last target before writing any files", () => {
+  withTokenFixture((dir, script, targets) => {
+    const source = join(dir, "tokens.css");
+    const original = readFileSync(source, "utf8");
+    const edited = original.replace(/--paper:[^;]+;/, "--paper:#010203;");
+    assert.notEqual(edited, original);
+    writeFileSync(source, edited);
+
+    const last = join(dir, targets.at(-1));
+    const theme = readFileSync(last, "utf8");
+    const invalid = theme.replace("@media (pointer:coarse){:root{", "@media (pointer:coarse){body{");
+    assert.notEqual(invalid, theme);
+    writeFileSync(last, invalid);
+
+    const before = targets.map((path) => readFileSync(join(dir, path)));
+    const result = spawnSync(process.execPath, [join(dir, script)], { encoding: "utf8" });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /Expected one design token block in extension\/lib\/theme\.css/);
+    for (const [index, path] of targets.entries()) {
+      assert.deepEqual(readFileSync(join(dir, path)), before[index], path);
+    }
+  });
+});
+
+test("the generator keeps whitespace inside a wrapped token value", () => {
+  withTokenFixture((dir, script, targets) => {
+    const source = join(dir, "tokens.css");
+    const original = readFileSync(source, "utf8");
+    const edited = original.replace("--shadow-pop:0 10px 30px", "--shadow-pop:0\n  10px 30px");
+    assert.notEqual(edited, original);
+    writeFileSync(source, edited);
+
+    const result = spawnSync(process.execPath, [join(dir, script)], { encoding: "utf8" });
+    assert.equal(result.status, 0);
+    for (const path of targets) {
+      const output = readFileSync(join(dir, path), "utf8");
+      assert.match(output, /--shadow-pop:0\s+10px 30px/);
+    }
+  });
+});
 
 const read = (p) => readFileSync(new URL("../../" + p, import.meta.url), "utf8");
 const bytes = (p) => readFileSync(new URL("../../" + p, import.meta.url));
@@ -16,7 +85,7 @@ const SHEETS = {
   dashboard: noComments(styleOf(read("docs/index.html"))),
   landing: noComments(
     (() => {
-      const s = read("backend/internscout/seo_pages.py");
+      const s = read("backend/internscout/site/assets.py");
       const a = s.indexOf('CSS = """') + 9;
       return s.slice(a, s.indexOf('"""', a));
     })(),
@@ -230,7 +299,7 @@ test("the two faces are self-hosted, the same files for the site and the extensi
   }
   // Nothing fetched from Google any more, on the dashboard or the generated pages.
   assert.doesNotMatch(read("docs/index.html"), /fonts\.googleapis\.com|fonts\.gstatic\.com/);
-  assert.doesNotMatch(read("backend/internscout/seo_pages.py"), /fonts\.googleapis\.com/);
+  assert.doesNotMatch(read("backend/internscout/site/assets.py"), /fonts\.googleapis\.com/);
 });
 
 // Every font size in the four sheets and the extension pages is one of the eight steps, and nothing is
@@ -330,7 +399,7 @@ test("one icon set of six, shared by the site and the extension", () => {
   assert.match(SHEETS.dashboard, /\.field\.search::before\{[^}]*mask:var\(--i-search\)/);
   assert.match(SHEETS.dashboard, /select\.mine\{[^}]*var\(--i-select\)[^}]*appearance:none/);
   // The Why panel's ✓ ✗ ! characters are icons with the meaning in words for a screen reader.
-  const app = read("docs/js/app.js").replace(/^\s*\/\/.*$/gm, "");
+  const app = readAppSource().replace(/^\s*\/\/.*$/gm, "");
   assert.doesNotMatch(app, /"✓ "|"✗ "|"! "/);
   assert.match(app, /icon\("check", "Have: "\)/);
 });

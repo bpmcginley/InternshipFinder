@@ -1,13 +1,11 @@
 // Dashboard selection, queueing and list order (the PR #94 review's dashboard P2s). core.js is loaded the
-// way the page loads it, against a stand-in `window`; the order tests run on the real listing files in
-// docs/data/listings.
+// way the page loads it, against a stand-in `window`; the order tests use synthetic listing shards.
+import { installCore } from "./core-fixture.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync } from "node:fs";
-import vm from "node:vm";
+import { LISTING_CLOCK, MAJORS, listingRows } from "./fixtures/listing_cases.mjs";
 
-const CORE = readFileSync(new URL("../../docs/js/core.js", import.meta.url), "utf8");
-function loadCore() {
+function loadCore(now) {
   const store = () => {
     const m = new Map();
     return {
@@ -31,12 +29,21 @@ function loadCore() {
     document: { documentElement: { dataset: {} } },
     console,
   };
+  if (now !== undefined) {
+    ctx.Date = class extends Date {
+      constructor(...args) {
+        super(...(args.length ? args : [now]));
+      }
+      static now() {
+        return now;
+      }
+    };
+  }
   ctx.window = ctx;
-  vm.createContext(ctx);
-  vm.runInContext(CORE, ctx);
+  installCore(ctx);
   return ctx.IS;
 }
-const IS = loadCore();
+const IS = loadCore(LISTING_CLOCK);
 const rows = (n) =>
   Array.from({ length: n }, (_, i) => ({ id: "r" + i, apply_url: "https://jobs.example/" + i }));
 
@@ -114,29 +121,16 @@ test("links held by a live job are left out of the header selection; a failed jo
   assert.equal(IS.heldUrls(null).size, 0);
 });
 
-test("the shared apply links the review counted are in the data", () => {
-  // Not a fixed number (the data changes daily); the case only has to exist for the fix to matter.
+test("distinct listings can share an apply link", () => {
   const all = loadAll();
   const byUrl = new Map();
-  for (const x of all) if (x.apply_url) byUrl.set(x.apply_url, (byUrl.get(x.apply_url) || 0) + 1);
+  for (const x of all) if (x.status === "open" && x.apply_url) byUrl.set(x.apply_url, (byUrl.get(x.apply_url) || 0) + 1);
   assert.ok([...byUrl.values()].some((n) => n > 1));
 });
 
 // ---------- list order ----------
-let cached = null;
-function loadAll() {
-  if (cached) return cached;
-  const dir = new URL("../../docs/data/listings/", import.meta.url);
-  const byId = new Map();
-  for (const f of readdirSync(dir)
-    .filter((f) => f.endsWith(".json") && !f.endsWith(".desc.json") && f !== "index.json")
-    .sort()) {
-    const list = JSON.parse(readFileSync(new URL(f, dir), "utf8"));
-    if (Array.isArray(list))
-      for (const x of list) if (x && x.id != null && !byId.has(x.id)) byId.set(x.id, x);
-  }
-  return (cached = [...byId.values()]);
-}
+const fixtureRows = listingRows();
+const loadAll = () => fixtureRows;
 // The comparators docs/js/app.js used before IS.sortRows, copied as they were.
 function legacySort(r, sort, S, ranked, rel) {
   const R = (a, b) => (ranked ? rel.get(b) - rel.get(a) : 0);
@@ -160,9 +154,6 @@ function legacySort(r, sort, S, ranked, rel) {
     );
   return r;
 }
-const MAJORS = JSON.parse(
-  readFileSync(new URL("../../docs/data/majors.json", import.meta.url), "utf8"),
-);
 const PROFILES = {
   none: null,
   cs: {
@@ -181,7 +172,7 @@ const PROFILES = {
     states: [],
   },
 };
-const scorer = (p) => {
+const scorer = (p, score = IS.score) => {
   const { direct, related } = IS.profileFields(p, MAJORS);
   const ctx = {
     p,
@@ -194,7 +185,7 @@ const scorer = (p) => {
   return (x) => {
     let v = m.get(x);
     if (!v) {
-      v = IS.score(x, ctx);
+      v = score(x, ctx);
       m.set(x, v);
     }
     return v;
@@ -202,9 +193,9 @@ const scorer = (p) => {
 };
 const ids = (list) => list.map((x) => x.id);
 
-test("the list comes out in exactly the old order for every sort, profile and search, on the real data", () => {
+test("the list comes out in exactly the old order for every sort, profile and search, on fixture shards", () => {
   const all = loadAll();
-  assert.ok(all.length > 1000, "the listing files should be in docs/data/listings");
+  assert.ok(all.length > 2500, "fixture must span more than one ranking batch");
   const searches = [null, "software engineer", "nursing", "boston", "marketing -unpaid"];
   for (const [name, p] of Object.entries(PROFILES)) {
     const S = scorer(p);
@@ -225,6 +216,8 @@ test("the list comes out in exactly the old order for every sort, profile and se
         }
         ranked = cq.terms.some((t) => !t.neg && !t.place);
       }
+      assert.ok(base.length > 0, "no fixture matches for " + q);
+      if (q === "software engineer") assert.ok(new Set(rel.values()).size > 1, "fixture needs relevance tiers");
       for (const sort of ["score", "new", "company", "comp"]) {
         const want = ids(legacySort(base.slice(), sort, S, ranked, rel));
         const got = ids(IS.sortRows(base.slice(), sort, S, ranked ? rel : null));
@@ -236,19 +229,21 @@ test("the list comes out in exactly the old order for every sort, profile and se
 
 test("rows that arrive file by file, scored once each, sort the same as all rows at once", () => {
   // The page keeps each row's score as its file lands and only sorts again; the result has to match a
-  // fresh score of everything.
+  // fresh score of everything at the same instant, so freshness decay cannot change the comparison.
+  const ranking = loadCore(LISTING_CLOCK);
   const all = loadAll();
   const p = PROFILES.cs,
-    cachedS = scorer(p),
+    cachedS = scorer(p, ranking.score),
     seen = [];
   const files = [];
   for (let i = 0; i < all.length; i += 2500) files.push(all.slice(i, i + 2500));
+  assert.ok(files.length > 1);
   let got = [];
   for (const f of files) {
     seen.push(...f);
-    got = ids(IS.sortRows(seen.slice(), "score", cachedS, null));
+    got = ids(ranking.sortRows(seen.slice(), "score", cachedS, null));
   }
-  const want = ids(legacySort(all.slice(), "score", scorer(p), false, null));
+  const want = ids(legacySort(all.slice(), "score", scorer(p, ranking.score), false, null));
   assert.deepEqual(got, want);
 });
 
@@ -327,7 +322,7 @@ const FILTER_STATES = (all) => {
     { company: [someCo] },
     { where: "onsite" },
     { where: "remote" },
-    { stage: "coop" },
+    { stage: "co_op" },
     { year: "junior" },
     { sector: someSector },
     { paid: "paid" },
@@ -370,6 +365,7 @@ test("IS.listRows gives exactly the old inline list for every filter, sort, sear
           [...ids(want)],
           `profile ${name}, ${JSON.stringify(extra)}, sort ${sort}`,
         );
+        assert.ok(got.rows.length > 0, `empty fixture branch: ${name}, ${JSON.stringify(extra)}`);
         assert.equal(got.ranked, !!(cq && cq.terms.some((t) => !t.neg && !t.place)));
         if (cq) for (const x of got.rows) assert.equal(got.rel.get(x), IS.matchScore(x, cq));
         else assert.equal(got.rel, null);

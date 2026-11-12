@@ -1,3 +1,4 @@
+import { EMPLOYER_POSTING_EVENT, admitEmployerPosting } from "./employer-posting-counts.js";
 // Exact visit counts (added 2026-09-30). Cloudflare Web Analytics samples page loads, about one in
 // ten, so the dashboard's small numbers came in steps of 10. Each page on the site (docs/js/count.js)
 // sends one POST /hit per load, and this adds one to a daily total by page kind and by where the
@@ -242,7 +243,7 @@ export async function countEvent(db, day, event, page = "worker") {
   }
 }
 
-export async function countHit(db, request, body, now) {
+export async function countHit(db, request, body, now, organicService = null) {
   const ua = request.headers.get("User-Agent") || "";
   // Only the live site sends hits (a browser always sets Origin on this cross-site POST); a local copy
   // of the site is left out so testing never shows up as visits.
@@ -250,7 +251,17 @@ export async function countHit(db, request, body, now) {
   if (!/^https:\/\/(internscout\.org|bpmcginley\.github\.io)$/.test(origin)) {
     throw new HttpError(403, "forbidden", "Hits come from the InternScout site only");
   }
-  if (!ua || BOT_UA.test(ua) || tooFast(request.headers.get("CF-Connecting-IP"), now)) return { counted: false };
+  if (!ua || BOT_UA.test(ua)) return { counted: false };
+  // Default off. The later route binding supplies a trusted request-scoped service.
+  // Organic admission never spends the legacy budget or reaches a legacy table.
+  if (body?.e === EMPLOYER_POSTING_EVENT) {
+    if (typeof organicService !== "function") return { counted: false };
+    const admission = await admitEmployerPosting(body, request.headers.get("CF-Connecting-IP"), now);
+    if (!admission) return { counted: false };
+    try { return { counted: (await organicService(admission)) === true }; }
+    catch { return { counted: false }; }
+  }
+  if (tooFast(request.headers.get("CF-Connecting-IP"), now)) return { counted: false };
   const page = pageKind(body.p);
   const day = now.toISOString().slice(0, 10);
   // A paid listing's box shown or opened (S9): { s: placement id, e: "shown" | "open", p: path }, nothing else.

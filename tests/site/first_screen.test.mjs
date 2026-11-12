@@ -1,12 +1,12 @@
+import { readAppSource } from "./app-fixture.mjs";
 // The first-screen file (P2) and deferred React (P1). data/first.json is written by the backend export
 // (export_static.first_screen); the dashboard paints from it before the state files arrive.
+import { installCore } from "./core-fixture.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
-import vm from "node:vm";
+import { readFileSync } from "node:fs";
 
 const read = (p) => readFileSync(new URL("../../" + p, import.meta.url), "utf8");
-const CORE = read("docs/js/core.js");
 const FIX = JSON.parse(read("tests/site/fixtures/first_screen.json"));
 
 function loadCore(fetchImpl, extra = {}) {
@@ -36,8 +36,7 @@ function loadCore(fetchImpl, extra = {}) {
     ...extra,
   };
   ctx.window = ctx;
-  vm.createContext(ctx);
-  vm.runInContext(CORE, ctx);
+  installCore(ctx);
   return ctx.IS;
 }
 const ok = (body) => Promise.resolve({ ok: true, status: 200, json: async () => body });
@@ -129,7 +128,7 @@ test("no first-screen file, or one that fails, changes nothing", async () => {
 });
 
 test("the dashboard uses the first-screen file only for the list it was written for", () => {
-  const app = read("docs/js/app.js");
+  const app = readAppSource();
   assert.match(
     app,
     /const prime = !p && !everything && scope\.all && !qKeys\.length && f\.sort === "new";/,
@@ -140,19 +139,23 @@ test("the dashboard uses the first-screen file only for the list it was written 
   );
 });
 
-test("React is deferred, ahead of core.js and app.js, so the static hero paints first (P1)", () => {
+test("React is deferred ahead of Core and App, so the static hero paints first (P1)", () => {
   const html = read("docs/index.html");
   const tags = [...html.matchAll(/<script\b[^>]*\bsrc="([^"]+)"[^>]*>/g)].map((m) => ({
     src: m[1],
     tag: m[0],
   }));
   const at = (s) => tags.findIndex((t) => t.src.includes(s));
-  for (const s of ["react.production", "react-dom.production", "js/core.js", "js/app.js"])
+  for (const s of ["react.production", "react-dom.production"])
     assert.match(tags[at(s)].tag, /\sdefer\b/, s);
+  assert.match(tags[at("js/core/entry.mjs")].tag, /type="module"/);
+  assert.doesNotMatch(tags[at("js/core/entry.mjs")].tag, /\sasync\b/);
+  assert.match(tags[at("js/app/entry.mjs")].tag, /type="module"/);
+  assert.doesNotMatch(tags[at("js/app/entry.mjs")].tag, /\sasync\b/);
   assert.ok(
     at("/react@") < at("/react-dom@") &&
-      at("/react-dom@") < at("js/core.js") &&
-      at("js/core.js") < at("js/app.js"),
+      at("/react-dom@") < at("js/core/entry.mjs") &&
+      at("js/core/entry.mjs") < at("js/app/entry.mjs"),
   );
   // No inline script may call React before the deferred ones have run.
   const inline = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)]
@@ -161,28 +164,25 @@ test("React is deferred, ahead of core.js and app.js, so the static hero paints 
   assert.doesNotMatch(inline, /\bReact(DOM)?\./);
 });
 
-// Once the pipeline has written first.json, it must be the top of the first-visit list built from the
-// state files it was taken from (the same export, so the same commit).
-test(
-  "the committed first.json is the top of the first-visit list",
-  { skip: !existsSync(new URL("../../docs/data/first.json", import.meta.url)) },
-  () => {
-    const IS = loadCore(() => new Promise(() => {}));
-    const index = JSON.parse(read("docs/data/listings/index.json"));
-    const first = JSON.parse(read("docs/data/first.json"));
-    const byId = new Map();
-    for (const k of index.first.keys)
-      if (index.files[k])
-        for (const x of JSON.parse(read("docs/data/" + index.files[k].file)))
-          if (!byId.has(x.id)) byId.set(x.id, x);
-    const rows = [...byId.values()].filter((x) => x.status === "open");
-    IS.sortRows(rows, "new", noProfile(IS), null);
-    const key = (x) => [x.posted_at ? 1 : 0, x.posted_at || "", x.first_seen || ""].join("|");
-    // Ties at the edge may fall either way; the keys must match position by position.
-    assert.deepEqual(first.map(key), rows.slice(0, first.length).map(key));
-    assert.equal(first.length, index.first.rows);
-  },
-);
+// The pinned preview and shard metadata represent the same export.
+test("the fixture first.json is the top of the first-visit list", () => {
+  const IS = loadCore(() => new Promise(() => {}));
+  const index = FIX.index;
+  assert.equal(index.first.file, "first.json");
+  const byFixtureId = new Map(FIX.rows.map((row) => [row.id, row]));
+  const first = FIX.expected.map((id) => byFixtureId.get(id));
+  const byId = new Map();
+  for (const k of index.first.keys)
+    if (index.files[k])
+      for (const id of FIX.shards[index.files[k].file])
+        if (!byId.has(id)) byId.set(id, byFixtureId.get(id));
+  const rows = [...byId.values()].filter((x) => x.status === "open");
+  IS.sortRows(rows, "new", noProfile(IS), null);
+  const key = (x) => [x.posted_at ? 1 : 0, x.posted_at || "", x.first_seen || ""].join("|");
+  // Ties at the edge may fall either way; the keys must match position by position.
+  assert.deepEqual(first.map(key), rows.slice(0, first.length).map(key));
+  assert.equal(first.length, index.first.rows);
+});
 
 test("a request the page head started is used once, then fetches go out as usual", async () => {
   const asked = [];
@@ -215,7 +215,7 @@ test("a request the page head started is used once, then fetches go out as usual
 
 test("the head starts the index and, on a plain first visit, the first-screen file", () => {
   const html = read("docs/index.html");
-  const core = read("docs/js/core.js");
+  const core = read("docs/js/core/profile.mjs");
   const params = JSON.parse(core.match(/const FILTER_PARAMS = (\[[^\]]+\]);/)[1]);
   const re = html.match(/!\/\[\?&\]\(([^)]+)\)=\/\.test\(location\.search\)/);
   assert.ok(re, "the first-visit check in index.html");

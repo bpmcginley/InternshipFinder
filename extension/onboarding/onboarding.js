@@ -1,4 +1,4 @@
-// Deep Dive: setup → files → facts → interview → voice → review. Re-runnable; keeps existing answers.
+// Deep Dive starts with the resume. Returning students can reopen any step.
 import { loadStore, updateStore, hasKey, isGemini, isWorker, modelFor, modeOf, PRESETS, CONFIRMATION_FACTS, ELIGIBILITY_FACTS, confirmedFacts, factFallback, factSuggestions, resumeReviewPending, unconfirmedOldFacts, workAuthMismatch, manualDetailsMissing } from "../lib/store.js";
 import { allowanceLines, tierNote, MAIN_TASKS, PROVIDER_LABELS, OFFER_KEY, SESSION_KEY } from "../lib/auth.js";
 import { BACKGROUND_SETTINGS, RESTORED_KEY, restoredMessage, takeRestored, restoredAt } from "../lib/sync.js";
@@ -8,10 +8,14 @@ import { quickStartReady, finishOnboarding, digestLink, enterDetailsManually, ma
 import { heldLine } from "../background/held.js";
 import { confirmProfileValue, applyInterviewFacts, dismissSuggestion, planResumeImport, applyResumeImport, preselectedImports, bulkConfirmKeys, mergeProfileEdits, focusStepHeading, pendingResumeReview, formatResumeValue, setSetupEmail, repairSetupEmail } from "./profile.js";
 
+import { readFile, docBlock } from "./files.js";
+import { SLOTS, FACTS, VOICE_FIELDS, JSON_SECTIONS, GOAL_FIELDS } from "./field-options.js";
+import { interviewSystem } from "./interview-prompt.js";
+
 const main = document.getElementById("main");
 const stepsEl = document.getElementById("steps");
 const STEPS = [
-  ["setup", "Setup"], ["files", "Files"], ["facts", "Quick facts"],
+  ["files", "Resume"], ["setup", "Setup"], ["facts", "Quick facts"],
   ["interview", "Interview"], ["voice", "Voice"], ["review", "Review"],
 ];
 // Auto-Apply can be turned on from Files (2026-10-04); these three make its answers better and are
@@ -22,38 +26,51 @@ let savedSnapshot = structuredClone(S);
 let saveChain = Promise.resolve();
 let pendingResumeImport = pendingResumeReview(S);
 let renderEpoch = 0;
+let interviewChat = null;
+let interviewWrites = Promise.resolve();
 let rerun = !!S.settings.onboarded;   // was: const. A restore from the account (below) makes this a rerun.
-let step = new URLSearchParams(location.search).get("step") || (rerun ? "review" : "setup");
+const requestedStep = new URLSearchParams(location.search).get("step");
+const explicitStep = STEPS.some(([id]) => id === requestedStep);
+let step = explicitStep ? requestedStep : rerun ? "review" : "files";
 let seenRestore = await restoredAt();   // the last restore this page has loaded
 let restoredNote = "";                  // shown above the current step until the student moves on
 // Signed in to InternScout's AI: true, false, or null until the background has said (refreshSignIn).
 // dashOffer: the dashboard has offered its own sign-in and the Worker has said it is live (U8).
 let signedIn = null, dashOffer = false;
+let queuedResume = null;
+let signingIn = false;
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const $ = (sel) => main.querySelector(sel);
+const practiceLink = `<span class="small" style="display:block;margin:6px 0 0"><a id="practice-link" href="../practice/practice.html" target="_blank" rel="noopener">Practice Auto-Apply</a></span>`;
 
 // ---------- persistence ----------
 // The service worker also writes the store (accounts, answers, learned answers), so merge instead of overwrite.
 // It also restores the Deep Dive from the student's account (lib/sync.js): when that happened after this
 // page loaded, this page's copy is out of date and must not be written over it; the page reloads instead.
 let saveTimer = null;
+function queueStoreWrite(write) {
+  saveChain = saveChain.then(write, write);
+  return saveChain;
+}
 function save(now) {
   clearTimeout(saveTimer);
   const run = () => {
-    const snapshot = structuredClone(S), revision = seenRestore;
-    const write = async () => {
+    const store = S, revision = seenRestore;
+    // Navigation during a story commit must save the profile as it looks after that commit settles.
+    const queuedSnapshot = interviewChat?.savingStories ? null : structuredClone(store);
+    return queueStoreWrite(async () => {
+      if (S !== store) return;
+      const snapshot = queuedSnapshot ?? structuredClone(store);
       let applied = false;
       await updateStore(async (fresh) => {
-        if ((await restoredAt()) !== revision) return;
+        if ((await restoredAt()) !== revision || S !== store) return;
         for (const key of ["profile", "files", "ai"]) mergeProfileEdits(fresh[key], savedSnapshot[key], snapshot[key]);
         const editable = (settings) => Object.fromEntries(Object.entries(settings).filter(([k]) => !BACKGROUND_SETTINGS.includes(k)));
         mergeProfileEdits(fresh.settings, editable(savedSnapshot.settings), editable(snapshot.settings));
         applied = true;
       });
-      if (applied) savedSnapshot = snapshot;
-    };
-    saveChain = saveChain.then(write, write);
-    return saveChain;
+      if (applied && S === store) savedSnapshot = snapshot;
+    });
   };
   if (now) return run();
   saveTimer = setTimeout(run, 300);
@@ -71,34 +88,6 @@ const runId = () => {
 const ai = (opts) => callAI({ ai: S.ai, kind: "deep_dive", run_id: runId(), ...opts });
 const M = () => ({ fast: modelFor(S, "fast"), deep: modelFor(S, "deep"), agent: modelFor(S, "interview") });
 const busy = (el, text) => { el.innerHTML = `<span class="spin"></span>${esc(text)}`; };
-
-// ---------- file helpers ----------
-function toB64(buf) {
-  const bytes = new Uint8Array(buf);
-  let s = "";
-  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
-  return btoa(s);
-}
-async function readFile(file) {
-  if (file.size > 15 * 1024 * 1024) throw new Error(`${file.name} is over 15 MB.`);
-  const buf = await file.arrayBuffer();
-  const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
-  const isDocx = /\.docx$/i.test(file.name);
-  const out = { name: file.name, type: isPdf ? "application/pdf" : file.type || "application/octet-stream", size: file.size, b64: toB64(buf) };
-  if (isDocx) {
-    if (!window.mammoth) throw new Error("DOCX reader failed to load. Save the file as PDF instead.");
-    out.text = (await window.mammoth.extractRawText({ arrayBuffer: buf })).value;
-  } else if (!isPdf) {
-    out.text = new TextDecoder().decode(buf);
-  }
-  return out;
-}
-function docBlock(f, title) {
-  if (!f) return null;
-  if (f.type === "application/pdf" && f.b64) return { type: "document", source: { type: "base64", media_type: "application/pdf", data: f.b64 }, title };
-  if (f.text) return { type: "document", source: { type: "text", media_type: "text/plain", data: f.text.slice(0, 60000) }, title };
-  return null;
-}
 
 // ---------- nav ----------
 function doneFor(id) {
@@ -146,19 +135,30 @@ async function showRestore() {
   const r = await takeRestored();
   seenRestore = await restoredAt();
   if (!r) return false;
-  restoredNote = restoredMessage(r) + (S.files.resume ? "" : " Your files stay on each device, so add your resume under Files.");
+  restoredNote = restoredMessage(r) + (S.files.resume ? "" : " Your files stay on each device, so add your resume under Resume.");
   return true;
 }
 chrome.storage.onChanged.addListener(async (ch, area) => {
   const r = area === "local" && ch[RESTORED_KEY] && ch[RESTORED_KEY].newValue;
-  if (!r || r.at === seenRestore) return;
+  if (!r || r.at === seenRestore || r.at === interviewChat?.revision) return;
+  const previous = interviewChat;
+  const next = interviewChat = interviewConversation(null, r.at);
+  next.restoring = true;
+  next.interrupted = !!(previous?.pending || previous?.failed || previous?.interrupted);
+  previous?.pending?.abort();
   clearTimeout(saveTimer);
-  S = await loadStore();
+  const current = await loadStore();
+  if (interviewChat !== next) return;
+  S = current;
   savedSnapshot = structuredClone(S);
   pendingResumeImport = pendingResumeReview(S);
+  queuedResume = null;
   rerun = !!S.settings.onboarded;
-  if (!(await showRestore())) return;
-  if (rerun) step = "review";
+  const shown = await showRestore();
+  if (interviewChat !== next) return;
+  next.restoring = false;
+  if (shown && rerun) step = "review";
+  if (!shown && step !== "interview") return;
   render();
   scrollTo(0, 0);
   focusStepHeading(main);
@@ -221,7 +221,7 @@ function setup(advOpen = false) {
     </div>
     </details>
     <div id="need" class="small warn"></div>
-    ${navButtons(null, "files", "Next: add your resume")}`;
+    ${S.files.resume ? navButtons("files", "facts") : navButtons(null, "files", "Add your resume")}`;
   drawNeed();
   $("#provider").value = isWorker(S.ai) ? "internscout" : isGemini(S.ai) ? "gemini" : "anthropic";
   if (isWorker(S.ai)) fillAccount();
@@ -346,14 +346,20 @@ function signInRow() {
 // `done(error)` runs after the attempt, with "" when it worked.
 function wireSignIn(box, done) {
   box.querySelectorAll("[data-signin]").forEach((b) => b.addEventListener("click", async () => {
+    if (signingIn) return;
+    signingIn = true;
     box.querySelectorAll("button").forEach((x) => { x.disabled = true; });
     const dash = b.dataset.signin === "dashboard";
     busy(box.querySelector(".signin-msg"), dash ? "Checking that sign-in…" : "Waiting for the sign-in window…");
     const r = await chrome.runtime.sendMessage(dash ? { type: "auth:accept_offer" } : { type: "auth:signin", provider: b.dataset.signin }).catch((e) => ({ error: e.message }));
+    signingIn = false;
     if (dash) dashOffer = false;   // used once, whichever way it went
     if (r && !r.error && r.signedIn) signedIn = true;
     drawSteps();
     done(r && r.error ? r.error : "");
+    // Setup's reply can arrive after the student has already returned to Resume.
+    if (step === "files" && box.id !== "files-signin") drawFilesSignIn();
+    if ($("#extract")) $("#extract").disabled = !canReadResume();
   }));
 }
 
@@ -376,6 +382,7 @@ async function refreshSignIn() {
   drawNeed();
   if (step === "setup" && $("#acct")) fillAccount();
   drawFilesSignIn();
+  if ($("#extract")) $("#extract").disabled = !canReadResume();
 }
 
 // The dashboard's offer usually arrives just after this page opens (the install opens this page and
@@ -392,11 +399,12 @@ chrome.storage.onChanged.addListener((ch, area) => {
 function drawFilesSignIn(msg = "") {
   const box = $("#files-signin");
   if (!box) return;
-  box.hidden = !signInNeeded(S, signedIn);
+  box.hidden = !S.files.resume || !signInNeeded(S, signedIn);
   if (box.hidden) { box.innerHTML = ""; return; }
   box.innerHTML = `<p class="small" style="margin:12px 0 8px"><b>Sign in to read your resume.</b> Any Google account or personal Microsoft account works.</p>${signInRow()}`
     + (msg ? `<p class="small err" style="margin:8px 0 0">${esc(msg)}</p>` : "");
   wireSignIn(box, (err) => {
+    if (step !== "files") return;
     if (err || !signedIn) { drawFilesSignIn(err || ""); return; }
     drawFilesSignIn();
     if (readAfterSignIn(S, { extracting, pending: !!pendingResumeImport })) extract($("#extract"), $("#exout")).catch((e) => { const f = $("#ferr"); if (f) f.textContent = e.message || String(e); });
@@ -422,22 +430,37 @@ async function fillSpending() {
 }
 
 // ---------- 2. files ----------
-const SLOTS = [
-  ["resume", "Resume", "Required. Used for every application and uploaded where asked."],
-  ["cv", "CV", "Optional longer version with everything."],
-  ["transcript", "Transcript", "Optional. Uploaded when a site asks for one."],
-  ["cover_letter", "Cover letter", "Optional. A past letter you like, used as a style reference and uploaded if asked."],
-];
+const canReadResume = () =>
+  !!S.files.resume && !extracting && !signingIn && hasKey(S) && (!isWorker(S.ai) || signedIn === true);
+
+function readQueuedResume() {
+  if (!queuedResume || queuedResume !== S.files.resume || !$("#extract") || !canReadResume()) return;
+  extract($("#extract"), $("#exout")).catch(() => {});
+}
+
 function files() {
   const fmt = (f) => f ? `${esc(f.name)} · ${Math.max(1, Math.round(f.size / 1024))} KB` : "No file";
+  const optionalOpen = $("#optional-files")?.open;
+  const slot = ([k, t, d]) => `
+    <div class="slot"><div class="name"><b>${t}</b><span class="small muted">${d}</span><div class="small ${S.files[k] ? "ok" : "muted"}">${fmt(S.files[k])}</div></div>
+      <input type="file" data-slot="${k}" accept=".pdf,.docx,.txt,.md" hidden>
+      <button class="btn small${k === "resume" && !S.files[k] ? " primary" : ""}" data-pick="${k}">${S.files[k] ? "Replace" : k === "resume" ? "Choose resume" : "Choose"}</button>
+      ${S.files[k] ? `<button class="btn small" data-clear="${k}">Remove</button>` : ""}</div>`;
   main.innerHTML = `
-    <h2>Your files</h2><p class="lead">PDF works best. DOCX, TXT and Markdown are fine too.</p>
-    <div class="card">${SLOTS.map(([k, t, d]) => `
-      <div class="slot"><div class="name"><b>${t}</b><span class="small muted">${d}</span><div class="small ${S.files[k] ? "ok" : "muted"}">${fmt(S.files[k])}</div></div>
-        <input type="file" data-slot="${k}" accept=".pdf,.docx,.txt,.md" hidden>
-        <button class="btn small" data-pick="${k}">${S.files[k] ? "Replace" : "Choose"}</button>
-        ${S.files[k] ? `<button class="btn small" data-clear="${k}">Remove</button>` : ""}</div>`).join("")}
+    <h2>${rerun ? "Your resume" : "Start with your resume"}</h2><p class="lead">Add your resume to build a profile you can review and edit. PDF works best. DOCX, TXT and Markdown are fine too.</p>
+    <div class="card">${slot(SLOTS[0])}
     </div>
+    <div class="card"${S.files.resume ? "" : " hidden"}><h3>Read my resume</h3>
+      <p class="small muted" style="margin-top:0">${isWorker(S.ai) ? "InternScout's AI" : isGemini(S.ai) ? "Gemini" : "Claude"} reads your resume${S.files.cv ? " and CV" : ""} and fills in your education, experience, projects, skills and contact info. You can edit all of it.</p>
+      <div id="files-signin" hidden></div>
+      <div class="row"><button class="btn primary" id="extract" ${canReadResume() ? "" : "disabled"}>Read my resume</button><span id="exout" role="status" class="small">${extracting ? `<span class="spin"></span>Reading your resume… (about 30 seconds)` : S.settings.resume_details_ready && S.settings.extracted_from ? `<span class="ok">Last read: ${esc(S.settings.extracted_from)}</span>` : ""}</span></div>
+    </div>
+    <div class="card" id="resume-review" hidden></div>
+    <div class="card" id="resume-profile" hidden></div>
+    <div class="card" id="quick" hidden></div>
+    <div id="ferr" class="err small" role="status"></div>
+    <details class="adv" id="optional-files" ${optionalOpen ? "open" : ""}><summary>Optional files and writing samples</summary>
+    <div class="card">${SLOTS.slice(1).map(slot).join("")}</div>
     <div class="card"><h3>Writing samples and "you" material</h3>
       <p class="small muted" style="margin-top:0">Essays, personal statements, blog posts, or anything that shows how you write and who you are. The AI studies these to write short answers in your voice.</p>
       ${S.files.samples.map((f, i) => `<div class="slot"><div class="name"><b>${esc(f.name)}</b><span class="small muted">${f.text ? `${f.text.length.toLocaleString()} characters` : fmt(f)}</span></div><button class="btn small" data-rms="${i}">Remove</button></div>`).join("")}
@@ -445,28 +468,37 @@ function files() {
       <label class="f" style="margin-top:12px"><span>…or paste text</span><textarea id="paste" placeholder="Paste an essay, a LinkedIn About section, anything."></textarea></label>
       <button class="btn small" id="addpaste">Add pasted text</button>
     </div>
-    <div class="card"><h3>Read my files</h3>
-      <p class="small muted" style="margin-top:0">${isWorker(S.ai) ? "InternScout's AI" : isGemini(S.ai) ? "Gemini" : "Claude"} reads your resume${S.files.cv ? " and CV" : ""} and fills in your education, experience, projects, skills and contact info. You can edit all of it in Review.</p>
-      <div id="files-signin" hidden></div>
-      <div class="row"><button class="btn primary" id="extract" ${S.files.resume && !extracting ? "" : "disabled"}>Read my resume</button><span id="exout" class="small">${extracting ? `<span class="spin"></span>Reading your resume… (about 30 seconds)` : S.settings.extracted_from ? `<span class="ok">Last read: ${esc(S.settings.extracted_from)}</span>` : ""}</span></div>
-    </div>
-    <div class="card" id="resume-review" hidden></div>
-    <div class="card" id="quick" hidden></div>
-    <div id="ferr" class="err small"></div>
-    ${navButtons("setup", "facts")}`;
+    </details>
+    <div class="nav"><div></div><button class="btn" data-go="setup">Continue to setup</button></div>`;
   const err = (e) => { $("#ferr").textContent = e.message || String(e); };
   main.querySelectorAll("[data-pick]").forEach((b) => b.addEventListener("click", () => main.querySelector(`[data-slot=${b.dataset.pick}]`).click()));
   // A new or removed resume pauses Auto-Apply through resume_details_ready (store.js resumeReviewPending)
   // until the new one is read and reviewed. was: also onboarded = false here, in the remove handler and in
   // extract(), which lib/sync.js read as a device that never finished and restored the account's older copy.
   main.querySelectorAll("[data-slot]").forEach((inp) => inp.addEventListener("change", async () => {
-    try { S.files[inp.dataset.slot] = await readFile(inp.files[0]); if (inp.dataset.slot === "resume") { pendingResumeImport = null; S.settings.resume_import = null; S.settings.resume_details_ready = false; } await save(true); files(); wireNav(); } catch (e) { err(e); return; }
+    try {
+      S.files[inp.dataset.slot] = await readFile(inp.files[0]);
+      if (inp.dataset.slot === "resume") {
+        pendingResumeImport = null;
+        queuedResume = S.files.resume;
+        S.settings.resume_import = null;
+        S.settings.resume_details_ready = false;
+      }
+      await save(true);
+      if (step !== "files") return;
+      files(); wireNav();
+    } catch (e) { err(e); return; }
     // A new resume is read straight away (2026-10-04) rather than waiting for "Read my resume", which
     // students skipped: the profile stayed empty and every application had to ask the model for it.
     // Not while signed out on InternScout's AI (U4): the card asks for sign-in and reads it straight after.
-    if (inp.dataset.slot === "resume" && hasKey(S) && !signInNeeded(S, signedIn)) extract($("#extract"), $("#exout")).catch(err);
+    if (inp.dataset.slot === "resume") {
+      const signIn = $("#files-signin button");
+      if (signIn) signIn.focus();
+      else focusStepHeading(main);
+      readQueuedResume();
+    }
   }));
-  main.querySelectorAll("[data-clear]").forEach((b) => b.addEventListener("click", async () => { S.files[b.dataset.clear] = null; if (b.dataset.clear === "resume") { pendingResumeImport = null; S.settings.resume_import = null; S.settings.resume_details_ready = false; } await save(true); files(); wireNav(); }));
+  main.querySelectorAll("[data-clear]").forEach((b) => b.addEventListener("click", async () => { S.files[b.dataset.clear] = null; if (b.dataset.clear === "resume") { pendingResumeImport = null; queuedResume = null; S.settings.resume_import = null; S.settings.resume_details_ready = false; } await save(true); files(); wireNav(); }));
   main.querySelectorAll("[data-rms]").forEach((b) => b.addEventListener("click", async () => { S.files.samples.splice(+b.dataset.rms, 1); await save(true); files(); wireNav(); }));
   $("#addsamples").addEventListener("click", () => $("#samples").click());
   $("#samples").addEventListener("change", async (e) => {
@@ -479,9 +511,35 @@ function files() {
     await save(true); files(); wireNav();
   });
   $("#extract").addEventListener("click", () => extract($("#extract"), $("#exout")).catch(err));
-  drawQuick();
   drawResumeReview();
+  drawResumeProfile();
+  drawQuick();
   drawFilesSignIn();
+}
+
+function drawResumeProfile() {
+  const box = $("#resume-profile");
+  if (!box) return;
+  box.hidden = !(
+    S.files.resume && S.settings.extracted_from === S.files.resume.name &&
+    S.settings.resume_details_ready && !S.settings.resume_details_manual && !pendingResumeImport
+  );
+  if (box.hidden) return;
+  const p = S.profile;
+  const name = [p.facts.first_name, p.facts.last_name].filter(Boolean).join(" ");
+  const contact = [name, p.facts.email, p.facts.phone]
+    .filter(Boolean).join(" · ");
+  const sections = JSON_SECTIONS.slice(0, 5)
+    .map(([key, label]) => [label, formatResumeValue(p[key])])
+    .filter(([, value]) => value && value !== "Not listed");
+  box.innerHTML = `<h3 tabindex="-1">Review your resume details</h3>
+    <p class="small">Check these details and correct anything before turning on Auto-Apply.</p>
+    ${contact ? `<p>${esc(contact)}</p>` : ""}
+    ${sections.map(([label, value]) =>
+      `<details><summary>${label}</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(value)}</pre></details>`).join("")}
+    <div class="row" style="margin-top:12px"><button class="btn small" id="edit-contact">Edit contact details</button><button class="btn small" id="edit-resume-profile">Edit profile sections</button></div>`;
+  $("#edit-contact").onclick = () => go("facts");
+  $("#edit-resume-profile").onclick = () => go("review");
 }
 
 function drawResumeReview() {
@@ -517,7 +575,7 @@ function drawResumeReview() {
 // "Turn on Auto-Apply now" on the Files step, once the AI, a resume and the sign-up email are there:
 // the same finish as Review's button (finishOnboarding), so a student can start applying without the
 // optional steps. Redrawn after a resume is read, since reading it can fill in the sign-up email.
-function drawQuick(msg = "") {
+function drawQuick(msg = "", offerPractice = false) {
   const box = $("#quick");
   if (!box) return;
   // A resume that couldn't be read (or wasn't), or details still missing after choosing to enter them:
@@ -544,16 +602,24 @@ function drawQuick(msg = "") {
   box.innerHTML = S.settings.onboarded
     ? `<p class="small" style="margin:0"><span class="ok">${esc(msg || "Auto-Apply is on.")}</span> <a href="https://internscout.org/" target="_blank">Open the internship dashboard ↗</a></p>
        ${digestLink()}
+       ${offerPractice ? practiceLink : ""}
        <div id="held" hidden></div>
        <p class="small muted" style="margin:6px 0 0">Quick facts, Interview and Voice are optional. They make the answers on your applications better, and you can do them any time.</p>`
     : `<h3>Ready to apply</h3>
        <p class="small muted" style="margin-top:0">Your resume and your email for applications are in, which is all Auto-Apply needs. Quick facts, Interview and Voice are optional: they make the answers better, and you can do them later.</p>
        <div class="row"><button class="btn primary" id="quickgo">Turn on Auto-Apply now</button></div>`;
-  if (shouldRevealQuick(was, quickWasReady)) revealQuick(box, $("#quickgo"), matchMedia("(prefers-reduced-motion: reduce)").matches);
+  if (shouldRevealQuick(was, quickWasReady)) {
+    const profileBox = $("#resume-profile");
+    const preview = profileBox && !profileBox.hidden && !rerun;
+    revealQuick(preview ? profileBox : box, preview ? profileBox.querySelector("h3") : $("#quickgo"),
+      matchMedia("(prefers-reduced-motion: reduce)").matches);
+  }
   if ($("#quickgo")) $("#quickgo").addEventListener("click", async () => {
     $("#quickgo").disabled = true;
-    await finishAndRender();
-    drawQuick("Saved. Auto-Apply is on.");
+    const finished = await finishAndRender();
+    if (!finished) return;
+    drawQuick("Saved. Auto-Apply is on.", true);
+    $("#practice-link")?.focus();
   });
   if (S.settings.onboarded) drawHeld();
 }
@@ -586,29 +652,37 @@ async function drawHeld() {
 
 // Both finish buttons (Files' quick start, Review's finish). was: the body of Review's #finishall handler.
 async function finishAndRender() {
+  const currentStore = S, revision = seenRestore;
   await finishOnboarding(S, save);
+  const finished = (await restoredAt()) === revision && S === currentStore;
   render();
+  return finished;
 }
 
 // One read at a time: the automatic one when a resume is chosen and the button can overlap, and two
 // reads of one resume would be two AI calls for the same answer.
 let extracting = false;
 async function extract(btn, out) {
-  if (extracting) return;
+  if (!canReadResume()) return;
+  queuedResume = null;
   extracting = true;
   pendingResumeImport = null;
   S.settings.resume_details_ready = false;
   drawQuick();
   drawResumeReview();
+  drawResumeProfile();
   // files() redraws itself (another file added meanwhile), so write to whatever is on the page now.
   const live = (el, sel) => (el && el.isConnected ? el : $(sel));
   if (btn) btn.disabled = true;
   if (out) busy(out, "Reading your resume… (about 30 seconds)");
   // The file this read is about. A different resume chosen while it runs is read straight after (below),
   // and "Last read" names the file that was read, not whichever one is chosen when the answer comes back.
-  const file = S.files.resume;
+  const currentStore = S, revision = seenRestore, file = S.files.resume;
+  const stillCurrent = async () => (await restoredAt()) === revision && S === currentStore &&
+    S.files.resume?.b64 === file.b64 && S.files.resume?.name === file.name;
   try {
     await save(true);
+    if (!(await stillCurrent())) return;
     const content = [docBlock(file, "Resume"), docBlock(S.files.cv, "CV")].filter(Boolean);
     if (!content.length) throw new Error("Couldn't read the resume file. Try a PDF.");
     content.push({ type: "text", text: `Extract this applicant's details as JSON only, no commentary. Use "" or [] when unknown; never guess.
@@ -621,7 +695,7 @@ async function extract(btn, out) {
 Dates as "Mon YYYY" or "Present". Keep bullet wording faithful to the document.` });
     const r = await ai({ model: M().deep, max_tokens: 12000, thinking: { type: "adaptive" }, messages: [{ role: "user", content }] });
     const x = jsonOf(r);
-    if (S.files.resume?.b64 !== file.b64 || S.files.resume?.name !== file.name) return;
+    if (!(await stillCurrent())) return;
     const p = S.profile, plan = planResumeImport(p, x, { legacyResume: !!S.settings.extracted_from });
     if (plan.some((e) => e.conflict)) {
       pendingResumeImport = { file, plan };
@@ -649,41 +723,15 @@ Dates as "Mon YYYY" or "Present". Keep bullet wording faithful to the document.`
   } finally {
     extracting = false;
     const b = live(btn, "#extract");
-    if (b) b.disabled = !S.files.resume;
+    if (b) b.disabled = !canReadResume();
+    drawResumeProfile();
     drawQuick();   // reading the resume can fill in the sign-up email
     const now = S.files.resume;
-    if (now && hasKey(S) && $("#exout") && !(file && now.name === file.name && now.b64 === file.b64)) extract($("#extract"), $("#exout")).catch(() => {});
+    if (now && !(file && now.name === file.name && now.b64 === file.b64)) readQueuedResume();
   }
 }
 
 // ---------- 3. facts ----------
-const YN = ["", "Yes", "No"];
-const FACTS = [
-  ["Contact", "", [
-    ["first_name", "First name"], ["last_name", "Last name"], ["preferred_name", "Preferred name"], ["pronouns", "Pronouns"],
-    ["email", "Email"], ["phone", "Phone"], ["address", "Street address"], ["city", "City"], ["state", "State"], ["zip", "ZIP"],
-    ["country", "Country"], ["linkedin", "LinkedIn URL"], ["github", "GitHub URL"], ["website", "Website / portfolio"]]],
-  ["Work eligibility", "", [
-    ["work_authorized", "Authorized to work in the US?", YN],
-    ["needs_sponsorship", "Need visa sponsorship now or later?", YN],
-    ["citizenship", "Citizenship", ["", "U.S. citizen", "U.S. permanent resident", "F-1 student visa", "Other"]],
-    ["clearance_eligible", "Eligible for a security clearance?", ["", "Yes", "No", "Not sure"]],
-    ["over_18", "18 or older?", YN], ["background_check", "OK with a background check?", YN],
-    ["drug_test", "OK with a drug test?", YN], ["non_compete", "Bound by a non-compete?", YN]]],
-  ["Availability and defaults", "", [
-    ["available_start", "Internship start date (e.g. May 2027)"], ["available_end", "Internship end date (e.g. August 2027)"],
-    ["earliest_start", "Earliest start date"], ["hours_per_week", "Hours per week"],
-    ["willing_to_relocate", "Willing to relocate for the summer?", YN], ["willing_to_travel", "Willing to travel?", YN],
-    ["salary_expectation", "Pay expectation (blank = \"flexible\")"], ["how_heard", "\"How did you hear about us?\" default"],
-    ["worked_here_before", "\"Worked here before?\" default", YN], ["languages", "Languages you speak"]]],
-  ["Voluntary self-identification", "These questions are optional and can't affect your eligibility. The default is to decline.", [
-    ["gender", "Gender", ["Decline to self-identify", "Male", "Female", "Non-binary"]],
-    ["hispanic", "Hispanic or Latino?", ["Decline to self-identify", "Yes", "No"]],
-    ["race", "Race", ["Decline to self-identify", "American Indian or Alaska Native", "Asian", "Black or African American", "Native Hawaiian or Other Pacific Islander", "White", "Two or more races"]],
-    ["veteran", "Veteran status", ["I don't wish to answer", "I am not a protected veteran", "I identify as one or more of the classifications of protected veteran"]],
-    ["disability", "Disability", ["I don't wish to answer", "No, I do not have a disability", "Yes, I have a disability (or previously had one)"]],
-    ["lgbtq", "LGBTQ+?", ["Decline to self-identify", "Yes", "No"]]]],
-];
 function facts() {
   const f = S.profile.facts;
   const ready = confirmedFacts(S);
@@ -723,9 +771,9 @@ function facts() {
     ${FACTS.map(([t, note, list]) => `<div class="card"><h3>${t}</h3>${note ? `<p class="small muted" style="margin-top:0">${note}</p>` : ""}<div class="grid">${list.map(field).join("")}</div></div>`).join("")}
     <div class="card"><h3>Education</h3>${S.profile.education.length
       ? S.profile.education.map((e) => `<div>${esc(e.school)} · ${esc([e.degree, e.major].filter(Boolean).join(", "))} · ${esc(e.grad_term || e.end)}${e.gpa ? ` · GPA ${esc(e.gpa)}` : ""}</div>`).join("")
-      : `<span class="muted small">Nothing yet. Read your resume in Files, or add it in Review.</span>`}</div>
+      : `<span class="muted small">Nothing yet. Read your resume, or add education in Review.</span>`}</div>
     <div class="card"><button class="btn primary" id="confirm-facts">Confirm answers shown</button> <span id="facts-confirmed" role="status" class="small"></span></div>
-    ${navButtons("files", "interview")}`;
+    ${navButtons("setup", "interview")}`;
   // A field the student changes is their own answer, suggestion or not.
   main.querySelectorAll("[data-fact]").forEach((el) => el.addEventListener("input", () => {
     f[el.dataset.fact] = el.value; confirmProfileValue(S.profile, "facts", el.dataset.fact); save();
@@ -751,108 +799,215 @@ function facts() {
 
 // ---------- 4. interview ----------
 const CHAT_KEY = "deepdive_chat";
-const COVERAGE = `1. The project they're proudest of (what they built, their exact role, technical depth, result)
-2. A hard challenge or obstacle they worked through
-3. Leadership or taking initiative
-4. Teamwork and collaboration
-5. A failure or mistake, and what they changed afterward
-6. A disagreement or conflict and how they handled it
-7. Career goals (next 1–2 years and longer term)
-8. Why their field / major
-9. What they want out of an internship, and the kinds of companies/teams that excite them
-10. Strengths, and one honest growth area
-11. Interests and life outside class, and anything that makes them distinct`;
+function interviewConversation(messages = null, revision = seenRestore) {
+  return { revision, messages, draft: "", pending: null, finishing: false, failed: false };
+}
 
-function interviewSystem() {
-  const p = S.profile;
-  const { voice, extra, ...rest } = p;
-  return `You are running the InternScout Deep Dive, a friendly, efficient interview of a college student who is applying to internships. An application agent will later use what you learn to answer essay and short-answer questions truthfully and specifically, in the student's voice.
+async function currentInterview(conversation) {
+  const revision = await restoredAt();
+  return interviewChat === conversation && conversation.revision === revision;
+}
 
-What we already know (JSON):
-${JSON.stringify(rest)}
+function persistInterview(conversation, messages, beforeReply) {
+  // Start over and post-restore reads wait for any write this document has already issued.
+  const storage = chrome.storage.local;
+  const write = async () => {
+    const revision = await restoredAt();
+    if (interviewChat !== conversation || conversation.revision !== revision) return false;
+    await storage.set({ [CHAT_KEY]: messages });
+    const restored = (await restoredAt()) !== revision;
+    if (restored && beforeReply) {
+      // Restore only our own exact late reply and retain the already saved user answer.
+      const current = (await storage.get(CHAT_KEY))[CHAT_KEY];
+      if (current?.length === messages.length && messages.every((message, i) =>
+        current[i]?.role === message.role && current[i].content === message.content)) {
+        await storage.set({ [CHAT_KEY]: beforeReply });
+      }
+    }
+    return interviewChat === conversation && !restored;
+  };
+  const result = interviewWrites.then(write);
+  interviewWrites = result.catch(() => {});
+  return result;
+}
 
-Cover these topics:
-${COVERAGE}
-
-How to interview:
-- Ask ONE question at a time, 1–3 sentences, warm and plain. No lists of questions.
-- Dig for specifics with a follow-up or two when an answer is vague: numbers, their exact contribution, tools used, the outcome, what they learned.
-- Build on their resume: reference actual projects and roles by name.
-- Skip or shorten topics that existing stories already cover well${p.stories.length ? " (this is a re-run: focus on gaps and on anything new since last time)" : ""}.
-- Never invent details. Don't write essays for them.
-- When every topic is covered (or the student asks to stop), thank them in one sentence and end your message with [[DONE]].`;
+async function requestInterview(conversation) {
+  if (conversation.pending || conversation.finishing || interviewChat !== conversation) return;
+  if (!conversation.messages.length) {
+    conversation.messages.push({ role: "user", content: `(Begin the interview. Greet me${S.profile.facts.first_name ? ` as ${S.profile.facts.first_name}` : ""} in one short sentence and ask the first question.)` });
+  }
+  const controller = new AbortController();
+  conversation.pending = controller;
+  conversation.failed = false;
+  conversation.status = null;
+  conversation.draw?.();
+  try {
+    const { messages } = conversation;
+    if (!conversation.reply) {
+      if (!(await persistInterview(conversation, messages)) || !(await currentInterview(conversation))) return;
+      const r = await ai({ model: M().agent, max_tokens: 1024, system: interviewSystem(S), messages, signal: controller.signal });
+      if (!(await currentInterview(conversation))) return;
+      conversation.reply = { role: "assistant", content: textOf(r) };
+    }
+    const completed = [...messages, conversation.reply];
+    if (!(await persistInterview(conversation, completed, messages))) return;
+    conversation.messages = completed;
+    conversation.reply = null;
+    if (/\[\[DONE\]\]/.test(completed.at(-1).content)) {
+      conversation.status = { text: "All topics covered. Press Finish & save." };
+    }
+  } catch (e) {
+    conversation.failed = true;
+    conversation.status = { text: e.message, tone: "err" };
+  } finally {
+    conversation.pending = null;
+    conversation.draw?.(true);
+  }
 }
 
 async function interview(epoch) {
-  let msgs = (await chrome.storage.local.get(CHAT_KEY))[CHAT_KEY] || [];
+  const conversation = interviewChat ??= interviewConversation();
+  if (conversation.restoring) return;
+  if (!conversation.messages) {
+    await interviewWrites;
+    const stored = (await chrome.storage.local.get(CHAT_KEY))[CHAT_KEY] || [];
+    if (interviewChat !== conversation) return;
+    if (!conversation.messages) {
+      conversation.messages = stored;
+      if (conversation.interrupted && stored.at(-1)?.role === "user") {
+        conversation.failed = true;
+        conversation.status = { text: "Interview paused after your profile was restored." };
+      }
+      conversation.interrupted = false;
+    }
+  }
   if (epoch !== renderEpoch || step !== "interview") return;
   main.innerHTML = `<h2>Interview</h2><p class="lead">The optional Deep Dive, part 1: a 10 to 15 minute conversation about your experiences and goals. Short, honest answers are perfect. Stop any time; what you've said is saved.</p>
     <div class="card"><div class="chat" id="chat"></div>
       <textarea id="say" placeholder="Type your answer… (Ctrl+Enter to send)"></textarea>
       <div class="row" style="margin-top:8px;justify-content:space-between">
-        <div class="row"><button class="btn primary" id="send">Send</button><span id="cstat" class="small muted"></span></div>
+        <div class="row"><button class="btn primary" id="send">Send</button><span id="cstat" class="small muted" role="status"></span></div>
         <div class="row"><button class="btn small" id="restart">Start over</button><button class="btn primary" id="finish">Finish & save stories</button></div></div>
     </div>
     ${S.profile.stories.length ? `<div class="card"><h3>Saved stories (${S.profile.stories.length})</h3>${S.profile.stories.map((s) => `<div class="story"><b>${esc(s.theme)}</b><div class="small muted">${esc(s.situation)}</div></div>`).join("")}</div>` : ""}
     ${navButtons("facts", "voice")}`;
   wireNav();
   focusStepHeading(main);
-  const chat = $("#chat"), say = $("#say"), stat = $("#cstat"), sendBtn = $("#send"), finishBtn = $("#finish");
-  const draw = () => {
-    chat.innerHTML = msgs.slice(1).map((m) => `<div class="msg ${m.role === "user" ? "u" : "a"}">${esc(String(m.content).replace("[[DONE]]", "").trim())}</div>`).join("");
+  const chat = $("#chat"), say = $("#say"), stat = $("#cstat");
+  const sendBtn = $("#send"), finishBtn = $("#finish"), restartBtn = $("#restart");
+  say.value = conversation.draft;
+  const isView = () => epoch === renderEpoch && step === "interview" && interviewChat === conversation;
+  conversation.draw = (focus = false) => {
+    if (!isView()) return;
+    chat.innerHTML = conversation.messages.slice(1).map((m) => `<div class="msg ${m.role === "user" ? "u" : "a"}">${esc(String(m.content).replace("[[DONE]]", "").trim())}</div>`).join("");
     chat.scrollTop = chat.scrollHeight;
+    sendBtn.disabled = finishBtn.disabled = !!conversation.pending || conversation.finishing;
+    restartBtn.disabled = !!conversation.savingStories;
+    sendBtn.textContent = conversation.failed ? "Retry" : "Send";
+    const status = conversation.status;
+    if (conversation.pending) busy(stat, "Thinking…");
+    else if (conversation.finishing) busy(stat, "Turning the conversation into stories… (about a minute)");
+    else if (status?.tone) stat.innerHTML = `<span class="${status.tone}">${esc(status.text)}</span>`;
+    else stat.textContent = status?.text ?? "";
+    if (focus) say.focus();
   };
-  const persist = () => chrome.storage.local.set({ [CHAT_KEY]: msgs });
-  const turn = async () => {
-    sendBtn.disabled = true;
-    busy(stat, "Thinking…");
-    try {
-      const r = await ai({ model: M().agent, max_tokens: 1024, system: interviewSystem(), messages: msgs });
-      msgs.push({ role: "assistant", content: textOf(r) });
-      await persist();
-      draw();
-      stat.textContent = /\[\[DONE\]\]/.test(textOf(r)) ? "All topics covered. Press Finish & save." : "";
-    } catch (e) {
-      stat.innerHTML = `<span class="err">${esc(e.message)}</span>`;
-    } finally { sendBtn.disabled = false; if (say.isConnected && step === "interview") say.focus(); }
+  const send = () => {
+    if (!isView() || conversation.pending || conversation.finishing) return;
+    if (!conversation.failed) {
+      const text = say.value.trim();
+      if (!text) return;
+      conversation.messages.push({ role: "user", content: text });
+      conversation.draft = say.value = "";
+    }
+    requestInterview(conversation);
   };
-  const send = async () => {
-    const t = say.value.trim();
-    if (!t) return;
-    msgs.push({ role: "user", content: t });
-    say.value = "";
-    draw();
-    await persist();
-    await turn();
-  };
-  $("#send").addEventListener("click", send);
-  say.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) send(); });
-  $("#restart").addEventListener("click", async () => {
-    if (msgs.length > 2 && !confirm("Clear this conversation? Stories you already saved are kept.")) return;
-    msgs = [];
-    await persist();
-    go("interview");
+  sendBtn.addEventListener("click", send);
+  say.addEventListener("input", () => { if (isView()) conversation.draft = say.value; });
+  say.addEventListener("keydown", (e) => {
+    if (e.isComposing || e.key !== "Enter" || !(e.ctrlKey || e.metaKey)) return;
+    e.preventDefault();
+    if (!e.repeat && !conversation.failed) send();
   });
-  $("#finish").addEventListener("click", async () => {
-    if (msgs.length < 3) { stat.textContent = "Answer a few questions first."; return; }
-    finishBtn.disabled = true;
-    busy(stat, "Turning the conversation into stories… (about a minute)");
+  restartBtn.addEventListener("click", async () => {
+    if (!isView() || conversation.savingStories) return;
+    if (conversation.messages.length > 2 && !confirm("Clear this conversation? Stories you already saved are kept.")) return;
+    conversation.pending?.abort();
+    const next = interviewChat = interviewConversation([]);
     try {
-      await distill(msgs);
-      stat.innerHTML = `<span class="ok">Saved ${S.profile.stories.length} stories and your goals.</span>`;
-      setTimeout(() => go("voice"), 900);
+      await persistInterview(next, []);
     } catch (e) {
-      stat.innerHTML = `<span class="err">${esc(e.message)}</span>`;
-      finishBtn.disabled = false;
+      next.failed = true;
+      next.status = { text: e.message, tone: "err" };
+    }
+    if (interviewChat === next && step === "interview") go("interview");
+  });
+  finishBtn.addEventListener("click", async () => {
+    if (!isView() || conversation.pending || conversation.finishing) return;
+    if (conversation.messages.length < 3) {
+      conversation.status = { text: "Answer a few questions first." };
+      conversation.draw();
+      return;
+    }
+    conversation.finishing = true;
+    conversation.draw();
+    try {
+      if (!(await currentInterview(conversation))) return;
+      const x = await distill(conversation.messages);
+      if (!(await currentInterview(conversation))) return;
+      // Start over can retire a pending request. Once the profile commit starts, finish that save first.
+      conversation.savingStories = true;
+      conversation.draw();
+      if (!(await saveInterviewStories(conversation, x))) return;
+      conversation.status = { text: `Saved ${S.profile.stories.length} stories and your goals.`, tone: "ok" };
+      setTimeout(() => { if (isView()) go("voice"); }, 900);
+    } catch (e) {
+      conversation.status = { text: e.message, tone: "err" };
+    } finally {
+      conversation.savingStories = false;
+      conversation.finishing = false;
+      conversation.draw();
     }
   });
-  if (!msgs.length) {
-    msgs.push({ role: "user", content: `(Begin the interview. Greet me${S.profile.facts.first_name ? ` as ${S.profile.facts.first_name}` : ""} in one short sentence and ask the first question.)` });
-    await turn();
-  } else {
-    draw();
-    if (msgs[msgs.length - 1].role === "user") await turn();
+  conversation.draw();
+  if (!conversation.failed && conversation.messages.at(-1)?.role !== "assistant") {
+    requestInterview(conversation);
   }
+}
+
+function saveInterviewStories(conversation, x) {
+  const store = S;
+  const owns = () => S === store && interviewChat === conversation;
+  return queueStoreWrite(async () => {
+    if (!owns()) return false;
+    const before = structuredClone(store.profile);
+    const proposed = structuredClone(before);
+    if (Array.isArray(x.stories)) proposed.stories = x.stories;
+    for (const [k, v] of Object.entries(x.goals || {})) if (v) proposed.goals[k] = v;
+    applyInterviewFacts(proposed, x.facts);
+
+    let applied = false;
+    await updateStore(async (fresh) => {
+      if ((await restoredAt()) !== conversation.revision || !owns()) return;
+      mergeProfileEdits(fresh.profile, before, proposed);
+      applied = true;
+    });
+    if (!applied || (await restoredAt()) !== conversation.revision || !owns()) return false;
+
+    // Update the saved baseline, then layer any edits made while storage was pending onto the live profile.
+    mergeProfileEdits(savedSnapshot.profile, before, proposed);
+    const current = structuredClone(store.profile);
+    mergeProfileEdits(proposed, before, current);
+    // A manually edited fact and its provenance must stay together.
+    for (const [key, value] of Object.entries(current.facts)) {
+      const source = current.sources?.facts?.[key];
+      if (value === before.facts[key] && JSON.stringify(source) === JSON.stringify(before.sources?.facts?.[key])) continue;
+      proposed.facts[key] = value;
+      if (source) proposed.sources.facts[key] = source;
+      else delete proposed.sources.facts[key];
+    }
+    mergeProfileEdits(store.profile, current, proposed);
+    return true;
+  });
 }
 
 async function distill(msgs) {
@@ -875,18 +1030,10 @@ Return JSON only:
 - "goals": merged; keep an existing value when the transcript says nothing new.
 - "facts": only clear factual updates the student stated, using these keys: ${Object.keys(S.profile.facts).join(", ")}.` }],
   });
-  const x = jsonOf(r);
-  if (Array.isArray(x.stories)) S.profile.stories = x.stories;
-  for (const [k, v] of Object.entries(x.goals || {})) if (v) S.profile.goals[k] = v;
-  applyInterviewFacts(S.profile, x.facts);
-  await save(true);
+  return jsonOf(r);
 }
 
 // ---------- 5. voice ----------
-const VOICE_FIELDS = [
-  ["summary", "In a sentence, how you come across"], ["tone", "Tone"], ["sentence_style", "Sentence style"],
-  ["vocabulary", "Word choice"], ["avoid", "Things to avoid"], ["sample", "A sample answer in your voice"],
-];
 function voice() {
   const v = S.profile.voice;
   const n = S.files.samples.length + (S.files.cover_letter ? 1 : 0);
@@ -902,7 +1049,7 @@ function voice() {
     try {
       const chat = ((await chrome.storage.local.get(CHAT_KEY))[CHAT_KEY] || []).filter((m, i) => i > 0 && m.role === "user").map((m) => m.content).join("\n---\n");
       const content = [...S.files.samples.map((f) => docBlock(f, f.name)), docBlock(S.files.cover_letter, "Cover letter")].filter(Boolean);
-      if (!content.length && chat.length < 200) throw new Error("Add a writing sample in Files or do some of the interview first.");
+      if (!content.length && chat.length < 200) throw new Error("Add a writing sample under Resume or do some of the interview first.");
       content.push({ type: "text", text: `${chat ? `The student's own interview replies (casual register):\n${chat.slice(0, 20000)}\n\n` : ""}Describe this student's writing voice so another writer can imitate it in internship application answers (formal register, but recognizably them). Return JSON only:
 {"summary":"one sentence","tone":"","sentence_style":"length, rhythm, structure","vocabulary":"word choice, jargon level, favorite constructions","avoid":"clichés or habits that would sound fake for them","sample":"a 90–120 word answer to 'Why are you interested in this internship?' written in their voice, using only facts from the material"}` });
       const r = await ai({ model: M().deep, max_tokens: 8000, thinking: { type: "adaptive" }, messages: [{ role: "user", content }] });
@@ -917,14 +1064,6 @@ function voice() {
 }
 
 // ---------- 6. review ----------
-const JSON_SECTIONS = [
-  ["education", "Education"], ["experience", "Experience"], ["projects", "Projects"],
-  ["skills", "Skills"], ["links", "Links"], ["stories", "Stories"], ["extra", "Answers learned while applying"],
-];
-const GOAL_FIELDS = [
-  ["career", "Career goals"], ["why_field", "Why this field"], ["why_internship", "What you want from an internship"],
-  ["interests", "Interests"], ["strengths", "Strengths"], ["growth_areas", "Growth areas"],
-];
 // The JSON lists sit under "Edit raw data", closed (2026-10-04). was: one open code box per list,
 // which made Review read as something a student had to check line by line before finishing.
 function review() {
@@ -933,10 +1072,10 @@ function review() {
   main.innerHTML = `<h2>Review</h2><p class="lead">Everything the agent knows about you. Edit anything; changes save automatically.</p>
     ${missing.length ? `<div class="card warn">Still to do: ${missing.join(", ")}. Auto-Apply works best with everything filled.</div>` : ""}
     <div class="card"><h3>Goals</h3>${GOAL_FIELDS.map(([k, t]) => `<label class="f"><span>${t}</span><textarea data-goal="${k}" style="min-height:54px">${esc(p.goals[k])}</textarea></label>`).join("")}</div>
-    <details class="adv"><summary>Edit raw data</summary>
+    <details class="adv" ${!rerun && S.settings.extracted_from ? "open" : ""}><summary>Edit profile sections</summary>
     ${JSON_SECTIONS.map(([k, t]) => `<div class="card"><h3>${t}</h3><textarea class="code" data-json="${k}">${esc(JSON.stringify(p[k], null, 2))}</textarea><div class="small" data-jerr="${k}"></div></div>`).join("")}
     </details>
-    <div class="card"><div class="row"><button class="btn primary" id="finishall" ${quickStartReady(S) && !extracting && !pendingResumeImport ? "" : "disabled"}>${rerun ? "Save changes" : "Finish, turn on Auto-Apply"}</button><span id="rstat" class="small muted">${extracting || pendingResumeImport || S.settings.resume_details_ready === false ? "Auto-Apply is paused. Return to Files to finish reading your resume, or to enter your details yourself." : manualDetailsMissing(S).length ? `Auto-Apply is paused. ${esc(pausedMessage(S))}` : quickStartReady(S) ? "" : "Set up AI, add a resume, and add your application email first."}</span></div><div id="held" hidden></div></div>
+    <div class="card"><div class="row"><button class="btn primary" id="finishall" ${quickStartReady(S) && !extracting && !pendingResumeImport ? "" : "disabled"}>${rerun ? "Save changes" : "Finish, turn on Auto-Apply"}</button><span id="rstat" class="small muted">${extracting || pendingResumeImport || S.settings.resume_details_ready === false ? "Auto-Apply is paused. Return to Resume to finish reading your resume, or to enter your details yourself." : manualDetailsMissing(S).length ? `Auto-Apply is paused. ${esc(pausedMessage(S))}` : quickStartReady(S) ? "" : "Set up AI, add a resume, and add your application email first."}</span></div><div id="held" hidden></div></div>
     ${navButtons("voice", null)}`;
   main.querySelectorAll("[data-goal]").forEach((el) => el.addEventListener("input", () => { p.goals[el.dataset.goal] = el.value; save(); }));
   main.querySelectorAll("[data-json]").forEach((el) => el.addEventListener("input", () => {
@@ -951,9 +1090,13 @@ function review() {
     } catch (e) { msg.innerHTML = `<span class="err">Not saved: ${esc(e.message)}</span>`; }
   }));
   $("#finishall").addEventListener("click", async () => {
-    await finishAndRender();
+    const finished = await finishAndRender();
+    if (!finished) return;
     // The weekly email's link under it (2026-10-06), as on the Files step's finish (drawQuick).
-    $("#rstat").innerHTML = `<span class="ok">Saved. Auto-Apply is on.</span> <a href="https://internscout.org/" target="_blank">Open the internship dashboard ↗</a>${digestLink()}`;
+    const status = $("#rstat");
+    if (!status) return;
+    status.innerHTML = `<span class="ok">Saved. Auto-Apply is on.</span> <a href="https://internscout.org/" target="_blank">Open the internship dashboard ↗</a>${digestLink()}${practiceLink}`;
+    $("#practice-link")?.focus();
     drawHeld();
   });
   if (S.settings.onboarded) drawHeld();
@@ -963,6 +1106,6 @@ function review() {
 if (repairSetupEmail(S)) { pendingResumeImport = pendingResumeReview(S); save(true); }
 // A restore that happened before this page opened (signed in from the popup on a new computer).
 await showRestore();
-if (restoredNote && S.settings.onboarded && !new URLSearchParams(location.search).get("step")) step = "review";
+if (restoredNote && S.settings.onboarded && !explicitStep) step = "review";
 render();
 refreshSignIn();

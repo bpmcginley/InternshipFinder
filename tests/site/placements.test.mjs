@@ -1,16 +1,18 @@
+import { createTestApp, readAppSource } from "./app-fixture.mjs";
 // Paid listings ("placements") on the dashboard (2026-10-14, B2 plan section 5.4; rows S5 and S6). The rule
 // these tests hold the code to: payment never changes any score, order, filter, count or what Auto-Apply
-// does. docs/js/core.js, docs/js/placements.js and docs/js/app.js are loaded the way the page loads them,
-// against a stand-in `window`; T1 runs on real listing files from docs/data/listings.
+// does. The Core factory and classic placements/app scripts use a stand-in `window`.
+// T1 uses synthetic listing shards.
+import { installCore } from "./core-fixture.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import vm from "node:vm";
+import { LISTING_CLOCK, MAJORS, listingRows } from "./fixtures/listing_cases.mjs";
 
 const read = p => readFileSync(new URL("../../" + p, import.meta.url), "utf8");
-const CORE_SRC = read("docs/js/core.js");
 const PLACE_SRC = read("docs/js/placements.js");
-const APP_SRC = read("docs/js/app.js");
+const APP_SRC = readAppSource();
 
 function context(extra = {}) {
   const store = () => { const m = new Map(); return { getItem: k => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)), removeItem: k => m.delete(k) }; };
@@ -31,7 +33,7 @@ const freezeClock = ctx => vm.runInContext(`{ const D = Date; Date = class exten
 function loadBoth(extra) {
   const ctx = context(extra);
   freezeClock(ctx);
-  vm.runInContext(CORE_SRC, ctx);
+  installCore(ctx);
   vm.runInContext(PLACE_SRC, ctx);
   return { IS: ctx.IS, P: ctx.ISPlace, ctx };
 }
@@ -40,20 +42,8 @@ const plain = v => JSON.parse(JSON.stringify(v));
 
 // ---------- fixtures ----------
 const DAY = "2026-11-03";
-let realCache = null;
-function realRows() {
-  if (realCache) return realCache;
-  const dir = new URL("../../docs/data/listings/", import.meta.url);
-  const byId = new Map();
-  for (const f of ["MA.json", "NY.json", "CA.json", "TX.json", "remote.json"]) {
-    if (!readdirSync(dir).includes(f)) continue;
-    for (const x of JSON.parse(readFileSync(new URL(f, dir), "utf8"))) if (x && x.id != null && !byId.has(x.id)) byId.set(x.id, x);
-  }
-  return (realCache = [...byId.values()]);
-}
 const deepFreeze = o => { Object.values(o).forEach(v => v && typeof v === "object" && !Object.isFrozen(v) && deepFreeze(v)); return Object.freeze(o); };
 const BASE_F = { q: "", fields: [], states: [], company: [], where: "", stage: "", year: "", sector: "", status: "open", app_state: "", new_only: false, eligible: false, sort: "new", hide_citizen: false, paid: "" };
-const MAJORS = JSON.parse(read("docs/data/majors.json"));
 const PROFILE = { majors: ["Computer Science"], class_year: "junior", grad_term: "Spring 2028", states: ["MA", "NY"], work_auth: "visa", terms: ["Summer 2027"], stages: ["internship"] };
 function envFor(IS, p, all) {
   const { direct, related } = IS.profileFields(p, MAJORS);
@@ -72,13 +62,13 @@ const placementFor = (x, extra) => ({ id: "p-" + x.id, listing_id: String(x.id),
 
 // ---------- T1: a placement cannot change any row, order or score ----------
 test("T1: with or without placements, every row, its order and its score are the same", () => {
-  const { IS, P } = loadBoth();
+  const { IS, P } = loadBoth({ Date: class extends Date { static now() { return LISTING_CLOCK; } } });
   // A write to a listing would throw. core.js keeps two caches on each listing (hidden _regs and _keys
   // properties, from IS.regs and IS.shardKeys), so they are filled in first; any other write fails the test.
-  const listings = structuredClone(realRows());
+  const listings = listingRows();
   listings.forEach(x => { IS.regs(x); IS.shardKeys(x); });
   deepFreeze(listings);
-  assert.ok(listings.length > 500, "listing files should be in docs/data/listings");
+  assert.ok(listings.length > 500, "fixture must contain more than 500 listings");
   const words = IS.placeWords(listings);
   let picked = 0;
   for (const prof of [null, PROFILE]) {
@@ -98,8 +88,9 @@ test("T1: with or without placements, every row, its order and its score are the
       const malformed = P.clean({ placements: [null, 7, { id: "bad id!" }, { id: "x", listing_id: "1", apply_url: "http://x", start: "2026", end: "2027" }] });
       for (const placements of [[], matching, failing, malformed]) {
         for (const rand of [() => 0, () => 0.99]) {
-          if (P.pick({ placements, rows: Object.freeze(before.rows.slice()), rel: before.rel, ranked: before.ranked, fieldsSet: f.fields.length > 0,
-            appState: f.app_state, loading: false, day: DAY, exclude: () => false, hidden: false, prev: null, rand })) picked++;
+          const selection = P.pick({ placements, rows: Object.freeze(before.rows.slice()), rel: before.rel, ranked: before.ranked, fieldsSet: f.fields.length > 0,
+            appState: f.app_state, loading: false, day: DAY, exclude: () => false, hidden: false, prev: null, rand });
+          if (placements === matching && selection) picked++;
           const after = IS.listRows(listings, f, env);
           assert.deepEqual(plain([after.rows.map(x => String(x.id)), after.rows.map(x => IS.score(x, env.ctx))]), snap,
             `${prof ? "profile" : "no profile"}, ${JSON.stringify(extra)}, ${placements.length} placements`);
@@ -115,7 +106,8 @@ test("T1b: the ranking code has no way in", () => {
   // listRows and score take no placements argument and never name them ("paid" is the pay filter, so the
   // code is named "placement" and the guard greps for that).
   const { IS } = loadBoth();
-  assert.doesNotMatch(CORE_SRC, /placement|ISPlace/i);
+  for (const name of ["entry", "index", "profile", "ranking", "listings", "bridge", "account"])
+    assert.doesNotMatch(read(`docs/js/core/${name}.mjs`), /placement|ISPlace/i);
   assert.equal(IS.listRows.length, 3);
   assert.equal(IS.score.length, 2);
   // app.js builds the list from the same six inputs as before, and only after that is the pick made.
@@ -128,7 +120,7 @@ test("T1b: the ranking code has no way in", () => {
 // ---------- T2: every filter passes through ----------
 test("T2: a placement whose listing isn't in the student's rows, or fails a check, is never picked", () => {
   const { IS, P } = loadBoth();
-  const listings = realRows();
+  const listings = listingRows();
   const words = IS.placeWords(listings);
   const env0 = envFor(IS, null, listings);
   const base = { loading: false, day: DAY, exclude: () => false, hidden: false, prev: null, rand: () => 0, appState: "" };
@@ -200,11 +192,10 @@ function uiHarness() {
     useEffect(fn, deps) { const i = cursor++, old = slots[i]; if (!old || deps.some((x, j) => x !== old.deps[j])) { slots[i] = { deps }; pending.push(fn); } },
   };
   const ctx = context({ React: react, CONFIG: {} });
-  vm.runInContext(CORE_SRC, ctx);
+  installCore(ctx);
   vm.runInContext(PLACE_SRC, ctx);
-  vm.runInContext(APP_SRC.replace('ReactDOM.createRoot(document.getElementById("root")).render(h(App));',
-    'window.components = { ListTable, Row, Why, factsLine, matchControl, companyRuns };'), ctx);
-  return { c: ctx.components, P: ctx.ISPlace, IS: ctx.IS, h: react.createElement,
+  const components = createTestApp(ctx);
+  return { c: components, P: ctx.ISPlace, IS: ctx.IS, h: react.createElement,
     render(component, props) { cursor = 0; pending = []; const tree = component(props); pending.forEach(fn => fn()); return tree; },
     reset() { slots.length = 0; } };
 }
@@ -369,8 +360,8 @@ test("T8: headed Paid listing, Ad before the company name, and a sponsored link"
   }
   // Never the words the plan rules out.
   assert.doesNotMatch(PLACE_SRC.replace(/^\s*\/\/.*$/gm, ""), /Sponsored|Promoted|Featured/);
-  // The same words as the landing pages' box (backend/internscout/seo_pages.py placement_box).
-  const seo = read("backend/internscout/seo_pages.py");
+  // The same words as the landing pages' box (backend/internscout/site/publish.py _placement_box).
+  const seo = read("backend/internscout/site/publish.py");
   for (const w of ["Paid listing", '"ad">Ad<', "Why am I seeing this?", "Open posting", 'rel="sponsored noopener"']) assert.ok(seo.includes(w), w);
   for (const w of ['"Paid listing"', '"Ad"', '"Why am I seeing this?"', '"Open posting"', '"sponsored noopener"']) assert.ok(PLACE_SRC.includes(w), w);
   // Both boxes link to the ad disclosure, #paid-listings, never #paid (the paid plans section).
@@ -473,11 +464,12 @@ test("load: one same-origin fetch, nothing on a missing or bad file, and none at
   assert.match(read("docs/index.html"), /placements: true,/);
 });
 
-test("index.html loads placements.js between core.js and app.js, deferred", () => {
+test("index.html loads placements and share between the deferred Core and App entries", () => {
   const html = read("docs/index.html");
   const srcs = [...html.matchAll(/<script\b[^>]*\bsrc="([^"]+)"[^>]*>/g)].map(m => m[0]);
   const at = s => srcs.findIndex(t => t.includes(s));
-  assert.ok(at("js/core.js") < at("js/placements.js") && at("js/placements.js") < at("js/app.js"));
+  assert.ok(at("js/core/entry.mjs") < at("js/placements.js") && at("js/placements.js") < at("js/share.js") &&
+    at("js/share.js") < at("js/app/entry.mjs"));
   assert.match(srcs[at("js/placements.js")], /\sdefer\b/);
 });
 

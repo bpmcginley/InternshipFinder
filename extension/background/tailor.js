@@ -38,7 +38,7 @@ import {
   openDocx,
   saveDocx,
 } from "../lib/docx.js";
-import { applyTailoring, tailorInput } from "../lib/tailoring.js";
+import { applyTailoring, tailorInput, tailoringCacheFacts } from "../lib/tailoring.js";
 import { readTailored, tailorKey, writeTailored } from "../lib/tailor_cache.js";
 
 const SYSTEM = `You tailor a student's resume to one job posting. You may ONLY:
@@ -131,7 +131,7 @@ const isAccountError = (e) => NEEDS_YOU_CODES.has(e && e.code);
 // null when nothing usable came back.
 // BUILD names the code that turns a reply into a file. It is part of the cache key, so a file built
 // by an older, faultier version of lib/docx.js or lib/pdf_layout.js is not handed out again.
-const BUILD = "format-2";
+const BUILD = "facts-4";
 // was: tailorWith(store, job, system, prompt, build, extra) and tailorKey(model, system, prompt).
 // The key was made of words only. Two Word files with the same bullets but a different font, or the
 // same PDF re-read into a different layout, shared one key, and the student who uploaded a new file
@@ -139,7 +139,11 @@ const BUILD = "format-2";
 // goes into the key and not into the prompt.
 async function tailorWith(store, job, system, prompt, build, extra, salt = "") {
   const model = modelFor(store, "tailor");
-  const key = await tailorKey(model, system, `${prompt}\n${BUILD}\n${salt}`);
+  const key = await tailorKey(
+    model,
+    system,
+    `${prompt}\n${BUILD}\n${salt}\nLOCAL_FACTS:${baseName(store)}`,
+  );
   const hit = await readTailored(key);
   if (hit) return { ...hit, cost_usd: 0, reused: true };
   const resp = await callAI({
@@ -327,7 +331,11 @@ async function tailorPdf(store, job, orig) {
 async function tailorFromProfile(store, job) {
   const model = modelFor(store, "tailor");
   const prompt = `JOB\n${job.company} - ${job.title}\n${String(job.description).slice(0, 6000)}\n\nPROFILE (JSON)\n${JSON.stringify(tailorInput(store))}`;
-  const key = await tailorKey(model, SYSTEM, prompt);
+  const key = await tailorKey(
+    model,
+    SYSTEM,
+    `${prompt}\n${BUILD}\nLOCAL_FACTS:${JSON.stringify([baseName(store), tailoringCacheFacts(store)])}`,
+  );
   const hit = await readTailored(key);
   if (hit) return { ...hit, cost_usd: 0, reused: true };
 

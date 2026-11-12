@@ -24,12 +24,25 @@ async function sha256Hex(s) {
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+export { sha256Hex as sessionTokenHash };
+
+// For an optional session-owned transaction. The account column is fixed by the caller's SQL.
+export function sessionWriteFence(session, accountColumn) {
+  if (session === undefined) return { sql: "", args: [] };
+  return {
+    sql:
+      ` AND ${accountColumn}=? AND EXISTS(SELECT 1 FROM sessions s WHERE s.id=? AND s.user_hash=? ` +
+      "AND julianday(s.expires)>julianday('now'))",
+    args: [session.user, session.id, session.user],
+  };
+}
+
 const expiresFrom = (now) => new Date(now.getTime() + LIFETIME_MS).toISOString();
 
 // POST /session, after the ID token has been verified. Returns the new token and its expiry. The new row
 // and the trim to MAX_SESSIONS are one batch; the new row is left out of the trim, so a tie on
 // `last_used` (several sign-ins in the same millisecond) can never push out the one just made.
-// `also(id)` adds statements to the same batch (copySession's record of where the session came from).
+// `also(id)` appends optional statements to the same transaction.
 export async function createSession(db, { user, tier, provider }, now, also = () => []) {
   const token = newToken();
   const id = await sha256Hex(token);
@@ -74,21 +87,44 @@ export async function copySession(db, token, deps = {}) {
       .first()
   )
     throw copied();
+  const tokenCopy = newToken();
+  const id = await sha256Hex(tokenCopy);
   const now = new Date(deps.now ?? Date.now());
+  const at = now.toISOString(),
+    expires = expiresFrom(now);
   try {
-    const made = await createSession(db, { user, tier, provider }, now, (id) => [
+    const [created] = await db.batch([
+      // Preflight authentication is not a write fence: deletion, sign-out or expiry can
+      // intervene. Recheck the exact source/account inside this same D1 transaction.
       db
         .prepare(
-          "INSERT INTO session_copies (source, copy, user_hash, created) VALUES (?, ?, ?, ?)",
+          "INSERT INTO sessions (id,user_hash,tier,provider,created,last_used,expires) " +
+            "SELECT ?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM sessions " +
+            "WHERE id=? AND user_hash=? AND tier=? AND provider=? AND expires>?)",
         )
-        .bind(source, id, user, now.toISOString()),
+        .bind(id, user, tier, provider, at, at, expires, source, user, tier, provider, at),
+      db
+        .prepare(
+          "INSERT INTO session_copies (source, copy, user_hash, created) SELECT ?, ?, ?, ? WHERE changes()=1",
+        )
+        .bind(source, id, user, at),
+      // A unique copy-capability conflict rolls the new session back. A failed source
+      // check creates neither row and must not trim unrelated live sessions.
+      db
+        .prepare(
+          "DELETE FROM sessions WHERE user_hash = ? AND id != ? AND id NOT IN " +
+            "(SELECT id FROM sessions WHERE user_hash = ? AND id != ? ORDER BY last_used DESC, created DESC LIMIT ?) " +
+            "AND changes()=1",
+        )
+        .bind(user, id, user, id, MAX_SESSIONS - 1),
     ]);
+    if (created.meta.changes !== 1) throw expired();
     return {
-      session: made.token,
+      session: tokenCopy,
       account: user.slice(0, 16),
       provider: provider || null,
       tier,
-      expires: made.expires,
+      expires,
     };
   } catch (e) {
     if (/UNIQUE|constraint/i.test(String(e && e.message))) throw copied();
@@ -98,7 +134,8 @@ export async function copySession(db, token, deps = {}) {
 
 // { user, tier } for a session token. A use moves `last_used` and `expires` forward at most once per UTC
 // day, in the background (`later`), so a busy day costs one write rather than one per request.
-export async function sessionUser(db, token, { now = Date.now(), later } = {}) {
+// refresh:false performs only the existing lookup; callers must recheck expiry after awaited I/O.
+export async function sessionUser(db, token, { now = Date.now(), later, refresh = true } = {}) {
   if (!db) throw new HttpError(500, "server", "Server is missing its database");
   if (!TOKEN.test(String(token))) throw expired();
   const id = await sha256Hex(token);
@@ -111,7 +148,7 @@ export async function sessionUser(db, token, { now = Date.now(), later } = {}) {
   const at = new Date(now);
   const today = at.toISOString().slice(0, 10);
   let expires = row.expires;
-  if (String(row.last_used).slice(0, 10) < today) {
+  if (refresh && String(row.last_used).slice(0, 10) < today) {
     expires = expiresFrom(at);
     // The WHERE repeats the day check, so parallel requests on a new day still write once.
     const refresh = db

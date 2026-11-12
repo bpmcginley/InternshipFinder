@@ -19,6 +19,13 @@ export function text(body, field, { required = false } = {}) {
 export const DAYS = 30;              // days each role runs
 export const FIELD_CAP = 5;          // paid roles running at once that share a field tag
 export const MAX_START_DAYS = 90;    // the start day is today up to this many days ahead
+export const MAX_ORDER_BYTES = 4_000;
+
+// The terms an order accepts: docs/terms.html's "Last updated" day (tests/site/buy.test.mjs holds the two
+// together), and the clickwrap box exactly as docs/employers/buy/ shows it, stored on every order (legal
+// review round 4, 2026-10-19). was: "2026-10-19", and only the version was stored.
+export const TERMS_VERSION = "2026-10-20";
+export const TERMS_BOX = "I have read and accept the InternScout terms, including the section for employers, on behalf of my company, and I am authorized to accept them for it.";
 
 // A verified order's roles hold their days this long after its Checkout opened (Checkout expires at 31
 // minutes), so two buyers can't both pay for the last place in a field.

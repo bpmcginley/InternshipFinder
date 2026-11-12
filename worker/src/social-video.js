@@ -29,14 +29,16 @@ export async function socialVideo(request, fetcher) {
     }
     headers.Range = range;
   }
+  const upstreamUrl = RAW + name;
   let upstream;
   try {
-    upstream = await fetcher(RAW + name, {
+    upstream = await fetcher(upstreamUrl, {
       method: request.method,
       headers,
-      redirect: "error",
+      // Workers accepts manual redirects. Reject their response below without following them.
+      redirect: "manual",
       signal: AbortSignal.timeout(15000),
-      cf: { cacheEverything: true, cacheTtlByStatus: { "200-299": 3600, "400-599": -1 } },
+      cf: { cacheEverything: true, cacheTtlByStatus: { "200-299": 3600, "300-599": -1 } },
     });
   } catch {
     throw new HttpError(502, "media_unavailable", "Brand video is not available yet");
@@ -45,6 +47,9 @@ export async function socialVideo(request, fetcher) {
     if (upstream.body) await upstream.body.cancel();
     throw new HttpError(status, code, message);
   };
+  if (upstream.redirected || (upstream.url && upstream.url !== upstreamUrl)) {
+    return refuse(502, "media_unavailable", "Brand video is not available yet");
+  }
   if (upstream.status === 404) return refuse(404, "not_found", "No such brand video");
   if (upstream.status === 416) return refuse(416, "range", "Byte range is not available");
   if (upstream.status !== 200 && upstream.status !== 206) {

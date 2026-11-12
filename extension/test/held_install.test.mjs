@@ -43,10 +43,12 @@ test("U1: the bridge's pages come from the manifest, and its match is the host a
     "the install prompt is unchanged",
   );
   assert.ok(manifest.permissions.includes("scripting") && manifest.permissions.includes("tabs"));
-  assert.equal(
-    manifest.version,
-    "0.5.9",
-    "audit fixes use a new version after the submitted 0.5.8 package",
+  assert.match(manifest.version, /^(?:0|[1-9]\d{0,4})(?:\.(?:0|[1-9]\d{0,4})){2}$/);
+  const [major, minor, patch] = manifest.version.split(".").map(Number);
+  assert.ok([major, minor, patch].every((part) => part <= 65535));
+  assert.ok(
+    major > 0 || minor > 5 || (minor === 5 && patch > 9),
+    "the release candidate advances beyond the published 0.5.9 package",
   );
 });
 

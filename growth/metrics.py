@@ -30,6 +30,7 @@ Run from the repo root:  python growth/metrics.py [docs] [--write]
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import sys
@@ -44,6 +45,7 @@ from zoneinfo import ZoneInfo
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
 try:
     from internscout.console_log import console
+    from internscout.public_data import public_data_dir
 finally:
     sys.path.pop(0)
 
@@ -1267,7 +1269,7 @@ def listings(site_dir: str) -> dict:
     backend/internscout (the Dashboard metrics workflow checks out both); where either is missing, it
     falls back to stats.json's own "new", which counts before deduplication and runs a little higher.
     new_7d_basis says which one a snapshot holds."""
-    with open(os.path.join(site_dir, "data", "stats.json"), encoding="utf-8") as f:
+    with open(os.path.join(public_data_dir(site_dir), "stats.json"), encoding="utf-8") as f:
         s = json.load(f)
     # was: return {"open": s.get("open"), "new_7d": s.get("new"), "generated_at": s.get("generated_at")}
     out = {
@@ -1281,11 +1283,11 @@ def listings(site_dir: str) -> dict:
         for p in (os.path.join(here, "..", "backend"), here):
             if p not in sys.path:
                 sys.path.insert(0, p)
-        import digest  # imported here: it needs backend/internscout
+        from internscout.site import source as site_source
 
-        d = digest.sp.load(site_dir)
-        now = digest.sp._when(d["generated_at"]) or datetime.now(timezone.utc)
-        out.update(new_7d=len(digest.new_roles(d, now)), new_7d_basis="digest")
+        d = site_source.load(site_dir)
+        now = site_source._when(d["generated_at"]) or datetime.now(timezone.utc)
+        out.update(new_7d=len(site_source.new_roles(d, now)), new_7d_basis="digest")
     except (ImportError, OSError, ValueError, KeyError):
         pass
     return out
@@ -1457,12 +1459,11 @@ def main(argv: list[str]) -> int:
         for sql, params in prune_sql(now):
             d1(token, sql, params)
     except (urllib.error.HTTPError, urllib.error.URLError, RuntimeError) as e:
-        detail = (
-            e.read().decode("utf-8", "replace")[:300]
-            if isinstance(e, urllib.error.HTTPError)
-            else str(e)
+        console(
+            f"[metrics] write failed: {type(e).__name__}",
+            level=logging.WARNING,
+            exception_type=type(e).__name__,
         )
-        print(f"[metrics] write failed: {detail}")
         console("[metrics] The Cloudflare token needs D1: Edit as well as Account Analytics: Read.")
         return 1
     console(f"[metrics] wrote {len(days)} days and a snapshot")
