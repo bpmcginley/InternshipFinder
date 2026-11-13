@@ -1,5 +1,6 @@
 // Dormant response boundary: no endpoint, credential, transport retry or production limits.
 import { HttpError } from "./http.js";
+import { createSSEWireCounter } from "./sse-wire.js";
 import { acceptFundedCall, releaseFundedCall, meterFundedCall } from "./funded-run-callbacks.js";
 
 const object = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
@@ -175,43 +176,7 @@ export async function fundedProviderResponse({
     if (f.terminal) usage = f.usage;
     return f.usable;
   };
-  // Count original SSE framing before decoding or acceptance. CRLF is one line
-  // ending; bare CR also ends a line. A blank line resets only after its bytes
-  // count, including an initial UTF-8 BOM, comments and ignored SSE fields.
-  let wireEventBytes = 0,
-    wireLineBytes = 0,
-    wireCR = false,
-    wireFirstLine = true,
-    wireBom = true;
-  const wireLine = () => {
-    if (!wireLineBytes || (wireFirstLine && wireLineBytes === 3 && wireBom)) wireEventBytes = 0;
-    wireLineBytes = 0;
-    wireFirstLine = false;
-  };
-  const wireCount = () => {
-    if (++wireEventBytes > limits.maxEventBytes) throw upstreamError();
-  };
-  const scanWire = (bytes) => {
-    for (const byte of bytes) {
-      if (wireCR) {
-        wireCR = false;
-        if (byte === 10) {
-          wireCount();
-          wireLine();
-          continue;
-        }
-        wireLine();
-      }
-      wireCount();
-      if (byte === 13) wireCR = true;
-      else if (byte === 10) wireLine();
-      else {
-        wireLineBytes++;
-        if (wireFirstLine && wireLineBytes <= 3)
-          wireBom = wireBom && byte === [239, 187, 191][wireLineBytes - 1];
-      }
-    }
-  };
+  const scanWire = createSSEWireCounter(limits.maxEventBytes, upstreamError);
   // The existing LF semantic parser can combine several raw CR-delimited frames.
   // Keep its independent bound without repeatedly encoding an accumulated event
   // or incomplete line. Each decoded piece and each completed line is counted once.
