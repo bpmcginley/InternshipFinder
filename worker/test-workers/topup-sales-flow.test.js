@@ -15,7 +15,7 @@ const answer = {
   usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 2 },
 };
 
-async function setup() {
+async function setup({ respondToAi = () => reply(answer) } = {}) {
   // Qualify the already deployed schema boundary, without dormant history/owner migrations.
   await applyD1Migrations(
     env.DB,
@@ -72,7 +72,7 @@ async function setup() {
     if (parsed.origin === "https://generativelanguage.googleapis.com") {
       assert.equal(init.method, "POST");
       calls.push("ai");
-      return reply(answer);
+      return respondToAi(parsed);
     }
     assert.equal(parsed.origin, "https://api.stripe.com");
     assert.equal(init.redirect, "manual");
@@ -171,7 +171,9 @@ async function setup() {
       { waitUntil: (p) => pending.push(p) },
       { now: () => new Date(now), config, fetch },
     );
-    const result = await response.json();
+    const result = response.headers.get("Content-Type")?.startsWith("text/event-stream")
+      ? await response.text()
+      : await response.json();
     await Promise.all(pending.splice(0));
     return { response, result };
   }
@@ -183,8 +185,8 @@ async function setup() {
     assert.equal(calls.length, before, "Balance reads must not contact a provider");
     return got.result.allowance.autofill;
   };
-  const ai = (run) =>
-    send("/ai", "POST", {
+  const ai = (run, { stream = false } = {}) =>
+    send(stream ? "/ai?stream=1" : "/ai", "POST", {
       task: "autofill",
       run_id: run,
       request: { contents: [{ role: "user", parts: [{ text: "synthetic input" }] }] },
@@ -335,4 +337,55 @@ it("native sales flow rejects incomplete funded or payment settings before provi
   assert.equal(w.calls.length, 0);
   assert.equal(await w.count("topup_checkout_attempts"), 0);
   assert.equal(await w.count("topup_purchases"), 0);
+});
+
+it("native purchased SSE restores a definitively rejected first call and debits its successful retry once", async () => {
+  const frame = `data: ${JSON.stringify(answer)}\n\n`;
+  let rejected = false;
+  const w = await setup({
+    respondToAi(url) {
+      if (!url.pathname.endsWith(":streamGenerateContent")) return reply(answer);
+      assert.equal(url.searchParams.get("alt"), "sse");
+      if (!rejected) {
+        rejected = true;
+        return new Response(null, { status: 503 });
+      }
+      return new Response(frame, { headers: { "Content-Type": "text/event-stream" } });
+    },
+  });
+  assert.equal((await w.ai("included")).response.status, 200);
+  assert.equal((await w.send("/billing/topup/checkout", "POST")).response.status, 200);
+  w.pay();
+  assert.equal((await w.deliver()).response.status, 200);
+  assert.deepEqual((await w.deliver()).result, { ok: true, repeat: true });
+  const credited = { available: 25, held: 0, consumed: 0, revoked: 0 };
+  assert.deepEqual(await w.balance(), credited);
+
+  const funded = () => w.ai("purchased-stream", { stream: true });
+  const failed = await funded();
+  assert.equal(failed.response.status, 502);
+  assert.equal(failed.result.error, "upstream");
+  assert.deepEqual(await w.balance(), credited);
+  assert.deepEqual(await w.me(), { used: 1, limit: 26, purchased: 25 });
+  assert.equal(
+    await w.db
+      .prepare("SELECT COUNT(*) AS n FROM funded_runs WHERE run_id=?")
+      .bind("purchased-stream")
+      .first("n"),
+    0,
+  );
+
+  const succeeded = await funded();
+  assert.equal(succeeded.response.status, 200);
+  assert.match(succeeded.response.headers.get("Content-Type"), /^text\/event-stream/);
+  assert.equal(succeeded.response.headers.get("X-InternScout-Remaining"), "24");
+  assert.equal(succeeded.result, frame);
+  const consumed = { available: 24, held: 0, consumed: 1, revoked: 0 };
+  assert.deepEqual(await w.balance(), consumed);
+  assert.deepEqual(await w.me(), { used: 2, limit: 26, purchased: 24 });
+  assert.equal((await funded()).result, frame);
+  assert.deepEqual(await w.balance(), consumed);
+  assert.equal(await w.count("topup_purchases"), 1);
+  assert.equal(await w.count("stripe_events"), 1);
+  assert.equal(w.calls.filter((call) => call === "ai").length, 4);
 });

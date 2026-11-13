@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { loadFollowCatalog } from "../src/follow-catalog-loader.js";
+import { loadFollowCatalog, loadFollowPublicBytes } from "../src/follow-catalog-loader.js";
 
 const bytes = readFileSync(new URL("./fixtures/follow-catalog-python.json", import.meta.url));
 const wire = JSON.parse(bytes);
@@ -38,6 +38,45 @@ const deferred = () => {
   const promise = new Promise((r) => (resolve = r));
   return { promise, resolve };
 };
+
+test("shared raw reader returns bounded exact bytes without claiming catalog integrity", async () => {
+  const raw = new Uint8Array([0, 255, 1]);
+  const result = await loadFollowPublicBytes(options({ fetch: async () => reply(raw) }));
+  assert.equal(result.status, "available");
+  assert.deepEqual(result.bytes, raw);
+  assert.equal(Object.hasOwn(result, "catalog"), false);
+  assert.deepEqual(await loadFollowPublicBytes(), { status: "disabled" });
+});
+
+test("shared reader checks intrinsic stream size before copying a disguised oversized view", async () => {
+  let reads = 0,
+    cancelled = 0;
+  class Disguised extends Uint8Array {
+    get length() {
+      reads++;
+      return 1;
+    }
+    get byteLength() {
+      reads++;
+      return 1;
+    }
+  }
+  const stream = new ReadableStream({
+    start(controller) {
+      controller.enqueue(new Disguised(11));
+    },
+    cancel() {
+      cancelled++;
+    },
+  });
+  assert.deepEqual(
+    await loadFollowPublicBytes(options({ maxBytes: 10, fetch: async () => reply(stream) })),
+    { status: "unavailable" },
+  );
+  assert.equal(reads, 0);
+  assert.equal(cancelled, 1);
+  assert.equal(stream.locked, false);
+});
 
 // All URLs are synthetic. Every transport is injected; no global fetch/network is used.
 test("catalog loader is off by default and rejects bad release/config before fetching", async () => {
