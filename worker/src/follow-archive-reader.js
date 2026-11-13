@@ -13,6 +13,7 @@ const unavailable = () => ({ status: "unavailable" });
 
 export function createFollowArchiveReader({
   indexUrl,
+  indexSha256,
   fetch: get,
   clock,
   bounds,
@@ -36,6 +37,8 @@ export function createFollowArchiveReader({
     fail();
   }
   if (
+    (indexSha256 !== undefined &&
+      (typeof indexSha256 !== "string" || !digestPattern.test(indexSha256))) ||
     url.href !== indexUrl ||
     url.protocol !== "https:" ||
     url.username ||
@@ -89,7 +92,7 @@ export function createFollowArchiveReader({
     try {
       const started = now();
       const check = () => {
-        if (now() - started >= b.deadlineMs) fail();
+        if (controller.signal.aborted || now() - started >= b.deadlineMs) fail();
       };
       const timeout = new Promise((_, reject) => {
         timer = setTimeout(() => {
@@ -156,7 +159,7 @@ export function createFollowArchiveReader({
         return bytes;
       }
       const operation = async () => {
-        const result = await action(read);
+        const result = await action(read, check);
         check();
         return result;
       };
@@ -169,9 +172,14 @@ export function createFollowArchiveReader({
     }
   }
 
-  async function manifest(read) {
-    const raw = await read(indexUrl, b.maxManifestBytes),
-      text = decode(raw),
+  async function manifest(read, check) {
+    const raw = await read(indexUrl, b.maxManifestBytes);
+    if (indexSha256 !== undefined) {
+      const digest = await followSnapshotDigest(raw);
+      check();
+      if (digest !== indexSha256) fail();
+    }
+    const text = decode(raw),
       m = JSON.parse(text);
     if (
       !keys(m, "checked_at,entries,high_water,latest,version") ||
@@ -266,8 +274,8 @@ export function createFollowArchiveReader({
 
   async function latest(effectiveLower) {
     return (
-      (await run(async (read) => {
-        const entry = (await manifest(read)).at(-1);
+      (await run(async (read, check) => {
+        const entry = (await manifest(read, check)).at(-1);
         if (
           !entry ||
           now() < followInstant(entry.generated_at) ||
@@ -301,8 +309,8 @@ export function createFollowArchiveReader({
         !positive(maxBytes)
       )
         return null;
-      return run(async (read) => {
-        const entry = (await manifest(read)).find(
+      return run(async (read, check) => {
+        const entry = (await manifest(read, check)).find(
           (e) => e.sha256 === digest && e.generated_at === at,
         );
         if (!entry) fail();
