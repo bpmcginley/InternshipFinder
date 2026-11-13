@@ -38,11 +38,111 @@ These exact main Tests and Pages runs passed. Each artifact preserved all 5,148 
 | [#622](https://github.com/bpmcginley/InternshipFinder/pull/622), confirmation and management email links | `a6e4d35c8c33087590343cccf586251c46d80b49` | [43372438739](https://github.com/bpmcginley/InternshipFinder/actions/runs/43372438739) | [43372438736](https://github.com/bpmcginley/InternshipFinder/actions/runs/43372438736), [14013805113](https://github.com/bpmcginley/InternshipFinder/actions/runs/43372438736/artifacts/14013805113) |
 | [#620](https://github.com/bpmcginley/InternshipFinder/pull/620), browser unsubscribe page | `9d0df1750f04bb8853ee1bfb45fbf9c75a80d436` | [43372922824](https://github.com/bpmcginley/InternshipFinder/actions/runs/43372922824) | [43372922875](https://github.com/bpmcginley/InternshipFinder/actions/runs/43372922875), [14013331791](https://github.com/bpmcginley/InternshipFinder/actions/runs/43372922875/artifacts/14013331791) |
 
+### Release qualification on the current listing export
+
+The annotations-only rehearsal used source `ad2810c4` and data `871d7862`. Current main `e93d26c3` differs from that source only in the two status trackers. All 141 default listing files matched raw Git. The annotation build added the 2,860-key catalog and changed only employer metadata in 69 JSON files and 2,207 HTML files. Removing the keys restored all 35,495 listing occurrences and exact HTML bytes. All 50,218 annotated anchors matched organic postings in the same export. The exact catalog passed local Worker membership, expiry and refresh tests. The browser capture attribute was absent. The build used an isolated clock, synthetic placements and no live prior page metadata. [Employer rehearsal](https://github.com/bpmcginley/InternshipFinder/pull/465#issuecomment-6846730343)
+
+A second offline rehearsal composed the held #329 head with main deebe26d before building both modes. All 141 raw pins, 35,495 rows, 50,218 organic anchors and 2,860 catalog keys matched the expected export. Browser capture was absent. [Post-cutover rehearsal](https://github.com/bpmcginley/InternshipFinder/pull/465#issuecomment-6848348562)
+
+After #329 publishes and passes exact raw listing verification, use a separate annotations-only Pages slot. The existing manual Pages trigger can build directly. It selects main and data at execution, so verify both actual pins and the published artifact. Existing Pages notification, the downstream every-major workflow and conditional placement accounting still apply. Recheck the served catalog and current-day maintenance before enabling Worker intake. Keep browser capture off until that qualification passes. Rollback through the off mode rebuilds the selected export.
+
+Exact [Engineering #645](https://github.com/bpmcginley/InternshipFinder/pull/645) merged as `e93d26c3`. [Tests](https://github.com/bpmcginley/InternshipFinder/actions/runs/43385048649) and [Pages](https://github.com/bpmcginley/InternshipFinder/actions/runs/43385048634) passed. All 5,148 public files and 141 listing pins matched the preceding artifact. The listing cutover remains held.
+
+### Follow release evidence on November 13
+
+- The [listing writer acknowledgement draft #650](https://github.com/bpmcginley/InternshipFinder/pull/650) at
+  `0cdb0b24` validates raw staged Git objects and binds each opted-in push to its exact candidate. A recorder failure
+  leaves the pinned push in place. A failed push stops before retry if the recorder changed HEAD. All 73 local tests,
+  19 subtests and nine hosted checks passed. [Independent exact review](https://github.com/bpmcginley/InternshipFinder/pull/650#pullrequestreview-5887794066)
+- The [pinned digest release draft #649](https://github.com/bpmcginley/InternshipFinder/pull/649) at
+  `34719813` stops before submitting the owner update when the ready lookup finishes after the deadline. It checks
+  the same deadline again immediately before handing off to EMAIL. A spent claim retains its budget and existing held
+  outcome. The author passed 94 native and 1,268 Node tests. Independent native tests verified both fixes. An owner
+  update submitted on time may still arrive at SQLite after the deadline. Engineering reproduced that case with no
+  email, budget use or queue change. A follow-up will apply the cutoff at the database update. All nine hosted checks
+  passed for `34719813`.
+  [Exact deadline review](https://github.com/bpmcginley/InternshipFinder/pull/649#issuecomment-6847406822)
+- The [default-entry test draft #647](https://github.com/bpmcginley/InternshipFinder/pull/647) at
+  `1e01b559` passed 36 native cases and all nine hosted checks. It covers HTTP signup and confirmation, scheduled
+  links and archive enqueue, direct owned digest delivery, and digest unsubscribe with deletion and replay.
+  Engineering repeated the native composition on tree `3f61458a11ab264793dee1681eca022fbbfa95cd` with the corrected
+  #649 wrapper. The scheduled archive queued the digest, the wrapper fetched the catalog, manifest and exact queued
+  snapshot, and synthetic EMAIL recorded one confirmation and one digest. The owner returned ready and the watermark
+  and action assertions passed. Production scheduling, sender and restore qualification remain open.
+  [Independent corrected composition](https://github.com/bpmcginley/InternshipFinder/pull/649#issuecomment-6847431772)
+
+- The [push intent journal draft #651](https://github.com/bpmcginley/InternshipFinder/pull/651) at `3b51a5a9`
+  records each exact candidate before its push through a trusted caller-supplied sink. Independent review passed 45
+  tests and verified the existing recovery parser accepts the canonical bytes. A stale sink acknowledgement withholds
+  private evidence while the ordinary listing retry still succeeds. Production storage and trusted accepted-operation
+  evidence remain open. [Independent exact review](https://github.com/bpmcginley/InternshipFinder/pull/651#pullrequestreview-5887873831)
+
+### Current Follow and top-up qualification
+
+Four source packages merged after exact review. All four exact Pages checks below preserved all 5,148 public
+files and 141 pinned listing blobs. No Worker deployment or production migration accompanied these merges.
+
+| Package | Main merge | Tests | Pages and artifact |
+| --- | --- | --- | --- |
+| [#655 purchased streaming retry](https://github.com/bpmcginley/InternshipFinder/pull/655) | `cd3c38b8` | [43399103340](https://github.com/bpmcginley/InternshipFinder/actions/runs/43399103340) | [43399102819](https://github.com/bpmcginley/InternshipFinder/actions/runs/43399102819), [14023728127](https://github.com/bpmcginley/InternshipFinder/actions/runs/43399102819/artifacts/14023728127) |
+| [#663 payment history receipt cleanup](https://github.com/bpmcginley/InternshipFinder/pull/663) | `dcd26dff` | [43399594966](https://github.com/bpmcginley/InternshipFinder/actions/runs/43399594966) | [43399595009](https://github.com/bpmcginley/InternshipFinder/actions/runs/43399595009), [14024048363](https://github.com/bpmcginley/InternshipFinder/actions/runs/43399595009/artifacts/14024048363) |
+| [#657 logical Follow checkpoint retirement](https://github.com/bpmcginley/InternshipFinder/pull/657) | `72584d81` | [43400061127](https://github.com/bpmcginley/InternshipFinder/actions/runs/43400061127) | [43400061044](https://github.com/bpmcginley/InternshipFinder/actions/runs/43400061044), [14024472717](https://github.com/bpmcginley/InternshipFinder/actions/runs/43400061044/artifacts/14024472717) |
+| [#658 payment history epoch candidacy](https://github.com/bpmcginley/InternshipFinder/pull/658) | `20b9d41a` | [43400559734](https://github.com/bpmcginley/InternshipFinder/actions/runs/43400559734) | [43400559767](https://github.com/bpmcginley/InternshipFinder/actions/runs/43400559767), [14024833877](https://github.com/bpmcginley/InternshipFinder/actions/runs/43400559767/artifacts/14024833877) |
+
+The corrected #663 cleanup preserves counts from acknowledged pages and stops if the deadline, clock or acknowledgement
+becomes uncertain. The existing indexed 30-day cutoff is unchanged. The [independent review](https://github.com/bpmcginley/InternshipFinder/pull/663#pullrequestreview-5888579278)
+verified the strict async clock failure and 35 focused native cases. The exact #658 merge tree passed 77 native D1
+cases spanning migrations, receipt cleanup, coverage, enrollment and sales. The [daily adapter #664](https://github.com/bpmcginley/InternshipFinder/pull/664)
+passed its initial local cases. Independent review found an async database binding edge and the author is correcting
+it. Scheduling, historical coverage, erasure and live sales remain off.
+
+- [Follow database deadline #653](https://github.com/bpmcginley/InternshipFinder/pull/653) at `bc647e01`
+  checks the same fixed cutoff in the SQLite owner update. A late batch changes zero rows. A committed update
+  with lost acknowledgement preserves the existing running state. All nine hosted checks and 101 independent
+  native tests passed. The exact combined signup-to-unsubscribe rehearsal also passed.
+  [Independent review](https://github.com/bpmcginley/InternshipFinder/pull/653#pullrequestreview-5887959008) ·
+  [Lifecycle rehearsal](https://github.com/bpmcginley/InternshipFinder/pull/653#issuecomment-6847642984)
+- Corrected [scheduled digest #654](https://github.com/bpmcginley/InternshipFinder/pull/654) at
+  `da68a169` passed all nine hosted checks, 141 independent native cases and seven entry probes. The
+  isolated #647 lifecycle sent through the actual shared scheduled handler. The default Worker has no
+  digest supplier. Composition with #636 preserved the maintenance jobs and passed 14 native cases.
+  [Exact review](https://github.com/bpmcginley/InternshipFinder/pull/654#issuecomment-6848273711) ·
+  [Scheduled lifecycle](https://github.com/bpmcginley/InternshipFinder/pull/654#issuecomment-6848472301)
+- Six local Git tests verified that the [journal #651](https://github.com/bpmcginley/InternshipFinder/pull/651)
+  feeds the [detached recovery #640](https://github.com/bpmcginley/InternshipFinder/pull/640) unchanged after an
+  actual two-parent retry. Recovery held when the journal write failed, the direct push acknowledgement was lost,
+  or the original candidate or pending generation differed. The rehearsal used separate exact writer modules.
+  Production still needs trusted storage, accepted-operation evidence and restore authority.
+  [Recovery rehearsal](https://github.com/bpmcginley/InternshipFinder/pull/640#issuecomment-6847831767)
+- [Purchased streaming test #655](https://github.com/bpmcginley/InternshipFinder/pull/655) at `7066527d`
+  verified signed settlement, restoration after a definitive provider rejection, and a successful same-run
+  streaming retry with one debit. All 31 independent native tests passed. Three unchanged native suites timed out
+  on the initial hosted Worker job. The exact rerun passed all nine checks. Live Stripe qualification remains open.
+  [Independent review](https://github.com/bpmcginley/InternshipFinder/pull/655#pullrequestreview-5888078455) ·
+  [Hosted rerun](https://github.com/bpmcginley/InternshipFinder/actions/runs/43392335054/attempts/2)
+
+- [Logical checkpoint retirement #657](https://github.com/bpmcginley/InternshipFinder/pull/657) at
+  `e1cce927` passed all nine hosted checks and 107 independent native cases plus two live-slot probes.
+  Rejection and expiry preserve the other slot under the existing witness. Physical cleanup and
+  production storage remain separately gated.
+  [Exact review](https://github.com/bpmcginley/InternshipFinder/pull/657#pullrequestreview-5888359334)
+- Corrected [top-up epoch candidacy #658](https://github.com/bpmcginley/InternshipFinder/pull/658) at
+  `1d9012c7` passed 86 independent native cases and an additional native empty-result accessor probe.
+  An isolated composition with #657 passed 42 affected D1 cases. Existing settlement still grants
+  normally when coverage is stale or missing. Candidacy supplies no erasure authority.
+  [Exact review](https://github.com/bpmcginley/InternshipFinder/pull/658#issuecomment-6848507353) ·
+  [Combined test](https://github.com/bpmcginley/InternshipFinder/pull/658#issuecomment-6848493027)
+- [Detached recovery source successor #660](https://github.com/bpmcginley/InternshipFinder/pull/660)
+  at `d4adae17` preserves the corrected #606 helper and fixture on exact #501. All 50 local recovery
+  cases and the fresh GitGuardian check passed. The original #606 finding remains open for separate
+  disposition. The prerequisite and owner release gates still apply.
+  [Exact review](https://github.com/bpmcginley/InternshipFinder/pull/660#issuecomment-6848457020)
+
 ### Follow delivery source progress
 
 The indexed digest cleanup and opt-in scheduler are merged. The selector refuses ambiguous settings before D1 access. The exact native suite covered legacy behavior through migration 0029, the new indexes through 0033, the bounded deadline and database-call limits, and held or uncertain outcomes. The indexed lane has no production trigger. Migration 0033 is pending production adoption. [Cleanup #623](https://github.com/bpmcginley/InternshipFinder/pull/623) · [Scheduler #627](https://github.com/bpmcginley/InternshipFinder/pull/627)
 
-The digest link adapter issues both credentials inside the existing budgeted delivery transaction and checks the exact issued credentials again before transport. The maintenance observation adapter accepts a fixed outcome and bounded counts. It has no live recorder. The link release runner verifies exact catalog and label inputs before the existing owner is acquired. It remains unmounted. [Digest links #624](https://github.com/bpmcginley/InternshipFinder/pull/624) · [Observation #628](https://github.com/bpmcginley/InternshipFinder/pull/628) · [Link release #629](https://github.com/bpmcginley/InternshipFinder/pull/629)
+The digest link adapter issues both credentials inside the existing budgeted delivery transaction and checks the exact issued credentials again before transport. The maintenance observation adapter accepts a fixed outcome and bounded counts. It has no live recorder. The link release runner verifies exact catalog and label inputs before the existing owner is acquired. The default-off scheduler now calls it only for an explicitly configured Follow cron. [Digest links #624](https://github.com/bpmcginley/InternshipFinder/pull/624) · [Observation #628](https://github.com/bpmcginley/InternshipFinder/pull/628) · [Link release #629](https://github.com/bpmcginley/InternshipFinder/pull/629)
 
 These exact main builds passed Tests and Pages. Their artifacts preserved all 5,148 public files and 141 listing pins. Five live responses matched in each Product check.
 
@@ -53,6 +153,10 @@ These exact main builds passed Tests and Pages. Their artifacts preserved all 5,
 | [#624](https://github.com/bpmcginley/InternshipFinder/pull/624) | [43376470082](https://github.com/bpmcginley/InternshipFinder/actions/runs/43376470082) | [43376470104](https://github.com/bpmcginley/InternshipFinder/actions/runs/43376470104), [14015385013](https://github.com/bpmcginley/InternshipFinder/actions/runs/43376470104/artifacts/14015385013) |
 | [#628](https://github.com/bpmcginley/InternshipFinder/pull/628) | [43376960894](https://github.com/bpmcginley/InternshipFinder/actions/runs/43376960894) | [43376960902](https://github.com/bpmcginley/InternshipFinder/actions/runs/43376960902), [14015345809](https://github.com/bpmcginley/InternshipFinder/actions/runs/43376960902/artifacts/14015345809) |
 | [#629](https://github.com/bpmcginley/InternshipFinder/pull/629) | [43377363824](https://github.com/bpmcginley/InternshipFinder/actions/runs/43377363824) | [43377363651](https://github.com/bpmcginley/InternshipFinder/actions/runs/43377363651), [14014079997](https://github.com/bpmcginley/InternshipFinder/actions/runs/43377363651/artifacts/14014079997) |
+| [#631 scheduled links](https://github.com/bpmcginley/InternshipFinder/pull/631) | [43379255801](https://github.com/bpmcginley/InternshipFinder/actions/runs/43379255801) | [43379255718](https://github.com/bpmcginley/InternshipFinder/actions/runs/43379255718), [14016006997](https://github.com/bpmcginley/InternshipFinder/actions/runs/43379255718/artifacts/14016006997) |
+| [#630 archive enqueue](https://github.com/bpmcginley/InternshipFinder/pull/630) | [43379743595](https://github.com/bpmcginley/InternshipFinder/actions/runs/43379743595) | [43379743465](https://github.com/bpmcginley/InternshipFinder/actions/runs/43379743465), [14016221461](https://github.com/bpmcginley/InternshipFinder/actions/runs/43379743465/artifacts/14016221461) |
+
+The scheduled link entry merged at `00b05576` and the bounded archive enqueue runner at `5f4f109f`. [Independent archive review](https://github.com/bpmcginley/InternshipFinder/pull/630#pullrequestreview-5887091338) covered 80 native cases and six receipt mutation probes. The corrected receipt binds existing-job replay to actual stored subscriber, day, payload and pending progress. The archive runner needs a deployment input adapter and a qualified scheduler entry. The current link scheduler has no production trigger or settings. The production Worker still serves `9d0df175`.
 
 ### Follow cleanup and publication progress
 
@@ -626,17 +730,25 @@ The golden harness now covers static assets as well as generated pages. Each sit
 
 ## Waiting for Bruce
 
-- **Follow maintenance activation.** [#616](https://github.com/bpmcginley/InternshipFinder/pull/616) and [#621](https://github.com/bpmcginley/InternshipFinder/pull/621) are merged and shipped with maintenance scheduling off. The scheduler reached an orphan behind 41 healthy rows in eight local D1 calls. Indexed digest expiry and the optional scheduler are merged in #623 and #627. The scheduler remains off in production. Backlog, cadence, observation and restore qualification remain pending.
+- **Reviewed Follow drafts.** [#653 database deadline](https://github.com/bpmcginley/InternshipFinder/pull/653) and [#654 scheduled digest](https://github.com/bpmcginley/InternshipFinder/pull/654) are staged with exact review and hosted checks. Follow and top-up sales remain off.
 
-- **Follow site and archive publication.** Drafts [#617](https://github.com/bpmcginley/InternshipFinder/pull/617) and [#618](https://github.com/bpmcginley/InternshipFinder/pull/618) passed independent review and hosted checks for private staging. An isolated rehearsal of the current listing export rendered all 826 employer page models. Draft [#625](https://github.com/bpmcginley/InternshipFinder/pull/625) passed independent review and the hosted backend suite for same-export private assembly. Draft [#632](https://github.com/bpmcginley/InternshipFinder/pull/632) is building the public label artifact from those same pins and verified retained labels. The production writer, archive and catalog activation remain pending.
+- **Daily Follow sweep capacity.** At the current statement ceiling, the actual local Workers/D1 queue completed 19 matching subscribers. With 20, two fresh passes each left the same subscriber unprocessed. [Capacity evidence](https://github.com/bpmcginley/InternshipFinder/pull/630#issuecomment-6846262939). [Design #641](https://github.com/bpmcginley/InternshipFinder/pull/641) proposes one expiring private resume record with a single subscriber reference, atomic erasure and a pinned daily snapshot. [Independent design review](https://github.com/bpmcginley/InternshipFinder/pull/641#pullrequestreview-5887334844) passed. Owner approval is required for the new reference, deletion and expiry before implementation.
 
-- **Follow archive recovery.** Draft [#606](https://github.com/bpmcginley/InternshipFinder/pull/606) at `5823a889` recovered the exact archive after a real two-parent Git retry in an isolated candidate checkout. Fifty adapter tests and [independent review](https://github.com/bpmcginley/InternshipFinder/pull/606#pullrequestreview-5885474815) passed. GitGuardian still flags the branch setup commit that restored an existing file byte for byte. The alert needs classification in the signed-in GitGuardian dashboard. Production witness, restore, writer integration and archive publication remain pending.
+- **Public digest role page.** [Design #634](https://github.com/bpmcginley/InternshipFinder/pull/634) proposes one public page for both digest links. The URL fragment carries the ordered role IDs and pinned archive digest. Anyone with the link can see those roles while the verified archive is served. The design adds no subscriber information or tracking. Bruce's design approval is pending.
+
+- **Similar roles in Follow email.** [#635](https://github.com/bpmcginley/InternshipFinder/pull/635) implements the approved selection of up to two related roles. [Independent review](https://github.com/bpmcginley/InternshipFinder/pull/635#pullrequestreview-5887162299) passed 30 Node and 14 native Workers tests, plus 3,000 independent pool orderings. [Digest preparation #642](https://github.com/bpmcginley/InternshipFinder/pull/642) passes the verified selected roles into the renderer from the same preparation parse. The exact correction passed all nine checks and [independent review](https://github.com/bpmcginley/InternshipFinder/pull/642#pullrequestreview-5887446518). [Owned runtime #646](https://github.com/bpmcginley/InternshipFinder/pull/646) passes explicit limits into that path. The corrected `f2cc259c` reads the own `relatedLimits` descriptor after the enablement and sending gates, without invoking a getter. All nine hosted checks and [independent exact review](https://github.com/bpmcginley/InternshipFinder/pull/646#pullrequestreview-5887586641) passed.
+
+- **Follow maintenance activation.** [#616](https://github.com/bpmcginley/InternshipFinder/pull/616) and [#621](https://github.com/bpmcginley/InternshipFinder/pull/621) are merged and shipped with maintenance scheduling off. The scheduler reached an orphan behind 41 healthy rows in eight local D1 calls. Indexed digest expiry and the optional scheduler are merged in #623 and #627. [Maintenance observation #636](https://github.com/bpmcginley/InternshipFinder/pull/636) passed all nine hosted checks and [50 independent native cases](https://github.com/bpmcginley/InternshipFinder/pull/636#pullrequestreview-5887194324). It awaits owner merge. Production cadence, recorder, backlog and restore qualification remain pending.
+
+- **Follow site and archive publication.** Drafts [#617](https://github.com/bpmcginley/InternshipFinder/pull/617) and [#618](https://github.com/bpmcginley/InternshipFinder/pull/618) passed independent review and hosted checks for private staging. An isolated rehearsal of the current listing export rendered all 826 employer page models. Draft [#625](https://github.com/bpmcginley/InternshipFinder/pull/625) passed independent review and the hosted backend suite for same-export private assembly. Draft [#632](https://github.com/bpmcginley/InternshipFinder/pull/632) produces the label artifact from those same pins and verified retained labels. All nine hosted checks and [independent review](https://github.com/bpmcginley/InternshipFinder/pull/632#pullrequestreview-5887050256) passed. [#639](https://github.com/bpmcginley/InternshipFinder/pull/639) adds the label file to the same private assembly with exclusive staging, readback and an atomic rename. [Independent review](https://github.com/bpmcginley/InternshipFinder/pull/639#pullrequestreview-5887349095) passed 61 cases, including two separate collision probes. The stacked publication source remains held for the listing cutover and writer qualification.
+
+- **Follow archive recovery.** Draft [#606](https://github.com/bpmcginley/InternshipFinder/pull/606) at `5823a889` recovered the exact archive after a real two-parent Git retry in an isolated candidate checkout. Fifty adapter tests and [independent review](https://github.com/bpmcginley/InternshipFinder/pull/606#pullrequestreview-5885474815) passed. GitGuardian flags three ADP values in the branch setup commit that restored an existing file byte for byte. Source inspection traced them to the public career-center query parameter. The exact check still reports failure and the scanner owner must verify and classify the occurrences in the signed-in dashboard. [Classification evidence](https://github.com/bpmcginley/InternshipFinder/pull/606#issuecomment-6847391871) Draft [#640](https://github.com/bpmcginley/InternshipFinder/pull/640) adds a bounded handoff to that recovery path. The corrected source passed 46 authored local Git cases and [independent retesting](https://github.com/bpmcginley/InternshipFinder/pull/640#issuecomment-6846627490). It guards both named-ref observations and preserves an unknown result when the existing checkpoint call cannot attest its acknowledgement. The #537 public receipt identifies a successful listing handoff, but supplies no private generation or accepted retry ordinal. Current repository rules do not establish exclusive writer authority. Production accepted-operation evidence, separate restore witness, writer integration and archive publication remain pending.
 
 - **Bounded digest cleanup.** [#609](https://github.com/bpmcginley/InternshipFinder/pull/609) merged dormant at `c5e10d60` after two reviews and all nine checks. Exact main Tests and Pages passed. All 5,142 public files, including the 141 listing pins, matched the preceding publication. [#610](https://github.com/bpmcginley/InternshipFinder/pull/610) merged at `1aba7785` and reduces repeated scope validation. In a local Workers/D1 run of the same 185-scope cleanup, reads fell from 1,202,698 to 4,269, with 188 writes in both runs. Adoption of the migration, scheduler bounds and production capacity remain pending.
 
 - **Follow signup release configuration.** [#605](https://github.com/bpmcginley/InternshipFinder/pull/605) merged dormant at `8c421a0e`. The default Worker route now supports a deployment-supplied descriptor. Corrected head `d570bbbe` rejects a backward clock sample before reading the request or catalog. [Independent review](https://github.com/bpmcginley/InternshipFinder/pull/605#pullrequestreview-5885258862), 38 focused Node tests and 26 local Workers/D1 tests passed. Pinned catalog publication, independently verified genesis or retained predecessor, and coordinated deployment and activation remain pending.
 
-- **Follow delivery.** The [release design #601](https://github.com/bpmcginley/InternshipFinder/pull/601) is merged. The production Worker has no Follow delivery scheduler. Browser unsubscribe is live. Digest link issuance and link release input validation are merged as dormant source in [#624](https://github.com/bpmcginley/InternshipFinder/pull/624) and [#629](https://github.com/bpmcginley/InternshipFinder/pull/629). Drafts [#630](https://github.com/bpmcginley/InternshipFinder/pull/630) and [#631](https://github.com/bpmcginley/InternshipFinder/pull/631) cover bounded archive enqueue and the default-off link schedule. Verify the selected sender, preview settings, allowance and reserve for existing mail, bounded retention and scheduling, and restore evidence before enabling delivery.
+- **Follow delivery.** The [release design #601](https://github.com/bpmcginley/InternshipFinder/pull/601) is merged. Browser unsubscribe is live. The production Worker has no Follow delivery scheduler. The [default-off link schedule #631](https://github.com/bpmcginley/InternshipFinder/pull/631) and [bounded archive enqueue #630](https://github.com/bpmcginley/InternshipFinder/pull/630) are merged to source. The corrected [archive deployment adapter #637](https://github.com/bpmcginley/InternshipFinder/pull/637) passed all nine hosted checks and [independent review](https://github.com/bpmcginley/InternshipFinder/pull/637#pullrequestreview-5887300482). Local D1 rejected delayed admission at the original cutoff, and invalid scope limits and colliding URLs failed before acquisition. The adapter awaits owner merge. [Scheduled archive #644](https://github.com/bpmcginley/InternshipFinder/pull/644) passed all nine checks and [independent review](https://github.com/bpmcginley/InternshipFinder/pull/644#pullrequestreview-5887502935). The optional entry preserves fixed daily cleanup and produces the existing bounded aggregate. [#647](https://github.com/bpmcginley/InternshipFinder/pull/647) passed its local test through the actual HTTP and scheduled entries. The reviewed [writer draft #650](https://github.com/bpmcginley/InternshipFinder/pull/650) and corrected [digest release draft #649](https://github.com/bpmcginley/InternshipFinder/pull/649) remain in review or release staging. The [exact digest role-link design #634](https://github.com/bpmcginley/InternshipFinder/pull/634) and the [temporary subscriber reference design #641](https://github.com/bpmcginley/InternshipFinder/pull/641) still await owner decisions. Verify sender and reserve capacity, retention and scheduling, and restore evidence before enabling delivery.
 
 - **Top-up sales.** The [local sales-flow rehearsal #600](https://github.com/bpmcginley/InternshipFinder/pull/600), [new-sales guard #602](https://github.com/bpmcginley/InternshipFinder/pull/602) and [operator checklist #604](https://github.com/bpmcginley/InternshipFinder/pull/604) are merged. The sales guard is included in the verified `9d0df175` deployment. The account, approved live Price, signed webhook and funded-run configuration still need private qualification before enabling sales. [Operator checklist](../../worker/README.md#one-time-top-up-activation-owner-qualification-required)
 
