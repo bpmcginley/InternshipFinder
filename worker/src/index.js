@@ -21,6 +21,7 @@ import { createFollowSignupRoute } from "./follow-signup-route.js";
 import { prepareFollowSignupDeployment } from "./follow-signup-release.js";
 import { runFollowScheduledMaintenance } from "./follow-scheduled-maintenance.js";
 import { runFollowScheduledLinks } from "./follow-scheduled-links.js";
+import { runFollowDigestRelease } from "./follow-digest-release.js";
 import { runFollowArchiveDeployment } from "./follow-archive-deployment.js";
 import { followTokenEndpoints } from "./follow-token-endpoint.js";
 import { followUnsubscribeEndpoint } from "./follow-unsubscribe-endpoint.js";
@@ -785,9 +786,50 @@ export async function handle(request, env, ctx, deps = {}) {
   return res;
 }
 
-export default {
-  fetch: (request, env, ctx) => handle(request, env, ctx),
-  scheduled(event, env, ctx) {
+function discardDigestPromise(value) {
+  try { Promise.prototype.then.call(value, undefined, () => {}); } catch { /* Not a native promise. */ }
+}
+
+// Trusted code dependency only. The default export supplies no digest authority.
+function scheduleFollowDigest(event, ctx, deps) {
+  try {
+    const slot = Object.getOwnPropertyDescriptor(deps, "followDigest");
+    if (!slot || !Object.hasOwn(slot, "value")) return;
+    const selected = slot.value;
+    if (!selected || ![Object.prototype, null].includes(Object.getPrototypeOf(selected))) return;
+    const cron = Object.getOwnPropertyDescriptor(selected, "cron");
+    if (!cron || !Object.hasOwn(cron, "value") || typeof cron.value !== "string" ||
+        cron.value.length > 128 || !/^[0-9*/,-]+(?: [0-9*/,-]+){4}$/.test(cron.value) ||
+        event?.cron !== cron.value) return;
+    const enabled = Object.getOwnPropertyDescriptor(selected, "enabled");
+    if (!enabled || !Object.hasOwn(enabled, "value") || enabled.value !== true) return;
+    if (Reflect.ownKeys(selected).sort().join(",") !== "cron,enabled,supply") return;
+    const supply = Object.getOwnPropertyDescriptor(selected, "supply");
+    if (!supply || !Object.hasOwn(supply, "value") || typeof supply.value !== "function") return;
+    const options = supply.value();
+    if (!options || ![Object.prototype, null].includes(Object.getPrototypeOf(options))) {
+      discardDigestPromise(options);
+      return;
+    }
+    const descriptors = Object.getOwnPropertyDescriptors(options);
+    const required = ["archive", "catalog", "db", "deadlineMs", "email", "enabled", "fetch", "key",
+      "limits", "monotonicNow", "now", "policy", "transportTimeoutMs"];
+    if (Reflect.ownKeys(descriptors).some((k) => typeof k !== "string" ||
+        (!required.includes(k) && k !== "relatedLimits")) ||
+        required.some((k) => !descriptors[k]) ||
+        Object.values(descriptors).some((d) => !d.enumerable || !Object.hasOwn(d, "value")) ||
+        descriptors.enabled.value !== true) {
+      discardDigestPromise(options);
+      return;
+    }
+    const captured = Object.fromEntries(Object.entries(descriptors).map(([k, d]) => [k, d.value]));
+    ctx.waitUntil(runFollowDigestRelease(captured));
+  } catch {
+    // No sensitive error, retry, provider fallback or second scheduled job.
+  }
+}
+
+export function handleScheduled(event, env, ctx, deps = {}) {
     // The half-hourly trigger is the repository's clock (clock.js); the daily one is the cleanup.
     if (event && event.cron === CLOCK_CRON) {
       ctx.waitUntil(startCatchup(env).catch((e) => console.error("clock failed:", e && e.name)));
@@ -835,10 +877,9 @@ export default {
       if (
         typeof archiveCron === "string" &&
         archiveCron.length > 0 &&
-        event?.cron === archiveCron &&
-        env.FOLLOW_ARCHIVE_ENABLED === "1"
+        event?.cron === archiveCron
       ) {
-        ctx.waitUntil(
+        if (env.FOLLOW_ARCHIVE_ENABLED === "1") ctx.waitUntil(
           runFollowArchiveDeployment({
             enabled: true,
             get descriptor() {
@@ -850,7 +891,9 @@ export default {
             fetch,
           }),
         );
+        return;
       }
+      scheduleFollowDigest(event, ctx, deps);
       return;
     }
     const now = new Date();
@@ -874,5 +917,9 @@ export default {
     };
     ctx.waitUntil(Promise.all([cleanup(env.DB, now), dropStale(env.DB, CONFIG, now), dropExpiredSessions(env.DB, now),
       dropOldLeads(env.DB, now), expireCampaignReportMail(env.DB, now), employerJobs()]));
-  },
+  }
+
+export default {
+  fetch: (request, env, ctx) => handle(request, env, ctx),
+  scheduled: (event, env, ctx) => handleScheduled(event, env, ctx),
 };
