@@ -18,6 +18,7 @@ import { createFollowManagementHttp } from "./follow-management-http.js";
 import { createFollowManagementRequestHttp } from "./follow-management-request-http.js";
 import { loadFollowCatalog, prepareFollowCatalogRelease } from "./follow-catalog-loader.js";
 import { createFollowSignupRoute } from "./follow-signup-route.js";
+import { prepareFollowSignupDeployment } from "./follow-signup-release.js";
 import { followTokenEndpoints } from "./follow-token-endpoint.js";
 import { followUnsubscribeEndpoint } from "./follow-unsubscribe-endpoint.js";
 import { topupCheckoutResponse, topupOfferResponse } from "./topup-checkout-http.js";
@@ -167,11 +168,22 @@ function prepareFollowSignupAdmission({ db, now, d }) {
 }
 
 const signupFollow = ({ request, env, db, now, d }) => {
-  if (env.FOLLOW_SIGNUP_ENABLED !== "1" || typeof d.followSignupRelease !== "function")
+  if (env.FOLLOW_SIGNUP_ENABLED !== "1" ||
+      (typeof d.followSignupRelease !== "function" && typeof env.FOLLOW_SIGNUP_RELEASE !== "string"))
     return followSignupClosed();
   return followSignup(request, {
     originAllowed: (r) => followOriginAllowed(r, env),
-    prepareAdmission: () => prepareFollowSignupAdmission({ db, now, d }),
+    prepareAdmission: () => {
+      if (typeof d.followSignupRelease === "function")
+        return prepareFollowSignupAdmission({ db, now, d });
+      try {
+        return { db, ...prepareFollowSignupDeployment(env.FOLLOW_SIGNUP_RELEASE, {
+          fetch: d.fetch, now: d.now, initialTime: now instanceof Date ? +now : NaN,
+        }) };
+      } catch {
+        return followSignupClosed();
+      }
+    },
   });
 };
 
