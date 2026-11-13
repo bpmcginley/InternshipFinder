@@ -42,6 +42,7 @@ const migrationNames = [
   "0029_topup_history_observation.sql",
   "0030_topup_history_coverage.sql",
   "0031_follow_delivery_owner.sql",
+  "0032_follow_finalize_attempt_cost.sql",
 ];
 const legacySql = [...env.TEST_SCHEMA_SQL, ...env.TEST_EXTRA_SCHEMA_SQL];
 const databases = [env.LEGACY_DB, env.MIGRATION_DB];
