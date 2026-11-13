@@ -10,6 +10,17 @@ const canonicalTime = (v) =>
   Number.isFinite(Date.parse(v)) &&
   new Date(v).toISOString() === v;
 const data = (v, key) => Object.getOwnPropertyDescriptor(v, key)?.value;
+const receiptData = (v, key) => {
+  const d = Object.getOwnPropertyDescriptor(v, key);
+  if (!d || !Object.hasOwn(d, "value")) throw new Error();
+  return d.value;
+};
+function receiptArray(value) {
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) throw new Error();
+  const length = receiptData(value, "length");
+  if (length !== 0 && length !== 1) throw new Error();
+  return length ? [receiptData(value, "0")] : [];
+}
 
 // Explicit trusted pre-settlement capture, never a provider-history qualification API.
 // The opaque authority is local to this isolate and DB binding; serialization loses it.
@@ -32,32 +43,30 @@ export async function captureTopupEnrollment(db, attempt, livemode, options = {}
     )
       throw new Error();
     const mode = livemode ? "live" : "test";
-    const rows = await db.batch([
-      db
-        .prepare(
-          `SELECT c.mode,c.epoch,c.schema_key,c.starts_at,
+    const rows = receiptArray(
+      await db.batch([
+        db
+          .prepare(
+            `SELECT c.mode,c.epoch,c.schema_key,c.starts_at,
       c.covered_through,c.revision,${UTC} AS observed_at FROM topup_history_coverage c
       WHERE c.mode=? AND c.schema_key=? AND c.health='qualified'
       AND c.starts_at<=? AND c.covered_through>=? AND c.covered_through<=${UTC}
       AND EXISTS(SELECT 1 FROM topup_checkout_attempts a JOIN topup_attempt_revisions r
         ON r.attempt_id=a.id WHERE a.id=? AND r.revision=? AND a.created=?
         AND a.state IN ('creating','open'))`,
-        )
-        .bind(mode, schema, created, created, id, revision, created),
-    ]);
-    if (
-      !Array.isArray(rows) ||
-      rows.length !== 1 ||
-      !Object.hasOwn(rows, 0) ||
-      rows[0]?.success !== true ||
-      rows[0].meta?.changes !== 0 ||
-      !Array.isArray(rows[0].results) ||
-      rows[0].results.length > 1
-    )
-      throw new Error();
-    if (!rows[0].results.length) return { status: "unproven" };
-    if (!Object.hasOwn(rows[0].results, 0)) throw new Error();
-    const value = rows[0].results[0];
+          )
+          .bind(mode, schema, created, created, id, revision, created),
+      ]),
+    );
+    if (rows.length !== 1) throw new Error();
+    const row = rows[0],
+      success = receiptData(row, "success"),
+      meta = receiptData(row, "meta"),
+      changes = receiptData(meta, "changes"),
+      results = receiptArray(receiptData(row, "results"));
+    if (success !== true || changes !== 0) throw new Error();
+    if (!results.length) return { status: "unproven" };
+    const value = results[0];
     const keys = [
       "mode",
       "epoch",

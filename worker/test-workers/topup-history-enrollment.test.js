@@ -285,3 +285,71 @@ it("transaction rollback preserves no partial claim or epoch; committed lost ack
   assert.equal((await settle(f, token)).status, "stale");
   assert.equal((await select("topup_purchases"))[0].available, 25);
 });
+
+it("rejects accessor receipt fields without executing them", async () => {
+  const f = await fixture();
+  for (const path of ["batch", "success", "results", "meta", "changes", "row", "epoch"]) {
+    let reads = 0;
+    const db = {
+      prepare: env.DB.prepare.bind(env.DB),
+      batch: async (statements) => {
+        const rows = await env.DB.batch(statements);
+        const [target, key] = {
+          batch: [rows, "0"],
+          success: [rows[0], "success"],
+          results: [rows[0], "results"],
+          meta: [rows[0], "meta"],
+          changes: [rows[0].meta, "changes"],
+          row: [rows[0].results, "0"],
+          epoch: [rows[0].results[0], "epoch"],
+        }[path];
+        const original = target[key];
+        Object.defineProperty(target, key, {
+          get() {
+            reads++;
+            return original;
+          },
+        });
+        return rows;
+      },
+    };
+    assert.equal((await capture(f, db)).status, "unavailable", path);
+    assert.equal(reads, 0, path);
+  }
+});
+it("missing actual capture revision cannot be replaced by a results getter before settlement", async () => {
+  const f = await fixture();
+  let captureReads = 0,
+    getters = 0;
+  const db = {
+    prepare: env.DB.prepare.bind(env.DB),
+    batch: async (statements) => {
+      const rows = await env.DB.batch(statements);
+      if (statements.length === 1) {
+        captureReads++;
+        assert.deepEqual(rows[0].results, []);
+        const row = await env.DB.prepare(
+          "SELECT mode,epoch,schema_key,starts_at,covered_through,revision,strftime('%Y-%m-%dT%H:%M:%fZ','now') AS observed_at FROM topup_history_coverage",
+        ).first();
+        Object.defineProperty(rows[0], "results", {
+          get() {
+            getters++;
+            return [row];
+          },
+        });
+      }
+      return rows;
+    },
+  };
+  await env.DB.prepare("DELETE FROM topup_attempt_revisions WHERE attempt_id=?").bind(f.a.id).run();
+  const token = await capture(f, db);
+  assert.equal(token.status, "unavailable");
+  assert.equal(captureReads, 1);
+  assert.equal(getters, 0);
+  const actual = await captureTopupSettlement(env.DB, f.a.id);
+  assert.equal(actual.revision, f.a.revision);
+  await afterCapture();
+  assert.equal((await settle(f, token, db)).status, "settled");
+  assert.equal((await select("topup_retention"))[0].coverage_epoch, null);
+  assert.equal((await select("topup_purchases"))[0].available, 25);
+});
