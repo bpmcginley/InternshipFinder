@@ -402,3 +402,74 @@ test("input and options accessors are not invoked", async () => {
   assert.deepEqual(await inventoryTopupHistory(input(), o), unavailable);
   assert.equal(calls, 0);
 });
+
+test("rejected asynchronous initial clock is drained before any I/O", async () => {
+  let calls = 0;
+  const result = await inventoryTopupHistory(
+    input(),
+    options(
+      async () => {
+        calls++;
+        return response(page());
+      },
+      { clock: () => Promise.reject(new Error("synthetic clock rejection")) },
+    ),
+  );
+  assert.deepEqual(result, unavailable);
+  assert.equal(calls, 0);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+});
+
+test("rejected asynchronous clock after page await is drained and response canceled", async () => {
+  let bad = false,
+    canceled = 0,
+    calls = 0;
+  const result = await inventoryTopupHistory(
+    input(),
+    options(
+      async () => {
+        calls++;
+        bad = true;
+        return new Response(
+          new ReadableStream({
+            cancel() {
+              canceled++;
+            },
+          }),
+        );
+      },
+      { clock: () => (bad ? Promise.reject(new Error("synthetic clock rejection")) : now) },
+    ),
+  );
+  assert.deepEqual(result, unavailable);
+  assert.equal(calls, 1);
+  assert.equal(canceled, 1);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+});
+
+test("rejected asynchronous clock after body await is drained and reader released", async () => {
+  let bad = false,
+    canceled = 0;
+  const stream = new ReadableStream(
+    {
+      pull(c) {
+        bad = true;
+        c.enqueue(new TextEncoder().encode(JSON.stringify(page())));
+      },
+      cancel() {
+        canceled++;
+      },
+    },
+    { highWaterMark: 0 },
+  );
+  const result = await inventoryTopupHistory(
+    input(),
+    options(async () => new Response(stream), {
+      clock: () => (bad ? Promise.reject(new Error("synthetic clock rejection")) : now),
+    }),
+  );
+  assert.deepEqual(result, unavailable);
+  assert.equal(canceled, 1);
+  assert.equal(stream.locked, false);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+});

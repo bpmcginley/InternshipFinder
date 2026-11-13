@@ -197,3 +197,74 @@ it("native noncooperative late page is discarded after timeout", async () => {
   await new Promise((resolve) => setTimeout(resolve, 0));
   expect(canceled).toBe(1);
 });
+
+it("native rejected initial clock drains without page I/O", async () => {
+  let calls = 0;
+  expect(
+    await inventoryTopupHistory(
+      input,
+      options(
+        async () => {
+          calls++;
+          return response(page());
+        },
+        { clock: () => Promise.reject(new Error("synthetic clock rejection")) },
+      ),
+    ),
+  ).toEqual(unavailable);
+  expect(calls).toBe(0);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+});
+
+it("native rejected clock after page await drains and cancels response", async () => {
+  let bad = false,
+    canceled = 0;
+  expect(
+    await inventoryTopupHistory(
+      input,
+      options(
+        async () => {
+          bad = true;
+          return new Response(
+            new ReadableStream({
+              cancel() {
+                canceled++;
+              },
+            }),
+          );
+        },
+        { clock: () => (bad ? Promise.reject(new Error("synthetic clock rejection")) : now) },
+      ),
+    ),
+  ).toEqual(unavailable);
+  expect(canceled).toBe(1);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+});
+
+it("native rejected clock after body await drains and releases reader", async () => {
+  let bad = false,
+    canceled = 0;
+  const stream = new ReadableStream(
+    {
+      pull(c) {
+        bad = true;
+        c.enqueue(new TextEncoder().encode(JSON.stringify(page())));
+      },
+      cancel() {
+        canceled++;
+      },
+    },
+    { highWaterMark: 0 },
+  );
+  expect(
+    await inventoryTopupHistory(
+      input,
+      options(async () => new Response(stream), {
+        clock: () => (bad ? Promise.reject(new Error("synthetic clock rejection")) : now),
+      }),
+    ),
+  ).toEqual(unavailable);
+  expect(canceled).toBe(1);
+  expect(stream.locked).toBe(false);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+});

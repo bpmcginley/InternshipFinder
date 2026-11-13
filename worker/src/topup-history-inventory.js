@@ -5,6 +5,14 @@ const unavailable = () => ({ status: "unavailable" });
 const fail = () => {
   throw new Error("History inventory unavailable");
 };
+const sample = (clock) => {
+  const value = clock();
+  if (!Number.isSafeInteger(value) || value < 0) {
+    void Promise.resolve(value).catch(() => {});
+    fail();
+  }
+  return value;
+};
 const own = (value) => {
   if (
     !value ||
@@ -69,10 +77,8 @@ export async function inventoryTopupHistory(input, options = {}) {
         cap[key] = value;
       }
     }
-    initial = clock();
+    initial = sample(clock);
     if (
-      !Number.isSafeInteger(initial) ||
-      initial < 0 ||
       typeof config.livemode !== "boolean" ||
       !Number.isSafeInteger(config.from) ||
       !Number.isSafeInteger(config.to) ||
@@ -110,10 +116,9 @@ export async function inventoryTopupHistory(input, options = {}) {
     last = initial,
     total = 0;
   const check = () => {
-    const now = clock();
+    const now = sample(clock);
     if (
       stopped ||
-      !Number.isSafeInteger(now) ||
       now < last ||
       Math.max(now - initial, performance.now() - started) >= cap.timeoutMs
     )
