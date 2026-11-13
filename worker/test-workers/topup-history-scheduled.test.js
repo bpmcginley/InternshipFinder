@@ -98,6 +98,10 @@ it("descriptor requires exact plain own-data daily UTC shape and free-tier page 
     ),
     unavailable,
   );
+  assert.deepEqual(
+    await call(Object.defineProperty(config(), "enabled", { enumerable: false }), ctx),
+    unavailable,
+  );
   assert.equal(reads, 0);
 });
 it("semantic collisions cover the existing four and configured lists and ranges", async () => {

@@ -58,6 +58,7 @@ export async function runTopupHistoryScheduled(eventCron, descriptor = {}, conte
     if (!enabled) return { status: "disabled" };
     if (!Object.hasOwn(enabled, "value")) return unavailable();
     if (enabled.value !== true) return { status: "disabled" };
+    if (!enabled.enumerable) return unavailable();
     record(descriptor, "cron,deadlineMs,enabled,limit,maxPages");
     const cron = data(descriptor, "cron");
     if (
