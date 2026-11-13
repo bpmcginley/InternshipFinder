@@ -1,5 +1,24 @@
 // Dormant daily-cleanup building block. No scheduler, provider or purchase erasure.
 import { cleanupTopupHistoryReceipts } from "./topup-history-observation.js";
+const promiseThen = Promise.prototype.then;
+const promiseSpecies = Object.getOwnPropertyDescriptor(Promise, Symbol.species)?.get;
+function discardAsyncClock(value) {
+  // Observe ordinary accidental async returns without adopting foreign thenables or
+  // consulting caller-defined constructors/species. Exotic promises remain caller-owned.
+  if (
+    !value ||
+    Object.getPrototypeOf(value) !== Promise.prototype ||
+    Object.hasOwn(value, "constructor") ||
+    Object.getOwnPropertyDescriptor(Promise.prototype, "constructor")?.value !== Promise ||
+    Object.getOwnPropertyDescriptor(Promise, Symbol.species)?.get !== promiseSpecies
+  )
+    return;
+  try {
+    Reflect.apply(promiseThen, value, [undefined, () => {}]);
+  } catch {
+    /* Not a native promise. */
+  }
+}
 
 function own(value, key) {
   const d = Object.getOwnPropertyDescriptor(value, key);
@@ -39,8 +58,10 @@ export async function drainTopupHistoryReceipts(db, options = {}) {
     let previous = -1;
     const sample = () => {
       const at = clock();
-      if (!Number.isFinite(at) || at < 0 || at < previous || at > Number.MAX_SAFE_INTEGER)
+      if (!Number.isFinite(at) || at < 0 || at < previous || at > Number.MAX_SAFE_INTEGER) {
+        discardAsyncClock(at);
         throw new Error();
+      }
       previous = at;
       return at;
     };

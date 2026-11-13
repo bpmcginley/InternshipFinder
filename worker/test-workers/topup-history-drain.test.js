@@ -347,3 +347,68 @@ it("supports the full existing 256-row page with explicit aggregate bounds", asy
     { status: "complete", pages: 2, removed: 257 },
   );
 });
+
+it("accidental rejected async clock fails closed without an unhandled rejection", async () => {
+  let calls = 0;
+  const db = {
+    prepare() {
+      calls++;
+      throw new Error();
+    },
+  };
+  assert.deepEqual(
+    await drain(db, {
+      ...options(),
+      monotonicNow: async () => {
+        throw new Error("synthetic clock rejection");
+      },
+    }),
+    { status: "unavailable", pages: 0, removed: 0 },
+  );
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(calls, 0);
+});
+it("async clock after an acknowledged page retains aggregate without another submission", async () => {
+  await seed(3);
+  let settled = false,
+    calls = 0;
+  const db = {
+    prepare: env.DB.prepare.bind(env.DB),
+    async batch(s) {
+      calls++;
+      const r = await env.DB.batch(s);
+      settled = true;
+      return r;
+    },
+  };
+  assert.deepEqual(
+    await drain(db, {
+      ...options(),
+      monotonicNow: () =>
+        settled ? Promise.reject(new Error("synthetic late clock rejection")) : 0,
+    }),
+    { status: "unavailable", pages: 1, removed: 2 },
+  );
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(calls, 1);
+  assert.equal((await rows()).length, 1);
+});
+it("invalid clocks never consult foreign thenables or native then getters", async () => {
+  let reads = 0;
+  const trap = () => {
+    reads++;
+    throw new Error("must not inspect");
+  };
+  const foreign = Object.defineProperty({}, "then", { get: trap });
+  const native = Object.defineProperty(Promise.reject(new Error("synthetic")), "then", {
+    get: trap,
+  });
+  for (const at of [foreign, { then: trap }, native])
+    assert.deepEqual(await drain(null, { ...options(), monotonicNow: () => at }), {
+      status: "unavailable",
+      pages: 0,
+      removed: 0,
+    });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(reads, 0);
+});
