@@ -283,7 +283,6 @@ def test_complete_model_rejection_precedes_artifact_write(fixture, tmp_path, mon
     [
         "data/FOLLOW-CATALOG.JSON",
         "js/FOLLOW-COMPANY-MODULES/unknown.mjs",
-        "js/APP-MODULES/unknown/entry.mjs",
     ],
 )
 def test_case_alias_owned_namespace_is_rejected(fixture, tmp_path, relative):
@@ -300,11 +299,12 @@ def test_case_alias_owned_namespace_is_rejected(fixture, tmp_path, relative):
 
 def test_directory_entries_are_bounded_before_copy(fixture, tmp_path, monkeypatch):
     site, inputs = fixture
+    limit = sum(1 for _ in site.rglob("*")) + 10
     for i in range(15):
         (site / f"empty-{i}").mkdir()
     monkeypatch.setattr(adapter.shutil, "copytree", lambda *_: pytest.fail("copied unbounded tree"))
     with pytest.raises(ValueError):
-        run((site, replace(inputs, max_site_files=10)), tmp_path / "too-many-directories")
+        run((site, replace(inputs, max_site_files=limit)), tmp_path / "too-many-directories")
     assert not (tmp_path / "too-many-directories").exists()
 
 
@@ -331,3 +331,15 @@ def test_option_looking_reference_is_only_an_absolute_read(fixture, tmp_path, mo
     )
     assert seen and sentinel.read_text() == "unchanged"
     assert not (output / "data/placements.json").exists()
+
+
+def test_case_alias_of_otherwise_valid_existing_graph_rejected(fixture, tmp_path):
+    site, inputs = fixture
+    for name, body in inputs.plan_options["graph_plan"][1].items():
+        target = site / name.replace("js/app-modules/", "js/APP-MODULES/")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(body)
+    before = tree(site)
+    with pytest.raises(ValueError):
+        run(fixture, tmp_path / "graph-alias")
+    assert tree(site) == before and not (tmp_path / "graph-alias").exists()
