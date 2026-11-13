@@ -57,7 +57,7 @@ Workers Logs stay off for the same reason.
 | `src/orders/` | Paid listings bought on the site: the order, email link, field cap, Checkout, review page, credits, daily cron (`ORDERS.md`) |
 | `src/mail.js` | Plain-text email over the Cloudflare Email Sending binding `EMAIL` (orders only) |
 | `scripts/placement.mjs` | Bruce's command line for the placement admin routes, plus `orders` and `pilot-code` (token from the environment) |
-| `src/config.js` | Models, per-task allowances, prices, rate limits. Edit here, then deploy |
+| `src/config.js` | Models, per-task allowances, prices, rate limits. Release via [Deploy](#deploy-bruce) |
 | `wrangler.toml` | Public vars (client IDs, origins, budget) and the D1 binding |
 
 ## Run locally
@@ -117,8 +117,11 @@ Claude never handles keys. Run these yourself:
    Run `npm run deploy` only when the entire pending set and backfills are approved. If a migration
    is held for another package, stop and use the coordinated release procedure for the exact approved
    code and existing schema. Do not apply the held migration merely to deploy unrelated code.
-   Verify the resulting ledger and expected schema before promotion. Preserve a compatible prior
-   Worker version and its bindings for rollback. A Worker rollback does not undo D1 migrations.
+   The package script deploys immediately after the database steps pass. When the release requires
+   ledger and schema verification before promotion, use a coordinated split procedure that stops
+   after the approved database steps, verifies them, and only then promotes the exact Worker.
+   Preserve a compatible prior Worker version and its bindings for rollback. A Worker rollback
+   does not undo D1 migrations.
    Repair schema drift through a reviewed migration, not an ad hoc manual `ALTER TABLE`.
 
 6. Use the verified deployed Worker URL in the extension and dashboard configuration.
@@ -169,7 +172,7 @@ copy anywhere that calls InternScout simply free is now wrong.
 Two things still gate a tier even with payments on, and both are secrets rather than code: nothing is
 offered at all unless `STRIPE_SECRET_KEY` is set, and a tier is offered only while its own price id
 (`STRIPE_PRICE_ID` for Supporter, `STRIPE_PRICE_ID_PRO` for Pro) is set. Unsetting one hides that tier
-and makes its checkout 404 again, without a deploy.
+and makes its checkout 404 again once the updated binding configuration is live.
 
 The steps below are how this was turned on, and how to redo it against a new Stripe account or when
 rotating from test keys to live ones. Claude does none of them — keys stay with you.
@@ -206,7 +209,7 @@ Check `task_tokens` in D1 (cents per task and model) after a few weeks: if an ap
 under 2¢, the allowances can go up; if it costs more, lower them. Neither changes the margin, only how
 often a student meets the ceiling before the allowance. Changing a price means creating a new Stripe price and updating the matching
 secret (`STRIPE_PRICE_ID`, `STRIPE_PRICE_ID_PRO`), `PLANS` and the `*_PRICE_TEXT` vars together (step 2
-below), and deploying.
+below). Follow the [deployment procedure](#deploy-bruce).
 
 A tier is offered only when its own Stripe price id is set, so you can launch Supporter alone and add
 Pro later without touching code.
@@ -227,7 +230,8 @@ Pro later without touching code.
    allowance. This is the subscription setup list, not the complete top-up event list. Preserve
    existing employer and subscription events when adding the top-up families below. Copy the
    endpoint's signing secret and run `npx wrangler secret put STRIPE_WEBHOOK_SECRET`.
-5. Set `PAYMENTS_ENABLED = "1"` and a correct `SITE_URL` in `wrangler.toml`, then `npm run deploy`.
+5. Set `PAYMENTS_ENABLED = "1"` and a correct `SITE_URL` in `wrangler.toml`, then follow the
+   [deployment procedure](#deploy-bruce), including review of every pending migration.
 6. Check it with a test card (`4242 4242 4242 4242`): `GET /me` should flip to `"plan": "supporter"`
    (or `"pro"`) with a larger allowance, switching tier in Stripe's portal should move it across, and
    cancelling should put it back to `free`.
@@ -241,8 +245,9 @@ activated at `dashboard.stripe.com/settings/managed-payments`, and each product 
 "Eligible for Managed Payments" (ours use `txcd_10105003`, AI as a service). Set it to `"0"` to send
 plain checkout sessions, where you owe the tax yourself.
 
-To switch them off again, set `PAYMENTS_ENABLED = "0"` and deploy. Existing subscribers keep their plan
-row but stop being charged only once you cancel their subscriptions in Stripe, so cancel there too.
+To switch subscription sales off again, set `PAYMENTS_ENABLED = "0"` through the
+[deployment procedure](#deploy-bruce). Existing subscribers keep their plan row but stop being
+charged only once you cancel their subscriptions in Stripe, so cancel there too.
 
 ## One-time top-up activation (owner qualification required)
 
@@ -273,10 +278,15 @@ Before enabling sales, verify these separately without printing secrets or priva
   `FUNDED_RESPONSE_MAX_BYTES`, `FUNDED_RESPONSE_EVENT_BYTES` and `FUNDED_RESPONSE_DEADLINE_MS`.
   Qualify those bounds with the actual supported client. The event bound cannot exceed the body
   bound. Existing allowance, pause, rate and spending limits still apply.
-- The proposed [sales-provider correction #602](https://github.com/bpmcginley/InternshipFinder/pull/602)
-  adds the required `STRIPE_TOPUP_MODE` value `test` or `live`, with no default, and a signing-key
-  presence gate for new sales. Treat those checks as enforced only after that exact correction is
-  merged and deployed. They do not verify the real account or delivery by themselves.
+- [Sales-provider correction #602](https://github.com/bpmcginley/InternshipFinder/pull/602) merged as
+  `0deb1ea1`. It requires `STRIPE_TOPUP_MODE` set to `test` or `live`, with no default, and a signing-key
+  presence gate for new sales. Before activation, verify the exact deployed Worker version includes
+  that correction. A repository merge alone does not establish enforcement in production. These
+  checks do not verify the real account or delivery by themselves.
+
+Use a separate Worker, D1 database and signed webhook endpoint for provider test mode. Purchased
+balances aggregate by user, so test and live purchases must not share the production database.
+Keep test credentials and events confined to that isolated environment.
 
 Read-only account, Price and endpoint checks can avoid creating a payment. Use the authorized
 provider interface and keep full responses private. Record only the expected checks and pass/fail
@@ -310,16 +320,17 @@ you switch a placement on. No student data is in either table, and no recruiter 
 **Turn it on (once, on your own machine; Claude does neither step):**
 
 1. `npx wrangler secret put ADMIN_TOKEN` (any long random string; it prompts for the value)
-2. `npm run deploy` (applies `schema.sql`, which creates the two tables, then deploys)
+2. Follow the [deployment procedure](#deploy-bruce) with the approved migration set and backfills.
 
-Then check the tables exist, because the schema step sometimes only prints a permission list:
+After the approved database steps, verify the placement schema objects:
 
 ```
 npx wrangler d1 execute internscout --remote --command "SELECT name FROM sqlite_master WHERE name LIKE 'placement%'"
 ```
 
 It should list `placements`, `placements_live`, `placement_log` and `placement_log_placement`. If not,
-run `npm run deploy` again.
+stop and reconcile the binding, migration ledger and expected schema through the coordinated release
+procedure. Do not rerun deployment to repair unexplained schema drift.
 
 **Day to day:** `scripts/placement.mjs` (no install). Put the same token in your shell's environment as
 `INTERNSCOUT_ADMIN_TOKEN` (for example in PowerShell, `$env:INTERNSCOUT_ADMIN_TOKEN = Read-Host`, then
@@ -351,7 +362,7 @@ binding, the `REVIEW_TO` secret, the Stripe webhook events) are in [ORDERS.md](O
 
 ## Changing limits
 
-- Allowances, models, prices and rate limits: `src/config.js`, then deploy.
+- Allowances, models, prices and rate limits: `src/config.js`, then follow [Deploy](#deploy-bruce).
 - Global monthly budget: `MONTHLY_BUDGET_CENTS` in `wrangler.toml` ($75). Keep the Google Cloud
   budget alert in step with it. It is the backstop that stops AI before a surprise bill arrives, so
   raise it and a per-student allowance together only once you have real usage numbers.
