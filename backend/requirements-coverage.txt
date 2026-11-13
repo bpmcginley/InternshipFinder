@@ -1,3 +1,0 @@
-# Install application dependencies from requirements.txt separately, as test.yml does.
-pytest-cov==7.1.0
-coverage==7.17.2
