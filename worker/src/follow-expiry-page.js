@@ -94,9 +94,7 @@ export async function expireFollowPage(db, options = {}) {
       await db.batch([
         after === null ? db.prepare(ceiling) : db.prepare("SELECT ? AS ceiling").bind(through),
         db
-          .prepare(
-            `SELECT CAST(rowid AS TEXT) AS cursor FROM ${table}${seek} ORDER BY rowid LIMIT ?`,
-          )
+          .prepare(`SELECT count(*) AS examined,CAST(max(rowid) AS TEXT) AS last FROM (${page})`)
           .bind(...args),
         db.prepare(`DELETE FROM ${table} WHERE rowid IN (${page}) AND ${expired}`).bind(...args),
         db.prepare("SELECT changes() AS removed"),
@@ -114,7 +112,7 @@ export async function expireFollowPage(db, options = {}) {
       read.changes !== 0 ||
       count.changes !== 0 ||
       write.rows.length ||
-      read.rows.length > maxRows ||
+      read.rows.length !== 1 ||
       count.rows.length !== 1
     )
       return unavailable();
@@ -123,33 +121,43 @@ export async function expireFollowPage(db, options = {}) {
     if (through !== null && bound.ceiling !== through) return unavailable();
     through = bound.ceiling;
     const high = through === null ? null : rowid(through);
-    let previous = after === null ? null : rowid(after);
-    for (const entry of read.rows) {
-      const r = record(entry);
-      if (Object.keys(r).join() !== "cursor") return unavailable();
-      const next = rowid(r.cursor);
-      if (high === null || next > high || (previous !== null && next <= previous))
-        return unavailable();
-      previous = next;
-    }
+    const pageReceipt = record(read.rows[0]);
+    const { examined, last } = pageReceipt;
+    if (
+      Object.keys(pageReceipt).sort().join() !== "examined,last" ||
+      !Number.isSafeInteger(examined) ||
+      examined < 0 ||
+      examined > maxRows
+    )
+      return unavailable();
+    const previous = last === null ? null : rowid(last);
+    if (
+      (examined === 0) !== (previous === null) ||
+      (previous !== null &&
+        (high === null || previous > high || (after !== null && previous <= rowid(after)))) ||
+      (after === null &&
+        high !== null &&
+        (examined === 0 || (examined < maxRows && previous !== high)))
+    )
+      return unavailable();
     const direct = record(count.rows[0]);
     const removed = direct.removed;
     if (
       Object.keys(direct).join() !== "removed" ||
       !Number.isSafeInteger(removed) ||
       removed < 0 ||
-      removed > read.rows.length ||
+      removed > examined ||
       write.changes < removed ||
       write.changes > removed * multiplier
     )
       return unavailable();
-    const complete = read.rows.length < maxRows || previous === high;
+    const complete = examined < maxRows || previous === high;
     return {
       status: "maintained",
-      examined: read.rows.length,
+      examined,
       removed,
       complete,
-      next: complete ? null : { kind, after: read.rows.at(-1).cursor, through },
+      next: complete ? null : { kind, after: previous.toString(), through },
     };
   } catch {
     // A write may have committed. No retry or cursor is certified after an uncertain receipt.

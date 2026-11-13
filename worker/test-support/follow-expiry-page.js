@@ -310,6 +310,9 @@ export async function expiryPageRollbackAndUnknownAcknowledgement(db) {
     (r) => {
       r[1].results = new Array(1);
     },
+    (r) => {
+      r[1].results = [];
+    },
   ]) {
     const bad = {
       prepare: (s) => db.prepare(s),
@@ -418,4 +421,55 @@ export async function expiryPageSignedInt64KeysAndCapturedCeiling(db) {
     next: null,
   });
   assert.equal(await total(db, "follow_confirmation_outbox"), 0);
+}
+
+export async function expiryPageCannotReturnAnUnvalidatedCursor(db) {
+  await seed(db);
+  await seed(db, "tail");
+  await job(db, "first", 1);
+  await seed(db, "middle");
+  await job(db, "middle", 2, "-1 second", null, "middle");
+  await job(db, "last", 3, "-1 second", null, "tail");
+  let reads = 0;
+  const changed = {
+    prepare: (s) => db.prepare(s),
+    async batch(s) {
+      const r = await db.batch(s);
+      r[1].results[0] = new Proxy(r[1].results[0], {
+        get(target, key) {
+          if (key === "last") {
+            reads++;
+            return "2";
+          }
+          return target[key];
+        },
+      });
+      return r;
+    },
+  };
+  assert.deepEqual((await expireFollowPage(changed, opts("confirmation", 1))).next, {
+    kind: "confirmation",
+    after: "1",
+    through: "3",
+  });
+  assert.equal(reads, 0);
+  const resumed = await expireFollowPage(
+    db,
+    opts("confirmation", 2, { kind: "confirmation", after: "1", through: "3" }),
+  );
+  assert.equal(resumed.removed, 2);
+  assert.equal(await total(db, "follow_confirmation_outbox"), 0);
+  await job(db, "live", 4, "+1 day");
+  const impossible = {
+    prepare: (s) => db.prepare(s),
+    async batch(s) {
+      const r = await db.batch(s);
+      r[1].results = [{ examined: 0, last: null }];
+      return r;
+    },
+  };
+  assert.deepEqual(await expireFollowPage(impossible, opts("confirmation", 1)), {
+    status: "unavailable",
+  });
+  assert.equal(await total(db, "follow_confirmation_outbox"), 1);
 }
