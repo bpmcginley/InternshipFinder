@@ -228,6 +228,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "atalanta": {
+   "name": "Atalanta",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-13"
+  },
   "auctor": {
    "name": "Auctor",
    "quant": false,
@@ -6091,6 +6097,12 @@
    "added": "2026-09-18",
    "sector": "hospitality_sports"
   },
+  "octantbio": {
+   "name": "Octant Bio",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-13"
+  },
   "octaura": {
    "name": "Octaura",
    "quant": false,
@@ -7018,6 +7030,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-10-06"
+  },
+  "stackav": {
+   "name": "StackAV",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-13"
   },
   "staged": {
    "name": "KKR",
@@ -10088,8 +10106,9 @@
   "metlife": {
    "name": "MetLife",
    "quant": false,
-   "fails": 0,
-   "added": "2026-10-01"
+   "fails": 1,
+   "added": "2026-10-01",
+   "last_fail": "2026-11-13"
   },
   "mirego": {
    "name": "Mirego",
@@ -11532,6 +11551,12 @@
   }
  },
  "recruitee": {
+  "huaweicanada": {
+   "name": "Huawei",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-13"
+  },
   "transperfect": {
    "name": "TransPerfect",
    "quant": false,
@@ -12870,6 +12895,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "abinbev|wd1.myworkdaysite.com|CAN": {
+   "name": "AB InBev",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-13"
   },
   "abinbev|wd1|USA": {
    "name": "Anheuser-Busch",
@@ -14334,6 +14365,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "capitalpower|wd10|External": {
+   "name": "Capital Power",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-13"
   },
   "cardinalhealth|wd1|EXT": {
    "name": "Cardinal Health",
@@ -17215,9 +17252,9 @@
   "marmon|wd501|Marmon_MSIP_Internships": {
    "name": "Marmon Holdings",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-09-13",
-   "last_fail": "2026-11-12"
+   "last_fail": "2026-11-13"
   },
   "mars|wd3|external": {
    "name": "Mars",
@@ -18060,6 +18097,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "originbank|wd1|Careers": {
+   "name": "Origin Bank",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-13"
   },
   "orthoclinical|wd1|Search": {
    "name": "QuidelOrtho",
