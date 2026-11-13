@@ -62,8 +62,7 @@ export async function runFollowScheduledMaintenance(db, rawPolicy, now = () => p
       (cursor) => expireFollowPage(budgetedDb, { ...page, kind: "confirmation", cursor }),
       (cursor) => expireFollowPage(budgetedDb, { ...page, kind: "tokens", cursor }),
       (cursor) => expireFollowUnconfirmedPage(budgetedDb, { ...page, cursor }),
-      (cursor) =>
-        expireFollowOrphanPage(budgetedDb, { ...page, maxRows: 1, maxChildren: maxRows, cursor }),
+      (cursor) => expireFollowOrphanPage(budgetedDb, { ...page, maxChildren: maxRows, cursor }),
       (cursor) => expireFollowDigestPage(budgetedDb, { ...page, maxRows: 1, cursor }),
       (cursor) => expireFollowPage(budgetedDb, { ...page, kind: "digest-days", cursor }),
       async () => {
