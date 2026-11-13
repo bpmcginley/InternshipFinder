@@ -82,6 +82,25 @@ function page(db, o, kind, table, limit) {
       fail();
     return {
       examined,
+      finishCandidate: (candidate, preceding, draining) => {
+        const key = rowid(candidate),
+          before = preceding === null ? null : rowid(preceding);
+        if (
+          !examined ||
+          previous === null ||
+          key > previous ||
+          (after !== null && key <= rowid(after)) ||
+          (before !== null && (before >= key || (after !== null && before <= rowid(after))))
+        )
+          fail();
+        const complete = !draining && key === high;
+        return {
+          complete,
+          next: complete
+            ? null
+            : { kind, after: draining ? (preceding ?? after) : candidate, through },
+        };
+      },
       finish: (draining = false) => {
         if (draining) {
           if (examined !== 1 || through === null) fail();
@@ -150,10 +169,21 @@ export async function expireFollowOrphanPage(db, options = {}) {
     if (o.enabled !== true) return { status: "disabled" };
     const { maxChildren } = o;
     if (!Number.isSafeInteger(maxChildren) || maxChildren < 1 || maxChildren > 128) fail();
-    const p = page(db, o, "orphans", "follow_subscribers", 1);
+    const p = page(db, o, "orphans", "follow_subscribers", 128);
     const absent = (subscriber) =>
       `NOT EXISTS(SELECT 1 FROM follow_subscriptions s WHERE s.subscriber_id=${subscriber})`;
-    const parent = `SELECT id FROM follow_subscribers WHERE ${p.selected}`;
+    const lookahead = o.maxRows > 1;
+    // Apply the rowid LIMIT before scope probes. Each statement sees the same candidate:
+    // these writes cannot change scope eligibility, and only the final write deletes a parent.
+    const selection = `WITH scan AS MATERIALIZED (
+      SELECT rowid AS rid,id FROM follow_subscribers WHERE ${p.selected}
+    ), candidate AS MATERIALIZED (
+      SELECT min(rid) AS rid FROM scan p WHERE ${absent("p.id")}
+    ) `;
+    const selected = lookahead ? `rowid=(${selection} SELECT rid FROM candidate)` : p.selected;
+    const parent = lookahead
+      ? `${selection} SELECT id FROM scan WHERE rid=(SELECT rid FROM candidate)`
+      : `SELECT id FROM follow_subscribers WHERE ${p.selected}`;
     // Each indexed child prefix is bounded before filtering current scope absence.
     // NOT INDEXED applies only to the outer rowid mutation, never to child selection.
     const tokens = `SELECT t.rowid FROM follow_tokens t INDEXED BY follow_tokens_subscriber
@@ -165,7 +195,11 @@ export async function expireFollowOrphanPage(db, options = {}) {
         ...p.initial,
         db
           .prepare(
-            `SELECT count(*) AS eligible FROM follow_subscribers WHERE ${p.selected} AND ${absent("follow_subscribers.id")}`,
+            lookahead
+              ? `SELECT * FROM (${selection} SELECT CASE WHEN rid IS NULL THEN 0 ELSE 1 END AS eligible,
+              CAST(rid AS TEXT) AS candidate,
+              CAST((SELECT max(rid) FROM scan WHERE rid<candidate.rid) AS TEXT) AS previous FROM candidate)`
+              : `SELECT count(*) AS eligible FROM follow_subscribers WHERE ${p.selected} AND ${absent("follow_subscribers.id")}`,
           )
           .bind(...p.args),
         db
@@ -182,7 +216,7 @@ export async function expireFollowOrphanPage(db, options = {}) {
         db.prepare("SELECT changes() AS changed"),
         db
           .prepare(
-            `DELETE FROM follow_subscribers NOT INDEXED WHERE ${p.selected} AND ${absent("follow_subscribers.id")}
+            `DELETE FROM follow_subscribers NOT INDEXED WHERE ${selected} AND ${absent("follow_subscribers.id")}
         AND NOT EXISTS(SELECT 1 FROM follow_tokens t WHERE t.subscriber_id=follow_subscribers.id)
         AND NOT EXISTS(SELECT 1 FROM follow_digest_outbox d WHERE d.subscriber_id=follow_subscribers.id)`,
           )
@@ -198,7 +232,8 @@ export async function expireFollowOrphanPage(db, options = {}) {
     const eligibleRow = record(r[2].rows[0]),
       eligible = eligibleRow.eligible;
     if (
-      Object.keys(eligibleRow).join() !== "eligible" ||
+      Object.keys(eligibleRow).sort().join() !==
+        (lookahead ? "candidate,eligible,previous" : "eligible") ||
       ![0, 1].includes(eligible) ||
       eligible > snapshot.examined
     )
@@ -209,6 +244,12 @@ export async function expireFollowOrphanPage(db, options = {}) {
     const removed = changed(r[7], r[8], eligible, 3);
     if (!eligible && (tokensRemoved || digestsRemoved)) fail();
     const draining = eligible === 1 && removed === 0;
+    if (lookahead && !eligible && (eligibleRow.candidate !== null || eligibleRow.previous !== null))
+      fail();
+    const continuation =
+      lookahead && eligible
+        ? snapshot.finishCandidate(eligibleRow.candidate, eligibleRow.previous, draining)
+        : snapshot.finish(draining);
     return {
       status: "maintained",
       examined: snapshot.examined,
@@ -216,7 +257,7 @@ export async function expireFollowOrphanPage(db, options = {}) {
       digestsRemoved,
       removed,
       draining,
-      ...snapshot.finish(draining),
+      ...continuation,
     };
   } catch {
     // A write can have committed. No automatic retry or continuation after uncertainty.
