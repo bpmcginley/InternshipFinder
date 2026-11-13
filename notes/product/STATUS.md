@@ -75,6 +75,33 @@ Exact [Engineering #645](https://github.com/bpmcginley/InternshipFinder/pull/645
   private evidence while the ordinary listing retry still succeeds. Production storage and trusted accepted-operation
   evidence remain open. [Independent exact review](https://github.com/bpmcginley/InternshipFinder/pull/651#pullrequestreview-5887873831)
 
+### Current Follow and top-up qualification
+
+- [Follow database deadline #653](https://github.com/bpmcginley/InternshipFinder/pull/653) at `bc647e01`
+  checks the same fixed cutoff in the SQLite owner update. A late batch changes zero rows. A committed update
+  with lost acknowledgement preserves the existing running state. All nine hosted checks and 101 independent
+  native tests passed. The exact combined signup-to-unsubscribe rehearsal also passed.
+  [Independent review](https://github.com/bpmcginley/InternshipFinder/pull/653#pullrequestreview-5887959008) ·
+  [Lifecycle rehearsal](https://github.com/bpmcginley/InternshipFinder/pull/653#issuecomment-6847642984)
+- [Scheduled digest #654](https://github.com/bpmcginley/InternshipFinder/pull/654) at `fef97235` passed all nine
+  hosted checks, 84 independent native cases and an additional disabled-archive collision case. The scheduled
+  handler dispatches one digest when supplied with trusted inputs. The default Worker has no supplier. An isolated
+  merge rehearsal with #636 resolved the adjacent helper insertion and preserved both maintenance jobs in 13
+  native cases. Production scheduling, key provisioning and digest presentation remain open.
+  [Independent review](https://github.com/bpmcginley/InternshipFinder/pull/654#pullrequestreview-5888128344)
+- Six local Git tests verified that the [journal #651](https://github.com/bpmcginley/InternshipFinder/pull/651)
+  feeds the [detached recovery #640](https://github.com/bpmcginley/InternshipFinder/pull/640) unchanged after an
+  actual two-parent retry. Recovery held when the journal write failed, the direct push acknowledgement was lost,
+  or the original candidate or pending generation differed. The rehearsal used separate exact writer modules.
+  Production still needs trusted storage, accepted-operation evidence and restore authority.
+  [Recovery rehearsal](https://github.com/bpmcginley/InternshipFinder/pull/640#issuecomment-6847831767)
+- [Purchased streaming test #655](https://github.com/bpmcginley/InternshipFinder/pull/655) at `7066527d`
+  verified signed settlement, restoration after a definitive provider rejection, and a successful same-run
+  streaming retry with one debit. All 31 independent native tests passed. Three unchanged native suites timed out
+  on the initial hosted Worker job. The exact rerun passed all nine checks. Live Stripe qualification remains open.
+  [Independent review](https://github.com/bpmcginley/InternshipFinder/pull/655#pullrequestreview-5888078455) ·
+  [Hosted rerun](https://github.com/bpmcginley/InternshipFinder/actions/runs/43392335054/attempts/2)
+
 ### Follow delivery source progress
 
 The indexed digest cleanup and opt-in scheduler are merged. The selector refuses ambiguous settings before D1 access. The exact native suite covered legacy behavior through migration 0029, the new indexes through 0033, the bounded deadline and database-call limits, and held or uncertain outcomes. The indexed lane has no production trigger. Migration 0033 is pending production adoption. [Cleanup #623](https://github.com/bpmcginley/InternshipFinder/pull/623) · [Scheduler #627](https://github.com/bpmcginley/InternshipFinder/pull/627)
@@ -666,6 +693,8 @@ The golden harness now covers static assets as well as generated pages. Each sit
 | D | P-2.1au native checkpoint test budget | audit_worker_extension | `codex/product-checkpoint-test-budget` | [#485](https://github.com/bpmcginley/InternshipFinder/pull/485) | Merged as `ae151b70` after exact independent review and hosted checks | 58 native cases pass with a dedicated 15-second test budget after a hosted case exceeded the default five-second limit. Real SQLite expiry assertions, single attempts and the 120-second outer wrapper are unchanged. Coverage and stress evidence tracked in the PR; no production changes. |
 
 ## Waiting for Bruce
+
+- **Reviewed Follow and top-up drafts.** [#653 database deadline](https://github.com/bpmcginley/InternshipFinder/pull/653), [#654 scheduled digest](https://github.com/bpmcginley/InternshipFinder/pull/654) and [#655 purchased streaming test](https://github.com/bpmcginley/InternshipFinder/pull/655) are staged with exact review and hosted checks. Follow and top-up sales remain off.
 
 - **Daily Follow sweep capacity.** At the current statement ceiling, the actual local Workers/D1 queue completed 19 matching subscribers. With 20, two fresh passes each left the same subscriber unprocessed. [Capacity evidence](https://github.com/bpmcginley/InternshipFinder/pull/630#issuecomment-6846262939). [Design #641](https://github.com/bpmcginley/InternshipFinder/pull/641) proposes one expiring private resume record with a single subscriber reference, atomic erasure and a pinned daily snapshot. [Independent design review](https://github.com/bpmcginley/InternshipFinder/pull/641#pullrequestreview-5887334844) passed. Owner approval is required for the new reference, deletion and expiry before implementation.
 
