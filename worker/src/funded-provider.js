@@ -212,11 +212,19 @@ export async function fundedProviderResponse({
       }
     }
   };
+  // The existing LF semantic parser can combine several raw CR-delimited frames.
+  // Keep its independent bound without repeatedly encoding an accumulated event
+  // or incomplete line. Each decoded piece and each completed line is counted once.
+  const semanticEncoder = new TextEncoder();
+  let semanticEventBytes = 0,
+    incompleteBytes = 0;
   const scan = (piece, final = false) => {
     text += piece;
+    incompleteBytes += semanticEncoder.encode(piece).byteLength;
     let usable = false,
       end;
     while ((end = text.indexOf("\n")) >= 0) {
+      incompleteBytes -= semanticEncoder.encode(text.slice(0, end + 1)).byteLength;
       const line = text.slice(0, end).replace(/\r$/, "");
       text = text.slice(end + 1);
       if (line === "") {
@@ -224,9 +232,16 @@ export async function fundedProviderResponse({
           const value = event.endsWith("\n") ? event.slice(0, -1) : event;
           if (value !== "[DONE]") usable = inspect(JSON.parse(value)) || usable;
           event = "";
+          semanticEventBytes = 0;
         }
-      } else if (line.startsWith("data:")) event += line.slice(5).replace(/^ /, "") + "\n";
+      } else if (line.startsWith("data:")) {
+        const data = line.slice(5).replace(/^ /, "") + "\n";
+        event += data;
+        semanticEventBytes += semanticEncoder.encode(data).byteLength;
+      }
+      if (semanticEventBytes > limits.maxEventBytes) throw upstreamError();
     }
+    if (incompleteBytes + semanticEventBytes > limits.maxEventBytes) throw upstreamError();
     if (final && (text.trim() || event)) throw upstreamError(); // Incomplete event is not proof of completion.
     return usable;
   };

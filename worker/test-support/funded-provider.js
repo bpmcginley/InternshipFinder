@@ -194,6 +194,61 @@ export async function fundedWireEventLimitDoesNotApplyToJson(db) {
   await result.completion;
   assert.equal(await budget(db), 2);
 }
+export async function fundedMixedCrFramesRetainSemanticLimit(db) {
+  const partA = "data: {" + " ".repeat(185) + "\n\r";
+  const body = JSON.stringify({
+    candidates: [{ content: { parts: [{ text: "x".repeat(75) }] }, finishReason: "STOP" }],
+    usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1 },
+  });
+  const partB = ": bridge\ndata: " + body.slice(1) + "\n\n";
+  assert.deepEqual([encoder.encode(partA).length, encoder.encode(partB).length], [194, 229]);
+  assert.equal(encoder.encode(partA.slice(6, -1) + body.slice(1)).length, 399);
+  for (const step of [1, 194, 1024]) {
+    const options = await setup(db);
+    let cancelled = 0;
+    await assert.rejects(
+      () =>
+        boundary({
+          ...options,
+          stream: true,
+          limits: { ...limits, maxEventBytes: 256 },
+          send: async () => wireResponse(encoder.encode(partA + partB), step, () => cancelled++),
+        }),
+      (e) => e.code === "upstream",
+    );
+    assert.equal(cancelled, 1);
+    assert.equal((await stored(db)).state, "reserved");
+    assert.equal(await budget(db), 6);
+  }
+  const options = await setup(db),
+    first = encoder.encode(frame(answer()));
+  let index = 0;
+  const result = await boundary({
+    ...options,
+    stream: true,
+    limits: { ...limits, maxEventBytes: 256 },
+    send: async () =>
+      new Response(
+        new ReadableStream(
+          {
+            pull(c) {
+              c.enqueue(index++ === 0 ? first : encoder.encode(partA + partB));
+            },
+          },
+          { highWaterMark: 0 },
+        ),
+      ),
+  });
+  const reader = result.response.body.getReader();
+  assert.deepEqual((await reader.read()).value, first);
+  await assert.rejects(
+    () => reader.read(),
+    (e) => e.code === "upstream",
+  );
+  await result.completion;
+  assert.equal((await stored(db)).state, "accepted");
+  assert.equal(await budget(db), 6);
+}
 export async function fundedJsonCommitsBeforeExactExposure(db) {
   const options = await setup(db),
     raw = " \n" + JSON.stringify(answer("fixture å")) + "\n";
