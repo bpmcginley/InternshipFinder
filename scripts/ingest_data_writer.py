@@ -1,11 +1,13 @@
 """Prepare and publish one complete ingest snapshot on the existing data branch."""
 
 import argparse
+from dataclasses import dataclass
 from datetime import datetime
 import io
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import tarfile
@@ -228,30 +230,61 @@ def same_snapshot(checkout, earlier, later):
     )
 
 
-def push_existing(checkout, expected):
+@dataclass(frozen=True)
+class PushIntent:
+    ordinal: int
+    expected_predecessor: str
+    candidate_commit: str
+    public_tree: str
+
+
+def _push_existing(checkout, expected, candidate=None):
     # The hook sees the server's advertised old OID in this push, including an absent ref.
     # A normal push checks that same OID on the server when it updates the ref.
     with tempfile.TemporaryDirectory(prefix="ingest-push-") as folder:
         hook = Path(folder) / "pre-push"
+        check_candidate = (
+            b'  [ "$local_oid" = "$INTERN_SCOUT_DATA_PUSH_CANDIDATE" ] || exit 1\n'
+            if candidate is not None
+            else b""
+        )
         hook.write_bytes(
             b'#!/bin/sh\n'
             b'while read -r local_ref local_oid remote_ref remote_oid; do\n'
             b'  [ "$remote_ref" = refs/heads/data ] && '
             b'[ "$remote_oid" = "$INTERN_SCOUT_DATA_EXPECTED_TIP" ] || exit 1\n'
-            b'done\n'
+            + check_candidate
+            + b'done\n'
         )
         hook.chmod(0o755)
-        result = git(
+        push_env = {**os.environ, "INTERN_SCOUT_DATA_EXPECTED_TIP": expected}
+        if candidate is not None:
+            push_env["INTERN_SCOUT_DATA_PUSH_CANDIDATE"] = candidate
+        return git(
             checkout,
             "-c",
             f"core.hooksPath={Path(folder).as_posix()}",
+            *(("-c", f"core.abbrev={len(candidate)}") if candidate is not None else ()),
             "push",
+            *(("--porcelain",) if candidate is not None else ()),
             "origin",
-            f"HEAD:{BRANCH}",
+            f"{'HEAD' if candidate is None else candidate}:{BRANCH}",
             check=False,
-            env={**os.environ, "INTERN_SCOUT_DATA_EXPECTED_TIP": expected},
+            env=push_env,
         )
-    return result.returncode == 0
+
+
+def push_existing(checkout, expected):
+    return _push_existing(checkout, expected).returncode == 0
+
+
+def _acknowledges_push(result, intent):
+    if result.returncode != 0:
+        return False
+    records = [line for line in result.stdout.splitlines() if b"\t" in line]
+    source = f"{intent.candidate_commit}:{BRANCH}".encode("ascii")
+    summary = f"{intent.expected_predecessor}..{intent.candidate_commit}".encode("ascii")
+    return records == [b" \t" + source + b"\t" + summary]
 
 
 def remote_tip(checkout):
@@ -264,7 +297,12 @@ def publication_marker(checkout, commit):
     return f"[ingest-data] commit={commit} tree={tree}"
 
 
-def publish(checkout, state, message):
+def publish(checkout, state, message, *, observe_push=None):
+    """Optionally report intent before push and direct acknowledgement after it.
+
+    The trusted observer must return promptly. Its records require separate
+    run, attempt and pending-checkpoint authentication before recovery.
+    """
     base = data_base(checkout)
     git(checkout, "ls-remote", "--exit-code", "--heads", "origin", BRANCH)
     if not state.is_dir() or state.is_symlink():
@@ -283,8 +321,33 @@ def publish(checkout, state, message):
     candidate = revision(checkout, "HEAD")
     expected = base
     for attempt in range(3):
-        if push_existing(checkout, expected):
-            return "Published validated data snapshot.", revision(checkout, "HEAD")
+        pushed_commit = None
+        if observe_push is None:
+            pushed = push_existing(checkout, expected)
+        else:
+            current = revision(checkout, "HEAD")
+            public_tree = revision(checkout, f"{current}:{PUBLIC}")
+            if not all(
+                re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", oid) and len(oid) == len(current)
+                for oid in (expected, current, public_tree)
+            ):
+                raise ValueError("Invalid Follow push identity")
+            intent = PushIntent(attempt + 1, expected, current, public_tree)
+            try:
+                observe_push(intent, False)
+            except Exception:
+                observe_push = None
+            result = _push_existing(checkout, expected, current)
+            pushed = result.returncode == 0
+            pushed_commit = current
+            if observe_push is not None and _acknowledges_push(result, intent):
+                try:
+                    observe_push(intent, True)
+                except Exception:
+                    # The listing was pushed. Optional evidence cannot revoke that result.
+                    pass
+        if pushed:
+            return "Published validated data snapshot.", pushed_commit or revision(checkout, "HEAD")
         remote = remote_tip(checkout)
         if ancestor(checkout, candidate, remote):
             if same_snapshot(checkout, candidate, remote):
