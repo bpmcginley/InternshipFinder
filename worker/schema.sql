@@ -1243,3 +1243,6 @@ BEGIN
   UPDATE follow_delivery_owner SET management_id=NULL,management_expires_at=NULL
   WHERE management_id=OLD.id AND management_expires_at=OLD.expires_at;
 END;
+
+CREATE INDEX IF NOT EXISTS follow_digest_outbox_created ON follow_digest_outbox (created);
+CREATE INDEX IF NOT EXISTS follow_digest_outbox_expiry ON follow_digest_outbox (state, expires_at);
