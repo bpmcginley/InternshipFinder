@@ -20,6 +20,7 @@ import { loadFollowCatalog, prepareFollowCatalogRelease } from "./follow-catalog
 import { createFollowSignupRoute } from "./follow-signup-route.js";
 import { prepareFollowSignupDeployment } from "./follow-signup-release.js";
 import { runFollowScheduledMaintenance } from "./follow-scheduled-maintenance.js";
+import { runFollowScheduledLinks } from "./follow-scheduled-links.js";
 import { followTokenEndpoints } from "./follow-token-endpoint.js";
 import { followUnsubscribeEndpoint } from "./follow-unsubscribe-endpoint.js";
 import { followUnsubscribePreview } from "./follow-unsubscribe-preview.js";
@@ -819,6 +820,13 @@ export default {
       if (env.FOLLOW_MAINTENANCE_ENABLED === "1") {
         ctx.waitUntil(runFollowScheduledMaintenance(env.DB, env.FOLLOW_MAINTENANCE_POLICY));
       }
+      return;
+    }
+    const linksCron = env.FOLLOW_LINKS_CRON;
+    if (typeof linksCron === "string" && linksCron.length > 0 &&
+        ![CLOCK_CRON, STUDENT_BILLING_CRON, CAMPAIGN_REPORT_CRON, "17 7 * * *", followCron].includes(linksCron) &&
+        event?.cron === linksCron) {
+      if (env.FOLLOW_LINKS_ENABLED === "1") ctx.waitUntil(runFollowScheduledLinks(env));
       return;
     }
     if (event?.cron !== "17 7 * * *") return;

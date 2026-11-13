@@ -13,7 +13,7 @@ const exact = (value, keys) =>
   Object.keys(value).sort().join(",") === keys;
 
 // JSON grammar is checked first. Compare decoded names, including escaped aliases.
-function uniqueMembers(text) {
+export function uniqueFollowDeploymentMembers(text) {
   const stack = [];
   let previous;
   for (const [token] of text.matchAll(/"(?:[^"\\]|\\.)*"|[{}:]/g)) {
@@ -29,6 +29,31 @@ function uniqueMembers(text) {
   }
 }
 
+// Pure deployment policy shared with the dormant archive adapter. No read or clock starts here.
+export function prepareFollowCatalogDeployment(input) {
+  if (
+    !exact(input, "deadlineMs,maxBytes,maxKeys,origin,predecessor,release,version") ||
+    input.version !== 1 ||
+    input.origin !== ORIGIN ||
+    input.maxBytes > 1000000 ||
+    input.maxKeys > 10000
+  )
+    fail();
+  const policy = prepareFollowCatalogRelease({ ...input, previousValid: empty() });
+  if (!Number.isFinite(+new Date(policy.release.expiresAt))) fail();
+  let predecessor = null;
+  if (!(exact(input.predecessor, "genesis") && input.predecessor.genesis === true)) {
+    if (!exact(input.predecessor, "catalogSha256,sourceSha256,url")) fail();
+    predecessor = prepareFollowCatalogRelease({
+      ...policy,
+      // Current release authority qualifies historical bytes, not predecessor admission.
+      release: { ...policy.release, ...input.predecessor },
+    });
+    if (predecessor.release.url === policy.release.url) fail();
+  }
+  return { policy, predecessor };
+}
+
 // Deployment input only. No request values, cached authority, settings or default pins.
 // maxBytes is PER catalog (at most two); maxKeys is the existing per-array bound.
 export function prepareFollowSignupDeployment(
@@ -38,7 +63,7 @@ export function prepareFollowSignupDeployment(
   if (typeof raw !== "string" || raw.length > 4096 || new TextEncoder().encode(raw).length > 4096)
     fail();
   const input = JSON.parse(raw);
-  uniqueMembers(raw);
+  uniqueFollowDeploymentMembers(raw);
   if (
     !exact(input, "dailyLimit,deadlineMs,maxBytes,maxKeys,origin,predecessor,release,version") ||
     input.version !== 1 ||
@@ -53,19 +78,8 @@ export function prepareFollowSignupDeployment(
     typeof monotonicNow !== "function"
   )
     fail();
-  const policy = prepareFollowCatalogRelease({ ...input, previousValid: empty() });
-  if (!Number.isFinite(+new Date(policy.release.expiresAt))) fail();
-  let predecessor = null;
-  if (!(exact(input.predecessor, "genesis") && input.predecessor.genesis === true)) {
-    if (!exact(input.predecessor, "catalogSha256,sourceSha256,url")) fail();
-    predecessor = prepareFollowCatalogRelease({
-      ...policy,
-      // These times qualify the CURRENT descriptor's authority to read historical bytes.
-      // They do not renew the predecessor as a signup release or assert its genesis.
-      release: { ...policy.release, ...input.predecessor },
-    });
-    if (predecessor.release.url === policy.release.url) fail();
-  }
+  const { dailyLimit, ...catalogInput } = input;
+  const { policy, predecessor } = prepareFollowCatalogDeployment(catalogInput);
   let latest = initialTime ?? -Infinity;
   const clock = () => {
     const sample = now();
@@ -94,7 +108,7 @@ export function prepareFollowSignupDeployment(
   };
   clock();
   return {
-    dailyLimit: input.dailyLimit,
+    dailyLimit,
     clock,
     loadCatalog: async () => {
       try {
