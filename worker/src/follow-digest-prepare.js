@@ -1,5 +1,10 @@
 // Dormant preparation only. A sender must still claim an attempt under fresh consent.
-import { followInstant, followSnapshotDigest, matchFollowSnapshot } from "./follow-matching.js";
+import {
+  followInstant,
+  followSnapshotDigest,
+  matchFollowSnapshot,
+  matchFollowSnapshotWithRelated,
+} from "./follow-matching.js";
 import { payloadOf } from "./follow-outbox.js";
 
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
@@ -42,9 +47,10 @@ export async function prepareLeasedFollowDigest(
   db,
   jobId,
   lease,
-  { catalog, limits, loadSnapshot, clock = () => new Date() } = {},
+  { catalog, limits, loadSnapshot, clock = () => new Date(), relatedLimits } = {},
 ) {
   const bounds = { ...limits };
+  const related = relatedLimits === undefined ? undefined : { ...relatedLimits };
   if (
     typeof jobId !== "string" ||
     !uuid.test(jobId) ||
@@ -78,11 +84,15 @@ export async function prepareLeasedFollowDigest(
       confirmed_at: confirmedAt,
       watermark: from,
     }));
-    matched = matchFollowSnapshot(bytes, scopes, {
+    const options = {
       catalog,
       limits: bounds,
       upperBound: pinned.snapshot_at,
-    });
+    };
+    matched =
+      related === undefined
+        ? matchFollowSnapshot(bytes, scopes, options)
+        : matchFollowSnapshotWithRelated(bytes, scopes, options, related);
     if (
       matched.status !== "matched" ||
       !matched.refs.length ||
@@ -101,5 +111,6 @@ export async function prepareLeasedFollowDigest(
     Object.keys(pinned).some((key) => current[key] !== pinned[key])
   )
     return unavailable();
-  return { status: "ready", subscriberId: pinned.subscriber_id, roles: matched.roles };
+  const result = { status: "ready", subscriberId: pinned.subscriber_id, roles: matched.roles };
+  return related === undefined ? result : { ...result, similar: matched.similar };
 }

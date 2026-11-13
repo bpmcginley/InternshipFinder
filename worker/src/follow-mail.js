@@ -127,7 +127,7 @@ function trustedLinks(origins, links, withManagement) {
   return { urlFor, managementToken };
 }
 
-function roleLines(roles, seen, limit = Infinity) {
+function roleLines(roles, seen, limit = Infinity, selected = null) {
   if (!Array.isArray(roles)) invalid();
   const lines = [];
   for (const role of roles) {
@@ -138,6 +138,7 @@ function roleLines(roles, seen, limit = Infinity) {
     seen.ids.add(role.id);
     if (seen.urls.has(identity)) continue;
     seen.urls.add(identity);
+    selected?.push(role);
     lines.push(
       `${line(role.company_name, 200)}: ${line(role.title, 300)} (${line(role.location, 300)})`,
       posting.href,
@@ -145,6 +146,13 @@ function roleLines(roles, seen, limit = Infinity) {
     if (lines.length / 2 === limit) break;
   }
   return lines;
+}
+
+// Keep exact object identity and the same ordered posting deduplication as rendering.
+export function followMailDirectRoles(roles) {
+  const selected = [];
+  roleLines(roles, { ids: new Set(), urls: new Set() }, Infinity, selected);
+  return selected;
 }
 
 function rejectManagementInRoleLinks(lines, managementToken) {
