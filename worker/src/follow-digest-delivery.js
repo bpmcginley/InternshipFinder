@@ -1,6 +1,7 @@
-// Dormant one-attempt composition; no provider binding, route, scheduler or token issuance.
+// Dormant one-attempt composition; capability issuance requires an explicit trusted builder.
 import { prepareLeasedFollowDigest } from "./follow-digest-prepare.js";
 import { renderFollowMail } from "./follow-mail.js";
+import { createFollowCapability } from "./follows.js";
 import { validFollowSendCap } from "./follow-send-budget.js";
 import {
   leaseFollowDigest,
@@ -8,6 +9,31 @@ import {
   authorizeFollowSnapshotTransport,
   finishFollowDigestAttempt,
 } from "./follow-outbox.js";
+
+function privateLinks(buildLinks, management, unsubscribe) {
+  const values = buildLinks(Object.freeze({ management, unsubscribe }));
+  if (values && typeof values.then === "function") {
+    Promise.resolve(values).catch(() => {});
+    throw new Error("Invalid digest links");
+  }
+  if (!values || ![Object.prototype, null].includes(Object.getPrototypeOf(values)))
+    throw new Error("Invalid digest links");
+  const links = {};
+  for (const [name, token] of Object.entries({ management, unsubscribe })) {
+    const d = Object.getOwnPropertyDescriptor(values, name);
+    const value = d && Object.hasOwn(d, "value") && d.enumerable ? d.value : null;
+    if (typeof value !== "string" || value.length > 2000) throw new Error("Invalid digest links");
+    const url = new URL(value);
+    const expected =
+      name === "management"
+        ? `https://internscout.org/follows/manage.html#token=${token}`
+        : `${url.origin}/follows/unsubscribe?token=${token}`;
+    if (url.protocol !== "https:" || value !== expected || url.href !== expected)
+      throw new Error("Invalid digest links");
+    links[name] = value;
+  }
+  return links;
+}
 
 // present is trusted server code: links/similar facts must be authorized for subscriberId.
 // transport initiates immediately or rejects busy; it must not queue behind another send.
@@ -23,11 +49,13 @@ export async function deliverFollowSnapshotDigest({
   loadSnapshot,
   present,
   transport,
+  buildLinks = null,
 }) {
   const unavailable = () => ({ status: "unavailable" });
   if (
     !validFollowSendCap(cap) ||
-    [clock, loadSnapshot, present, transport].some((f) => typeof f !== "function")
+    [clock, loadSnapshot, present, transport].some((f) => typeof f !== "function") ||
+    (buildLinks !== null && typeof buildLinks !== "function")
   )
     return unavailable();
   let lease,
@@ -36,6 +64,7 @@ export async function deliverFollowSnapshotDigest({
     latest = -Infinity;
   const fresh = () => {
     const now = clock();
+    if (!(now instanceof Date)) Promise.resolve(now).catch(() => {});
     if (!(now instanceof Date) || !Number.isFinite(+now) || +now < latest)
       throw new Error("Invalid follow delivery clock");
     latest = +now;
@@ -62,10 +91,42 @@ export async function deliverFollowSnapshotDigest({
       subscriberId: prepared.subscriberId,
       roles: prepared.roles.map((role) => ({ ...role })),
     });
-    const envelope = renderFollowMail("digest", { ...presentation, matches, to: recipient });
+    let credentials = null,
+      bound = presentation;
+    if (buildLinks !== null) {
+      const [management, unsubscribe] = await Promise.all([
+        createFollowCapability(),
+        createFollowCapability(),
+      ]);
+      credentials = Object.freeze({
+        subscriberId: prepared.subscriberId,
+        email: recipient,
+        managementHash: management.digest,
+        managementGeneration: management.generation,
+        unsubscribeHash: unsubscribe.digest,
+        unsubscribeGeneration: unsubscribe.generation,
+      });
+      bound = {
+        ...presentation,
+        links: {
+          ...presentation?.links,
+          ...privateLinks(buildLinks, management.raw, unsubscribe.raw),
+        },
+      };
+    }
+    const envelope = renderFollowMail("digest", { ...bound, matches, to: recipient });
     if (!envelope) return unavailable();
-    const attempt = await beginBudgetedFollowSnapshotAttempt(db, key, jobId, lease, cap, fresh);
-    if (attempt !== "claimed") return attempt === "paused" ? { status: "paused" } : unavailable();
+    const attempt = await beginBudgetedFollowSnapshotAttempt(
+      db,
+      key,
+      jobId,
+      lease,
+      cap,
+      fresh,
+      credentials,
+    );
+    if ((credentials ? attempt?.status : attempt) !== "claimed")
+      return attempt === "paused" ? { status: "paused" } : unavailable();
     claimed = true;
     if (
       await authorizeFollowSnapshotTransport(
@@ -75,6 +136,7 @@ export async function deliverFollowSnapshotDigest({
         prepared.subscriberId,
         recipient,
         fresh,
+        credentials ? attempt : null,
       )
     ) {
       // No awaited rendering, token or presentation work may occur between this fence and send.

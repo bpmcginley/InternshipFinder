@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
 import { deliverFollowSnapshotDigest } from "../src/follow-digest-delivery.js";
 import { enqueueFollowSnapshot } from "../src/follow-enqueue.js";
-import { requestFollow, mintFollowToken, confirmFollow } from "../src/follows.js";
+import {
+  requestFollow,
+  mintFollowToken,
+  confirmFollow,
+  inspectFollowToken,
+  unsubscribeFollows,
+} from "../src/follows.js";
+import { beginBudgetedFollowSnapshotAttempt } from "../src/follow-outbox.js";
 import { reserveFollowSendAttempt } from "../src/follow-send-budget.js";
 const at = new Date(),
   confirmed = new Date(+at - 86400000);
@@ -308,3 +315,384 @@ export const databaseLeaseExpired = (db) => staleDatabaseClock(db, false);
 export const databaseUtcRollover = (db) => staleDatabaseClock(db, true);
 
 export const databaseJobExpired = (db) => staleDatabaseClock(db, false, true);
+
+async function capabilityFixture(db) {
+  const now = new Date(
+    await db.prepare("SELECT strftime('%Y-%m-%dT%H:%M:%fZ','now') AS at").first("at"),
+  );
+  const f = await fixture(db, now);
+  const oldManage = await mintFollowToken(db, f.sub.subscriberId, "manage", {}, now);
+  const oldUnsubscribe = await mintFollowToken(db, f.sub.subscriberId, "unsubscribe", {}, now);
+  const present = f.options.present;
+  f.options.present = async (input) => ({
+    ...(await present(input)),
+    origins: ["https://site.example.test", "https://internscout.org"],
+  });
+  const raw = [];
+  f.options.buildLinks = (credentials) => {
+    raw.push({ ...credentials });
+    assert.equal(Object.isFrozen(credentials), true);
+    return {
+      management: `https://internscout.org/follows/manage.html#token=${credentials.management}`,
+      unsubscribe: `https://site.example.test/follows/unsubscribe?token=${credentials.unsubscribe}`,
+    };
+  };
+  return Object.assign(f, { oldManage, oldUnsubscribe, raw, now });
+}
+const tokenRows = async (db) =>
+  (await db.prepare("SELECT * FROM follow_tokens ORDER BY token_hash").all()).results;
+async function clearCapabilities(db) {
+  await db.batch(
+    ["follow_subscribers", "follow_digest_days", "follow_send_budget"].map((t) =>
+      db.prepare(`DELETE FROM ${t}`),
+    ),
+  );
+}
+
+export async function capabilitiesAtomicSuccessAndOldUnsubscribe(db) {
+  const f = await capabilityFixture(db);
+  const results = await Promise.all([f.run(), f.run()]);
+  assert.equal(results.filter((r) => r.status === "accepted").length, 1);
+  assert.equal(f.calls(), 1);
+  const current = f.raw[0];
+  assert.equal(await inspectFollowToken(db, f.oldManage, "manage", f.now), null);
+  const managed = await inspectFollowToken(db, current.management, "manage", f.now);
+  assert.equal(managed.subscriber_id, f.sub.subscriberId);
+  const expiry = (await tokenRows(db)).find((r) => r.purpose === "manage").expires_at;
+  const dbNow = await db.prepare("SELECT strftime('%Y-%m-%dT%H:%M:%fZ','now') AS at").first("at");
+  assert.ok(Date.parse(expiry) >= +f.now + 1800000);
+  assert.ok(Date.parse(expiry) <= Date.parse(dbNow) + 1800000);
+  assert.ok(await inspectFollowToken(db, current.unsubscribe, "unsubscribe", f.now));
+  assert.ok(await inspectFollowToken(db, f.oldUnsubscribe, "unsubscribe", f.now));
+  const stored = JSON.stringify(await tokenRows(db));
+  for (const raw of Object.values(current)) assert.equal(stored.includes(raw), false);
+  assert.ok(f.messages[0].text.includes(current.management));
+  assert.equal(
+    f.messages[0].headers["List-Unsubscribe"],
+    `<https://site.example.test/follows/unsubscribe?token=${current.unsubscribe}>`,
+  );
+  assert.equal(await f.budget(), 1);
+  assert.equal(await unsubscribeFollows(db, f.oldUnsubscribe, f.now), true);
+  assert.equal((await tokenRows(db)).length, 0);
+  assert.equal(await f.budget(), 1);
+}
+
+export async function capabilitiesPrevalidationAndPausePreserveOldTokens(db) {
+  for (const invalid of [null, "async", "normalized", "foreign", "prefix", "query", "fragment"]) {
+    await clearCapabilities(db);
+    const f = await capabilityFixture(db),
+      before = await tokenRows(db);
+    const buildLinks =
+      invalid === "async"
+        ? async () => {
+            throw Error("synthetic");
+          }
+        : (credentials) => ({
+            management:
+              invalid === "normalized"
+                ? `https://internscout.org/${credentials.management}/../follows/manage.html`
+                : invalid === "foreign"
+                  ? `https://foreign.example.test/manage#token=${credentials.management}`
+                  : ["prefix", "query", "fragment"].includes(invalid)
+                    ? `https://internscout.org/follows/manage.html#token=${credentials.management}`
+                    : "https://internscout.org/follows/manage.html#token=invalid",
+            unsubscribe: `https://site.example.test/follows/unsubscribe?token=${invalid === "prefix" ? "fd_" : ""}${credentials.unsubscribe}${invalid === "query" ? "&extra=1" : invalid === "fragment" ? "#x" : ""}`,
+          });
+    assert.deepEqual(await f.run({ buildLinks }), { status: "unavailable" });
+    assert.deepEqual(await tokenRows(db), before);
+    assert.equal(await f.budget(), null);
+    assert.equal(f.calls(), 0);
+  }
+  await clearCapabilities(db);
+  const f = await capabilityFixture(db),
+    before = await tokenRows(db);
+  await reserveFollowSendAttempt(db, 1, f.now);
+  assert.deepEqual(await f.run({ cap: 1 }), { status: "paused" });
+  assert.deepEqual(await tokenRows(db), before);
+  assert.equal((await f.row()).state, "leased");
+  assert.equal(await f.budget(), 1);
+}
+
+export async function capabilitiesLastSlotAndExpiredSqlLeaseCannotIssue(db) {
+  for (const mode of ["budget", "expired"]) {
+    await clearCapabilities(db);
+    const f = await capabilityFixture(db),
+      before = await tokenRows(db);
+    let claimed = false;
+    const database = intercept(db, async (statements, run) => {
+      if (statements.length === 10) {
+        claimed = true;
+        if (mode === "budget") await reserveFollowSendAttempt(db, 1, f.now);
+        else
+          await db
+            .prepare(
+              "UPDATE follow_digest_outbox SET lease_until=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?",
+            )
+            .bind(f.job)
+            .run();
+      }
+      return run();
+    });
+    assert.deepEqual(await f.run({ db: database, cap: 1 }), {
+      status: mode === "budget" ? "paused" : "unavailable",
+    });
+    assert.equal(claimed, true);
+    assert.deepEqual(await tokenRows(db), before);
+    assert.equal(f.calls(), 0);
+    assert.equal(await f.budget(), mode === "budget" ? 1 : 0);
+    assert.equal((await db.prepare("SELECT * FROM follow_digest_days").all()).results.length, 0);
+  }
+}
+
+export async function capabilitiesRollbackKeepsPreviousGeneration(db) {
+  const f = await capabilityFixture(db),
+    before = await tokenRows(db);
+  await db
+    .prepare(
+      "CREATE TRIGGER synthetic_digest_token_failure BEFORE INSERT ON follow_tokens WHEN NEW.purpose='unsubscribe' BEGIN SELECT RAISE(ABORT,'synthetic'); END",
+    )
+    .run();
+  try {
+    assert.deepEqual(await f.run(), { status: "unavailable" });
+    assert.deepEqual(await tokenRows(db), before);
+    assert.equal(await f.budget(), null);
+    assert.equal((await f.row()).state, "leased");
+    assert.equal((await db.prepare("SELECT * FROM follow_digest_days").all()).results.length, 0);
+    assert.equal(f.calls(), 0);
+  } finally {
+    await db.prepare("DROP TRIGGER synthetic_digest_token_failure").run();
+  }
+}
+
+export async function capabilitiesLostAcknowledgementCannotReissue(db) {
+  const f = await capabilityFixture(db);
+  const database = intercept(db, async (statements, run) => {
+    const r = await run();
+    if (statements.length === 10) throw Error("synthetic lost acknowledgement");
+    return r;
+  });
+  assert.deepEqual(await f.run({ db: database }), { status: "unavailable" });
+  assert.equal(f.calls(), 0);
+  assert.equal(await f.budget(), 1);
+  const before = await tokenRows(db),
+    job = await f.row(),
+    raw = f.raw[0];
+  const hash = async (value) =>
+    [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)))]
+      .map((v) => v.toString(16).padStart(2, "0"))
+      .join("");
+  const credentials = {
+    subscriberId: f.sub.subscriberId,
+    email: "fixture@example.test",
+    managementHash: await hash(raw.management),
+    managementGeneration: raw.management.slice(0, 36),
+    unsubscribeHash: await hash(raw.unsubscribe),
+    unsubscribeGeneration: raw.unsubscribe.slice(0, 36),
+  };
+  assert.equal(
+    await beginBudgetedFollowSnapshotAttempt(
+      db,
+      f.options.key,
+      f.job,
+      job.lease_token,
+      3,
+      f.options.clock,
+      credentials,
+    ),
+    "unavailable",
+  );
+  assert.deepEqual(await tokenRows(db), before);
+  assert.deepEqual(await f.run(), { status: "unavailable" });
+  assert.equal((await f.row()).state, "attempting");
+  assert.equal(f.calls(), 0);
+}
+
+export async function capabilitiesMalformedCommittedReceiptsHold(db) {
+  for (const mode of ["hole", "false", "string", "getter", "wrong-count", "missing-token"]) {
+    await clearCapabilities(db);
+    const f = await capabilityFixture(db);
+    const database = intercept(db, async (statements, run) => {
+      const r = await run();
+      if (statements.length === 10) {
+        if (mode === "hole") delete r[5];
+        if (mode === "false") r[5].success = false;
+        if (mode === "string") r[5].meta.changes = "2";
+        if (mode === "getter")
+          Object.defineProperty(r[5].meta, "changes", {
+            enumerable: true,
+            get() {
+              assert.fail("Do not invoke receipt getter");
+            },
+          });
+        if (mode === "wrong-count") r[5].meta.changes = 1;
+        if (mode === "missing-token") r[9].results = [];
+      }
+      return r;
+    });
+    assert.deepEqual(await f.run({ db: database }), { status: "unavailable" });
+    assert.equal(f.calls(), 0);
+    assert.equal(await f.budget(), 1);
+    assert.equal((await f.row()).state, "attempting");
+  }
+}
+
+export async function capabilitiesCurrentTokenAndConsentFence(db) {
+  for (const mode of [
+    "rotate",
+    "coexist",
+    "expire",
+    "unsubscribe",
+    "consent",
+    "recipient",
+    "delete",
+    "generation",
+  ]) {
+    await clearCapabilities(db);
+    const f = await capabilityFixture(db);
+    const database = intercept(db, async (statements, run) => {
+      const r = await run();
+      if (statements.length === 10) {
+        if (mode === "rotate") await mintFollowToken(db, f.sub.subscriberId, "manage", {}, f.now);
+        if (mode === "coexist")
+          await db
+            .prepare(
+              "INSERT INTO follow_tokens(token_hash,subscriber_id,purpose,scope_key,generation,expires_at) VALUES(?,?,'manage','',?,?)",
+            )
+            .bind(
+              "f".repeat(64),
+              f.sub.subscriberId,
+              crypto.randomUUID(),
+              new Date(+f.now + 1800000).toISOString(),
+            )
+            .run();
+        if (mode === "expire")
+          await db
+            .prepare(
+              "UPDATE follow_tokens SET expires_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE purpose='manage'",
+            )
+            .run();
+        if (mode === "unsubscribe")
+          await db.prepare("DELETE FROM follow_tokens WHERE purpose='unsubscribe'").run();
+        if (mode === "consent")
+          await db
+            .prepare("UPDATE follow_subscriptions SET confirmed_at=? WHERE subscriber_id=?")
+            .bind(new Date(+f.now - 1000).toISOString(), f.sub.subscriberId)
+            .run();
+        if (mode === "recipient")
+          await db
+            .prepare("UPDATE follow_subscribers SET email='changed@example.test' WHERE id=?")
+            .bind(f.sub.subscriberId)
+            .run();
+        if (mode === "delete")
+          await db
+            .prepare("DELETE FROM follow_subscribers WHERE id=?")
+            .bind(f.sub.subscriberId)
+            .run();
+        if (mode === "generation")
+          await db
+            .prepare("UPDATE follow_tokens SET generation=? WHERE purpose='manage'")
+            .bind(crypto.randomUUID())
+            .run();
+      }
+      return r;
+    });
+    assert.deepEqual(
+      await f.run({ db: database }),
+      { status: mode === "delete" ? "unavailable" : "uncertain" },
+      mode,
+    );
+    assert.equal(f.calls(), 0, mode);
+    assert.equal(await f.budget(), 1);
+  }
+}
+
+export async function capabilitiesClaimBindsRenderedRecipient(db) {
+  const f = await capabilityFixture(db),
+    before = await tokenRows(db);
+  const present = f.options.present;
+  assert.deepEqual(
+    await f.run({
+      present: async (input) => {
+        const result = await present(input);
+        await db
+          .prepare("UPDATE follow_subscribers SET email='changed@example.test' WHERE id=?")
+          .bind(f.sub.subscriberId)
+          .run();
+        return result;
+      },
+    }),
+    { status: "unavailable" },
+  );
+  assert.deepEqual(await tokenRows(db), before);
+  assert.equal(await f.budget(), null);
+  assert.equal(f.calls(), 0);
+}
+
+export async function capabilitiesFinalReceiptAndDeadlineStayClosed(db) {
+  for (const mode of ["false", "hole", "row-accessor", "expired-reply"]) {
+    await clearCapabilities(db);
+    const f = await capabilityFixture(db);
+    const database = intercept(db, async (statements, run) => {
+      const r = await run();
+      if (statements.length === 1) {
+        if (mode === "false") r[0].success = false;
+        if (mode === "hole") delete r[0].results[0];
+        if (mode === "row-accessor")
+          Object.defineProperty(r[0].results[0], "lease_until", {
+            enumerable: true,
+            get() {
+              assert.fail("Do not invoke row accessor");
+            },
+          });
+        if (mode === "expired-reply") f.setNow(+f.now + 1800000);
+      }
+      return r;
+    });
+    assert.deepEqual(await f.run({ db: database }), {
+      status: mode === "expired-reply" ? "unavailable" : "uncertain",
+    });
+    assert.equal(f.calls(), 0);
+    assert.equal(await f.budget(), 1);
+  }
+}
+
+export async function capabilitiesConsentRaceBeforeClaimCannotIssue(db) {
+  const f = await capabilityFixture(db),
+    before = await tokenRows(db);
+  const database = intercept(db, async (statements, run) => {
+    if (statements.length === 10)
+      await db
+        .prepare("UPDATE follow_subscriptions SET confirmed_at=? WHERE subscriber_id=?")
+        .bind(new Date(+f.now - 1000).toISOString(), f.sub.subscriberId)
+        .run();
+    return run();
+  });
+  assert.deepEqual(await f.run({ db: database }), { status: "unavailable" });
+  assert.deepEqual(await tokenRows(db), before);
+  assert.equal(await f.budget(), 0);
+  assert.equal(f.calls(), 0);
+  assert.equal((await db.prepare("SELECT * FROM follow_digest_days").all()).results.length, 0);
+}
+
+export async function capabilitiesRejectAsyncClockWithoutLeaking(db) {
+  for (const phase of ["early", "after-claim"]) {
+    await clearCapabilities(db);
+    const f = await capabilityFixture(db);
+    let reject = phase === "early";
+    const database = intercept(db, async (statements, run) => {
+      const result = await run();
+      if (statements.length === 10) reject = true;
+      return result;
+    });
+    assert.deepEqual(
+      await f.run({
+        db: database,
+        clock: () => (reject ? Promise.reject(Error("synthetic")) : f.now),
+      }),
+      { status: "unavailable" },
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.equal(f.calls(), 0);
+    assert.equal(await f.budget(), phase === "early" ? null : 1);
+  }
+}
