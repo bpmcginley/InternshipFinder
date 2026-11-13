@@ -102,7 +102,22 @@ export class FollowCheckpointControl {
         },
       };
       if ((await witness.prepare(copy(before.current), copy(intent))) !== true) return "held";
-      if (effect && (await effect(copy(before), copy(intent))) !== true) return "held";
+      // Optional effect fence reads this operation's already-pinned authority, never a new supplier.
+      const prepared = async () => {
+        try {
+          if (!equal(before, this.state())) return false;
+          const proof = {
+            current: intent.next,
+            receipt: { nonce: intent.nonce, previous: before.current },
+          };
+          return (
+            classify(await witness.read(), proof) === "recover_ack" && equal(before, this.state())
+          );
+        } catch {
+          return false;
+        }
+      };
+      if (effect && (await effect(copy(before), copy(intent), prepared)) !== true) return "held";
       if (this.beforeCommit) await this.beforeCommit();
       const committed = this.storage.transactionSync(() => {
         const state = this.state();

@@ -1055,7 +1055,7 @@ CREATE TABLE IF NOT EXISTS topup_retention (
   resolved_zero_since TEXT CHECK(resolved_zero_since IS NULL OR
     (resolved_at IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',resolved_zero_since) IS resolved_zero_since
       AND resolved_zero_since >= resolved_at))
-, history_proven INTEGER NOT NULL DEFAULT 0 CHECK(history_proven IN (0,1)), evidence_digest TEXT CHECK(evidence_digest IS NULL OR (length(evidence_digest)=64 AND evidence_digest NOT GLOB '*[^0-9a-f]*')));
+, history_proven INTEGER NOT NULL DEFAULT 0 CHECK(history_proven IN (0,1)), evidence_digest TEXT CHECK(evidence_digest IS NULL OR (length(evidence_digest)=64 AND evidence_digest NOT GLOB '*[^0-9a-f]*')), coverage_epoch TEXT CHECK(coverage_epoch IS NULL OR (length(coverage_epoch)=32 AND coverage_epoch NOT GLOB '*[^0-9a-f]*')));
 
 -- Pending confirmation queue. Credentials and rendered mail are created only at dispatch.
 CREATE TABLE IF NOT EXISTS follow_confirmation_outbox (
