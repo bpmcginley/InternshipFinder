@@ -492,6 +492,8 @@ export async function changedSalesSnapshotDuringPriceClosesWithoutReservation(db
     { STRIPE_WEBHOOK_SECRET: "fixture-rotated-signing-key" },
     { STRIPE_SECRET_KEY: "fixture-rotated-provider-key" },
     { STRIPE_PRICE_TOPUP: "price_rotated_fixture" },
+    { STRIPE_MANAGED_PAYMENTS: "1" },
+    { SITE_URL: legacy },
   ]) {
     for (const request of [offerRequest({ token }), req({ token })]) {
       let reads = 0;
@@ -617,4 +619,85 @@ export async function changedSalesSnapshotAfterReservationCannotCreate(db) {
     await db.prepare("SELECT state,checkout_id FROM topup_checkout_attempts").first(),
     { state: "creating", checkout_id: null },
   );
+}
+
+export async function changedSalesSnapshotAtFinalBoundariesCannotExposeOfferOrCheckout(db) {
+  const { token } = await login(db);
+  for (const boundary of [
+    "offer-auth",
+    "checkout-post",
+    "checkout-read",
+    "checkout-final-select",
+  ]) {
+    await db.prepare("DELETE FROM topup_checkout_attempts").run();
+    const env = { ...settings };
+    let reads = 0,
+      created,
+      priceReads = 0,
+      posts = 0,
+      opens = 0;
+    env.DB = {
+      prepare(sql) {
+        const statement = db.prepare(sql);
+        const interested =
+          boundary === "offer-auth"
+            ? sql.includes("FROM sessions WHERE id")
+            : boundary === "checkout-final-select" &&
+              sql.includes("LEFT JOIN topup_attempt_revisions");
+        if (!interested) return statement;
+        return {
+          bind(...args) {
+            const bound = statement.bind(...args);
+            return {
+              async first(...values) {
+                const result = await bound.first(...values);
+                if (++reads === 2) env.STRIPE_TOPUP_MODE = "live";
+                return result;
+              },
+            };
+          },
+        };
+      },
+      batch: (statements) => db.batch(statements),
+    };
+    const request = boundary === "offer-auth" ? offerRequest({ token }) : req({ token });
+    const result = await handle(request, env, null, {
+      now: () => at,
+      fetch: async (url, options) => {
+        if (url.includes("/prices/")) {
+          priceReads++;
+          return reply(price());
+        }
+        if (options.method === "POST") {
+          posts++;
+          const id = new URLSearchParams(options.body).get("metadata[attempt_id]");
+          created = {
+            ...session({ ...attempt(), id }),
+            success_url: site + "/",
+            cancel_url: site + "/",
+          };
+          if (boundary === "checkout-post") env.STRIPE_TOPUP_MODE = "live";
+          return reply(created);
+        }
+        opens++;
+        if (boundary === "checkout-read") env.STRIPE_TOPUP_MODE = "live";
+        return reply(created);
+      },
+    });
+    await expect(result, 503, {
+      status: ["checkout-post", "checkout-read"].includes(boundary) ? "unavailable" : "disabled",
+    });
+    assert.equal(priceReads, 1);
+    assert.equal(posts, boundary === "offer-auth" ? 0 : 1);
+    assert.equal(
+      opens,
+      boundary === "checkout-read" || boundary === "checkout-final-select" ? 1 : 0,
+    );
+    assert.equal(await attempts(db), boundary === "offer-auth" ? 0 : 1);
+    if (posts)
+      assert.deepEqual(
+        await db.prepare("SELECT state,checkout_id FROM topup_checkout_attempts").first(),
+        { state: "open", checkout_id: created.id },
+      );
+  }
 }

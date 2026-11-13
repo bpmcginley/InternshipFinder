@@ -305,22 +305,25 @@ export async function prepareTopupStripe(
   // Snapshot private configuration. Price/session paths and raw errors must never reach logs.
   const { key, signingKey, priceId, mode } = sales;
   const config = { STRIPE_SECRET_KEY: key },
-    livemode = mode === "live",
-    managed = managedPayments(env);
+    livemode = mode === "live";
+  let managed, root, success, cancel, price;
   const current = () => {
     const latest = topupSalesSettings(env);
     return (
       latest?.key === key &&
       latest.signingKey === signingKey &&
       latest.priceId === priceId &&
-      latest.mode === mode
+      latest.mode === mode &&
+      managedPayments(env) === managed &&
+      env.SITE_URL === root
     );
   };
   const request = (path, form = {}, key = null, method = "GET") =>
     boundedRequest(config, path, form, fetchImpl, key, method, timeoutMs);
-  let success, cancel, price;
   try {
-    const site = new URL(siteUrl(env));
+    managed = managedPayments(env);
+    root = env.SITE_URL;
+    const site = new URL(siteUrl({ SITE_URL: root }));
     if (
       site.protocol !== "https:" ||
       site.username ||
@@ -454,6 +457,8 @@ export async function prepareTopupStripe(
         form[`payment_intent_data[metadata][${k}]`] = v;
       }
       if (managed) form["managed_payments[enabled]"] = "true";
+      // A POST already sent under the captured settings may have created a session.
+      // Preserve verified durable attachment. A stale adapter cannot subsequently open it.
       return verified(await request("checkout/sessions", form, a.idempotencyKey, "POST"), a);
     },
     async readOpen(a) {
@@ -462,7 +467,7 @@ export async function prepareTopupStripe(
       const session = await request(
         "checkout/sessions/" + encodeURIComponent(a.checkout_id) + "?expand[]=line_items",
       );
-      if (session?.id !== a.checkout_id) throw unavailable();
+      if (!current() || session?.id !== a.checkout_id) throw unavailable();
       return verified(session, a);
     },
   };
