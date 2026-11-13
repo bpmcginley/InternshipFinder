@@ -113,10 +113,10 @@ async function main() {
     return;
   }
 
-  const key = process.env.INTERNSCOUT_GEMINI_EVAL_KEY;
+  const key = process.env.INTERNSCOUT_GEMINI_EVAL_KEY?.trim() || process.env.GEMINI_API_KEY?.trim();
   if (!key)
     throw new Error(
-      "Set INTERNSCOUT_GEMINI_EVAL_KEY in this process to use a Gemini test project.",
+      "Set GEMINI_API_KEY or INTERNSCOUT_GEMINI_EVAL_KEY in this process to run the Gemini benchmark.",
     );
   const dir = new URL(`./hydrogen-run-${randomUUID()}/`, import.meta.url);
   await mkdir(dir);

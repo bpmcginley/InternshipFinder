@@ -13,10 +13,11 @@ if (-not $Live) {
   exit $LASTEXITCODE
 }
 
-$existing = [Environment]::GetEnvironmentVariable('INTERNSCOUT_GEMINI_EVAL_KEY', 'Process')
+$hasEvalKey = -not [string]::IsNullOrWhiteSpace($env:INTERNSCOUT_GEMINI_EVAL_KEY)
+$hasGeminiKey = -not [string]::IsNullOrWhiteSpace($env:GEMINI_API_KEY)
 $bstr = [IntPtr]::Zero
 try {
-  if (-not $existing) {
+  if (-not ($hasEvalKey -or $hasGeminiKey)) {
     $secure = Read-Host 'Gemini test project API key (hidden)' -AsSecureString
     $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
     $env:INTERNSCOUT_GEMINI_EVAL_KEY = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)

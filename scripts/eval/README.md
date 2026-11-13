@@ -154,10 +154,11 @@ pwsh -File scripts/eval/run_hydrogen.ps1 -Live
 The first command previews request sizes in bytes. The second sends four calls to check that both
 models and all variants work. The full pilot sends up to 96 calls, two repeats per case and variant.
 Each call uses Google's streaming Gemini Developer API. The script rotates the order and makes calls
-sequentially without automatic retries. Use a dedicated Gemini API test project. The Windows launcher
-accepts its key at a hidden prompt. On other platforms provide the key in the process environment as
-`INTERNSCOUT_GEMINI_EVAL_KEY` and pass `--live` to the Node script. Both models are listed on Google's
-Standard free tier, subject to project limits. See [Gemini API pricing](https://ai.google.dev/gemini-api/docs/pricing).
+sequentially without automatic retries. The benchmark reads `GEMINI_API_KEY` from its process
+environment. Set `INTERNSCOUT_GEMINI_EVAL_KEY` to give a benchmark-specific key precedence. When neither
+is available, the Windows launcher accepts a key at a hidden prompt. On other platforms use the Node
+script with `--live`. A Cloudflare Worker secret is only available to the deployed Worker. Both models
+are listed on Google's Standard free tier, subject to project limits. See [Gemini API pricing](https://ai.google.dev/gemini-api/docs/pricing).
 
 The report lists consent and account verification separately as safety probes. Production can intercept
 these before a model call and can also prefill routine fields. Compare the remaining cases for the
