@@ -260,6 +260,10 @@ export async function expireFollowOrphanPage(db, options = {}) {
     }
     if (!eligible && (tokensRemoved || digestsRemoved)) fail();
     const draining = eligible === 1 && removed === 0;
+    // In this batch scope eligibility cannot change. If both child prefixes were
+    // shorter than their limits, no children remain to prevent root deletion.
+    if (lookahead && draining && tokensRemoved < maxChildren && digestsRemoved < maxChildren)
+      fail();
     if (lookahead && !eligible && (eligibleRow.candidate !== null || eligibleRow.previous !== null))
       fail();
     const continuation =

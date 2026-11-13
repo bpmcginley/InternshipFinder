@@ -936,6 +936,43 @@ export async function orphanLookaheadBindsRemovedRootAgainstCandidateSubstitutio
   );
 }
 
+export async function orphanLookaheadRejectsSurvivingRootAfterBothPrefixesDrained(db) {
+  await subscriber(db, "first", 9);
+  await scope(db);
+  let calls = 0;
+  const zero = await expireFollowOrphanPage(
+    wrap(db, async (statements) => {
+      calls++;
+      const result = await db.batch(statements);
+      result[2].results[0] = { eligible: 1, candidate: "9", previous: null };
+      return result;
+    }),
+    { ...options(), maxRows: 128 },
+  );
+  assert.deepEqual(zero, { status: "unavailable" });
+  assert.equal(calls, 1);
+  assert.equal(await count(db, "follow_subscribers"), 1);
+  await db.prepare("DELETE FROM follow_subscriptions").run();
+  await children(db, "first", 1);
+  calls = 0;
+  const positive = await expireFollowOrphanPage(
+    wrap(db, async (statements) => {
+      calls++;
+      const result = await db.batch(statements);
+      assert.equal(result[4].results[0].changed, 1);
+      assert.equal(result[6].results[0].changed, 1);
+      assert.deepEqual(result[7].results, [{ removed_rowid: "9" }]);
+      result[7] = { success: true, meta: { changes: 0 }, results: [] };
+      result[8].results[0].changed = 0;
+      return result;
+    }),
+    { ...options(), maxRows: 128 },
+  );
+  assert.deepEqual(positive, { status: "unavailable" });
+  assert.equal(calls, 1);
+  assert.equal(await count(db, "follow_subscribers"), 0);
+}
+
 export async function orphanLookaheadImpossibleCardinalityNeverAdvancesDrainage(db) {
   await subscriber(db, "first", 9);
   await children(db, "first", 6);
