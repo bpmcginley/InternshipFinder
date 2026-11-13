@@ -55,6 +55,7 @@ def inputs(captured, asset_fixture):
             max_rows=100,
             max_source_bytes=200000,
             max_models=20,
+            max_model_rows=100,
             max_asset_files=100,
             max_asset_bytes=2000000,
         ),
@@ -170,7 +171,15 @@ def test_standalone_source_requires_pinned_exact_import_contract(inputs, change)
 
 
 @pytest.mark.parametrize(
-    'bound', ['max_rows', 'max_source_bytes', 'max_models', 'max_asset_files', 'max_asset_bytes']
+    'bound',
+    [
+        'max_rows',
+        'max_source_bytes',
+        'max_models',
+        'max_model_rows',
+        'max_asset_files',
+        'max_asset_bytes',
+    ],
 )
 def test_invalid_explicit_bounds_and_no_partial_model_batch(inputs, bound):
     with pytest.raises(ValueError):
@@ -210,7 +219,7 @@ def test_entire_batch_rejects_without_mutating_inputs(inputs, change):
 def test_native_esm_links_old_and_new_assembled_plans_without_entry_boot(inputs):
     old = plan(inputs)
     files = {path.rsplit('/', 1)[1]: body for path, body in inputs[2]['graph_plan'][1].items()}
-    files['follow-form.mjs'] += b'\n// Synthetic second generation.\n'
+    files['entry.mjs'] += b'\n// Synthetic second generation.\n'
     newer, digest = graph(files)
     current = plan(inputs, graph_plan=newer, app_sha256=digest)
     assert old.script_url != current.script_url
@@ -280,9 +289,112 @@ def test_retained_generation_cannot_replace_explicit_current_pin(inputs):
     kwargs = inputs[2]
     old_entry, old_assets = kwargs['graph_plan']
     files = {path.rsplit('/', 1)[1]: body for path, body in old_assets.items()}
-    files['follow.mjs'] += b'\n// Synthetic newer generation.\n'
+    files['entry.mjs'] += b'\n// Synthetic newer generation.\n'
     (entry, assets), current = graph(files)
     assets.update(old_assets)
     assert plan(inputs, graph_plan=(entry, assets), app_sha256=current).app_sha256 == current
     with pytest.raises(ValueError):
         plan(inputs, graph_plan=(old_entry, assets), app_sha256=current)
+
+
+@pytest.mark.parametrize('kind', ['comment', 'template'])
+def test_import_decoy_with_honest_source_digest_rejects(inputs, kind):
+    one = publication._IMPORTS[0][0]
+    wrapped = b'/*\n' + one + b'\n*/' if kind == 'comment' else b'const decoy = `\n' + one + b'\n`;'
+    body = inputs[2]['standalone'].replace(one, wrapped, 1)
+    with pytest.raises(ValueError):
+        plan(inputs, standalone=body, standalone_sha256=hashlib.sha256(body).hexdigest())
+
+
+@pytest.mark.parametrize('kind', ['comment', 'template', 'after_prefix'])
+def test_export_decoy_or_changed_dependency_requires_reviewed_repin(inputs, kind):
+    files = {path.rsplit('/', 1)[1]: body for path, body in inputs[2]['graph_plan'][1].items()}
+    original = files['follow-form.mjs'].replace(b'\r\n', b'\n')
+    if kind == 'comment':
+        declaration = b'export const FOLLOW_COPY ='
+        body = (
+            b'/*\n'
+            + declaration
+            + b'\n*/\n'
+            + original.replace(declaration, b'const FOLLOW_COPY =')
+        )
+    elif kind == 'template':
+        body = b'const decoy = `\nexport function followSelection(\n`;\n' + original.replace(
+            b'export function followSelection(', b'function followSelection('
+        )
+    else:
+        body = original + b'\n// Changed after every required declaration.\n'
+    files['follow-form.mjs'] = body
+    changed, digest = graph(files)
+    with pytest.raises(ValueError):
+        plan(inputs, graph_plan=changed, app_sha256=digest)
+
+
+@pytest.mark.parametrize(
+    'path',
+    [
+        '',
+        'https://example.test/internships/at/fixture-labs/',
+        '/internships/at/fixture-labs',
+        '/internships/at/./fixture-labs/',
+        '/internships/at/other/../fixture-labs/',
+        '/internships/at/altera-corporation/',
+        '/internships/at/fixture-labs/?x=1',
+        '/internships/at/fixture-labs/#x',
+        '/internships/at/' + 'x' * 81 + '/',
+    ],
+)
+def test_noncanonical_or_redirect_model_paths_reject_before_copies(inputs, path, monkeypatch):
+    captured, models, kwargs = inputs
+    monkeypatch.setattr(
+        publication,
+        'prepare_follow_employer_selection',
+        lambda *a, **k: pytest.fail('copied before path validation'),
+    )
+    with pytest.raises(ValueError):
+        plan((captured, [models[0], replace(models[0], path=path)], kwargs))
+
+
+def test_aggregate_occurrences_are_bounded_before_any_selection(inputs, monkeypatch):
+    captured, models, kwargs = inputs
+    many = [replace(models[0], path=f'/internships/at/model-{i}/') for i in range(20)]
+    count = sum(len(model.items) for model in many)
+    assert count == 160
+    selected = plan((captured, many, kwargs), max_model_rows=count)
+    assert sum(len(model.items) for model in selected.models) == count
+    monkeypatch.setattr(
+        publication,
+        'prepare_follow_employer_selection',
+        lambda *a, **k: pytest.fail('copied before aggregate bound'),
+    )
+    for bound in (10, count - 1):
+        with pytest.raises(ValueError):
+            plan((captured, many, kwargs), max_rows=10, max_model_rows=bound)
+
+
+def test_native_esm_confirms_commented_export_is_unusable(inputs):
+    original = next(
+        body
+        for path, body in inputs[2]['graph_plan'][1].items()
+        if path.endswith('/follow-form.mjs')
+    )
+    declaration = b'export const FOLLOW_COPY ='
+    decoy = (
+        b'/*\n' + declaration + b'\n*/\n' + original.replace(declaration, b'const FOLLOW_COPY =')
+    )
+    script = r'''
+import vm from 'node:vm';
+let source = ''; for await (const chunk of process.stdin) source += chunk;
+const dependency = new vm.SourceTextModule(source);
+const client = new vm.SourceTextModule('import { FOLLOW_COPY } from "dependency";');
+try { await client.link(() => dependency); process.exitCode = 1; }
+catch (error) { if (!(error instanceof SyntaxError)) throw error; console.log('missing real export'); }
+'''
+    result = subprocess.run(
+        ['node', '--experimental-vm-modules', '--input-type=module', '-e', script],
+        input=decoy.decode(),
+        text=True,
+        capture_output=True,
+        timeout=20,
+    )
+    assert result.returncode == 0 and 'missing real export' in result.stdout, result.stderr
