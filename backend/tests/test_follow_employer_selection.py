@@ -390,3 +390,62 @@ def test_canada_metro_membership_and_inherited_multibyte_label_bound(captured, n
             ctx.select(value, enabled=True)
     else:
         assert ctx.select(value, enabled=True).follow_company.key == source.employer_key(name)
+
+
+@pytest.mark.parametrize(
+    'invalid', [{'regions': [None]}, {'regions': ['invalid']}, {'apply_url': 'javascript:void(0)'}]
+)
+def test_genuine_stage_loader_skips_ineligible_rows_before_adapter_facts(captured, invalid):
+    root = captured[0]
+    _, _, options = sample()
+    options['max_source_rows'] = 20
+    selected = {
+        path: (root / 'data' / path).read_bytes()
+        for path in ('listings/index.json', 'majors.json', 'listings/MA.json', 'listings/ON.json')
+    }
+    rows = json.loads(selected['listings/MA.json'])
+    skipped = rows[0] | {'id': 'e' * 16} | invalid
+    rows.append(skipped)
+    selected['listings/MA.json'] = raw(rows)
+    index = json.loads(selected['listings/index.json'])
+    index['files']['MA']['count'] += 1
+    index['files']['MA']['open'] += 1
+    selected['listings/index.json'] = raw(index)
+    first = raw([rows[0]])
+    stage = stage_paired_annotations(selected, first, **repin(selected, first, options))
+    assert any(
+        row['id'] == skipped['id'] for row in json.loads(stage.follow.files['listings/MA.json'])
+    )
+    for path, data in selected.items():
+        (root / 'data' / path).write_bytes(data)
+    loaded = source.load(str(root))
+    assert len(loaded['listings']) == len(captured[1]['listings'])
+    assert all(row['id'] != skipped['id'] for row in loaded['listings'])
+    current = (root, loaded, stage)
+    assert selection(current).select(page(current), enabled=True).follow_company.key == 'booz allen'
+    # Supplying an excluded/unknown row as allegedly loaded data still fails closed.
+    loaded['listings'].append(skipped | {'keys': {'MA'}})
+    with pytest.raises(ValueError):
+        selection(current)
+
+
+def test_alias_validation_is_not_repeated_for_each_candidate(captured):
+    class CountedAliases(dict):
+        reads = 0
+
+        def get(self, key, default=None):
+            self.reads += 1
+            return super().get(key, default)
+
+        def __getitem__(self, key):
+            self.reads += 1
+            return super().__getitem__(key)
+
+    ctx = selection(captured)
+    aliases = CountedAliases(ctx._aliases)
+    value = page(captured)
+    assert (
+        replace(ctx, _aliases=aliases).select(value, enabled=True).follow_company.key
+        == 'booz allen'
+    )
+    assert aliases.reads <= 1 + 2 * len(value.spellings)

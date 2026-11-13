@@ -132,11 +132,12 @@ class EmployerFollowSelection:
             or not employer._follow_text(model.name, 200)
         ):
             _fail()
-        if any(
+        company_key = self._aliases.get(model.name)
+        if company_key not in self._companies or any(
             type(name) is not str
             or len(name) > 200
             or not employer._follow_text(name, 200)
-            or name not in self._aliases
+            or self._aliases.get(name) != company_key
             for name in model.spellings
         ):
             _fail()
@@ -153,12 +154,9 @@ class EmployerFollowSelection:
             if (
                 captured is None
                 or captured[0] is not row
+                or captured[2] != company_key
                 or self._source[captured[3]] is not row
                 or _facts(row, limit=captured[4]) != captured[1]
-            ):
-                _fail()
-            if self._aliases.get(model.name) != captured[2] or any(
-                self._aliases[name] != captured[2] for name in model.spellings
             ):
                 _fail()
             verified.append((row, captured[2]))
@@ -228,11 +226,11 @@ def prepare_follow_employer_selection(
             if type(row.get('id')) is not str or key not in companies:
                 _fail()
             original = {k: v for k, v in row.items() if k != 'follow_company_key'}
+            if not source.well_formed(original) or not source.safe_url(original.get('apply_url')):
+                continue
             identity = (_facts(original, limit=max_bytes, public=True, derive=True), key)
             if identities.setdefault(row['id'], identity) != identity:
                 _fail()
-            if not source.well_formed(original) or not source.safe_url(original.get('apply_url')):
-                continue
             keys = membership.setdefault(row['id'], set())
             keys.add(path[9:-5])
             for region in original.get('regions') or []:
