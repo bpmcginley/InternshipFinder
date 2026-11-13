@@ -429,3 +429,275 @@ export async function fundedConfigurationRecheckedAfterAccountReads(db) {
   }
   assert.equal(await attempts(db), 0);
 }
+
+export async function invalidSalesProviderSettingsPreserveOriginAndAuthGates(db) {
+  const { token } = await login(db);
+  const before = await sessionTimes(db);
+  for (const patch of [
+    { STRIPE_WEBHOOK_SECRET: undefined },
+    { STRIPE_WEBHOOK_SECRET: "" },
+    { STRIPE_WEBHOOK_SECRET: " " },
+    { STRIPE_WEBHOOK_SECRET: "fixture\n" },
+    { STRIPE_WEBHOOK_SECRET: {} },
+    { STRIPE_TOPUP_MODE: undefined },
+    { STRIPE_TOPUP_MODE: false },
+    { STRIPE_TOPUP_MODE: "LIVE" },
+    { STRIPE_TOPUP_MODE: "test " },
+  ]) {
+    const env = { ...settings, ...patch, DB: db };
+    const run = (request) =>
+      handle(request, env, null, {
+        now: () => at,
+        fetch: () => assert.fail("Sales settings must close before provider I/O"),
+      });
+    const config = await run(req({ method: "GET", path: "/config" }));
+    assert.equal(Object.hasOwn(await config.json(), "topups"), false);
+    await expect(await run(offerRequest({ token })), 503, { status: "disabled" });
+    await expect(await run(req({ token })), 503, { status: "disabled" });
+    await expect(await run(req({ token, origin: "https://foreign.invalid" })), 403, {
+      status: "unavailable",
+    });
+    await expect(await run(req()), 401, { status: "auth" });
+  }
+  assert.equal(await attempts(db), 0);
+  assert.deepEqual(await sessionTimes(db), before);
+}
+
+export async function priceModeMustMatchThePinnedModeBeforeReservation(db) {
+  const { token } = await login(db);
+  for (const mode of ["test", "live"]) {
+    let reads = 0;
+    const env = { ...settings, STRIPE_TOPUP_MODE: mode, DB: db };
+    const run = (request) =>
+      handle(request, env, null, {
+        now: () => at,
+        fetch: async (url, options) => {
+          assert.match(url, /\/prices\//);
+          assert.equal(options.method, "GET");
+          reads++;
+          return reply({ ...price(), livemode: mode === "test" });
+        },
+      });
+    await expect(await run(offerRequest({ token })), 503, { status: "disabled" });
+    await expect(await run(req({ token })), 503, { status: "disabled" });
+    assert.equal(reads, 2);
+    assert.equal(await attempts(db), 0);
+  }
+}
+
+export async function changedSalesSnapshotDuringPriceClosesWithoutReservation(db) {
+  const { token } = await login(db);
+  for (const patch of [
+    { STRIPE_TOPUP_MODE: "live" },
+    { STRIPE_WEBHOOK_SECRET: "fixture-rotated-signing-key" },
+    { STRIPE_SECRET_KEY: "fixture-rotated-provider-key" },
+    { STRIPE_PRICE_TOPUP: "price_rotated_fixture" },
+    { STRIPE_MANAGED_PAYMENTS: "1" },
+    { SITE_URL: legacy },
+  ]) {
+    for (const request of [offerRequest({ token }), req({ token })]) {
+      let reads = 0;
+      const env = { ...settings, DB: db };
+      const response = await handle(request, env, null, {
+        now: () => at,
+        fetch: async (url, options) => {
+          assert.match(url, /\/prices\//);
+          assert.equal(options.method, "GET");
+          reads++;
+          Object.assign(env, patch);
+          return reply(price());
+        },
+      });
+      await expect(response, 503, { status: "disabled" });
+      assert.equal(reads, 1);
+      assert.equal(await attempts(db), 0);
+    }
+  }
+}
+
+export async function livePriceAndCheckoutUseThePinnedLiveMode(db) {
+  const { token } = await login(db);
+  const env = { ...settings, STRIPE_TOPUP_MODE: "live", DB: db };
+  const calls = [];
+  let opened;
+  const run = (request) =>
+    handle(request, env, null, {
+      now: () => at,
+      fetch: async (url, options) => {
+        if (url.includes("/prices/")) {
+          calls.push("price");
+          return reply({ ...price(), livemode: true });
+        }
+        if (options.method === "POST") {
+          calls.push("create");
+          const id = new URLSearchParams(options.body).get("metadata[attempt_id]");
+          opened = {
+            ...session({ ...attempt(), id }),
+            livemode: true,
+            success_url: site + "/",
+            cancel_url: site + "/",
+          };
+          opened.line_items.data[0].price.livemode = true;
+          return reply(opened);
+        }
+        calls.push("open");
+        return reply(opened);
+      },
+    });
+  await expect(await run(offerRequest({ token })), 200, {
+    enabled: true,
+    offer: { amount: 300, currency: "usd", units: 25 },
+  });
+  await expect(await run(req({ token })), 200, { status: "open", url: session().url });
+  assert.deepEqual(calls, ["price", "price", "create", "open"]);
+  assert.equal(await attempts(db), 1);
+}
+
+export async function changedSalesSnapshotAfterPriceAccountReadCannotReserve(db) {
+  const { token } = await login(db);
+  const env = { ...settings };
+  let accountReads = 0,
+    priceReads = 0;
+  env.DB = {
+    prepare(sql) {
+      const statement = db.prepare(sql);
+      if (!/\bFROM plans\b/.test(sql)) return statement;
+      return {
+        bind(...values) {
+          const bound = statement.bind(...values);
+          return {
+            async first(...args) {
+              const result = await bound.first(...args);
+              if (++accountReads === 2) env.STRIPE_TOPUP_MODE = "live";
+              return result;
+            },
+          };
+        },
+      };
+    },
+  };
+  const response = await handle(req({ token }), env, null, {
+    now: () => at,
+    fetch: async (url, options) => {
+      assert.match(url, /\/prices\//);
+      assert.equal(options.method, "GET");
+      priceReads++;
+      return reply(price());
+    },
+  });
+  await expect(response, 503, { status: "disabled" });
+  assert.equal(accountReads, 2);
+  assert.equal(priceReads, 1);
+  assert.equal(await attempts(db), 0);
+}
+
+export async function changedSalesSnapshotAfterReservationCannotCreate(db) {
+  const { token } = await login(db);
+  const env = { ...settings };
+  let priceReads = 0;
+  env.DB = {
+    prepare: (sql) => db.prepare(sql),
+    async batch(statements) {
+      const result = await db.batch(statements);
+      if ((await attempts(db)) === 1) env.STRIPE_TOPUP_MODE = "live";
+      return result;
+    },
+  };
+  const response = await handle(req({ token }), env, null, {
+    now: () => at,
+    fetch: async (url, options) => {
+      assert.match(url, /\/prices\//);
+      assert.equal(options.method, "GET");
+      priceReads++;
+      return reply(price());
+    },
+  });
+  await expect(response, 202, { status: "pending" });
+  assert.equal(priceReads, 1);
+  assert.equal(await attempts(db), 1);
+  assert.deepEqual(
+    await db.prepare("SELECT state,checkout_id FROM topup_checkout_attempts").first(),
+    { state: "creating", checkout_id: null },
+  );
+}
+
+export async function changedSalesSnapshotAtFinalBoundariesCannotExposeOfferOrCheckout(db) {
+  const { token } = await login(db);
+  for (const boundary of [
+    "offer-auth",
+    "checkout-post",
+    "checkout-read",
+    "checkout-final-select",
+  ]) {
+    await db.prepare("DELETE FROM topup_checkout_attempts").run();
+    const env = { ...settings };
+    let reads = 0,
+      created,
+      priceReads = 0,
+      posts = 0,
+      opens = 0;
+    env.DB = {
+      prepare(sql) {
+        const statement = db.prepare(sql);
+        const interested =
+          boundary === "offer-auth"
+            ? sql.includes("FROM sessions WHERE id")
+            : boundary === "checkout-final-select" &&
+              sql.includes("LEFT JOIN topup_attempt_revisions");
+        if (!interested) return statement;
+        return {
+          bind(...args) {
+            const bound = statement.bind(...args);
+            return {
+              async first(...values) {
+                const result = await bound.first(...values);
+                if (++reads === 2) env.STRIPE_TOPUP_MODE = "live";
+                return result;
+              },
+            };
+          },
+        };
+      },
+      batch: (statements) => db.batch(statements),
+    };
+    const request = boundary === "offer-auth" ? offerRequest({ token }) : req({ token });
+    const result = await handle(request, env, null, {
+      now: () => at,
+      fetch: async (url, options) => {
+        if (url.includes("/prices/")) {
+          priceReads++;
+          return reply(price());
+        }
+        if (options.method === "POST") {
+          posts++;
+          const id = new URLSearchParams(options.body).get("metadata[attempt_id]");
+          created = {
+            ...session({ ...attempt(), id }),
+            success_url: site + "/",
+            cancel_url: site + "/",
+          };
+          if (boundary === "checkout-post") env.STRIPE_TOPUP_MODE = "live";
+          return reply(created);
+        }
+        opens++;
+        if (boundary === "checkout-read") env.STRIPE_TOPUP_MODE = "live";
+        return reply(created);
+      },
+    });
+    await expect(result, 503, {
+      status: ["checkout-post", "checkout-read"].includes(boundary) ? "unavailable" : "disabled",
+    });
+    assert.equal(priceReads, 1);
+    assert.equal(posts, boundary === "offer-auth" ? 0 : 1);
+    assert.equal(
+      opens,
+      boundary === "checkout-read" || boundary === "checkout-final-select" ? 1 : 0,
+    );
+    assert.equal(await attempts(db), boundary === "offer-auth" ? 0 : 1);
+    if (posts)
+      assert.deepEqual(
+        await db.prepare("SELECT state,checkout_id FROM topup_checkout_attempts").first(),
+        { state: "open", checkout_id: created.id },
+      );
+  }
+}

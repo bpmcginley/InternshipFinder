@@ -1,10 +1,16 @@
 // Dormant authenticated-event association. No coverage authority or balance transition.
 import { topupReversalObject } from "./topup-reversal-types.js";
-import { readTopupAssociation, readHistoricalTopupTarget } from "./topup-stripe.js";
+import {
+  readTopupAssociation,
+  readHistoricalTopupTarget,
+  readEmployerHistoryObject,
+  topupRecoveryConfigured,
+} from "./topup-stripe.js";
 import { readVerifiedTopupPayment } from "./topup-purchase-recovery.js";
 import { PAYMENT_EVIDENCE_BOUNDS } from "./topup-payment-evidence.js";
 import { referenceHash } from "./topup-ledger.js";
 import { observeTopupHistory } from "./topup-history-observation.js";
+import { excludeVerifiedEmployerPayment } from "./topup-history-exclusion.js";
 const pending = () => ({ status: "pending" });
 const id = (v, prefix) =>
   typeof v === "string" && new RegExp("^" + prefix + "_[A-Za-z0-9_]{1,250}$").test(v);
@@ -25,6 +31,8 @@ export async function observeVerifiedTopupEvent(db, env, event, options = {}) {
     livemode,
     apiVersions,
     timeoutMs = PAYMENT_EVIDENCE_BOUNDS.timeoutMs,
+    beforeObserve,
+    excludeEmployerPayments = false,
   } = options;
   let e, object, kind, paymentId, chargeId, config;
   try {
@@ -72,6 +80,8 @@ export async function observeVerifiedTopupEvent(db, env, event, options = {}) {
       !id(object.id, { refund: "re", dispute: "du", charge: "ch" }[kind]) ||
       (kind !== "refund" && object.livemode !== livemode) ||
       (object.livemode !== undefined && object.livemode !== livemode) ||
+      (beforeObserve !== undefined && typeof beforeObserve !== "function") ||
+      typeof excludeEmployerPayments !== "boolean" ||
       typeof fetchImpl !== "function" ||
       typeof resolveOffer !== "function" ||
       !Number.isInteger(timeoutMs) ||
@@ -178,7 +188,10 @@ export async function observeVerifiedTopupEvent(db, env, event, options = {}) {
   };
   async function run() {
     if (!paymentId) {
-      const c = await readTopupAssociation(config, "charges", chargeId, get);
+      const c =
+        excludeEmployerPayments && topupRecoveryConfigured(config)
+          ? await readEmployerHistoryObject(config, "charges", chargeId, get)
+          : await readTopupAssociation(config, "charges", chargeId, get);
       live();
       if (c?.object !== "charge" || c.id !== chargeId || c.livemode !== livemode) return pending();
       paymentId = ref(c.payment_intent, "payment_intent", livemode);
@@ -198,10 +211,28 @@ export async function observeVerifiedTopupEvent(db, env, event, options = {}) {
       !Array.isArray(rows) ||
       rows.length !== 1 ||
       rows[0]?.success !== true ||
-      !Array.isArray(rows[0].results) ||
-      rows[0].results.length !== 1
+      !Array.isArray(rows[0].results)
     )
       return pending();
+    if (
+      excludeEmployerPayments &&
+      Object.hasOwn(rows, 0) &&
+      rows[0].meta?.changes === 0 &&
+      rows[0].results.length === 0
+    ) {
+      return excludeVerifiedEmployerPayment(db, {
+        event: e,
+        kind,
+        paymentId,
+        paymentHash: hash,
+        chargeId,
+        livemode,
+        config,
+        get,
+        live,
+      });
+    }
+    if (rows[0].results.length !== 1) return pending();
     const claim = rows[0].results[0];
     if (["deleted", "retired"].includes(claim?.state)) return { status: "inactive" };
     if (claim?.state !== "granted") return pending();
@@ -232,6 +263,7 @@ export async function observeVerifiedTopupEvent(db, env, event, options = {}) {
       )
         return pending();
     }
+    if (beforeObserve !== undefined && (await beforeObserve()) !== true) return pending();
     live();
     return observeTopupHistory(
       db,

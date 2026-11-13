@@ -7,6 +7,7 @@ import { authenticateUser, bearerOf, providers, userHash, verifyIdToken } from "
 import { copySession, createSession, dropExpiredSessions, endSession, isSessionToken, sessionInfo } from "./session.js";
 import { MAX_PROFILE_BYTES, deleteProfile, getProfile, putProfile, requireSync, syncOn } from "./profile.js";
 import { callGemini, costCents, estimateCents, readUsageFromSSE, sanitizeRequest } from "./gemini.js";
+import { boundLegacySSE } from "./legacy-provider-response.js";
 import { allowanceFor, cleanup, upgradeOffer, deleteUser, globalRpm, isPaused, monthOf, release, remainingOf, settle, shownLimit, usageFor } from "./limits.js";
 import { admitAiLifecycle, fundedPurchaseCreationReady, respondFundedAi } from "./ai-lifecycle.js";
 import { purchasedRunsFor } from "./funded-purchase.js";
@@ -17,6 +18,8 @@ import { createFollowManagementHttp } from "./follow-management-http.js";
 import { createFollowManagementRequestHttp } from "./follow-management-request-http.js";
 import { loadFollowCatalog, prepareFollowCatalogRelease } from "./follow-catalog-loader.js";
 import { createFollowSignupRoute } from "./follow-signup-route.js";
+import { prepareFollowSignupDeployment } from "./follow-signup-release.js";
+import { runFollowScheduledMaintenance } from "./follow-scheduled-maintenance.js";
 import { followTokenEndpoints } from "./follow-token-endpoint.js";
 import { followUnsubscribeEndpoint } from "./follow-unsubscribe-endpoint.js";
 import { topupCheckoutResponse, topupOfferResponse } from "./topup-checkout-http.js";
@@ -166,11 +169,22 @@ function prepareFollowSignupAdmission({ db, now, d }) {
 }
 
 const signupFollow = ({ request, env, db, now, d }) => {
-  if (env.FOLLOW_SIGNUP_ENABLED !== "1" || typeof d.followSignupRelease !== "function")
+  if (env.FOLLOW_SIGNUP_ENABLED !== "1" ||
+      (typeof d.followSignupRelease !== "function" && typeof env.FOLLOW_SIGNUP_RELEASE !== "string"))
     return followSignupClosed();
   return followSignup(request, {
     originAllowed: (r) => followOriginAllowed(r, env),
-    prepareAdmission: () => prepareFollowSignupAdmission({ db, now, d }),
+    prepareAdmission: () => {
+      if (typeof d.followSignupRelease === "function")
+        return prepareFollowSignupAdmission({ db, now, d });
+      try {
+        return { db, ...prepareFollowSignupDeployment(env.FOLLOW_SIGNUP_RELEASE, {
+          fetch: d.fetch, now: d.now, initialTime: now instanceof Date ? +now : NaN,
+        }) };
+      } catch {
+        return followSignupClosed();
+      }
+    },
   });
 };
 
@@ -571,8 +585,14 @@ const safeRouteHandlers = {
     const price = (usage) => (usage ? costCents(model, usage, d.config, now) : estimate);
 
     if (stream) {
-      const [client, meter] = upstream.body.tee();
-      later(ctx, readUsageFromSSE(meter).then((u) => settle(db, user, admitted, price(u), u, { task, model })));
+      const bounded = boundLegacySSE(upstream.body);
+      const [client, meter] = bounded.body.tee();
+      later(ctx, readUsageFromSSE(meter).then(async (u) => {
+        // Retain first-autofill and ordinary error settlement. Only a byte cutoff
+        // discards provisional usage and keeps the already charged estimate.
+        const usage = await bounded.completed === "limited" ? null : u;
+        await settle(db, user, admitted, price(usage), usage, { task, model });
+      }));
       return new Response(client, {
         status: 200,
         headers: { ...headers, "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },
@@ -787,6 +807,19 @@ export default {
       ctx.waitUntil(reportJob());
       return;
     }
+    const followCron = env.FOLLOW_MAINTENANCE_CRON;
+    if (
+      typeof followCron === "string" &&
+      followCron.length > 0 &&
+      followCron !== "17 7 * * *" &&
+      event?.cron === followCron
+    ) {
+      if (env.FOLLOW_MAINTENANCE_ENABLED === "1") {
+        ctx.waitUntil(runFollowScheduledMaintenance(env.DB, env.FOLLOW_MAINTENANCE_POLICY));
+      }
+      return;
+    }
+    if (event?.cron !== "17 7 * * *") return;
     const now = new Date();
     // was: ctx.waitUntil(Promise.all([cleanup(env.DB, now), dropStale(env.DB, CONFIG, now)]));
     // was: ctx.waitUntil(Promise.all([cleanup(env.DB, now), dropStale(env.DB, CONFIG, now), dropExpiredSessions(env.DB, now)]));

@@ -207,7 +207,9 @@ def _held_paths(listing: str) -> frozenset[str]:
         return frozenset()
 
 
-def main(argv: list[str], *, card_renderer: share_cards.Renderer | None = None) -> None:
+def main(
+    argv: list[str], *, card_renderer: share_cards.Renderer | None = None, _follow=None
+) -> None:
     """python -m internscout.site.publish SITE_DIR [LIVE_SITEMAP [LIVE_NOINDEX_LIST]] [--placements PATH]
     [--placements-report PATH] [--employer-postings] [--employer-posting-capture]
 
@@ -233,6 +235,8 @@ def main(argv: list[str], *, card_renderer: share_cards.Renderer | None = None) 
             raise ValueError("Capture requires exactly one employer publication option")
         argv.remove("--employer-posting-capture")
     employer_postings = "--employer-postings" in argv
+    if _follow is not None and (employer_postings or capture):
+        raise ValueError("Follow publication supplies its own paired stage")
     if employer_postings:
         if argv.count("--employer-postings") != 1:
             raise ValueError("Duplicate employer publication option")
@@ -247,17 +251,23 @@ def main(argv: list[str], *, card_renderer: share_cards.Renderer | None = None) 
         i = argv.index("--placements")
         placements_path = argv[i + 1] if i + 1 < len(argv) else ""
         del argv[i : i + 2]
+    if _follow is not None and report_path is not None:
+        raise ValueError("Private Follow publication forbids external report sidecars")
     site_dir = argv[1] if len(argv) > 1 else "docs"
     from .employer_capture import require_unmarked
 
     require_unmarked(Path(site_dir))
     state = runtime.BuildState()
     hooks = runtime.BuildHooks()
+    if _follow is not None and (employer_postings or capture):
+        raise ValueError("Follow publication supplies its own paired stage")
     if employer_postings:
         from .employer_publication import prepare
 
         data, state.posting_links = prepare(site_dir)
         hooks = runtime.BuildHooks(load=lambda _site: data)
+    if _follow is not None:
+        hooks = _follow.configure(state)
     pages = runtime.invoke(
         state,
         hooks,
@@ -266,6 +276,8 @@ def main(argv: list[str], *, card_renderer: share_cards.Renderer | None = None) 
         _live_paths(argv[2]) if len(argv) > 2 else {},
         _held_paths(argv[3]) if len(argv) > 3 else frozenset(),
     ).pages
+    if _follow is not None:
+        _follow.write(Path(site_dir))
     built = pages  # as build() made them, before any paid box, for the feeds
     today = _today_utc()
     if placements_path is not None:

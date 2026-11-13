@@ -1,0 +1,66 @@
+[
+  {
+    "current": "before",
+    "width": 1280,
+    "colorScheme": "light",
+    "externalBlocked": 0,
+    "posts": 0,
+    "overflow": false
+  },
+  {
+    "current": "after",
+    "width": 1280,
+    "colorScheme": "light",
+    "externalBlocked": 0,
+    "posts": 0,
+    "overflow": false
+  },
+  {
+    "current": "before",
+    "width": 1280,
+    "colorScheme": "dark",
+    "externalBlocked": 0,
+    "posts": 0,
+    "overflow": false
+  },
+  {
+    "current": "after",
+    "width": 1280,
+    "colorScheme": "dark",
+    "externalBlocked": 0,
+    "posts": 0,
+    "overflow": false
+  },
+  {
+    "current": "before",
+    "width": 375,
+    "colorScheme": "light",
+    "externalBlocked": 0,
+    "posts": 0,
+    "overflow": false
+  },
+  {
+    "current": "after",
+    "width": 375,
+    "colorScheme": "light",
+    "externalBlocked": 0,
+    "posts": 0,
+    "overflow": false
+  },
+  {
+    "current": "before",
+    "width": 375,
+    "colorScheme": "dark",
+    "externalBlocked": 0,
+    "posts": 0,
+    "overflow": false
+  },
+  {
+    "current": "after",
+    "width": 375,
+    "colorScheme": "dark",
+    "externalBlocked": 0,
+    "posts": 0,
+    "overflow": false
+  }
+]

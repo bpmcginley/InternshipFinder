@@ -24,32 +24,66 @@ def _regular(root: Path, relative: str, *, missing: bool = False) -> Path:
     return path
 
 
-def prepare(site_dir: str) -> tuple[dict, PostingLinks]:
-    """Validate before writing, then stage annotations and return the captured render input.
-
-    The caller has already selected/staged the public export. This adapter does not choose
-    Git revisions, fetch data or establish provenance. Destination inputs must match it.
-    """
+def capture(site_dir: str, *, max_bytes=None, max_files=None) -> dict[str, bytes]:
     selected = Path(public_data_dir(site_dir))
     target = Path(site_dir) / "data"
     for root in (selected, target):
         if root.is_symlink() or root.is_junction() or not root.is_dir():
             raise ValueError("Employer publication requires real data directories")
-    index = _regular(selected, "listings/index.json").read_bytes()
+    used = 0
+
+    def read(name):
+        nonlocal used
+        path = _regular(selected, name)
+        if max_bytes is not None and path.stat().st_size > max_bytes - used:
+            raise ValueError("Captured export exceeds byte bound")
+        with path.open("rb") as stream:
+            raw = stream.read() if max_bytes is None else stream.read(max_bytes - used + 1)
+        used += len(raw)
+        if max_bytes is not None and used > max_bytes:
+            raise ValueError("Captured export exceeds byte bound")
+        return raw
+
+    index = read("listings/index.json")
     decoded = json.loads(index)
     manifest = decoded.get("files") if isinstance(decoded, dict) else None
     if (
         not isinstance(manifest, dict)
         or not manifest
+        or (max_files is not None and len(manifest) + 3 > max_files)
         or any(not re.fullmatch(r"[A-Za-z0-9_-]+", key) for key in manifest)
     ):
         raise ValueError("Invalid employer publication manifest")
     # Derive safe paths from keys; the existing stage validates each declared file and count.
     captured = {"listings/index.json": index}
     for name in [*(f"listings/{key}.json" for key in manifest), "first.json", "majors.json"]:
-        captured[name] = _regular(selected, name).read_bytes()
+        captured[name] = read(name)
+    if selected.resolve() != target.resolve():
+        for name, raw in captured.items():
+            path = _regular(target, name)
+            if max_bytes is not None and path.stat().st_size != len(raw):
+                raise ValueError("Staged site differs from selected export")
+            with path.open("rb") as stream:
+                staged = stream.read() if max_bytes is None else stream.read(len(raw) + 1)
+            if staged != raw:
+                raise ValueError("Staged site differs from selected export")
+    return captured
+
+
+def load_capture(site_dir, captured):
+    with TemporaryDirectory(prefix="internscout-employer-publication-") as temporary:
+        snapshot = Path(temporary)
+        (snapshot / "listings").mkdir()
+        for name, raw in captured.items():
+            (snapshot / name).write_bytes(raw)
+        return source.load(site_dir, data_dir=str(snapshot))
+
+
+def prepare(site_dir: str) -> tuple[dict, PostingLinks]:
+    captured = capture(site_dir)
+    target = Path(site_dir) / "data"
     stage = stage_employer_postings(
-        index,
+        captured["listings/index.json"],
         {
             name: raw
             for name, raw in captured.items()
@@ -58,21 +92,9 @@ def prepare(site_dir: str) -> tuple[dict, PostingLinks]:
         captured["first.json"],
     )
     links = PostingLinks.from_stage(stage)
-    same_directory = selected.resolve() == target.resolve()
-    for name, raw in captured.items():
-        destination = _regular(target, name)
-        if not same_directory and destination.read_bytes() != raw:
-            raise ValueError("Staged site differs from the selected employer export")
     for name in stage.files:
         _regular(target, name, missing=True)
-    # The ordinary loader keeps its existing filtering/deduplication. It reads only these
-    # captured bytes, never reselects or rereads the changing input directory during rendering.
-    with TemporaryDirectory(prefix="internscout-employer-publication-") as temporary:
-        snapshot = Path(temporary)
-        (snapshot / "listings").mkdir()
-        for name, raw in captured.items():
-            (snapshot / name).write_bytes(raw)
-        data = source.load(site_dir, data_dir=str(snapshot))
+    data = load_capture(site_dir, captured)
     for name, raw in stage.files.items():
         (target / name).write_bytes(raw)
     return data, links

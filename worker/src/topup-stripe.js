@@ -1,6 +1,7 @@
 // Trusted checkout adapter with explicit injected fetch.
 import { stripe, siteUrl, paymentsOn, managedPayments } from "./billing.js";
 import { validTopupCheckoutId } from "./topup-ledger.js";
+import { uniqueJson } from "./topup-history-traversal.js";
 const OFFER = Object.freeze({
   verified: true,
   version: "topup-v1",
@@ -76,13 +77,62 @@ export async function readHistoricalTopupTarget(env, kind, id, fetchImpl) {
   );
 }
 
-export function topupConfigured(env) {
-  return (
-    env?.TOPUPS_ENABLED === "1" &&
-    paymentsOn(env) &&
-    typeof env.STRIPE_PRICE_TOPUP === "string" &&
-    /^price_[A-Za-z0-9_]{1,250}$/.test(env.STRIPE_PRICE_TOPUP)
+// History-only positive employer proof. Fixed GET paths, no current sales configuration.
+export async function readEmployerHistoryObject(env, kind, id, fetchImpl) {
+  const prefix = new Map([
+    ["charges", "ch"],
+    ["payment_intents", "pi"],
+    ["refunds", "re"],
+    ["disputes", "du"],
+  ]).get(kind);
+  if (
+    typeof env?.STRIPE_SECRET_KEY !== "string" ||
+    !env.STRIPE_SECRET_KEY ||
+    typeof fetchImpl !== "function" ||
+    !(kind === "checkout/sessions"
+      ? validTopupCheckoutId(id)
+      : prefix &&
+        typeof id === "string" &&
+        new RegExp("^" + prefix + "_[A-Za-z0-9_]{1,250}$").test(id))
+  )
+    throw unavailable();
+  return boundedRequest(
+    { STRIPE_SECRET_KEY: env.STRIPE_SECRET_KEY },
+    kind +
+      "/" +
+      encodeURIComponent(id) +
+      (kind === "checkout/sessions" ? "?expand[]=line_items" : ""),
+    {},
+    fetchImpl,
+    null,
+    "GET",
+    TOPUP_CHECKOUT_BOUNDS.timeoutMs,
+    true,
   );
+}
+
+function topupSalesSettings(env) {
+  if (env?.TOPUPS_ENABLED !== "1" || !paymentsOn(env)) return null;
+  const {
+    STRIPE_SECRET_KEY: key,
+    STRIPE_WEBHOOK_SECRET: signingKey,
+    STRIPE_PRICE_TOPUP: priceId,
+    STRIPE_TOPUP_MODE: mode,
+  } = env;
+  if (
+    typeof key !== "string" ||
+    !key ||
+    typeof signingKey !== "string" ||
+    !/^[!-~]+$/.test(signingKey) ||
+    typeof priceId !== "string" ||
+    !/^price_[A-Za-z0-9_]{1,250}$/.test(priceId) ||
+    (mode !== "test" && mode !== "live")
+  )
+    return null;
+  return { key, signingKey, priceId, mode };
+}
+export function topupConfigured(env) {
+  return topupSalesSettings(env) !== null;
 }
 
 export function topupDisplayOffer(adapter) {
@@ -127,7 +177,16 @@ export function checkoutUrl(value, id) {
 export const TOPUP_CHECKOUT_BOUNDS = Object.freeze({ timeoutMs: 10000, bodyBytes: 262144 });
 
 // One request per operation. A timed-out POST is ambiguous, never retried here.
-async function boundedRequest(config, path, form, fetchImpl, key, method, timeoutMs) {
+async function boundedRequest(
+  config,
+  path,
+  form,
+  fetchImpl,
+  key,
+  method,
+  timeoutMs,
+  strictJson = false,
+) {
   const controller = new AbortController(),
     deadline = performance.now() + timeoutMs;
   let stopped = false,
@@ -157,8 +216,8 @@ async function boundedRequest(config, path, form, fetchImpl, key, method, timeou
     controller.signal.addEventListener("abort", abort, { once: true });
     let bytes = 0,
       text = "";
-    // Match Response.text's UTF-8 decoding, including replacement of malformed bytes.
-    const decoder = new TextDecoder();
+    // Legacy reads retain Response.text decoding. Positive exclusion rejects malformed bytes.
+    const decoder = new TextDecoder("utf-8", { fatal: strictJson });
     try {
       for (;;) {
         live();
@@ -170,7 +229,13 @@ async function boundedRequest(config, path, form, fetchImpl, key, method, timeou
         if (bytes > TOPUP_CHECKOUT_BOUNDS.bodyBytes) throw unavailable();
         text += decoder.decode(chunk.value, { stream: true });
       }
-      return text + decoder.decode();
+      text += decoder.decode();
+      if (strictJson) {
+        if (length != null && bytes !== Number(length)) throw unavailable();
+        uniqueJson(text);
+        live();
+      }
+      return text;
     } finally {
       abort();
       controller.signal.removeEventListener("abort", abort);
@@ -228,8 +293,9 @@ export async function prepareTopupStripe(
   fetchImpl,
   timeoutMs = TOPUP_CHECKOUT_BOUNDS.timeoutMs,
 ) {
+  const sales = topupSalesSettings(env);
   if (
-    !topupConfigured(env) ||
+    !sales ||
     typeof fetchImpl !== "function" ||
     !Number.isInteger(timeoutMs) ||
     timeoutMs < 1 ||
@@ -237,14 +303,27 @@ export async function prepareTopupStripe(
   )
     return { enabled: false };
   // Snapshot private configuration. Price/session paths and raw errors must never reach logs.
-  const config = { STRIPE_SECRET_KEY: env.STRIPE_SECRET_KEY },
-    priceId = env.STRIPE_PRICE_TOPUP,
-    managed = managedPayments(env);
+  const { key, signingKey, priceId, mode } = sales;
+  const config = { STRIPE_SECRET_KEY: key },
+    livemode = mode === "live";
+  let managed, root, success, cancel, price;
+  const current = () => {
+    const latest = topupSalesSettings(env);
+    return (
+      latest?.key === key &&
+      latest.signingKey === signingKey &&
+      latest.priceId === priceId &&
+      latest.mode === mode &&
+      managedPayments(env) === managed &&
+      env.SITE_URL === root
+    );
+  };
   const request = (path, form = {}, key = null, method = "GET") =>
     boundedRequest(config, path, form, fetchImpl, key, method, timeoutMs);
-  let success, cancel, price;
   try {
-    const site = new URL(siteUrl(env));
+    managed = managedPayments(env);
+    root = env.SITE_URL;
+    const site = new URL(siteUrl({ SITE_URL: root }));
     if (
       site.protocol !== "https:" ||
       site.username ||
@@ -271,7 +350,8 @@ export async function prepareTopupStripe(
       price.unit_amount !== 300 ||
       Number(price.unit_amount_decimal) !== 300 ||
       price.tax_behavior !== "exclusive" ||
-      typeof price.livemode !== "boolean" ||
+      price.livemode !== livemode ||
+      !current() ||
       price.product?.object !== "product" ||
       price.product.active !== true ||
       price.product.deleted
@@ -307,7 +387,7 @@ export async function prepareTopupStripe(
       session.mode !== "payment" ||
       session.status !== "open" ||
       session.payment_status !== "unpaid" ||
-      session.livemode !== price.livemode ||
+      session.livemode !== livemode ||
       session.client_reference_id !== a.user_hash ||
       session.currency !== "usd" ||
       session.amount_subtotal !== 300 ||
@@ -347,10 +427,13 @@ export async function prepareTopupStripe(
     };
   }
   return {
-    enabled: true,
+    get enabled() {
+      return current();
+    },
     offer: OFFER,
     async create(a) {
       if (
+        !current() ||
         !attemptOk(a) ||
         a.state !== "creating" ||
         a.checkout_id !== null ||
@@ -374,15 +457,17 @@ export async function prepareTopupStripe(
         form[`payment_intent_data[metadata][${k}]`] = v;
       }
       if (managed) form["managed_payments[enabled]"] = "true";
+      // A POST already sent under the captured settings may have created a session.
+      // Preserve verified durable attachment. A stale adapter cannot subsequently open it.
       return verified(await request("checkout/sessions", form, a.idempotencyKey, "POST"), a);
     },
     async readOpen(a) {
-      if (!attemptOk(a) || a.state !== "open" || !validTopupCheckoutId(a.checkout_id))
+      if (!current() || !attemptOk(a) || a.state !== "open" || !validTopupCheckoutId(a.checkout_id))
         throw unavailable();
       const session = await request(
         "checkout/sessions/" + encodeURIComponent(a.checkout_id) + "?expand[]=line_items",
       );
-      if (session?.id !== a.checkout_id) throw unavailable();
+      if (!current() || session?.id !== a.checkout_id) throw unavailable();
       return verified(session, a);
     },
   };
