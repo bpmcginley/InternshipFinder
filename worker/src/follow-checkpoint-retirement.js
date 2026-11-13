@@ -9,9 +9,13 @@ const fail = () => {
   throw new Error("Follow checkpoint retirement unavailable");
 };
 
-export function createFollowCheckpointRetirement({ control, maxControlBytes, maxHeaderBytes }) {
+export function createFollowCheckpointMetadataCapture({
+  control,
+  maxControlBytes,
+  maxHeaderBytes,
+}) {
   if (
-    [control?.capture, control?.change].some((v) => typeof v !== "function") ||
+    typeof control?.capture !== "function" ||
     !integer(maxControlBytes) ||
     !maxControlBytes ||
     maxControlBytes > 65536 ||
@@ -20,7 +24,7 @@ export function createFollowCheckpointRetirement({ control, maxControlBytes, max
     maxHeaderBytes > maxControlBytes
   )
     throw new TypeError("Invalid checkpoint retirement dependencies");
-  function capture() {
+  return function capture() {
     const before = control.capture();
     if (
       !integer(before?.now) ||
@@ -92,7 +96,14 @@ export function createFollowCheckpointRetirement({ control, maxControlBytes, max
     }
     if ([accepted, pending, reservation].some((v) => v && before.now < v.starts)) fail();
     return { ...before, state };
-  }
+  };
+}
+
+export function createFollowCheckpointRetirement(options) {
+  const { control } = options;
+  if (typeof control?.change !== "function")
+    throw new TypeError("Invalid checkpoint retirement dependencies");
+  const capture = createFollowCheckpointMetadataCapture(options);
   async function retire(phase, generation) {
     try {
       const before = capture();
