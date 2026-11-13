@@ -1,0 +1,85 @@
+name: Tests
+
+# The suites that guard the parts a student actually touches: the ingest and tagging rules, the
+# Worker that holds the AI key and the caps, the extension that fills their applications, and the
+# dashboard's own logic in docs/js/core.js.
+# They ran nowhere automatically before this: the extension's only ran on a release tag, by which
+# point a break is already tagged, and the backend's and the Worker's ran only on a laptop.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+# Pinned to ubuntu-24.04 (was: ubuntu-latest): that label moves to Ubuntu 26 on 2026-10-19, and the move should be a deliberate change.
+jobs:
+  backend:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/python
+        with:
+          cache: pip
+          install-backend: 'true'
+          install-project: 'true'
+      - name: Install test dependencies
+        working-directory: backend
+        run: |
+          # pillow: growth/cards.py's tests draw a real card (DejaVu is on the runner image).
+          # cryptography: growth/metrics.py signs the Search Console sign-in with it.
+          pip install pytest pillow cryptography
+          # ffmpeg: growth/reels.py's test renders a real Reel and checks it with ffprobe (it is skipped
+          # where ffmpeg is missing, so a failed install only loses that one check).
+          if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
+            sudo -n timeout --kill-after=10s 3m apt-get install -y -qq ffmpeg >/dev/null || echo "::warning::no ffmpeg: the Reel render test is skipped"
+          fi
+      - name: Run tests
+        working-directory: backend
+        run: python -m pytest tests/ ../growth/tests/ -q
+
+  worker:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/node
+      - name: Install pinned Workers runtime test dependencies
+        working-directory: worker
+        run: npm ci
+      - name: Run tests
+        working-directory: worker
+        run: node --test test/
+      - name: Check local Workers runtime and D1 behavior
+        working-directory: worker
+        run: npm run test:workers
+
+  extension:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/node
+      - name: Run tests
+        run: node --test extension/test/*.test.mjs
+      - uses: ./.github/actions/python
+      - name: Verify reproducible extension packaging and safe release retries
+        run: python -m unittest discover -s scripts -p 'test_release_extension.py'
+
+  # The dashboard's own logic (docs/js/core.js), loaded the way the page loads it. The tests live
+  # outside docs/ so they aren't published with the site.
+  site:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/node
+      - name: Run tests
+        run: node --test tests/site/*.test.mjs

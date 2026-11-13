@@ -1,0 +1,91 @@
+{
+ "ats": "workday",
+ "token": "oshkoshcorporation|wd5|Oshkosh",
+ "name": "Oshkosh",
+ "sector": null,
+ "measured_on": "2026-10-18",
+ "production_keywords": [
+  "intern",
+  "co-op"
+ ],
+ "configs": [
+  {
+   "keywords": [
+    "intern"
+   ],
+   "status": "ok",
+   "requests": 27,
+   "request_errors": 0,
+   "est_sequential_seconds": 14.5,
+   "raw_rows": 127,
+   "normalized": 127,
+   "accepted": 125,
+   "accepted_dedupe_keys": 99,
+   "new_vs_baseline": 0,
+   "new_ids": []
+  },
+  {
+   "keywords": [
+    "intern",
+    "co-op"
+   ],
+   "status": "ok",
+   "requests": 47,
+   "request_errors": 0,
+   "est_sequential_seconds": 26.5,
+   "raw_rows": 128,
+   "normalized": 128,
+   "accepted": 125,
+   "accepted_dedupe_keys": 99,
+   "new_vs_baseline": 0,
+   "new_ids": []
+  },
+  {
+   "keywords": [
+    "intern",
+    "co-op",
+    "student"
+   ],
+   "status": "ok",
+   "requests": 53,
+   "request_errors": 0,
+   "est_sequential_seconds": 30.4,
+   "raw_rows": 129,
+   "normalized": 129,
+   "accepted": 126,
+   "accepted_dedupe_keys": 99,
+   "new_vs_baseline": 1,
+   "new_ids": [
+    {
+     "id": "oshkoshcorporation.wd5.myworkdayjobs.com/Oshkosh/job/Orlando-Florida-United-States/Quality-Intern--Summer-2027-_R49826",
+     "title": "Quality Intern (Summer 2027)"
+    }
+   ]
+  },
+  {
+   "keywords": [
+    "intern",
+    "co-op",
+    "student",
+    "stagiaire"
+   ],
+   "status": "ok",
+   "requests": 54,
+   "request_errors": 0,
+   "est_sequential_seconds": 30.9,
+   "raw_rows": 129,
+   "normalized": 129,
+   "accepted": 126,
+   "accepted_dedupe_keys": 99,
+   "new_vs_baseline": 1,
+   "new_ids": [
+    {
+     "id": "oshkoshcorporation.wd5.myworkdayjobs.com/Oshkosh/job/Orlando-Florida-United-States/Quality-Intern--Summer-2027-_R49826",
+     "title": "Quality Intern (Summer 2027)"
+    }
+   ]
+  }
+ ],
+ "network_requests": 54,
+ "network_wall_seconds_incl_pauses": 47.8
+}

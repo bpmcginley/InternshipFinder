@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Acme Robotics – Software Intern (fixture)</title>
+<style>
+body{font:15px/1.5 system-ui,sans-serif;max-width:640px;margin:30px auto;padding:0 16px}
+section{display:none} section.on{display:block}
+label{display:block;margin:12px 0 4px} input,select,textarea{width:100%;padding:6px;font:inherit}
+input[type=checkbox],input[type=radio]{width:auto}
+button{margin-top:16px;padding:8px 16px;font:inherit}
+.err{color:#b00}
+#log{margin-top:30px;padding:8px;background:#eee;font:12px monospace;white-space:pre-wrap}
+</style></head><body>
+<!-- Test page: 5 steps like Workday. Any submit shows FAIL in the log and title. -->
+<h1>Software Engineering Intern, Summer 2027</h1>
+<p>Acme Robotics · Boston, MA</p>
+
+<section id="s0" class="on">
+  <p>Build robot fleet software with our platform team. Python, C++, ROS a plus.</p>
+  <button type="button" data-next="s1">Apply</button>
+</section>
+
+<section id="s1">
+  <h2>Step 1 of 5: Create Account</h2>
+  <label for="em">Email Address *</label><input id="em" type="email" required>
+  <label for="pw">Password *</label><input id="pw" type="password" required>
+  <label for="pw2">Verify New Password *</label><input id="pw2" type="password" required>
+  <label><input type="checkbox" id="terms" required> I agree to the terms</label>
+  <p class="err" id="e1"></p>
+  <button type="button" id="create">Create Account</button>
+</section>
+
+<section id="s2">
+  <h2>Step 2 of 5: My Information</h2>
+  <label for="fn">Legal First Name *</label><input id="fn" required>
+  <label for="ln">Legal Last Name *</label><input id="ln" required>
+  <label for="ph">Phone Number *</label><input id="ph" type="tel" required>
+  <label for="st">State *</label>
+  <select id="st" required><option value="">Select One</option><option>Massachusetts</option><option>New York</option><option>Connecticut</option></select>
+  <label for="heard">How did you hear about us? *</label>
+  <select id="heard" required><option value="">Select One</option><option>Company Website</option><option>LinkedIn</option><option>Job Board</option><option>Referral</option></select>
+  <p class="err" id="e2"></p>
+  <button type="button" data-back="s1">Back</button>
+  <button type="button" data-next="s3" data-req="fn,ln,ph,st,heard" data-err="e2">Save and Continue</button>
+</section>
+
+<section id="s3">
+  <h2>Step 3 of 5: My Experience</h2>
+  <label for="cv">Resume/CV *</label><input id="cv" type="file" accept=".pdf,.doc,.docx" required>
+  <label for="school">School or University *</label><input id="school" required>
+  <label for="gpa">GPA</label><input id="gpa">
+  <label for="grad">Expected Graduation (MM/YYYY) *</label><input id="grad" required placeholder="MM/YYYY">
+  <p class="err" id="e3"></p>
+  <button type="button" data-back="s2">Back</button>
+  <button type="button" data-next="s4" data-req="cv,school,grad" data-err="e3">Save and Continue</button>
+</section>
+
+<section id="s4">
+  <h2>Step 4 of 5: Application Questions</h2>
+  <p>Are you legally authorized to work in the United States? *</p>
+  <label><input type="radio" name="auth" value="yes" required> Yes</label>
+  <label><input type="radio" name="auth" value="no"> No</label>
+  <p>Will you now or in the future require visa sponsorship? *</p>
+  <label><input type="radio" name="spons" value="yes" required> Yes</label>
+  <label><input type="radio" name="spons" value="no"> No</label>
+  <label for="why">Why do you want to intern at Acme Robotics? (100–200 words) *</label>
+  <textarea id="why" rows="6" required></textarea>
+  <p class="err" id="e4"></p>
+  <button type="button" data-back="s3">Back</button>
+  <button type="button" data-next="s5" data-req="why,auth,spons" data-err="e4">Save and Continue</button>
+</section>
+
+<section id="s5">
+  <h2>Step 5 of 5: Voluntary Disclosures</h2>
+  <label for="gender">Gender</label>
+  <select id="gender"><option value="">Select One</option><option>Male</option><option>Female</option><option>Non-binary</option><option>I decline to self-identify</option></select>
+  <label for="vet">Veteran Status</label>
+  <select id="vet"><option value="">Select One</option><option>I am not a protected veteran</option><option>I identify as a protected veteran</option><option>I decline to self-identify</option></select>
+  <label><input type="checkbox" id="consent" required> I certify the information is accurate *</label>
+  <form id="final" onsubmit="return caught(event)">
+    <button type="button" data-back="s4">Back</button>
+    <button type="submit">Submit</button>
+  </form>
+</section>
+
+<div id="log">log:</div>
+<script>
+const log = (t) => { document.getElementById("log").textContent += "\n" + t; };
+const show = (id) => { document.querySelectorAll("section").forEach(s => s.classList.toggle("on", s.id === id)); log("step -> " + id); };
+function filled(id) {
+  const el = document.getElementById(id);
+  if (el) return el.type === "file" ? el.files.length > 0 : !!el.value.trim();
+  return !!document.querySelector(`input[name="${id}"]:checked`);
+}
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.back) return show(b.dataset.back);
+  if (!b.dataset.next) return;
+  const missing = (b.dataset.req || "").split(",").filter(Boolean).filter(id => !filled(id));
+  if (missing.length) { document.getElementById(b.dataset.err).textContent = "Required: " + missing.join(", "); return; }
+  show(b.dataset.next);
+});
+document.getElementById("create").addEventListener("click", () => {
+  const pw = document.getElementById("pw").value, e1 = document.getElementById("e1");
+  if (!filled("em") || !pw) return e1.textContent = "Email and password are required.";
+  if (pw !== document.getElementById("pw2").value) return e1.textContent = "Passwords do not match.";
+  if (pw.length < 8 || !/[A-Z]/.test(pw) || !/\d/.test(pw) || !/[^A-Za-z0-9]/.test(pw)) return e1.textContent = "Password needs 8+ chars, a capital, a number and a symbol.";
+  if (!document.getElementById("terms").checked) return e1.textContent = "Accept the terms.";
+  log("account created for " + document.getElementById("em").value.replace(/.(?=.*@)/g, "*"));
+  show("s2");
+});
+function caught(e) { e.preventDefault(); document.title = "FAIL: SUBMITTED"; log("FAIL: form was submitted"); return false; }
+</script>
+</body></html>

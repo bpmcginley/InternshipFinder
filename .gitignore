@@ -1,0 +1,37 @@
+__pycache__/
+/node_modules/
+*.db
+.venv/
+*.egg-info/
+/build/
+
+# Chrome extension signing key - never commit
+extension.pem
+*.pem
+
+# Built extension zips (scripts/package_extension.py)
+dist/
+
+# Email digest previews (growth/digest.py): rebuilt from the data on every run
+digest-preview/
+outreach-kit/
+# The every-major list (growth/every_major_list.py) is published to its own repository, never here
+every-major-list/
+tmp/pdfs/
+
+# Worker: local secrets and build state - never commit
+worker/node_modules/
+worker/.wrangler/
+worker/.dev.vars
+
+# Model comparison (scripts/eval): recorded Auto-Apply steps hold a real profile - never commit
+scripts/eval/*.json
+scripts/eval/eval-report.md
+# Offline form benchmark (scripts/eval/form_bench.mjs): run logs and the headless-Chrome dependency
+scripts/eval/*.log
+scripts/eval/bench-*.md
+scripts/eval/node_modules/
+!scripts/eval/package.json
+!scripts/eval/package-lock.json
+# The ingest report is a run artifact, never part of the published site (2026-10-19).
+docs/data/ingest-report.json

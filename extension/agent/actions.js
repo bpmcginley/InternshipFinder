@@ -1,0 +1,891 @@
+// Low-level page helpers (MAIN world, so React internals are reachable). Moved from the old
+// content.js / workday.js and generalised: native setters, react-select via fiber
+// selectOption, Workday listboxes, ARIA comboboxes, radios, files.
+(function () {
+  if (window.ISActions && window.ISActions.v >= 9) return; // bump with dom.js V when this file changes
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const norm = (s) =>
+    String(s || "")
+      .replace(/\s+/g, " ")
+      .trim();
+  const low = (s) => norm(s).toLowerCase();
+
+  function visible(el) {
+    if (!el || !el.isConnected) return false;
+    const r = el.getBoundingClientRect();
+    if (r.width === 0 && r.height === 0) return false;
+    const s = getComputedStyle(el);
+    return s.visibility !== "hidden" && s.display !== "none";
+  }
+
+  function setNative(el, value) {
+    const proto =
+      el.tagName === "TEXTAREA"
+        ? HTMLTextAreaElement.prototype
+        : el.tagName === "SELECT"
+          ? HTMLSelectElement.prototype
+          : HTMLInputElement.prototype;
+    const desc = Object.getOwnPropertyDescriptor(proto, "value");
+    el.focus && el.focus();
+    desc.set.call(el, value);
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+  function blur(el) {
+    el.dispatchEvent(new Event("blur", { bubbles: true }));
+    el.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+  }
+  // Say it again as keystrokes. SuccessFactors' picklists (Country, State, School) render only the
+  // first 100 items and narrow the list from an inline onkeyup/onkeydown handler, so a value set the
+  // React way — value setter plus an "input" event — leaves the list unfiltered. "United States" is
+  // the 234th country, never drawn, so the pick failed and the model was handed 40 countries ending
+  // at Iran. One keydown/keyup pair after the value is set is what a human's last keypress looks
+  // like, which is all those handlers are waiting for.
+  // keyCode and which are gone from the spec but still what older widgets read, and Chrome lets an
+  // init dict set them, so send both spellings.
+  function keyEcho(el, value) {
+    const key = String(value == null ? "" : value).slice(-1) || "a";
+    const kc = key.toUpperCase().charCodeAt(0) || 0;
+    const code = /[a-z]/i.test(key)
+      ? "Key" + key.toUpperCase()
+      : /\d/.test(key)
+        ? "Digit" + key
+        : "";
+    for (const t of ["keydown", "keypress", "keyup"])
+      el.dispatchEvent(new KeyboardEvent(t, { key, code, keyCode: kc, which: kc, bubbles: true }));
+  }
+  // Option lists drawn inside shadow roots (SmartRecruiters oneclick-ui) are invisible to document.querySelectorAll.
+  function deepQueryAll(selector, root = document) {
+    const out = [...root.querySelectorAll(selector)];
+    for (const el of root.querySelectorAll("*"))
+      if (el.shadowRoot) out.push(...deepQueryAll(selector, el.shadowRoot));
+    return out;
+  }
+  function mouseClick(el) {
+    for (const t of ["pointerdown", "mousedown", "pointerup", "mouseup"])
+      el.dispatchEvent(new MouseEvent(t, { bubbles: true, cancelable: true, view: window }));
+    el.click();
+  }
+
+  // ---- option matching ----
+  const DECLINE =
+    /prefer not|decline|don'?t wish|do not wish|choose not|not to (say|disclose|answer|self)|rather not/i;
+  const US =
+    "AL Alabama,AK Alaska,AZ Arizona,AR Arkansas,CA California,CO Colorado,CT Connecticut,DE Delaware,DC District of Columbia,FL Florida,GA Georgia,HI Hawaii,ID Idaho,IL Illinois,IN Indiana,IA Iowa,KS Kansas,KY Kentucky,LA Louisiana,ME Maine,MD Maryland,MA Massachusetts,MI Michigan,MN Minnesota,MS Mississippi,MO Missouri,MT Montana,NE Nebraska,NV Nevada,NH New Hampshire,NJ New Jersey,NM New Mexico,NY New York,NC North Carolina,ND North Dakota,OH Ohio,OK Oklahoma,OR Oregon,PA Pennsylvania,RI Rhode Island,SC South Carolina,SD South Dakota,TN Tennessee,TX Texas,UT Utah,VT Vermont,VA Virginia,WA Washington,WV West Virginia,WI Wisconsin,WY Wyoming";
+  const STATE = Object.fromEntries(US.split(",").map((s) => [s.slice(0, 2), s.slice(3)]));
+  // "Amherst, MA" -> "amherst massachusetts"; "UMass - Amherst" -> "umass amherst"
+  const clean = (s) =>
+    low(String(s || "").replace(/,\s*([A-Z]{2})\b/g, (m, ab) => (STATE[ab] ? " " + STATE[ab] : m)))
+      .replace(/\s[-–—|]\s|[,;:()]/g, " ")
+      .replace(/[^\w\s'+#./-]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+  // "3.6" vs "3.5-3.9" / "below 3.0" / "4.0+": true/false when the option is a numeric bucket, else null
+  function numberInRange(t, w) {
+    const m = /^\$?(\d+(?:\.\d+)?)[a-z%]*$/.exec(w.replace(/[\s,]/g, ""));
+    if (!m) return null;
+    const n = parseFloat(m[1]),
+      num = "\\$?(\\d+(?:\\.\\d+)?)";
+    let r = new RegExp(`^${num}\\s*(?:-|to|–)\\s*${num}\\b`).exec(t);
+    if (r) return n >= parseFloat(r[1]) && n <= parseFloat(r[2]);
+    r = new RegExp(`^(?:below|under|less than)\\s+${num}\\b`).exec(t);
+    if (r) return n < parseFloat(r[1]);
+    r = new RegExp(
+      `^(?:above|over|more than|at least)\\s+${num}\\b|^${num}\\s*(?:\\+|or (?:more|higher|above))`,
+    ).exec(t);
+    if (r) return n >= parseFloat(r[1] ?? r[2]);
+    return null;
+  }
+  function scoreOption(text, want) {
+    const t = clean(text),
+      w = clean(want);
+    if (!t || !w) return 0;
+    if (t === w) return 100;
+    if (DECLINE.test(want) && DECLINE.test(text)) return 90;
+    const inRange = numberInRange(t, w);
+    if (inRange !== null) return inRange ? 85 : 0;
+    if (/^(yes|no)\b/.test(w) && t.startsWith(w.split(/\W/)[0] + "")) return 80 - t.length / 100;
+    if (t.startsWith(w) || w.startsWith(t)) return 70 - Math.abs(t.length - w.length) / 10;
+    if (t.includes(w) || w.includes(t)) return 55 - Math.abs(t.length - w.length) / 20;
+    const tw = new Set(t.split(/\s+/)),
+      ww = w.split(/\s+/).filter((x) => x.length > 2);
+    const hit = ww.filter((x) => tw.has(x)).length;
+    if (!ww.length || !hit) return 0;
+    return (hit / ww.length) * 45 + (t.startsWith(ww[0]) ? 3 : 0) - Math.max(0, tw.size - hit) / 50;
+  }
+  function best(options, want, getText = (o) => o) {
+    let top = null,
+      topScore = 0;
+    for (const o of options) {
+      const s = scoreOption(getText(o), want);
+      if (s > topScore) {
+        top = o;
+        topScore = s;
+      }
+    }
+    return topScore >= 30 ? top : null;
+  }
+
+  // ---- React fiber (react-select exposes selectOption in props) ----
+  function getFiber(el) {
+    const k = Object.keys(el).find(
+      (k) => k.startsWith("__reactFiber$") || k.startsWith("__reactInternalInstance$"),
+    );
+    return k ? el[k] : null;
+  }
+  function fiberProp(el, name, depth = 30) {
+    let f = getFiber(el);
+    for (let i = 0; i < depth && f; i++) {
+      const p = f.memoizedProps;
+      if (p && typeof p[name] !== "undefined") return p[name];
+      f = f.return;
+    }
+    return undefined;
+  }
+
+  async function waitFor(fn, timeout = 1500, step = 100) {
+    const end = Date.now() + timeout;
+    while (Date.now() < end) {
+      const v = fn();
+      if (v && (!Array.isArray(v) || v.length)) return v;
+      await sleep(step);
+    }
+    return fn();
+  }
+
+  // ---- react-select (new Greenhouse boards, Ashby, many custom forms) ----
+  // Synthetic mouse/key events don't open its menu, so drive it through its own props instead:
+  // selectProps.options + selectOption for fixed lists; loadOptions (async-paginate, e.g. School)
+  // or onInputChange (async search, e.g. Location) for type-ahead lists.
+  function reactSelectContainer(input) {
+    for (let p = input.parentElement; p && p !== document.body; p = p.parentElement) {
+      const cls = typeof p.className === "string" ? p.className : "";
+      if (/(^|\s)select-shell(\s|$)|select__container/.test(cls)) return p;
+      // skip react-select's inner "…__input-container" / "…__value-container" wrappers
+      if (
+        /-container(\s|$)/.test(cls) &&
+        !/input-container|value-container|indicators?-container/.test(cls) &&
+        p.querySelector('[class*="select__control"], [class*="-control"]')
+      )
+        return p;
+    }
+    const ctl = input.closest('[class*="select__control"], [class*="-control"]');
+    return ctl ? ctl.parentElement : null;
+  }
+  function isReactSelect(input) {
+    return (
+      /^react-select/.test(input.id || "") ||
+      !!(input.classList && input.classList.contains("select__input")) ||
+      !!(
+        input.closest &&
+        input.closest('.select-shell, [class*="select__control"], [class*="Select-control"]')
+      )
+    );
+  }
+  function rsProps(input) {
+    const sp = fiberProp(input, "selectProps", 40),
+      so = fiberProp(input, "selectOption", 40);
+    return sp && typeof so === "function" ? { sp, so } : null;
+  }
+  const rsFlat = (opts) =>
+    (Array.isArray(opts) ? opts : [])
+      .flatMap((o) => (o && Array.isArray(o.options) ? o.options : [o]))
+      .filter(Boolean);
+  function rsLabel(sp, o) {
+    try {
+      const l = sp.getOptionLabel ? sp.getOptionLabel(o) : o.label;
+      if (typeof l === "string" || typeof l === "number") return norm(l);
+    } catch (e) {}
+    return norm(o.label ?? o.name ?? o.value ?? "");
+  }
+  const rsSearchable = (sp) => typeof sp.loadOptions === "function" || !rsFlat(sp.options).length;
+  function reactSelectOptions(input) {
+    const h = rsProps(input);
+    if (!h) return { options: [], searchable: false };
+    return {
+      options: rsFlat(h.sp.options)
+        .map((o) => rsLabel(h.sp, o))
+        .filter(Boolean),
+      searchable: rsSearchable(h.sp),
+    };
+  }
+  function reactSelectValue(input) {
+    const c = reactSelectContainer(input);
+    if (c) {
+      const multi = [
+        ...c.querySelectorAll(
+          '[class*="multi-value__label"], [class*="multiValue"] > div:first-child',
+        ),
+      ]
+        .map((x) => norm(x.textContent))
+        .filter(Boolean);
+      if (multi.length) return multi.join(", ");
+      const single = c.querySelector('[class*="single-value"], [class*="singleValue"]');
+      if (single && norm(single.textContent)) return norm(single.textContent);
+    }
+    const h = rsProps(input),
+      v = h && h.sp.value;
+    return h
+      ? rsFlat(Array.isArray(v) ? v : v ? [v] : [])
+          .map((o) => rsLabel(h.sp, o))
+          .filter(Boolean)
+          .join(", ")
+      : "";
+  }
+  // Search boxes often want a prefix: "University of Massachusetts Amherst" finds nothing,
+  // "University of Massachusetts" finds "University of Massachusetts - Amherst".
+  function searchTerms(value) {
+    const cleaned = norm(
+      String(value)
+        .replace(/\s[-–—|]\s/g, " ")
+        .replace(/[^\w\s'&.-]/g, " "),
+    );
+    const words = cleaned.split(" ").filter(Boolean),
+      out = [norm(value), cleaned];
+    for (let n = words.length - 1; n >= 1; n--) out.push(words.slice(0, n).join(" "));
+    words
+      .filter((w) => w.length >= 4 && !/^(university|college|institute|school|state)$/i.test(w))
+      .sort((a, b) => b.length - a.length)
+      .forEach((w) => out.push(w));
+    return [...new Set(out.filter((q) => q.length >= 2))].slice(0, 7);
+  }
+  async function rsSearch(input, h, q, stopped = () => false) {
+    if (stopped()) return [];
+    if (typeof h.sp.loadOptions === "function") {
+      try {
+        const r = await Promise.race([
+          Promise.resolve(h.sp.loadOptions(q, [], h.sp.additional)),
+          sleep(6000).then(() => null),
+        ]);
+        return rsFlat(Array.isArray(r) ? r : r && r.options);
+      } catch (e) {
+        return [];
+      }
+    }
+    if (typeof h.sp.onInputChange !== "function") return [];
+    const before = (fiberProp(input, "selectProps", 40) || h.sp).options;
+    try {
+      h.sp.onInputChange(q, { action: "input-change", prevInputValue: "" });
+    } catch (e) {
+      return [];
+    }
+    const end = Date.now() + 4000;
+    while (Date.now() < end) {
+      await sleep(250);
+      if (stopped()) return [];
+      const sp = fiberProp(input, "selectProps", 40);
+      if (sp && sp.options !== before && !sp.isLoading && rsFlat(sp.options).length)
+        return rsFlat(sp.options);
+    }
+    return rsFlat((fiberProp(input, "selectProps", 40) || {}).options);
+  }
+
+  async function reactSelectPick(input, value, stopped = () => false) {
+    if (stopped()) return cancelled();
+    const h = rsProps(input);
+    if (!h) return reactSelectDomPick(input, value, stopped);
+    let pick = null,
+      score = 0;
+    const seen = [];
+    const consider = (list) => {
+      for (const o of list) {
+        const l = rsLabel(h.sp, o),
+          s = scoreOption(l, value);
+        seen.push(l);
+        if (s > score) {
+          score = s;
+          pick = o;
+        }
+      }
+    };
+    const searchable = rsSearchable(h.sp);
+    if (!searchable) consider(rsFlat(h.sp.options));
+    else {
+      const qs = searchTerms(value);
+      for (let i = 0; i < qs.length; i++) {
+        if (stopped()) return cancelled();
+        const got = await rsSearch(input, h, qs[i], stopped);
+        if (stopped()) return cancelled();
+        consider(got);
+        if (score >= 60) break;
+        // A props search that never answers: type the way a person does and click what the menu shows.
+        if (i === 0 && !got.length && typeof h.sp.loadOptions !== "function") {
+          const typed = await reactSelectTypePick(input, value, stopped);
+          if (stopped() || typed.cancelled) return cancelled();
+          if (typed.ok) return typed;
+          seen.push(...(typed.options || []));
+          break;
+        }
+      }
+    }
+    // A search that matched nothing still leaves the model guessing; the empty search shows what exists
+    // (Greenhouse "Degree" / "Discipline" are async lists with no options until something is typed).
+    if ((!pick || score < 30) && searchable && !seen.length) {
+      const first = await rsSearch(input, h, "", stopped);
+      for (const o of first) seen.push(rsLabel(h.sp, o));
+    }
+    if (stopped()) return cancelled();
+    const options = [...new Set(seen)].slice(0, 40);
+    if (!pick || score < 30) {
+      if (searchable && typeof h.sp.onInputChange === "function")
+        try {
+          h.sp.onInputChange("", { action: "input-blur", prevInputValue: "" });
+        } catch (e) {}
+      return {
+        ok: false,
+        options,
+        note: searchable
+          ? "Searchable list with no close match. Retry with one of these options or a shorter name."
+          : undefined,
+      };
+    }
+    (fiberProp(input, "selectOption", 40) || h.so)(pick);
+    await sleep(250);
+    if (stopped()) return cancelled();
+    const shown = reactSelectValue(input),
+      label = rsLabel(h.sp, pick);
+    // Greenhouse's Country shows only "+1" once picked, and Canada is +1 too: report the whole option.
+    return {
+      ok: !!shown,
+      chosen: shown && label.includes(shown) ? label : shown || label,
+      options: shown ? undefined : options,
+    };
+  }
+
+  // The menu's option elements. Menus can be portalled out of the container, so also look them up by
+  // react-select's own ids ("react-select-<instance>-option-3"; Greenhouse sets the input id to the instance).
+  function rsDomOptions(input, c) {
+    const id = input.id || "";
+    const prefix = !id
+      ? ""
+      : /^react-select-/.test(id)
+        ? id.replace(/-input$/, "")
+        : "react-select-" + id;
+    return [
+      ...new Set([
+        ...(prefix ? document.querySelectorAll(`[id^="${CSS.escape(prefix)}-option"]`) : []),
+        ...c.querySelectorAll('[class*="select__option"], [class*="-option"], [role="option"]'),
+        ...document.querySelectorAll('[class*="select__menu-portal"] [class*="option"]'),
+        // "-option" also matches the "No options" notice (select__menu-notice--no-options)
+      ]),
+    ].filter(
+      (o) => visible(o) && !/menu-notice/.test(typeof o.className === "string" ? o.className : ""),
+    );
+  }
+
+  // Greenhouse's newer boards (Location (City), 2026-09-30) start the geocode search from the input's
+  // own change event. Calling onInputChange from props sets the text, but the results never reach the
+  // props we can read: isLoading stays true and options stay empty, while the menu a person sees fills
+  // in. So type each search term, wait for the menu, and click the best option element.
+  async function reactSelectTypePick(input, value, stopped = () => false) {
+    if (stopped()) return cancelled();
+    const c = reactSelectContainer(input) || input.parentElement;
+    const control = c.querySelector('[class*="select__control"], [class*="-control"]') || input;
+    const optionsNow = () => rsDomOptions(input, c);
+    mouseClick(control);
+    input.focus();
+    await sleep(80);
+    let pick = null,
+      score = 0;
+    const seen = [];
+    for (const q of searchTerms(value)) {
+      if (stopped()) return cancelled();
+      // Clear first, so the last term's results are not read as this one's.
+      if (input.value) {
+        setNative(input, "");
+        await waitFor(() => !optionsNow().length, 1500);
+      }
+      if (stopped()) return cancelled();
+      setNative(input, q);
+      keyEcho(input, q);
+      if (!(await waitFor(optionsNow, 6000, 150)).length) continue;
+      await sleep(250); // debounced searches can redraw once more
+      for (const o of optionsNow()) {
+        const l = norm(o.textContent),
+          s = scoreOption(l, value);
+        seen.push(l);
+        if (s > score) {
+          score = s;
+          pick = o;
+        }
+      }
+      if (score >= 60) break;
+    }
+    if (stopped()) return cancelled();
+    const options = [...new Set(seen)].slice(0, 40);
+    if (!pick || score < 30 || !pick.isConnected) {
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      return { ok: false, options };
+    }
+    const label = norm(pick.textContent);
+    mouseClick(pick);
+    await sleep(250);
+    if (stopped()) return cancelled();
+    const shown = reactSelectValue(input);
+    return { ok: !!shown, chosen: shown || label, options: shown ? undefined : options };
+  }
+
+  // Fallback when React internals aren't reachable: open the menu and click an option.
+  async function reactSelectDomPick(input, value, stopped = () => false) {
+    if (stopped()) return cancelled();
+    const c = reactSelectContainer(input) || input.parentElement;
+    const control = c.querySelector('[class*="select__control"], [class*="-control"]') || input;
+    const optionsNow = () =>
+      [
+        ...c.querySelectorAll('[class*="select__option"], [class*="-option"], [role="option"]'),
+        ...document.querySelectorAll('[class*="select__menu-portal"] [class*="option"]'),
+      ].filter(visible);
+    mouseClick(control);
+    input.focus();
+    await sleep(80);
+    if (stopped()) return cancelled();
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+    let opts = await waitFor(optionsNow, 800);
+    if (stopped()) return cancelled();
+    let pick = best(opts, value, (o) => o.textContent);
+    if (!pick) {
+      setNative(input, value);
+      opts = await waitFor(optionsNow, 2000);
+      pick = best(opts, value, (o) => o.textContent) || (opts.length === 1 ? opts[0] : null);
+    }
+    if (stopped()) return cancelled();
+    const available = opts.map((o) => norm(o.textContent)).slice(0, 40);
+    if (!pick) {
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      return { ok: false, options: available };
+    }
+    mouseClick(pick);
+    await sleep(200);
+    const shown = reactSelectValue(input);
+    return {
+      ok: !!shown,
+      chosen: shown || norm(pick.textContent),
+      options: shown ? undefined : available,
+    };
+  }
+
+  // Search-as-you-type select libraries (selectize, tom-select, select2, chosen, choices) whose options come
+  // from the server (Greenhouse "School": the real <select> is empty until you type). Type into the
+  // library's own box, wait for its result rows to settle, click the best one.
+  const LIB_BOX_SEL =
+    ".selectize-control, .ts-wrapper, .chosen-container, .select2-container, .choices";
+  const LIB_ROW_SEL =
+    ".selectize-dropdown .option, .ts-dropdown .option, .select2-results__option, .chosen-results li.active-result, .choices__list--dropdown .choices__item--selectable";
+  async function searchSelectPick(input, value, stopped = () => false) {
+    if (stopped()) return cancelled();
+    const box = input.closest(LIB_BOX_SEL) || input.parentElement;
+    const rows = () =>
+      deepQueryAll(LIB_ROW_SEL).filter(
+        (o) =>
+          visible(o) &&
+          !o.classList.contains("create") &&
+          norm(o.textContent) &&
+          !/^(no (results|matches)|searching|loading)/i.test(norm(o.textContent)),
+      );
+    const loading = () =>
+      !!(
+        box.querySelector(".loading") ||
+        box.classList.contains("loading") ||
+        deepQueryAll(".select2-results__option.loading-results").some(visible)
+      );
+    const shown = () =>
+      norm(
+        [
+          ...box.querySelectorAll(
+            ".item, .select2-selection__rendered, .chosen-single span, .choices__list--single .choices__item",
+          ),
+        ]
+          .map((i) => i.textContent)
+          .join(" "),
+      );
+    // Server searches often need an exact substring ("University of Massachusetts - Amherst"), so fall back
+    // to the distinctive words, then the single longest one; never to filler like "University of".
+    const words = String(value)
+      .split(/[\s,\-–]+/)
+      .filter(
+        (w) => w && !/^(university|college|of|the|at|and|&|school|institute|inc|llc)$/i.test(w),
+      );
+    const longest = [...words].sort((a, b) => b.length - a.length)[0] || "";
+    let opts = [];
+    mouseClick(input);
+    for (const q of [...new Set([String(value), words.join(" "), longest])].filter(
+      (q) => q && q.length > 1,
+    )) {
+      if (stopped()) return cancelled();
+      setNative(input, q);
+      const key = q.slice(-1);
+      for (const t of ["keydown", "keypress", "keyup"])
+        input.dispatchEvent(new KeyboardEvent(t, { key, bubbles: true }));
+      // Done when rows show, or when a search we saw start has finished with none (debounced searches
+      // may not start for a while, so without a visible spinner wait the full time).
+      const t0 = Date.now();
+      let started = false;
+      opts = [];
+      while (Date.now() - t0 < 9000) {
+        await sleep(150);
+        opts = rows();
+        if (opts.length) break;
+        if (loading()) started = true;
+        else if (started && Date.now() - t0 > 600) break;
+      }
+      if (opts.length) {
+        await sleep(300);
+        opts = rows();
+        break;
+      }
+    }
+    if (stopped()) return cancelled();
+    const pick = best(opts, value, (o) => o.textContent);
+    if (!pick) {
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      return opts.length
+        ? { ok: false, options: opts.map((o) => norm(o.textContent)).slice(0, 40) }
+        : {
+            ok: false,
+            error: "No matches appeared for that search. Try a shorter or different spelling.",
+            options: [],
+          };
+    }
+    mouseClick(pick);
+    await sleep(300);
+    const now = shown();
+    return { ok: !!now, chosen: now || norm(pick.textContent) };
+  }
+
+  function listboxOptions(scope) {
+    return deepQueryAll(
+      '[data-automation-id="promptOption"], [role="option"], [data-automation-id="menuItem"], [role="menu"] [role="menuitem"], [role="menu"] [role="menuitemradio"]',
+      scope || document,
+    ).filter(visible);
+  }
+  // Workday: button[aria-haspopup=listbox] opens a popup; some popups have a search box and
+  // nested levels ("How did you hear" -> "Job Board" -> "LinkedIn").
+  // 2026-10-23: Take over also cancels helpers already waiting for options (EXT-4).
+  // was: generation was checked only before entering this asynchronous helper. Revert: remove stopped checks.
+  // The same callback covers React, ARIA and plain search helpers, including late Escape/blur cleanup.
+  const cancelled = () => ({ ok: false, cancelled: true, error: "The student stopped this run." });
+  async function workdayPick(btn, value, stopped = () => false) {
+    if (stopped()) return cancelled();
+    // Menu-style selects (BambooHR) keep every menu mounted and fade the last one out, so options
+    // read page-wide right after a pick belonged to the PREVIOUS dropdown. Read the button's own menu.
+    const menuId =
+      btn.getAttribute("aria-haspopup") !== "listbox" &&
+      (btn.getAttribute("aria-controls") || btn.getAttribute("data-menu-id"));
+    const optionsNow = () =>
+      menuId
+        ? document.getElementById(menuId)
+          ? listboxOptions(document.getElementById(menuId))
+          : []
+        : listboxOptions();
+    mouseClick(btn);
+    await sleep(350);
+    if (stopped()) return cancelled();
+    if (
+      menuId &&
+      !(await waitFor(optionsNow, 800)).length &&
+      btn.getAttribute("aria-expanded") !== "true"
+    ) {
+      // Some menus (BambooHR fab-Select) ignore synthetic mouse events but open from the keyboard,
+      // and render ~0.5s later. Focus usually still sits on the LAST dropdown picked, and a key sent in the
+      // same tick as focus() is dropped, so move focus, let it settle, then try keys one at a time.
+      if (stopped()) return cancelled();
+      if (document.activeElement && document.activeElement !== btn && document.activeElement.blur)
+        document.activeElement.blur();
+      btn.focus();
+      await sleep(200);
+      for (const key of ["ArrowDown", "Enter", " "]) {
+        if (stopped()) return cancelled();
+        if (btn.getAttribute("aria-expanded") === "true") {
+          await waitFor(optionsNow, 1500);
+          break;
+        }
+        if (document.activeElement !== btn) {
+          btn.focus();
+          await sleep(150);
+        }
+        if (stopped()) return cancelled();
+        btn.dispatchEvent(
+          new KeyboardEvent("keydown", { key, code: key === " " ? "Space" : key, bubbles: true }),
+        );
+        if ((await waitFor(optionsNow, 1500)).length) break;
+      }
+    }
+    if (stopped()) return cancelled();
+    const search = document.querySelector(
+      'input[data-automation-id="searchBox"], [data-automation-id="promptSearch"] input',
+    );
+    if (search && visible(search)) {
+      setNative(search, value);
+      await sleep(500);
+    }
+    for (let level = 0; level < 3; level++) {
+      const opts = await waitFor(optionsNow, 1500);
+      if (stopped()) return cancelled();
+      const pick = best(opts, value, (o) => o.textContent);
+      if (!pick) {
+        const available = opts.map((o) => norm(o.textContent)).slice(0, 40);
+        document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+        if (!available.length && level === 0)
+          return {
+            ok: false,
+            error:
+              "The dropdown did not open (no options appeared). Try clicking it once, then selecting again.",
+            options: [],
+          };
+        return { ok: false, options: available };
+      }
+      mouseClick(pick);
+      await sleep(400);
+      const still = optionsNow();
+      if (!still.length || still.some((o) => o === pick)) break;
+    }
+    await sleep(150);
+    return stopped() ? cancelled() : { ok: true, chosen: norm(btn.textContent) };
+  }
+
+  // fastFill's careful pick for a menu-style dropdown (Workday, 2026-10-01): open it, read its options,
+  // and pick only the one decide(options) names. When decide names none (no exact, single match), the
+  // menu is closed untouched and the question stays the model's. workdayPick, the model's tool, picks
+  // the best fuzzy match instead, which is right when the model chose the answer and wrong for a rule.
+  async function workdayChoose(btn, decide, stopped = () => false) {
+    if (stopped()) return cancelled();
+    const menuId =
+      btn.getAttribute("aria-haspopup") !== "listbox" &&
+      (btn.getAttribute("aria-controls") || btn.getAttribute("data-menu-id"));
+    const optionsNow = () =>
+      menuId
+        ? document.getElementById(menuId)
+          ? listboxOptions(document.getElementById(menuId))
+          : []
+        : listboxOptions();
+    const close = async () => {
+      if (stopped()) return;
+      document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      btn.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      await sleep(200);
+    };
+    mouseClick(btn);
+    const opts = await waitFor(optionsNow, 1500);
+    if (stopped()) return cancelled();
+    const texts = opts.map((o) => norm(o.textContent));
+    const want = texts.length ? decide(texts) : null;
+    const i = want == null ? -1 : texts.indexOf(want);
+    if (stopped()) return cancelled();
+    if (i < 0) {
+      await close();
+      return { ok: false, options: texts.slice(0, 40) };
+    }
+    mouseClick(opts[i]);
+    await sleep(400);
+    if (stopped()) return cancelled();
+    if (optionsNow().length) await close(); // a menu that stayed open after the pick
+    if (stopped()) return cancelled();
+    const shown = norm(btn.textContent);
+    return { ok: shown.toLowerCase() === want.toLowerCase(), chosen: shown };
+  }
+
+  async function ariaComboPick(el, value, stopped = () => false) {
+    if (stopped()) return cancelled();
+    const input = el.tagName === "INPUT" ? el : el.querySelector("input") || el;
+    mouseClick(input);
+    if (input.tagName === "INPUT") {
+      setNative(input, value);
+      keyEcho(input, value);
+    }
+    await sleep(300);
+    const ctl = input.getAttribute("aria-controls") || input.getAttribute("aria-owns");
+    const root = input.getRootNode ? input.getRootNode() : document;
+    const scope =
+      (ctl && root.getElementById && root.getElementById(ctl)) ||
+      (ctl && document.getElementById(ctl)) ||
+      document;
+    const shown = () => deepQueryAll('[role="option"], li[id*="option"]', scope).filter(visible);
+    // The click opens the unfiltered list at once, so waiting only for "some options exist" would
+    // read it before the keystroke has narrowed it. Wait for one that actually matches, and settle
+    // for whatever is on screen when the time is up, which is what the model gets told about.
+    // Three seconds because SuccessFactors fetches the narrowed page from its server: measured at
+    // just over 1.2s on a warm session, and the old 2s budget left no room for a slow one.
+    const opts =
+      (await waitFor(() => {
+        const o = shown();
+        return o.length && best(o, value, (x) => x.textContent) ? o : null;
+      }, 3000)) || shown();
+    if (stopped()) return cancelled();
+    const pick = best(opts, value, (o) => o.textContent);
+    if (!pick) return { ok: false, options: opts.map((o) => norm(o.textContent)).slice(0, 40) };
+    mouseClick(pick);
+    await sleep(200);
+    return { ok: true, chosen: norm(pick.textContent) };
+  }
+
+  // Plain <input> wired to a suggestion list with no ARIA roles (Lever "Current location", Google Places,
+  // many custom city/school boxes). They clear the box on blur unless a suggestion was chosen, so: type,
+  // fire the key events their handlers listen for, wait for NEW visible items that match, click the best.
+  const SUGGEST_SEL =
+    '[role="option"], li, .pac-item, [class*="suggest" i] > *, [class*="autocomplete" i] > *, [class*="dropdown" i] > *, [class*="result" i] > *, [class*="option" i], [class*="location" i]';
+  function suggestions(input) {
+    const zone =
+      input.closest("label, li, .field, [class*='field' i], [class*='question' i]") ||
+      input.parentElement;
+    const found = [
+      ...(zone ? zone.querySelectorAll(SUGGEST_SEL) : []),
+      ...deepQueryAll('.pac-container .pac-item, [role="listbox"] [role="option"]'),
+    ];
+    return found.filter(
+      (o) =>
+        o !== input &&
+        !o.contains(input) &&
+        visible(o) &&
+        norm(o.textContent).length > 0 &&
+        norm(o.textContent).length < 160 &&
+        !o.querySelector("input, select, textarea"),
+    );
+  }
+  async function typeahead(input, value, stopped = () => false) {
+    if (stopped()) return cancelled();
+    const before = new Set(suggestions(input));
+    const desc = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value");
+    input.focus();
+    desc.set.call(input, value);
+    const key = String(value).slice(-1);
+    for (const t of ["keydown", "keypress"])
+      input.dispatchEvent(new KeyboardEvent(t, { key, bubbles: true }));
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new KeyboardEvent("keyup", { key, bubbles: true }));
+    const fresh = () => suggestions(input).filter((o) => !before.has(o));
+    const matching = () => fresh().filter((o) => scoreOption(o.textContent, value) >= 30);
+    const opts = await waitFor(matching, 4000, 200);
+    if (stopped()) return cancelled();
+    const pick = best(opts, value, (o) => o.textContent);
+    if (!pick) {
+      const shown = fresh()
+        .map((o) => norm(o.textContent))
+        .filter(Boolean);
+      blur(input);
+      return {
+        ok: false,
+        error: "This box only accepts a choice from its suggestion list.",
+        options: [...new Set(shown)].slice(0, 20),
+      };
+    }
+    const chosen = norm(pick.textContent);
+    mouseClick(pick);
+    await sleep(300);
+    if (stopped()) return cancelled();
+    blur(input);
+    await sleep(100);
+    return input.value
+      ? { ok: true, chosen: norm(input.value) || chosen }
+      : { ok: false, error: "Picked a suggestion but the box stayed empty." };
+  }
+
+  function nativeSelect(el, value) {
+    const opt = best(
+      [...el.options].filter((o) => !o.disabled),
+      value,
+      (o) => o.text || o.value,
+    );
+    if (!opt)
+      return {
+        ok: false,
+        options: [...el.options]
+          .map((o) => norm(o.text))
+          .filter(Boolean)
+          .slice(0, 60),
+      };
+    setNative(el, opt.value);
+    blur(el);
+    return { ok: el.value === opt.value, chosen: norm(opt.text) };
+  }
+
+  function radioPick(radios, labels, value) {
+    const i = labels.indexOf(best(labels, value));
+    if (i < 0) return { ok: false, options: labels };
+    const r = radios[i];
+    const lab = r.id && document.querySelector(`label[for="${CSS.escape(r.id)}"]`);
+    if (r.getAttribute("role") === "radio") mouseClick(r);
+    else (lab || r).click();
+    if (r.type === "radio" && !r.checked) {
+      r.checked = true;
+      r.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    return { ok: r.type !== "radio" || r.checked, chosen: labels[i] };
+  }
+
+  function setChecked(el, on) {
+    const cur = el.type === "checkbox" ? el.checked : el.getAttribute("aria-checked") === "true";
+    if (cur !== !!on) {
+      const lab = el.id && document.querySelector(`label[for="${CSS.escape(el.id)}"]`);
+      el.type === "checkbox" && lab ? lab.click() : mouseClick(el);
+    }
+    const now = el.type === "checkbox" ? el.checked : el.getAttribute("aria-checked") === "true";
+    if (now !== !!on && el.type === "checkbox") {
+      el.checked = !!on;
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    return {
+      ok:
+        (el.type === "checkbox" ? el.checked : el.getAttribute("aria-checked") === "true") === !!on,
+    };
+  }
+
+  function b64ToFile(f) {
+    const bin = atob(
+      String(f.b64 || "")
+        .split(",")
+        .pop(),
+    );
+    const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    return new File([arr], f.name || "resume.pdf", { type: f.type || "application/pdf" });
+  }
+  function setFileInput(input, file) {
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    input.files = dt.files;
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    return input.files.length > 0;
+  }
+  function dropFile(zone, file) {
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    for (const t of ["dragenter", "dragover", "drop"])
+      zone.dispatchEvent(new DragEvent(t, { bubbles: true, cancelable: true, dataTransfer: dt }));
+    return true;
+  }
+
+  window.ISActions = {
+    v: 9,
+    sleep,
+    norm,
+    low,
+    visible,
+    setNative,
+    blur,
+    mouseClick,
+    best,
+    scoreOption,
+    getFiber,
+    fiberProp,
+    deepQueryAll,
+    typeahead,
+    waitFor,
+    isReactSelect,
+    reactSelectPick,
+    reactSelectContainer,
+    reactSelectOptions,
+    reactSelectValue,
+    workdayPick,
+    workdayChoose,
+    ariaComboPick,
+    nativeSelect,
+    radioPick,
+    setChecked,
+    b64ToFile,
+    setFileInput,
+    dropFile,
+    searchSelectPick,
+    LIB_BOX_SEL,
+  };
+})();

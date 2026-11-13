@@ -1,0 +1,864 @@
+"""Nationwide labels, demand-gated detail calls, sharded export and the coverage report."""
+
+import json
+import os
+from internscout.classify import ALL_FIELDS
+from internscout.coverage import CLUSTERS, SECTOR_CLUSTER, counts, dormant, per_tag, report
+from internscout.export_static import (
+    carry_first_seen,
+    carry_open_boards,
+    merged_stages,
+    shard_keys,
+    still_student_opportunities,
+    write_shards,
+)
+from internscout.region import evaluate_locations, maybe_in_region
+
+
+def _listing(i, locs, status="open", tags=("health",), sector=None):
+    ev = evaluate_locations(locs)
+    return {
+        "id": i,
+        "regions": ev["regions"],
+        "state": ev["state"],
+        "status": status,
+        "field_tags": list(tags),
+        "stage": ["internship"],
+        "sector": sector,
+    }
+
+
+def test_kinds():
+    kinds = lambda locs: [(g["kind"], g["state"]) for g in evaluate_locations(locs)["regions"]]
+    assert kinds(["Philadelphia, PA"]) == [("us", "PA")]
+    assert kinds(["Remote, TX"]) == [("remote", "TX")]
+    assert kinds(["United States"]) == [("us", None)]
+    assert kinds(["Chicago"]) == [("us", "IL")]
+    g = evaluate_locations(["Austin, TX"])
+    assert g["in_region"] and g["on_site"] and not g["within_radius"] and g["state"] == "TX"
+
+
+def test_detail_calls_follow_demand(monkeypatch):
+    monkeypatch.delenv("INTERNSCOUT_WANTED_STATES", raising=False)
+    assert maybe_in_region("Boston, MA") and maybe_in_region("Jersey City, NJ")
+    assert maybe_in_region("Remote - US") and maybe_in_region("3 Locations")
+    assert not maybe_in_region("Austin, TX") and not maybe_in_region("Remote, TX")
+    assert not maybe_in_region("London, UK")
+    monkeypatch.setenv("INTERNSCOUT_WANTED_STATES", "tx, FL")
+    assert maybe_in_region("Austin, TX") and maybe_in_region("Miami, FL")
+
+
+def test_google_locations_follow_demand(monkeypatch):
+    from internscout.config import google_jobs_locations, GOOGLE_JOBS_LOCATIONS
+
+    monkeypatch.delenv("INTERNSCOUT_WANTED_STATES", raising=False)
+    assert google_jobs_locations() == GOOGLE_JOBS_LOCATIONS
+    monkeypatch.setenv("INTERNSCOUT_WANTED_STATES", "CA,MA")
+    assert google_jobs_locations() == GOOGLE_JOBS_LOCATIONS + ["San Francisco, California"]
+
+
+def test_each_listing_in_exactly_its_files(tmp_path):
+    listings = [
+        _listing(1, ["Boston, MA", "Austin, TX"]),
+        _listing(2, ["Remote - US"]),
+        _listing(3, ["Remote, TX"]),
+        _listing(4, ["United States"], status="closed"),
+        _listing(5, ["New York, NY; Remote"]),
+    ]
+    assert shard_keys(listings[0]) == {"MA", "TX"}
+    assert shard_keys(listings[4]) == {"NY", "remote"}
+    stale = tmp_path / "listings"
+    stale.mkdir()
+    (stale / "WY.json").write_text("[]")
+    index = write_shards(listings, str(tmp_path), "now")
+    assert set(index["files"]) == {"MA", "TX", "remote", "US", "NY"}
+    assert not (stale / "WY.json").exists()
+    for x in listings:
+        homes = {
+            k
+            for k in index["files"]
+            if x["id"]
+            in [y["id"] for y in json.loads((stale / f"{k}.json").read_text(encoding="utf-8"))]
+        }
+        assert homes == shard_keys(x), x["id"]
+    assert index["files"]["TX"]["count"] == 2 and index["files"]["US"]["open"] == 0
+    assert index["files"]["MA"]["by_field"] == {"health": 1}
+
+
+def test_coverage():
+    known = set(ALL_FIELDS)
+    for name, tags in CLUSTERS.items():
+        assert set(tags) <= known, (name, set(tags) - known)
+    rows = [_listing(1, ["Boston, MA"]), _listing(2, ["Austin, TX"]), _listing(3, ["Remote"])]
+    c = counts(rows)
+    assert c["Health"] == 2
+    # the same three listings, counted nationally: the Texas one stops being excluded
+    assert counts(rows, baseline_only=False)["Health"] == 3
+
+    # a listing carrying two tags of one cluster counts once for the cluster and once per tag,
+    # which is the point of the breakdown: it says which of the two has nothing behind it
+    both = _listing(4, ["Boston, MA"], tags=("health", "nursing"))
+    assert counts(rows + [both])["Health"] == 3
+    assert per_tag(rows + [both])["nursing"] == 1 and per_tag(rows + [both])["health"] == 3
+
+    # a closed listing is not coverage, whichever way it is counted
+    shut = _listing(5, ["Boston, MA"], status="closed")
+    assert counts(rows + [shut])["Health"] == 2
+    assert per_tag(rows + [shut], baseline_only=False)["health"] == 3
+
+    text = report(rows, minimum=15, env=_ALL_KEYS)
+    # rarest first, so the tag with nothing behind it leads and the one carrying the cluster trails
+    assert "- Health: nursing 0," in text and text.rstrip().endswith("health 2")
+    assert "**thin**" in text
+    # nothing is thin below a bar of zero, and then there is no breakdown to print
+    assert "Every cluster has at least" in report(rows, minimum=0, env=_ALL_KEYS)
+
+
+def test_coverage_counts_the_employers_sector():
+    # Every sector the classifier can fall back on has to land in some cluster, or listings from those
+    # employers would be counted by nobody.
+    assert set(SECTOR_CLUSTER.values()) <= set(CLUSTERS)
+    assert SECTOR_CLUSTER["nonprofit"] == "Nonprofit & social work"
+    assert SECTOR_CLUSTER["quant_finance"] == "Business"
+    assert "engineering_manufacturing" not in SECTOR_CLUSTER  # absent from SECTOR_FIELDS on purpose
+
+    # The case this exists for: a real ACLU posting is tagged by what the role is, not who it is for,
+    # so on tags alone a nonprofit's whole board can count towards the nonprofit cluster zero times.
+    aclu = _listing(1, ["Boston, MA"], tags=("law",), sector="nonprofit")
+    c = counts([aclu])
+    assert c["Nonprofit & social work"] == 1
+    assert c["Government & law"] == 1, "the tag still counts too - it is a legal internship"
+    assert per_tag([aclu])["nonprofit"] == 0, "and it is still not given a tag it never had"
+
+    # A listing that matched the cluster both ways is one listing, not two.
+    assert (
+        counts([_listing(2, ["Boston, MA"], tags=("nonprofit",), sector="nonprofit")])[
+            "Nonprofit & social work"
+        ]
+        == 1
+    )
+    # An employer with no sector label, which is most of them, is unaffected.
+    assert counts([_listing(3, ["Boston, MA"], tags=("swe",))])["Nonprofit & social work"] == 0
+
+    # The breakdown has to account for the difference, and count only what no tag already covered.
+    text = report(
+        [aclu, _listing(4, ["Boston, MA"], tags=("nonprofit",), sector="nonprofit")], minimum=15
+    )
+    assert (
+        "- Nonprofit & social work: social_work 0, nonprofit 1, plus 1 from employers in that sector"
+        in text
+    )
+
+
+def test_a_row_that_would_no_longer_be_admitted_is_not_published():
+    # normalize() has refused new-grad postings for a while, but 46 of them were already in the
+    # store from before it did, and an export publishes what is stored. stage_of() answers [] for
+    # every one of them, which is the same answer that would have kept them out.
+    from internscout.classify import stage_of
+
+    stale = [
+        "Software Engineer, New Grad",
+        "2027 Early Career Software Engineer",
+        "Trader Trainee (September 2027)",
+        "Campus Police Officer",
+        "Adjunct Faculty-Off-Campus Advisor",
+        "Data Science Trainee",
+    ]
+    keep = [
+        "Software Engineer Intern",
+        "Research Assistant - Summer 2027",
+        "Manufacturing Co-op (Spring 2027)",
+    ]
+    rows = [{"id": i, "title": t, "stage": stage_of(t)} for i, t in enumerate(stale + keep)]
+    assert [x["title"] for x in still_student_opportunities(rows)] == keep
+
+
+def test_a_stored_stage_is_added_to_and_not_trusted_alone():
+    # "PhD Research Intern" was stored as an internship and nothing else, because the research rule
+    # did not know the bare word yet. 25 listings in one export were research jobs a student
+    # filtering for research could not find.
+    assert merged_stages(["internship"], "PhD Research Intern") == ["internship", "research"]
+    assert merged_stages([], "Research and Technology Co-Op") == ["co_op", "research"]
+    # The stored list is the only record of what the feed said the employment type was: the whole
+    # title of one Palantir posting is "Growth", and of another "Cohort 0".
+    assert merged_stages(["internship"], "Growth") == ["internship"]
+    assert merged_stages(["internship", "part_time"], "Data Analyst") == ["internship", "part_time"]
+    # and the order is STAGES order, whichever side a stage came from.
+    assert merged_stages(["research"], "Summer Intern") == ["internship", "research"]
+
+
+_ALL_KEYS = {"USAJOBS_API_KEY": "k", "USAJOBS_EMAIL": "a@b.c", "SERPAPI_KEY": "k"}
+
+
+def test_the_report_says_when_a_source_is_switched_off_rather_than_unseeded():
+    # "Social sciences 8" reads as an instruction to go and seed more employers. It was not: the
+    # two sources aimed at that cluster were built and had no key, so they contributed nothing and
+    # no amount of seeding would have moved the number.
+    assert dormant(_ALL_KEYS) == []
+    off = dormant({"SERPAPI_KEY": "k"})
+    assert len(off) == 1 and off[0].startswith("USAJOBS (USAJOBS_API_KEY and USAJOBS_EMAIL unset)")
+    # Half a key is no key: USAJOBS sends the email as its User-Agent and 403s without it.
+    assert len(dormant({**_ALL_KEYS, "USAJOBS_EMAIL": "  "})) == 1
+    assert len(dormant({})) == 2
+
+    rows = [_listing(1, ["Boston, MA"])]
+    text = report(rows, minimum=15, env={})
+    assert "Sources built but switched off" in text
+    assert "USAJOBS (USAJOBS_API_KEY and USAJOBS_EMAIL unset)" in text and "SERPAPI_KEY" in text
+    # It sits above the tag breakdown, because it decides whether that list is worth working from.
+    assert text.index("switched off") < text.index("Tags inside them")
+    assert "switched off" not in report(rows, minimum=15, env=_ALL_KEYS)
+
+    # A healthy table says so too, rather than implying every source ran.
+    assert "Switched off even so: USAJOBS" in report(rows, minimum=0, env={})
+
+
+def test_a_listing_remembers_when_we_first_saw_it(tmp_path):
+    # The database does not outlive a CI run, so first_seen was the moment of the run and is_new
+    # was true for all 13,652 listings in the last export. The badge was on every card.
+    from datetime import date
+
+    # Dates sit after 2026-09-18, the day first_seen began (before it nothing can be new).
+    shard_dir = tmp_path / "listings"
+    shard_dir.mkdir()
+    (shard_dir / "MA.json").write_text(
+        json.dumps(
+            [
+                {
+                    "id": "aaaa",
+                    "apply_url": "https://x/1",
+                    "first_seen": "2026-09-11T00:00:00+00:00",
+                },
+                {
+                    "id": "bbbb",
+                    "apply_url": "https://x/2",
+                    "first_seen": "2026-09-27T00:00:00+00:00",
+                },
+                {
+                    "id": "9999",
+                    "apply_url": "https://x/3",
+                    "first_seen": "2026-09-12T00:00:00+00:00",
+                },
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (shard_dir / "index.json").write_text('{"files": {}}', encoding="utf-8")
+
+    today = date(2026, 9, 28)
+    listings = [
+        {"id": "aaaa", "apply_url": "https://x/1", "first_seen": "2026-09-28", "is_new": True},
+        {"id": "bbbb", "apply_url": "https://x/2", "first_seen": "2026-09-28", "is_new": True},
+        # Same posting, but the employer edited the title, so the id moved: the URL still finds it.
+        {"id": "cccc", "apply_url": "https://x/3", "first_seen": "2026-09-28", "is_new": True},
+        # Genuinely first seen today.
+        {"id": "dddd", "apply_url": "https://x/4", "first_seen": "2026-09-28", "is_new": True},
+    ]
+    assert carry_first_seen(listings, str(tmp_path), today=today) == 3
+    assert listings[0]["first_seen"].startswith("2026-09-11")
+    assert listings[2]["first_seen"].startswith("2026-09-12")  # matched on the URL, not the id
+    assert listings[3]["first_seen"] == "2026-09-28"  # nothing to carry
+    # New means first seen inside the window, so the badge stops meaning "every listing".
+    assert [x["is_new"] for x in listings] == [False, True, False, True]
+
+
+def test_a_first_export_has_nothing_to_carry_and_does_not_mind(tmp_path):
+    from datetime import date
+
+    # A date after first_seen began being kept (seo_pages.FIRST_SEEN_SINCE), so it can be new.
+    listings = [{"id": "aaaa", "apply_url": "https://x/1", "first_seen": "2026-09-21"}]
+    assert carry_first_seen(listings, str(tmp_path), today=date(2026, 9, 23)) == 0
+    assert listings[0]["is_new"] is True
+    # An unreadable shard is skipped rather than failing the run.
+    (tmp_path / "listings").mkdir()
+    (tmp_path / "listings" / "MA.json").write_text("{not json", encoding="utf-8")
+    assert carry_first_seen(listings, str(tmp_path)) == 0
+
+
+def _prev(**over):
+    row = {
+        "id": "x",
+        "apply_url": "https://x/0",
+        "ats": "workday",
+        "company_name": "Stryker",
+        "status": "open",
+        "first_seen": "2026-09-16T00:00:00+00:00",
+        "last_seen": "2026-09-18T00:00:00+00:00",
+        "regions": [],
+        "state": "MA",
+        "title": "Summer Intern",
+        "stage": ["internship"],
+    }
+    row.update(over)
+    return row
+
+
+def _write_prev(tmp_path, rows):
+    shard_dir = tmp_path / "listings"
+    shard_dir.mkdir(exist_ok=True)
+    (shard_dir / "MA.json").write_text(json.dumps(rows), encoding="utf-8")
+    (shard_dir / "index.json").write_text('{"files": {}}', encoding="utf-8")
+
+
+def test_a_board_that_did_not_answer_does_not_delete_its_jobs(tmp_path):
+    # An export is only what the run managed to fetch. Between two exports on 2026-09-18, 2,341
+    # open listings vanished and 71 arrived, almost all of it Workday boards that timed out.
+    from datetime import date
+
+    prev = [_prev(id=str(i), apply_url="https://x/%d" % i) for i in range(10)]
+    _write_prev(tmp_path, prev)
+    # The board answered with one of its ten. That is a failed fetch, not nine closures.
+    listings = [dict(prev[0])]
+    held = carry_open_boards(listings, str(tmp_path), today=date(2026, 9, 18))
+    assert held == 9
+    assert len(listings) == 10
+    assert all(x["carried"] for x in listings[1:])
+    assert "carried" not in listings[0]  # this one was really fetched
+
+
+def test_a_board_that_merely_closed_a_job_is_left_alone(tmp_path):
+    from datetime import date
+
+    prev = [_prev(id=str(i), apply_url="https://x/%d" % i) for i in range(10)]
+    _write_prev(tmp_path, prev)
+    listings = [dict(r) for r in prev[:6]]  # six of ten: an employer closing jobs, not a failure
+    assert carry_open_boards(listings, str(tmp_path), today=date(2026, 9, 18)) == 0
+    assert len(listings) == 6
+
+
+def test_rows_todays_rules_drop_are_not_carried_back(tmp_path):
+    # A board whose staff jobs stopped counting as student ones is not a board that failed to
+    # answer: its dropped rows are not counted, and none of them come back.
+    from datetime import date
+
+    prev = [
+        _prev(
+            id=str(i),
+            apply_url="https://x/%d" % i,
+            title="Research Scientist II",
+            stage=["research"],
+        )
+        for i in range(8)
+    ]
+    prev += [
+        _prev(
+            id="i%d" % i,
+            apply_url="https://x/i%d" % i,
+            title="PhD Research Intern",
+            stage=["research"],
+        )
+        for i in range(2)
+    ]
+    _write_prev(tmp_path, prev)
+    listings = [dict(r) for r in prev[8:]]
+    assert carry_open_boards(listings, str(tmp_path), today=date(2026, 9, 18)) == 0
+    # and a genuine collapse carries only the rows that would still be admitted, restaged
+    listings = []
+    prev = [
+        _prev(
+            id=str(i),
+            apply_url="https://x/%d" % i,
+            title="Research Scientist II",
+            stage=["research"],
+        )
+        for i in range(3)
+    ]
+    prev += [
+        _prev(
+            id="i%d" % i,
+            apply_url="https://x/i%d" % i,
+            title="PhD Research Intern",
+            stage=["internship"],
+        )
+        for i in range(4)
+    ]
+    _write_prev(tmp_path, prev)
+    assert carry_open_boards(listings, str(tmp_path), today=date(2026, 9, 18)) == 4
+    assert all(x["title"] == "PhD Research Intern" for x in listings)
+    assert all(x["stage"] == ["internship", "research"] for x in listings)
+
+
+def test_a_tiny_board_is_left_alone_because_churn_looks_the_same(tmp_path):
+    from datetime import date
+
+    prev = [_prev(id=str(i), apply_url="https://x/%d" % i) for i in range(2)]
+    _write_prev(tmp_path, prev)
+    listings = []
+    assert carry_open_boards(listings, str(tmp_path), today=date(2026, 9, 18)) == 0
+
+
+def test_a_board_that_stays_quiet_empties_out(tmp_path):
+    # The hold is not open-ended: a carried listing keeps the last_seen of the run that fetched it.
+    from datetime import date
+
+    prev = [
+        _prev(id=str(i), apply_url="https://x/%d" % i, last_seen="2026-09-14T00:00:00+00:00")
+        for i in range(10)
+    ]
+    _write_prev(tmp_path, prev)
+    listings = []
+    assert carry_open_boards(listings, str(tmp_path), today=date(2026, 9, 18)) == 0
+
+
+def test_a_listing_no_rule_can_place_lands_in_no_state_file(tmp_path):
+    # Not hypothetical: _regions re-reads a carried listing's stored location under today's
+    # rules, so a listing that classified when it was first seen can stop classifying later.
+    # It cannot go in US.json - it never named the US - so it is withheld, and the only thing
+    # that stops it being lost silently is that export counts it.
+    lost = {
+        "id": "x",
+        "regions": [],
+        "state": None,
+        "status": "open",
+        "field_tags": ["health"],
+        "stage": ["internship"],
+        "sector": None,
+    }
+
+    assert shard_keys(lost) == set()
+    index = write_shards([lost, _listing("y", ["Boston, MA"])], str(tmp_path), "now")
+    assert list(index["files"]) == ["MA"]
+    kept = json.load(open(os.path.join(str(tmp_path), "listings", "MA.json"), encoding="utf-8"))
+    assert [x["id"] for x in kept] == ["y"]
+
+
+def test_a_stored_research_stage_alone_is_asked_again():
+    # Stored while the bare word still admitted a posting; today's rules find no student job in it.
+    assert merged_stages(["research"], "VP, Research") == []
+    assert merged_stages(["research"], "REU Site: Computational Biology") == ["research"]
+    # a feed that said intern still keeps the research reading of the title
+    assert merged_stages(["internship", "research"], "Researcher, Interpretability") == [
+        "internship",
+        "research",
+    ]
+
+
+def test_a_never_student_title_loses_the_stage_its_feed_gave_it():
+    # The feed called these internships; the title says only active-duty members or staff may apply.
+    assert merged_stages(["internship"], "Boeing SkillBridge - Military Internship") == []
+    assert merged_stages(["internship"], "Postdoctoral Research Fellow") == []
+    assert merged_stages(["internship"], "Regional Discovery Program Coach") == []
+    # a feed-only stage on a title that says nothing either way is still kept
+    assert merged_stages(["internship"], "Growth") == ["internship"]
+
+
+def test_state_files_are_slim_and_descriptions_ride_in_a_sidecar(tmp_path):
+    # A first visit loaded 8.15 MB of rows, half of it descriptions the list view never shows.
+    from datetime import date
+    from internscout.export_static import previous_export
+
+    full = dict(
+        _listing("a1", ["Boston, MA"]),
+        apply_url="https://x/a1",
+        description="Help run clinics.",
+        region_locations=["Boston, MA"],
+        location_raw="Boston, MA",
+        score_parts={"source": 0.9, "field": 0.5, "fresh": 1.0},
+    )
+    closed = dict(
+        _listing("c1", ["Boston, MA"], status="closed"),
+        apply_url="https://x/c1",
+        description=None,
+        location_raw="Boston, MA",
+    )
+    nowhere = dict(
+        _listing("n1", ["Remote - US"]),
+        apply_url="https://x/n1",
+        regions=[],
+        state="Remote",
+        location_raw="Anywhere",
+        description="Remote role.",
+    )
+    stale = tmp_path / "listings"
+    stale.mkdir()
+    (stale / "WY.desc.json").write_text("{}")
+    index = write_shards([full, closed, nowhere], str(tmp_path), "now")
+    assert not (stale / "WY.desc.json").exists()  # a state with nothing left loses both files
+    assert index["files"]["MA"]["desc"] == "listings/MA.desc.json"
+    rows = {r["id"]: r for r in json.loads((stale / "MA.json").read_text(encoding="utf-8"))}
+    a = rows["a1"]
+    assert "description" not in a and "region_locations" not in a
+    assert "location_raw" not in a  # it has regions, so no fallback is needed
+    assert a["score_parts"] == {"source": 0.9}
+    remote = json.loads((stale / "remote.json").read_text(encoding="utf-8"))[0]
+    assert remote["location_raw"] == "Anywhere"  # no regions: the fallback stays
+    assert json.loads((stale / "MA.desc.json").read_text(encoding="utf-8")) == {
+        "a1": "Help run clinics."
+    }
+    # The next run reads the export back, and a carried listing must not lose its description.
+    back = {x["id"]: x for x in previous_export(str(tmp_path))}
+    assert back["a1"]["description"] == "Help run clinics."
+    assert back["n1"]["description"] == "Remote role."
+    assert not back["c1"].get("description")
+
+
+def test_the_coverage_report_reads_a_folder_with_sidecars(tmp_path):
+    from internscout.coverage import load
+
+    write_shards([dict(_listing("a1", ["Boston, MA"]), description="x")], str(tmp_path), "now")
+    assert [x["id"] for x in load(str(tmp_path / "listings"))] == ["a1"]
+
+
+def test_what_the_daily_search_found_outlives_the_runs_that_do_not_search(tmp_path):
+    # Google Jobs runs once a day and the database is rebuilt every run, so its finds were
+    # published at 02:48 and gone at 10:49.
+    from datetime import date
+    from internscout.export_static import carry_search_finds
+
+    found = _prev(
+        id="g",
+        apply_url="https://www.linkedin.com/jobs/view/1",
+        ats="other",
+        via_search=True,
+        last_seen="2026-09-23T02:48:00+00:00",
+    )
+    board = _prev(id="b", apply_url="https://x/b")  # a board listing this run did not return
+    stale = _prev(
+        id="s", apply_url="https://x/s", via_search=True, last_seen="2026-09-19T02:48:00+00:00"
+    )
+    _write_prev(tmp_path, [found, board, stale])
+    listings = []
+    assert carry_search_finds(listings, str(tmp_path), today=date(2026, 9, 23)) == 1
+    assert [x["id"] for x in listings] == ["g"] and listings[0]["carried"]
+    # found again by today's search: not added twice
+    listings = [dict(found, last_seen="2026-09-24T02:48:00+00:00")]
+    assert carry_search_finds(listings, str(tmp_path), today=date(2026, 9, 24)) == 0
+
+
+def test_rows_carried_from_the_last_export_are_judged_new_again(tmp_path, monkeypatch):
+    # carry_first_seen set is_new before carry_open_boards and carry_search_finds added their rows, so
+    # a carried row kept the flag the last export gave it: a role new a week ago stayed "New" for as
+    # long as its board kept failing to answer.
+    from datetime import datetime, timedelta, timezone
+    from types import SimpleNamespace
+    from internscout import export_static
+
+    class NoRows:  # this run fetched nothing from the board: it collapsed
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def scalars(self, query):
+            return SimpleNamespace(all=lambda: [])
+
+    monkeypatch.setattr(export_static, "SessionLocal", NoRows)
+    monkeypatch.setattr(export_static, "init_db", lambda: None)
+    now = datetime.now(timezone.utc)
+    stamp = lambda days: (now - timedelta(days=days)).isoformat()  # noqa: E731
+    prev = [
+        _prev(
+            id=str(i),
+            apply_url=f"https://x/{i}",
+            is_new=True,
+            field_tags=["mechanical"],
+            first_seen=stamp(10 if i else 2),
+            last_seen=stamp(0),
+            posted_at=None,
+        )
+        for i in range(4)
+    ]
+    _write_prev(tmp_path, prev)
+    stats = export_static.export(str(tmp_path))
+    assert stats["held"] == 4
+    rows = {
+        x["id"]: x
+        for x in json.loads((tmp_path / "listings" / "MA.json").read_text(encoding="utf-8"))
+    }
+    assert rows["0"]["is_new"] is True  # found two days ago: still new
+    assert [rows[str(i)]["is_new"] for i in (1, 2, 3)] == [False] * 3
+    assert stats["new"] == 1
+
+
+def test_one_employers_two_boards_are_told_apart(tmp_path):
+    # Release checks for 0.5.7 (2026-10-14): boards were keyed on (ATS, company name), so when one of
+    # AIG's two Workday sites failed and the other answered, the failed site's jobs dropped.
+    from datetime import date
+
+    a = [
+        _prev(
+            id="a%d" % i,
+            company_name="AIG",
+            apply_url="https://aig.wd1.myworkdayjobs.com/aig/job/NY/Intern_%d" % i,
+        )
+        for i in range(6)
+    ]
+    b = [
+        _prev(
+            id="b%d" % i,
+            company_name="AIG",
+            apply_url="https://aig.wd1.myworkdayjobs.com/AIG_Early_Careers/job/NY/Analyst_%d" % i,
+        )
+        for i in range(5)
+    ]
+    _write_prev(tmp_path, a + b)
+    listings = [dict(r) for r in a]  # the first site answered in full, the second not at all
+    assert carry_open_boards(listings, str(tmp_path), today=date(2026, 9, 18)) == 5
+    assert sorted(x["id"] for x in listings if x.get("carried")) == ["b%d" % i for i in range(5)]
+
+
+def test_the_same_board_spelled_differently_is_one_board():
+    # A board read as new would make the old one look collapsed and bring its rows back twice.
+    from internscout.export_static import board_of
+
+    same = lambda urls, ats: {
+        board_of({"ats": ats, "company_name": "C", "apply_url": u}) for u in urls
+    }
+    assert (
+        len(
+            same(
+                [
+                    "https://aig.wd1.myworkdayjobs.com/en-US/aig/job/1",
+                    "https://aig.wd5.myworkdayjobs.com/aig/job/2",
+                ],
+                "workday",
+            )
+        )
+        == 1
+    )
+    # A two-letter site is a site, not a locale: KLA posts on /UR/ and on /Search/.
+    assert (
+        len(
+            same(
+                [
+                    "https://kla.wd1.myworkdayjobs.com/UR/job/1",
+                    "https://kla.wd1.myworkdayjobs.com/Search/job/2",
+                    "https://kla.wd1.myworkdayjobs.com/search/job/3",
+                ],
+                "workday",
+            )
+        )
+        == 2
+    )
+    assert (
+        len(
+            same(
+                [
+                    "https://boards.greenhouse.io/point72/jobs/1",
+                    "https://job-boards.greenhouse.io/Point72/jobs/2",
+                    "https://job-boards.greenhouse.io/embed/job_app?for=point72&token=3",
+                ],
+                "greenhouse",
+            )
+        )
+        == 1
+    )
+    assert (
+        len(
+            same(
+                [
+                    "https://apply.workable.com/mindex/j/1/apply",
+                    "https://apply.workable.com/j/2/apply",
+                ],
+                "workable",
+            )
+        )
+        == 1
+    )
+    assert (
+        len(
+            same(
+                [
+                    "https://careers-nrdc.icims.com/jobs/1/a/job",
+                    "https://careers-nrdc.icims.com/jobs/2/b/job",
+                ],
+                "icims",
+            )
+        )
+        == 1
+    )
+    # Different employers never share a board, even on one embed host.
+    assert board_of(
+        {
+            "ats": "greenhouse",
+            "company_name": "A",
+            "apply_url": "https://job-boards.greenhouse.io/embed/job_app?for=x",
+        }
+    ) != board_of(
+        {
+            "ats": "greenhouse",
+            "company_name": "B",
+            "apply_url": "https://job-boards.greenhouse.io/embed/job_app?for=x",
+        }
+    )
+    assert board_of({"ats": "lever", "company_name": "C", "apply_url": "not a url ["})[2] in (
+        "",
+        "/",
+    )
+
+
+def test_a_failed_board_does_not_restore_a_fresh_listing_under_an_old_url(tmp_path):
+    from datetime import date
+
+    # Ryan publishes one role through two Workday boards. A freshly fetched row keeps
+    # its stable ID when the URL changes; the old board can still look collapsed.
+    prev = [
+        _prev(id=str(i), apply_url=f"https://ryan.wd1.myworkdayjobs.com/Students/job/CA/Intern_{i}")
+        for i in range(4)
+    ]
+    fresh = dict(
+        prev[0],
+        apply_url="https://ryan.wd1.myworkdayjobs.com/Careers/job/CA/Intern_0-1",
+        years=["masters"],
+        regions=[{"loc": "Toronto", "kind": "canada", "state": "ON", "metro": "Toronto"}],
+    )
+    _write_prev(tmp_path, prev)
+    listings = [fresh]
+    assert carry_open_boards(listings, str(tmp_path), today=date(2026, 9, 18)) == 3
+    assert len({x["id"] for x in listings}) == len(listings) == 4
+    assert listings[0] is fresh
+    assert listings[0]["years"] == ["masters"]
+    assert "carried" not in listings[0]
+
+
+def test_search_carryover_does_not_restore_a_fresh_or_closed_id_under_an_old_url(tmp_path):
+    from datetime import date
+    from internscout.export_static import carry_search_finds
+
+    prev = [_prev(id="g", apply_url="https://example.test/old", via_search=True)]
+    for status in ("open", "closed"):
+        fresh = dict(prev[0], apply_url="https://example.test/new", status=status, via_search=False)
+        listings = [fresh]
+        assert carry_search_finds(listings, str(tmp_path), today=date(2026, 9, 18), prev=prev) == 0
+        assert listings == [fresh]
+
+
+def test_export_counts_each_stable_id_once_when_a_board_changes_url(tmp_path, monkeypatch):
+    from datetime import datetime, timezone
+    from types import SimpleNamespace
+    from internscout import export_static
+
+    stamp = datetime.now(timezone.utc).isoformat()
+    prev = [
+        _prev(
+            id=str(i),
+            apply_url=f"https://example.test/old/{i}",
+            field_tags=["mechanical"],
+            first_seen=stamp,
+            last_seen=stamp,
+        )
+        for i in range(4)
+    ]
+    fresh = dict(prev[0], apply_url="https://example.test/new/0")
+
+    class Rows:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def scalars(self, query):
+            return SimpleNamespace(all=lambda: [fresh])
+
+    monkeypatch.setattr(export_static, "SessionLocal", Rows)
+    monkeypatch.setattr(export_static, "init_db", lambda: None)
+    monkeypatch.setattr(export_static, "_listing_dict", lambda row: row)
+    _write_prev(tmp_path, prev)
+    stats = export_static.export(str(tmp_path))
+    rows = json.loads((tmp_path / "listings" / "MA.json").read_text(encoding="utf-8"))
+    assert stats["total"] == stats["open"] == len({r["id"] for r in rows}) == len(rows) == 4
+    assert stats["held"] == 3
+    assert next(r for r in rows if r["id"] == "0")["apply_url"] == fresh["apply_url"]
+
+
+def test_carried_security_corrections_reach_counts_and_shards_without_refreshing_jobs(
+    tmp_path, monkeypatch
+):
+    from datetime import datetime, timedelta, timezone
+    from types import SimpleNamespace
+    from internscout import export_static
+
+    class NoRows:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def scalars(self, query):
+            return SimpleNamespace(all=lambda: [])
+
+    monkeypatch.setattr(export_static, "SessionLocal", NoRows)
+    monkeypatch.setattr(export_static, "init_db", lambda: None)
+    now = datetime.now(timezone.utc)
+    first = (now - timedelta(days=10)).isoformat()
+    last = (now - timedelta(hours=3)).isoformat()
+    titles = [
+        "National Security Legal Internship",
+        "Security Systems Apprentice",
+        "Information Security Intern",
+        "National Security Solutions Intern - Nss",
+    ]
+    prev = [
+        _prev(
+            id=str(i),
+            title=title,
+            apply_url=f"https://example.test/board/{i}",
+            field_tags=["security", "law"] if i == 0 else ["security"],
+            first_seen=first,
+            last_seen=last,
+            posted_at=first,
+            is_new=False,
+        )
+        for i, title in enumerate(titles)
+    ]
+    # The search-only path has a separate carry rule from a collapsed employer board.
+    prev.append(
+        _prev(
+            id="search",
+            title="Food Security Intern",
+            company_name="Search Employer",
+            apply_url="https://search.test/job/1",
+            via_search=True,
+            field_tags=["security"],
+            first_seen=first,
+            last_seen=last,
+            posted_at=first,
+            is_new=False,
+        )
+    )
+    _write_prev(tmp_path, prev)
+
+    stats = export_static.export(str(tmp_path))
+    rows = {x["id"]: x for x in export_static.previous_export(str(tmp_path))}
+    assert stats["held"] == 5 and stats["open"] == 5
+    assert stats["by_field"] == {"law": 1, "other": 2, "security": 2}
+    index = json.loads((tmp_path / "listings" / "index.json").read_text(encoding="utf-8"))
+    assert index["files"]["MA"]["by_field"] == stats["by_field"]
+    for original in prev:
+        row = rows[original["id"]]
+        for key in ("id", "apply_url", "first_seen", "last_seen", "posted_at", "status", "is_new"):
+            assert row[key] == original[key], (key, original["id"])
+        assert row["carried"] is True
+    assert rows["0"]["field_tags"] == ["law"]
+    assert rows["1"]["field_tags"] == rows["search"]["field_tags"] == ["other"]
+    assert rows["search"]["via_search"] is True
+
+
+def test_security_correction_preserves_all_other_stored_record_evidence():
+    from copy import deepcopy
+    from internscout.export_static import correct_non_cyber_security_tags
+
+    rows = [
+        {
+            "id": "closed",
+            "title": "National Security Legal Internship",
+            "status": "closed",
+            "field_tags": ["security", "law", "communications"],
+            "first_seen": "old",
+            "last_seen": "older",
+            "carried": True,
+            "description": "Preserve source description",
+        },
+        {
+            "id": "ambiguous",
+            "title": "National Security Solutions Intern - Nss",
+            "field_tags": ["security", "custom_historical_evidence"],
+        },
+    ]
+    expected = deepcopy(rows)
+    expected[0]["field_tags"] = ["law", "communications"]
+    correct_non_cyber_security_tags(rows)
+    assert rows == expected

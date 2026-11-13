@@ -1,0 +1,18 @@
+{
+  "source": "https://nces.ed.gov/programs/digest/d23/tables/dt23_322.10.asp",
+  "table": "NCES Digest 2023, Table 322.10",
+  "academic_year": "2021-22",
+  "basis": "Ten largest broad fields by US bachelor's degrees conferred in the last column of the verified table; these are field groups, not ten individual degree programs.",
+  "fields": [
+    {"rank": 1, "name": "Business", "slug": "business", "degrees": 375418, "tags": ["business", "finance", "accounting", "consulting", "marketing", "sales", "hr", "operations", "supply_chain", "entrepreneurship", "pm", "real_estate", "insurance", "retail", "hospitality"]},
+    {"rank": 2, "name": "Health Professions", "nces_name": "Health professions and related programs", "slug": "health-professions", "degrees": 263765, "tags": ["health", "nursing", "public_health", "clinical_research"]},
+    {"rank": 3, "name": "Social Sciences and History", "slug": "social-sciences-and-history", "degrees": 151109, "tags": ["social_science", "economics", "government", "museums"]},
+    {"rank": 4, "name": "Biological and Biomedical Sciences", "slug": "biological-and-biomedical-sciences", "degrees": 131462, "tags": ["biology", "biomedical"]},
+    {"rank": 5, "name": "Psychology", "slug": "psychology", "degrees": 129609, "tags": ["psychology"]},
+    {"rank": 6, "name": "Engineering", "slug": "engineering", "degrees": 123017, "tags": ["engineering", "mechanical", "electrical", "civil", "chemical", "industrial", "aerospace", "hardware", "materials", "environmental", "biomedical"]},
+    {"rank": 7, "name": "Computer and Information Sciences", "nces_name": "Computer and information sciences and support services", "slug": "computer-and-information-sciences", "degrees": 108503, "tags": ["swe", "data", "ml", "security"]},
+    {"rank": 8, "name": "Visual and Performing Arts", "slug": "visual-and-performing-arts", "degrees": 90241, "tags": ["arts", "design", "theater", "music", "film"]},
+    {"rank": 9, "name": "Education", "slug": "education", "degrees": 89410, "tags": ["education"]},
+    {"rank": 10, "name": "Communication and Journalism", "nces_name": "Communication, journalism, and related programs", "slug": "communication-and-journalism", "degrees": 86043, "tags": ["communications", "journalism", "media", "publishing"]}
+  ]
+}

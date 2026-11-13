@@ -1,0 +1,18 @@
+{
+  "description": "InternScout staged response headers (review before applying)",
+  "expression": "http.host eq \"internscout.org\"",
+  "action": "rewrite",
+  "enabled": true,
+  "action_parameters": {
+    "headers": {
+      "x-content-type-options": { "operation": "set", "value": "nosniff" },
+      "referrer-policy": { "operation": "set", "value": "strict-origin-when-cross-origin" },
+      "x-frame-options": { "operation": "set", "value": "SAMEORIGIN" },
+      "strict-transport-security": { "operation": "set", "value": "max-age=300" },
+      "content-security-policy-report-only": {
+        "operation": "set",
+        "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://accounts.google.com https://apis.google.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: https:; connect-src 'self' https://internscout-api.bpmcginley.workers.dev https://raw.githubusercontent.com https://api.github.com https://cloudflareinsights.com https://static.cloudflareinsights.com https://cdn.jsdelivr.net https://accounts.google.com https://login.microsoftonline.com; frame-src https://accounts.google.com https://login.microsoftonline.com; form-action 'self' https://buttondown.com https://buttondown.email; worker-src 'self' blob:; object-src 'none'; base-uri 'self'"
+      }
+    }
+  }
+}

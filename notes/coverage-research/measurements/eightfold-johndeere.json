@@ -1,0 +1,574 @@
+{
+ "ats": "eightfold",
+ "token": "johndeere",
+ "name": "John Deere",
+ "sector": "engineering_manufacturing",
+ "measured_on": "2026-10-18",
+ "production_keywords": [
+  "intern",
+  "co-op",
+  "student",
+  "graduate program",
+  "stagiaire"
+ ],
+ "configs": [
+  {
+   "keywords": [
+    "intern"
+   ],
+   "status": "ok",
+   "requests": 4,
+   "request_errors": 0,
+   "est_sequential_seconds": 2.4,
+   "raw_rows": 9,
+   "normalized": 9,
+   "accepted": 9,
+   "accepted_dedupe_keys": 9,
+   "new_vs_baseline": 0,
+   "new_ids": []
+  },
+  {
+   "keywords": [
+    "intern",
+    "co-op"
+   ],
+   "status": "ok",
+   "requests": 5,
+   "request_errors": 0,
+   "est_sequential_seconds": 3.0,
+   "raw_rows": 9,
+   "normalized": 9,
+   "accepted": 9,
+   "accepted_dedupe_keys": 9,
+   "new_vs_baseline": 0,
+   "new_ids": []
+  },
+  {
+   "keywords": [
+    "intern",
+    "co-op",
+    "student"
+   ],
+   "status": "ok",
+   "requests": 10,
+   "request_errors": 0,
+   "est_sequential_seconds": 5.3,
+   "raw_rows": 48,
+   "normalized": 48,
+   "accepted": 48,
+   "accepted_dedupe_keys": 43,
+   "new_vs_baseline": 39,
+   "new_ids": [
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137480645147",
+     "title": "Part-Time Student - Cab Engineering - Dubuque, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137481425666",
+     "title": "Part-Time Student - DSM - Ames, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137481458189",
+     "title": "Part-Time Student - Data Science and Analytics - Austin, TX or Urbandale, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137481862391",
+     "title": "Part Time Student - Industrial Engineer - Waterloo, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137481864167",
+     "title": "Part Time Student - Industrial Engineer - Waterloo, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137481983166",
+     "title": "Part-Time Student - Data Science and Analytics - Urbandale, IA or Austin, TX"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137482175640",
+     "title": "Part Time Student - Industrial Engineer - Waterloo, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137482247004",
+     "title": "Part-Time Student - Warehouse Health Engineer - Milan, IL"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137482601358",
+     "title": "Part-Time Student IT - Infrastructure Engineer - Dubuque, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137482782400",
+     "title": "Part-Time Student - Robotics Engineer - Ames, IA or Urbandale, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483157846",
+     "title": "Part-Time Student - JDPS Application Engineering - Waterloo, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483192263",
+     "title": "Part-Time Student - Engineering - East Moline, IL"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483235535",
+     "title": "Part-Time Student - Electrification - Morrisville, NC"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483324497",
+     "title": "Part-Time Student - Engineering - Waterloo, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483369468",
+     "title": "Part-Time Student - Administrative/Engineering Support - Waterloo, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483371561",
+     "title": "Part Time Student - Program Management - Moline,IL"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483386008",
+     "title": "Part Time Student - Communication - Moline, IL"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483396343",
+     "title": "Part-time Student - OEM/Marine Applications - Waterloo, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483398610",
+     "title": "Part Time Student - Management Reporting - Moline, IL"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483480683",
+     "title": "Part-Time Student - UX Research - Champaign,IL"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483480914",
+     "title": "Part-Time Student - Supply Management - Fargo, ND"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483508705",
+     "title": "Part-Time Student - Purchasing - Fargo, ND"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483509631",
+     "title": "Part-Time Student - Factory Engineering - East Moline,IL"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483514226",
+     "title": "Part-Time Student - Communications - Johnston, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483583093",
+     "title": "Part Time Student - Quality - Ankeny, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483583981",
+     "title": "Part-Time Student - Software Engineer - Champaign, IL"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483617131",
+     "title": "Part-Time Student - Supply Management - Waterloo, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483619425",
+     "title": "Part-Time Student - Supply Management Specialist - Horicon, WI"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483700388",
+     "title": "Part-Time Student - IT Software Engineer - Chicago, IL"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483700527",
+     "title": "Part-Time Student - Software Engineer UIUC - Champaign, IL"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483718556",
+     "title": "Part-Time Student - Accounting and Finance - Moline, IL or Johnston, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483726452",
+     "title": "Part-Time Student - Manufacturing Engineering - Waterloo, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483757988",
+     "title": "Part-Time Student - Software Engineering UIUC - Champaign, IL"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483761763",
+     "title": "Part-Time Student - Manufacturing Engineer - Moline, IL"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483818578",
+     "title": "Part-Time Student - Foundry Engineering - Waterloo, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483829173",
+     "title": "Part-Time Student - Manufacturing Engineering - Waterloo, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483878698",
+     "title": "Part-Time Student - Paint Engineer - Moline, IL"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483907415",
+     "title": "Part-Time Student - Process Automation - Greeneville, TN"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483908089",
+     "title": "Part-Time Student - Software Engineering - Ames, IA"
+    }
+   ]
+  },
+  {
+   "keywords": [
+    "intern",
+    "co-op",
+    "student",
+    "stagiaire"
+   ],
+   "status": "ok",
+   "requests": 12,
+   "request_errors": 0,
+   "est_sequential_seconds": 6.1,
+   "raw_rows": 48,
+   "normalized": 48,
+   "accepted": 48,
+   "accepted_dedupe_keys": 43,
+   "new_vs_baseline": 39,
+   "new_ids": [
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137480645147",
+     "title": "Part-Time Student - Cab Engineering - Dubuque, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137481425666",
+     "title": "Part-Time Student - DSM - Ames, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137481458189",
+     "title": "Part-Time Student - Data Science and Analytics - Austin, TX or Urbandale, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137481862391",
+     "title": "Part Time Student - Industrial Engineer - Waterloo, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137481864167",
+     "title": "Part Time Student - Industrial Engineer - Waterloo, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137481983166",
+     "title": "Part-Time Student - Data Science and Analytics - Urbandale, IA or Austin, TX"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137482175640",
+     "title": "Part Time Student - Industrial Engineer - Waterloo, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137482247004",
+     "title": "Part-Time Student - Warehouse Health Engineer - Milan, IL"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137482601358",
+     "title": "Part-Time Student IT - Infrastructure Engineer - Dubuque, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137482782400",
+     "title": "Part-Time Student - Robotics Engineer - Ames, IA or Urbandale, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483157846",
+     "title": "Part-Time Student - JDPS Application Engineering - Waterloo, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483192263",
+     "title": "Part-Time Student - Engineering - East Moline, IL"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483235535",
+     "title": "Part-Time Student - Electrification - Morrisville, NC"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483324497",
+     "title": "Part-Time Student - Engineering - Waterloo, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483369468",
+     "title": "Part-Time Student - Administrative/Engineering Support - Waterloo, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483371561",
+     "title": "Part Time Student - Program Management - Moline,IL"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483386008",
+     "title": "Part Time Student - Communication - Moline, IL"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483396343",
+     "title": "Part-time Student - OEM/Marine Applications - Waterloo, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483398610",
+     "title": "Part Time Student - Management Reporting - Moline, IL"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483480683",
+     "title": "Part-Time Student - UX Research - Champaign,IL"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483480914",
+     "title": "Part-Time Student - Supply Management - Fargo, ND"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483508705",
+     "title": "Part-Time Student - Purchasing - Fargo, ND"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483509631",
+     "title": "Part-Time Student - Factory Engineering - East Moline,IL"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483514226",
+     "title": "Part-Time Student - Communications - Johnston, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483583093",
+     "title": "Part Time Student - Quality - Ankeny, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483583981",
+     "title": "Part-Time Student - Software Engineer - Champaign, IL"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483617131",
+     "title": "Part-Time Student - Supply Management - Waterloo, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483619425",
+     "title": "Part-Time Student - Supply Management Specialist - Horicon, WI"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483700388",
+     "title": "Part-Time Student - IT Software Engineer - Chicago, IL"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483700527",
+     "title": "Part-Time Student - Software Engineer UIUC - Champaign, IL"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483718556",
+     "title": "Part-Time Student - Accounting and Finance - Moline, IL or Johnston, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483726452",
+     "title": "Part-Time Student - Manufacturing Engineering - Waterloo, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483757988",
+     "title": "Part-Time Student - Software Engineering UIUC - Champaign, IL"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483761763",
+     "title": "Part-Time Student - Manufacturing Engineer - Moline, IL"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483818578",
+     "title": "Part-Time Student - Foundry Engineering - Waterloo, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483829173",
+     "title": "Part-Time Student - Manufacturing Engineering - Waterloo, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483878698",
+     "title": "Part-Time Student - Paint Engineer - Moline, IL"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483907415",
+     "title": "Part-Time Student - Process Automation - Greeneville, TN"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483908089",
+     "title": "Part-Time Student - Software Engineering - Ames, IA"
+    }
+   ]
+  },
+  {
+   "keywords": [
+    "intern",
+    "co-op",
+    "student",
+    "graduate program",
+    "stagiaire"
+   ],
+   "status": "ok",
+   "requests": 14,
+   "request_errors": 0,
+   "est_sequential_seconds": 7.1,
+   "raw_rows": 48,
+   "normalized": 48,
+   "accepted": 48,
+   "accepted_dedupe_keys": 43,
+   "new_vs_baseline": 39,
+   "new_ids": [
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137480645147",
+     "title": "Part-Time Student - Cab Engineering - Dubuque, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137481425666",
+     "title": "Part-Time Student - DSM - Ames, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137481458189",
+     "title": "Part-Time Student - Data Science and Analytics - Austin, TX or Urbandale, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137481862391",
+     "title": "Part Time Student - Industrial Engineer - Waterloo, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137481864167",
+     "title": "Part Time Student - Industrial Engineer - Waterloo, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137481983166",
+     "title": "Part-Time Student - Data Science and Analytics - Urbandale, IA or Austin, TX"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137482175640",
+     "title": "Part Time Student - Industrial Engineer - Waterloo, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137482247004",
+     "title": "Part-Time Student - Warehouse Health Engineer - Milan, IL"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137482601358",
+     "title": "Part-Time Student IT - Infrastructure Engineer - Dubuque, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137482782400",
+     "title": "Part-Time Student - Robotics Engineer - Ames, IA or Urbandale, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483157846",
+     "title": "Part-Time Student - JDPS Application Engineering - Waterloo, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483192263",
+     "title": "Part-Time Student - Engineering - East Moline, IL"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483235535",
+     "title": "Part-Time Student - Electrification - Morrisville, NC"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483324497",
+     "title": "Part-Time Student - Engineering - Waterloo, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483369468",
+     "title": "Part-Time Student - Administrative/Engineering Support - Waterloo, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483371561",
+     "title": "Part Time Student - Program Management - Moline,IL"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483386008",
+     "title": "Part Time Student - Communication - Moline, IL"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483396343",
+     "title": "Part-time Student - OEM/Marine Applications - Waterloo, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483398610",
+     "title": "Part Time Student - Management Reporting - Moline, IL"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483480683",
+     "title": "Part-Time Student - UX Research - Champaign,IL"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483480914",
+     "title": "Part-Time Student - Supply Management - Fargo, ND"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483508705",
+     "title": "Part-Time Student - Purchasing - Fargo, ND"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483509631",
+     "title": "Part-Time Student - Factory Engineering - East Moline,IL"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483514226",
+     "title": "Part-Time Student - Communications - Johnston, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483583093",
+     "title": "Part Time Student - Quality - Ankeny, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483583981",
+     "title": "Part-Time Student - Software Engineer - Champaign, IL"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483617131",
+     "title": "Part-Time Student - Supply Management - Waterloo, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483619425",
+     "title": "Part-Time Student - Supply Management Specialist - Horicon, WI"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483700388",
+     "title": "Part-Time Student - IT Software Engineer - Chicago, IL"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483700527",
+     "title": "Part-Time Student - Software Engineer UIUC - Champaign, IL"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483718556",
+     "title": "Part-Time Student - Accounting and Finance - Moline, IL or Johnston, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483726452",
+     "title": "Part-Time Student - Manufacturing Engineering - Waterloo, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483757988",
+     "title": "Part-Time Student - Software Engineering UIUC - Champaign, IL"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483761763",
+     "title": "Part-Time Student - Manufacturing Engineer - Moline, IL"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483818578",
+     "title": "Part-Time Student - Foundry Engineering - Waterloo, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483829173",
+     "title": "Part-Time Student - Manufacturing Engineering - Waterloo, IA"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483878698",
+     "title": "Part-Time Student - Paint Engineer - Moline, IL"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483907415",
+     "title": "Part-Time Student - Process Automation - Greeneville, TN"
+    },
+    {
+     "id": "johndeere.eightfold.ai/careers/job/137483908089",
+     "title": "Part-Time Student - Software Engineering - Ames, IA"
+    }
+   ]
+  }
+ ],
+ "network_requests": 14,
+ "network_wall_seconds_incl_pauses": 11.5
+}

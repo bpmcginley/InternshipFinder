@@ -1,0 +1,562 @@
+"""ATS auto-discovery: pull job-board tokens out of apply URLs and keep a registry of
+boards to scan whole on every run (backend/data/ats_registry.json, committed by CI).
+
+Registry shape: {ats: {token: {"name", "quant", "sector", "fails", "added"}}}
+sector is an employer label (health, nonprofit, quant_finance, ...); it never changes the score.
+Workday tokens are "tenant|wdN|site".
+"""
+
+from __future__ import annotations
+import json
+import os
+import re
+from datetime import date, timedelta
+from .config import DATA_DIR
+
+REGISTRY_PATH = os.path.join(DATA_DIR, "ats_registry.json")
+MAX_FAILS = 4  # consecutive failed runs before a board is dropped
+
+# Boards dropped from the registry, and when: {ats: {token lowercased: {"on": "YYYY-MM-DD", "why"}}}.
+# A dropped board used to come straight back. The GitHub lists and Google Jobs keep old apply links
+# for months, so discovery re-added every dead board the day after prune() took it out, and it spent
+# four more days failing. In the week to 2026-09-30 that was 170 boards a night, the same ones each
+# time: 146 SmartRecruiters boards (the API host's robots.txt closes them all), and Greenhouse,
+# Ashby and Workday boards that answer 404 or 422. Now a dropped board stays out for KEEP_OUT days,
+# then may be discovered again, in case the employer came back.
+DROPPED_PATH = os.path.join(DATA_DIR, "dropped_boards.json")
+KEEP_OUT = {"dead": 45, "robots": 120}
+_DROPPED: dict[str, dict[str, dict]] = {}
+_REFUSED = [0]  # add_board calls turned away this run, for the [registry] line
+
+PATTERNS = [
+    # job-boards.eu.greenhouse.io is a European employer's board; boards-api.greenhouse.io still
+    # serves it, so widening the host is all that is needed and nothing downstream changes.
+    (
+        "greenhouse",
+        re.compile(
+            r"(?:boards|job-boards)(?:\.eu)?\.greenhouse\.io/"
+            r"(?:embed/job_app\?for=)?([A-Za-z0-9_-]+)",
+            re.I,
+        ),
+    ),
+    ("greenhouse", re.compile(r"boards-api\.greenhouse\.io/v1/boards/([A-Za-z0-9_-]+)", re.I)),
+    # Unlike Greenhouse, Lever's EU boards are not on api.lever.co - it 404s for them - so the
+    # region rides in the token ("cirrus|eu") and lever.py picks its API host from that.
+    ("lever", re.compile(r"jobs\.(?:(?P<r>eu)\.)?lever\.co/(?P<t>[A-Za-z0-9_.-]+)", re.I)),
+    ("ashby", re.compile(r"jobs\.ashbyhq\.com/([A-Za-z0-9_.%-]+)", re.I)),
+    (
+        "workday",
+        re.compile(
+            r"https?://(?P<t>[a-z0-9-]+)\.(?P<wd>wd\d+)\.myworkdayjobs\.com/"
+            r"(?:[a-z]{2}-[A-Z]{2}/)?(?P<s>[A-Za-z0-9_-]+)",
+            re.I,
+        ),
+    ),
+    # Workday's other domain, where the tenant is a path segment instead of a subdomain:
+    # wd1.myworkdaysite.com/recruiting/wf/WellsFargoJobs. Same CXS API underneath.
+    (
+        "workday",
+        re.compile(
+            r"https?://(?P<wd>wd\d+\.myworkdaysite\.com)/(?:[a-z]{2}-[A-Z]{2}/)?"
+            r"recruiting/(?P<t>[A-Za-z0-9_-]+)/(?P<s>[A-Za-z0-9_-]+)",
+            re.I,
+        ),
+    ),
+    (
+        "smartrecruiters",
+        re.compile(r"(?:jobs|careers)\.smartrecruiters\.com/([A-Za-z0-9_-]+)", re.I),
+    ),
+    ("workable", re.compile(r"apply\.workable\.com/([A-Za-z0-9_-]+)", re.I)),
+    ("recruitee", re.compile(r"https?://([a-z0-9-]+)\.recruitee\.com", re.I)),
+    ("bamboohr", re.compile(r"https?://([a-z0-9-]+)\.bamboohr\.com/(?:careers|jobs)", re.I)),
+    (
+        "rippling",
+        re.compile(
+            r"ats\.rippling\.com/(?:embed/)?(?:[a-z]{2}-[A-Z]{2}/)?"
+            r"([A-Za-z0-9_-]+)/jobs",
+            re.I,
+        ),
+    ),
+    (
+        "oracle",
+        re.compile(
+            r"https?://([a-z0-9-]+\.fa(?:\.[a-z0-9]+)?\.oraclecloud\.com)/hcmUI/CandidateExperience/"
+            r"[a-z]{2}(?:-[A-Za-z]{2})?/sites/([A-Za-z0-9_]+)",
+            re.I,
+        ),
+    ),
+    (
+        "taleo",
+        re.compile(r"https?://([a-z0-9-]+)\.taleo\.net/careersection/([A-Za-z0-9_]+)/", re.I),
+    ),
+    (
+        "adp",
+        re.compile(
+            r"workforcenow\.adp\.com/.*?[?&]cid=([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})",
+            re.I,
+        ),
+    ),
+    ("jobvite", re.compile(r"jobs\.jobvite\.com/(?:careers/)?([A-Za-z0-9_-]+)", re.I)),
+    # The employer's own website is a required parameter of the Eightfold API and is not in the
+    # URL, so a discovered token is the tenant alone and eightfold.py assumes <tenant>.com;
+    # a seed can pin the real one with "tenant|domain.com" when that guess is wrong.
+    ("eightfold", re.compile(r"https?://([a-z0-9-]+)\.eightfold\.ai/", re.I)),
+    # The whole subdomain is the tenant: hospital-midlandhealth, careers-uhnjcareers, jobs-selectmedicalcorp.
+    ("icims", re.compile(r"https?://([a-z0-9-]+)\.icims\.com", re.I)),
+    # The same jobs behind the employer's own host, which is a different product with a different
+    # API - see sources/icims_site.py. The token is the host. The pattern above claims the
+    # icims.com ones first, so what reaches here is only ever a branded one.
+    (
+        "icims_site",
+        re.compile(r"https?://([a-z0-9][a-z0-9.-]*\.[a-z]{2,})/jobs/\d+\S*[?&]icims=1", re.I),
+    ),
+    # JazzHR: the tenant is the subdomain and the board is always at /apply.
+    ("jazzhr", re.compile(r"https?://([a-z0-9-]+)\.applytojob\.com", re.I)),
+]
+_BAD_TOKENS = {
+    "embed",
+    "job",
+    "jobs",
+    "wday",
+    "login",
+    "apply",
+    "search",
+    "v1",
+    "oneclick-ui",
+    "j",
+    "api",
+    "www",
+    "app",
+    "careers",
+    "rest",
+}
+ATS_HOSTS = [  # recognised even when no token can be extracted
+    ("icims", "icims.com"),
+    ("taleo", "taleo.net"),
+    ("oracle", "oraclecloud.com"),
+    ("successfactors", "successfactors"),
+    ("jobvite", "jobvite.com"),
+    ("eightfold", "eightfold.ai"),
+    ("workable", "workable.com"),
+    ("bamboohr", "bamboohr.com"),
+    ("adp", "adp.com"),
+    ("greenhouse", "gh_jid="),
+    ("jazzhr", "applytojob.com"),
+]
+
+
+def ats_of(url: str | None) -> tuple[str, str | None]:
+    """('greenhouse', 'janestreet') / ('workday', 'tenant|wd5|Site') / ('icims', None) / ('other', None)."""
+    if not url:
+        return "other", None
+    for ats, pat in PATTERNS:
+        m = pat.search(url)
+        if m:
+            # Only meaningful for the single-group patterns; every multi-group ats rebuilds its
+            # token below. Optional groups can be None, hence the filter rather than a plain join.
+            token = "|".join(g for g in m.groups() if g)
+            # The last group is the part that names the board, except where a pattern captures
+            # something else after it. On Workday that is the career site's name, which is
+            # legitimately a plain word - careers, search, External - and checking it against
+            # _BAD_TOKENS threw away most Workday boards there are. On Lever it is the region.
+            # In both cases the tenant is the part that has to look real.
+            check = m.group("t") if ats in ("workday", "lever") else m.groups()[-1]
+            if check.lower() in _BAD_TOKENS:
+                continue
+            if ats == "workday":
+                token = f"{m.group('t').lower()}|{m.group('wd').lower()}|{m.group('s')}"
+            elif ats == "lever":
+                token = m.group("t") + ("|" + m.group("r").lower() if m.group("r") else "")
+            elif ats == "taleo":
+                token = f"{m.group(1).lower()}|{m.group(2)}"
+            elif ats == "adp":
+                token = m.group(1).lower()
+            elif ats in ("oracle", "recruitee", "bamboohr"):
+                token = (
+                    f"{m.group(1).lower()}|{m.group(2)}" if ats == "oracle" else m.group(1).lower()
+                )
+            return ats, token
+    low = url.lower()
+    for ats, needle in ATS_HOSTS:
+        if needle in low:
+            return ats, None
+    return "other", None
+
+
+def load_registry() -> dict:
+    """The board registry, or {} when there is no file yet.
+
+    A file that is there but will not parse is an error, not an empty registry. It used to come back
+    as {} (was: `except (OSError, ValueError): return {}`), and the run went on to discover a few
+    boards and save them over the top - months of verified boards replaced by a dozen, with a green
+    tick. A bad merge or a write cut short is the likely way to get there, so the run stops and says so.
+    """
+    _DROPPED.clear()
+    _DROPPED.update(load_dropped())
+    _REFUSED[0] = 0
+    try:
+        with open(REGISTRY_PATH, encoding="utf-8") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {}
+    except ValueError as e:
+        raise RuntimeError(
+            f"{REGISTRY_PATH} is not valid JSON ({e}); restore it from git before running"
+        ) from e
+
+
+def load_dropped() -> dict:
+    """The dropped-board list, or {} when there is none. A damaged one is only a lost memory of what
+    failed (the boards come back and fail again), so unlike the registry it does not stop the run."""
+    try:
+        with open(DROPPED_PATH, encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def kept_out(ats: str, token: str, today: date | None = None) -> bool:
+    """Whether this board was dropped recently enough that discovery should leave it out."""
+    hit = _DROPPED.get(ats, {}).get(token.lower())
+    if not hit:
+        return False
+    try:
+        on = date.fromisoformat(hit.get("on", ""))
+    except ValueError:
+        return False
+    return (today or date.today()) - on < timedelta(
+        days=KEEP_OUT.get(hit.get("why"), KEEP_OUT["dead"])
+    )
+
+
+def refused_count() -> int:
+    return _REFUSED[0]
+
+
+def drop(reg: dict, ats: str, token: str, why: str = "dead", today: date | None = None) -> None:
+    """Take a board out of the registry and remember it, so discovery does not put it straight back."""
+    reg.get(ats, {}).pop(token, None)
+    _DROPPED.setdefault(ats, {})[token.lower()] = {
+        "on": (today or date.today()).isoformat(),
+        "why": why,
+    }
+
+
+def _save_dropped(today: date | None = None) -> None:
+    today = today or date.today()
+    keep = {}
+    for ats, toks in sorted(_DROPPED.items()):
+        live = {t: v for t, v in sorted(toks.items()) if kept_out(ats, t, today)}
+        if live:
+            keep[ats] = live
+    tmp = DROPPED_PATH + ".tmp"
+    with open(tmp, "w", encoding="utf-8", newline="\n") as f:
+        json.dump(keep, f, indent=1, ensure_ascii=False)
+        f.write("\n")
+    os.replace(tmp, DROPPED_PATH)
+
+
+def _board_count(reg: dict) -> int:
+    return sum(len(b) for b in reg.values() if isinstance(b, dict))
+
+
+def save_registry(reg: dict) -> None:
+    """Write the registry whole or not at all.
+
+    Written to a temp file and moved into place, so a run killed mid-write (the CI job has a time
+    limit) leaves the old file rather than half of a new one. And a registry that has lost more than
+    half its boards since it was read is refused: prune() takes a handful at a time, so a drop that
+    size is a bug upstream. REGISTRY_ALLOW_SHRINK=1 is the override for a deliberate clean-out.
+    """
+    os.makedirs(DATA_DIR, exist_ok=True)
+    out = {
+        ats: dict(sorted(boards.items(), key=lambda kv: kv[0].lower()))
+        for ats, boards in sorted(reg.items())
+    }
+    try:
+        with open(REGISTRY_PATH, encoding="utf-8") as f:
+            had = _board_count(json.load(f))
+    except (OSError, ValueError):
+        had = 0
+    if had >= 200 and _board_count(out) * 2 < had and not os.environ.get("REGISTRY_ALLOW_SHRINK"):
+        raise RuntimeError(
+            f"refusing to save a registry of {_board_count(out)} boards over one of {had}"
+        )
+    tmp = REGISTRY_PATH + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(out, f, indent=1, ensure_ascii=False)
+    os.replace(tmp, REGISTRY_PATH)
+    _save_dropped()
+
+
+def add_board(
+    reg: dict,
+    ats: str,
+    token: str,
+    name: str,
+    quant: bool = False,
+    sector: str | None = None,
+    location: str | None = None,
+) -> bool:
+    sector = sector or ("quant_finance" if quant else None)
+    boards = reg.setdefault(ats, {})
+    lower = {t.lower(): t for t in boards}
+    if token.lower() in lower:
+        entry = boards[lower[token.lower()]]
+        entry["quant"] = entry.get("quant", False) or quant
+        if sector and not entry.get("sector"):
+            entry["sector"] = sector
+        if location and not entry.get("location"):
+            entry["location"] = location
+        return False
+    if kept_out(ats, token):
+        _REFUSED[0] += 1
+        return False
+    boards[token] = {
+        "name": name or token,
+        "quant": quant,
+        "fails": 0,
+        "added": date.today().isoformat(),
+    }
+    if sector:
+        boards[token]["sector"] = sector
+    if location:
+        boards[token]["location"] = location
+    return True
+
+
+def relabel_sector(reg: dict, ats: str, token: str, sector: str) -> bool:
+    """Give a board the sector the seed file now says, whatever it was labelled before."""
+    boards = reg.get(ats) or {}
+    key = {t.lower(): t for t in boards}.get(token.lower())
+    if not key or boards[key].get("sector") == sector:
+        return False
+    boards[key]["sector"] = sector
+    return True
+
+
+def rename_board(reg: dict, ats: str, token: str, name: str) -> bool:
+    """Give a board the name the seed file says. Opt-in (a seed entry with 'rename': True) because
+    add_board keeps the first name it heard, and discovery sometimes hears the wrong one: the Red Sox,
+    Orioles and Phillies boards were all registered as "Major League Baseball", so each team's own
+    internships showed under the league's name. Most seed names are no better than
+    what discovery found, so renaming everything on every seed would churn names for nothing."""
+    boards = reg.get(ats) or {}
+    key = {t.lower(): t for t in boards}.get(token.lower())
+    if not key or not name or boards[key].get("name") == name:
+        return False
+    boards[key]["name"] = name
+    return True
+
+
+# A university is the one kind of employer that reliably names its own sector, and 57 boards
+# in the registry were unlabelled, with 435 open listings sitting on them - the largest
+# unlabelled group there is, and the one feeding the Education cluster that the coverage
+# report keeps putting a single point above thin. Seeding them by hand would have meant 57
+# lines that go stale the next time discovery finds a university, which it does most runs.
+#
+# The order matters, and it is the whole reason this is three patterns rather than one. A
+# finance arm is not something a name can settle, so it is left alone rather than guessed at:
+# University of Virginia Investment Management Company runs an endowment. A university health
+# system is health rather than education: St. Luke's University Health Network and Cooper
+# University Health Care hire nurses, not teaching assistants.
+#
+# Checked against all 3,156 boards in the registry: 67 names match, all 67 are genuinely
+# educational or university health systems, and none of the 9 that already carried a sector
+# disagreed with what this would have given them.
+_SECTOR_NAME_SKIP_RE = re.compile(
+    r"credit union|\bbank\b|investment|asset management|"
+    r"\bcapital\b|ventures?\b",
+    re.I,
+)
+_SECTOR_NAME_HEALTH_RE = re.compile(
+    r"\bhealth\b|hospital|\bmedical\b|\bclinic|cancer|"
+    r"medicine",
+    re.I,
+)
+_SECTOR_NAME_EDU_RE = re.compile(
+    r"\buniversit(y|ies)\b|\bcollege\b|institute of technology|"
+    r"\bpolytechnic\b|\bschool of\b|community college",
+    re.I,
+)
+
+
+def sector_from_name(name: str) -> str | None:
+    """The sector an employer name states outright, or None when it states none.
+
+    Deliberately narrow: this reads names, and a name is only good evidence in the one case
+    where institutions are required to say what they are. Everything else stays unlabelled."""
+    name = name or ""
+    if not _SECTOR_NAME_EDU_RE.search(name) or _SECTOR_NAME_SKIP_RE.search(name):
+        return None
+    return "health" if _SECTOR_NAME_HEALTH_RE.search(name) else "education_research"
+
+
+def label_boards(reg: dict) -> int:
+    """Fill in the sector for boards whose employer name says it. Never overwrites: a sector
+    already on a board came from the seed file or from a fetcher, and both know better than a
+    name does."""
+    filled = 0
+    for entries in reg.values():
+        for entry in entries.values():
+            if entry.get("sector"):
+                continue
+            sector = sector_from_name(entry.get("name") or "")
+            if sector:
+                entry["sector"] = sector
+                filled += 1
+    return filled
+
+
+def sector_index(reg: dict) -> dict[tuple[str, str], str]:
+    """(ats, token) -> sector for every labelled board, built once so a per-listing lookup is
+    cheap. Boards past MAX_FAILS are included on purpose: a board we have stopped fetching still
+    says who its employer is, and the listing being labelled was found somewhere else anyway."""
+    out = {}
+    for ats, entries in reg.items():
+        for token, entry in entries.items():
+            sector = entry.get("sector") or ("quant_finance" if entry.get("quant") else None)
+            if sector:
+                out[(ats, token.lower())] = sector
+    return out
+
+
+def label_sectors(reg: dict, items: list[dict]) -> int:
+    """Give a listing the sector its own board already carries.
+
+    A board walk knows the employer it asked for, so its postings arrive labelled. The same job
+    found through a GitHub list or a Google search arrives with a title and a link and nothing
+    else, and the link points straight at a board the registry has a sector for. So the label was
+    there to be read and was being dropped: 238 open listings, including 20 in government and 12
+    in health, were unlabelled while their own board sat in the registry saying what they were.
+
+    The sector is a fact about the employer, not the posting, which is why reading it off the
+    apply link is sound: the link is what says whose board this is.
+    """
+    index = sector_index(reg)
+    filled = 0
+    for it in items:
+        if it.get("sector"):
+            continue
+        ats, token = ats_of(it.get("apply_url") or it.get("url"))
+        sector = index.get((ats, (token or "").lower()))
+        if sector:
+            it["sector"] = sector
+            filled += 1
+    return filled
+
+
+def set_location(reg: dict, ats: str, token: str, location: str) -> bool:
+    """Give a board the one place the seed file says its employer is.
+
+    Only a seed may call this. A board that writes "Boston Campus" is telling us where it is and
+    trusting us to know the rest, which is a thing a person can check once and a parser cannot
+    guess; it is exactly the sort of answer that belongs in the seed file beside the token.
+    """
+    boards = reg.get(ats) or {}
+    key = {t.lower(): t for t in boards}.get(token.lower())
+    if not key or boards[key].get("location") == location:
+        return False
+    boards[key]["location"] = location
+    return True
+
+
+def seed_registry(reg: dict) -> int:
+    from . import companies_seed as seed
+
+    n = 0
+    for ats in (
+        "GREENHOUSE",
+        "LEVER",
+        "ASHBY",
+        "WORKDAY",
+        "SMARTRECRUITERS",
+        "WORKABLE",
+        "RECRUITEE",
+        "BAMBOOHR",
+        "RIPPLING",
+        "ORACLE",
+        "TALEO",
+        "ADP",
+        "JOBVITE",
+        "SUCCESSFACTORS",
+        "EIGHTFOLD",
+        "ICIMS",
+        "ICIMS_SITE",
+        "JAZZHR",
+    ):
+        for co in getattr(seed, ats, []):
+            n += add_board(
+                reg,
+                ats.lower(),
+                co["ats_token"],
+                co["name"],
+                co.get("is_quant_target", False),
+                co.get("sector"),
+                co.get("location"),
+            )
+            if co.get("sector"):
+                relabel_sector(reg, ats.lower(), co["ats_token"], co["sector"])
+            if co.get("location"):
+                set_location(reg, ats.lower(), co["ats_token"], co["location"])
+            if co.get("rename"):
+                rename_board(reg, ats.lower(), co["ats_token"], co["name"])
+    return n
+
+
+def discover(reg: dict, items: list[dict]) -> int:
+    """Register every board seen in the apply URLs of raw items. Returns # of new boards."""
+    n = 0
+    for it in items:
+        for url in {it.get("apply_url"), it.get("url")}:
+            ats, token = ats_of(url)
+            if token:
+                n += add_board(reg, ats, token, it.get("company_name") or "")
+    return n
+
+
+def boards(reg: dict):
+    for ats, entries in reg.items():
+        for token, entry in entries.items():
+            if entry.get("fails", 0) < MAX_FAILS:
+                yield ats, token, entry
+
+
+def record_result(reg: dict, ats: str, token: str, ok: bool, today: date | None = None) -> None:
+    """Count a failed fetch against a board, at most once per calendar day.
+
+    MAX_FAILS was written as "4 failed runs", and the ingest runs four times a day, so one bad day
+    at an ATS - an outage, a rate limit, a DNS blip on the runner - was enough to delete a board
+    from the registry for good. Counting days instead of runs keeps the same number but makes it
+    mean four different days with no success between them. (Was: fails += 1 on every call.)
+    """
+    entry = reg.get(ats, {}).get(token)
+    if entry is None:
+        return
+    if ok:
+        entry["fails"] = 0
+        entry.pop("last_fail", None)
+        return
+    day = (today or date.today()).isoformat()
+    if entry.get("last_fail") != day:
+        entry["fails"] = entry.get("fails", 0) + 1
+        entry["last_fail"] = day
+
+
+def record_closed(reg: dict, ats: str, token: str) -> None:
+    """The board's host said no in robots.txt. Unlike a failure that is not going to change by
+    tomorrow, so the board goes at this run's prune instead of after four days of asking again."""
+    entry = reg.get(ats, {}).get(token)
+    if entry is not None:
+        entry["fails"] = MAX_FAILS
+        entry["closed"] = True
+
+
+def prune(reg: dict, today: date | None = None) -> int:
+    dead = [
+        (a, t, v) for a, e in reg.items() for t, v in e.items() if v.get("fails", 0) >= MAX_FAILS
+    ]
+    for a, t, v in dead:
+        drop(reg, a, t, "robots" if v.get("closed") else "dead", today)
+    return len(dead)

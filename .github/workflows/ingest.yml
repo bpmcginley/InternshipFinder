@@ -1,0 +1,142 @@
+name: Ingest internships
+
+# Runs the scraper on a schedule and commits fresh data for the Pages site.
+on:
+  schedule:
+    - cron: "0 */6 * * *"     # every 6 hours (UTC)
+  workflow_dispatch:            # manual "Run workflow" button; Keep schedule (catchup.yml) uses it too
+    inputs:
+      force:
+        description: "Run even if another ingest finished in the last 4 hours"
+        type: boolean
+        default: true
+  push:
+    branches: [main]
+    # tests and one-off scripts never change what an ingest produces, so a push of only those
+    # no longer starts a full run (2026-09 audit; was: every file under backend/ except data/)
+    paths: ["backend/**", "!backend/data/**", "!backend/tests/**", "!backend/scripts/**", ".github/workflows/ingest.yml"]
+
+permissions:
+  contents: write               # allow committing the data back
+  actions: read                 # the guard reads this workflow's other runs
+
+concurrency:
+  group: ingest
+  cancel-in-progress: false
+
+# Pinned to ubuntu-24.04 (was: ubuntu-latest): that label moves to Ubuntu 26 on 2026-10-19, and the move should be a deliberate change.
+jobs:
+  # Keep schedule starts an ingest when GitHub's own schedule is hours late; the late scheduled run
+  # then arrives inside 4 hours of it and has nothing to add, so it skips (growth/catchup.py). A
+  # person's Run workflow click defaults force to true and always runs. A catch-up dispatch sends
+  # force: false, so it is guarded like the schedule.
+  guard:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    outputs:
+      skip: ${{ steps.guard.outputs.skip }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: |
+            growth
+            backend/internscout
+      - id: guard
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          CATCHUP_FORCE: ${{ inputs.force }}
+        run: python3 growth/catchup.py --guard ingest.yml
+
+  ingest:
+    needs: guard
+    if: needs.guard.outputs.skip != 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check out the existing data branch
+        uses: actions/checkout@v7
+        with:
+          ref: refs/heads/data
+          path: .ingest-data
+          sparse-checkout: |
+            docs/data
+            backend/data
+
+      - uses: ./.github/actions/python
+        with:
+          cache: pip
+          install-backend: 'true'
+
+      - name: Prepare the isolated ingest snapshot
+        run: |
+          data="$GITHUB_WORKSPACE/.ingest-data"
+          state="$RUNNER_TEMP/internscout-ingest-state"
+          python3 scripts/ingest_data_writer.py prepare "$data" "$GITHUB_WORKSPACE" "$state"
+          {
+            printf 'INTERNSCOUT_PUBLIC_DATA=%s/docs/data\n' "$data"
+            printf 'INTERNSCOUT_DATA=%s\n' "$state"
+          } >> "$GITHUB_ENV"
+
+      # Extra states (beyond New England + NY/NJ) that get detail calls and Google searches:
+      # the states students picked (Worker GET /demand, counts only) plus the optional repo variable.
+      - name: Add states students picked
+        env:
+          DEMAND_URL: ${{ secrets.INTERNSCOUT_DEMAND_URL }}
+          DEMAND_TOKEN: ${{ secrets.INTERNSCOUT_DEMAND_TOKEN }}
+          EXTRA: ${{ vars.INTERNSCOUT_WANTED_STATES }}
+        run: |
+          picked=""
+          if [ -n "$DEMAND_URL" ] && [ -n "$DEMAND_TOKEN" ]; then
+            picked=$(curl -fsS --max-time 20 -H "Authorization: Bearer $DEMAND_TOKEN" "$DEMAND_URL" \
+              | jq -r '.states | keys | map(select(length == 2)) | join(",")') || picked=""
+          else
+            echo "No Worker /demand secrets set; using the repo variable only."
+          fi
+          states=$(printf '%s,%s' "$EXTRA" "$picked" | sed 's/^,*//; s/,*$//')
+          echo "Wanted states beyond the baseline: ${states:-none}"
+          echo "INTERNSCOUT_WANTED_STATES=$states" >> "$GITHUB_ENV"
+
+      - name: Run ingester and export static JSON
+        working-directory: backend
+        env:
+          INTERNSCOUT_DB: ${{ github.workspace }}/internscout.db
+          # Look up unknown NY/NJ/PA towns once (cached in backend/data/geocache.json)
+          INTERNSCOUT_GEOCODE: "1"
+          SERPAPI_KEY: ${{ secrets.SERPAPI_KEY }}   # optional: enables Google Jobs search layer
+          # optional: federal student jobs (free key from developer.usajobs.gov; the email it was issued to)
+          USAJOBS_API_KEY: ${{ secrets.USAJOBS_API_KEY }}
+          USAJOBS_EMAIL: ${{ secrets.USAJOBS_EMAIL }}
+        # The ingest report (counts per source, board and filter) goes to the runner's temp folder and
+        # is kept as a run artifact below, not in docs/data, which the website serves to everyone.
+        run: |
+          python -m internscout.run_ingest --export "$INTERNSCOUT_PUBLIC_DATA" --metrics "${{ runner.temp }}/ingest-report.json"
+
+      - name: Keep the ingest report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ingest-report
+          path: ${{ runner.temp }}/ingest-report.json
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Coverage report
+        working-directory: backend
+        # The report names the keyed sources that are switched off, so it has to be handed the same
+        # keys the ingest step was. Without them it read every one as unset and told us to go and get
+        # two keys the run above had just used to fetch 119 federal postings.
+        env:
+          SERPAPI_KEY: ${{ secrets.SERPAPI_KEY }}
+          USAJOBS_API_KEY: ${{ secrets.USAJOBS_API_KEY }}
+          USAJOBS_EMAIL: ${{ secrets.USAJOBS_EMAIL }}
+        run: python -m internscout.coverage "$INTERNSCOUT_PUBLIC_DATA/listings"
+
+      - name: Commit updated data
+        run: |
+          data="$GITHUB_WORKSPACE/.ingest-data"
+          git -C "$data" config user.name "internscout-bot"
+          git -C "$data" config user.email "actions@github.com"
+          python3 scripts/ingest_data_writer.py publish "$data" "$INTERNSCOUT_DATA" \
+            --message "data: refresh listings ($(date -u +%FT%TZ))"

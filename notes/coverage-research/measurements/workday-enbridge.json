@@ -1,0 +1,81 @@
+{
+ "ats": "workday",
+ "token": "enbridge|wd3|enbridge_careers",
+ "name": "Enbridge",
+ "sector": null,
+ "measured_on": "2026-10-18",
+ "production_keywords": [
+  "intern",
+  "co-op"
+ ],
+ "configs": [
+  {
+   "keywords": [
+    "intern"
+   ],
+   "status": "ok",
+   "requests": 4,
+   "request_errors": 0,
+   "est_sequential_seconds": 2.4,
+   "raw_rows": 0,
+   "normalized": 0,
+   "accepted": 0,
+   "accepted_dedupe_keys": 0,
+   "new_vs_baseline": 0,
+   "new_ids": []
+  },
+  {
+   "keywords": [
+    "intern",
+    "co-op"
+   ],
+   "status": "ok",
+   "requests": 7,
+   "request_errors": 0,
+   "est_sequential_seconds": 4.3,
+   "raw_rows": 0,
+   "normalized": 0,
+   "accepted": 0,
+   "accepted_dedupe_keys": 0,
+   "new_vs_baseline": 0,
+   "new_ids": []
+  },
+  {
+   "keywords": [
+    "intern",
+    "co-op",
+    "student"
+   ],
+   "status": "ok",
+   "requests": 8,
+   "request_errors": 0,
+   "est_sequential_seconds": 4.9,
+   "raw_rows": 0,
+   "normalized": 0,
+   "accepted": 0,
+   "accepted_dedupe_keys": 0,
+   "new_vs_baseline": 0,
+   "new_ids": []
+  },
+  {
+   "keywords": [
+    "intern",
+    "co-op",
+    "student",
+    "stagiaire"
+   ],
+   "status": "ok",
+   "requests": 9,
+   "request_errors": 0,
+   "est_sequential_seconds": 5.5,
+   "raw_rows": 0,
+   "normalized": 0,
+   "accepted": 0,
+   "accepted_dedupe_keys": 0,
+   "new_vs_baseline": 0,
+   "new_ids": []
+  }
+ ],
+ "network_requests": 9,
+ "network_wall_seconds_incl_pauses": 8.2
+}

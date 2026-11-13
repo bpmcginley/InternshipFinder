@@ -1,0 +1,48 @@
+name: Wrong tag or detail
+description: A listing has the wrong field, type, year, location, pay or eligibility, or it's closed.
+title: "[Wrong tag] "
+labels: ["wrong-tag"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This issue is public, so please don't include personal details.
+  - type: input
+    id: listing
+    attributes:
+      label: Listing link or ID
+      description: Use the listing's "Report" link on the dashboard, or paste its apply link.
+    validations:
+      required: true
+  - type: dropdown
+    id: what
+    attributes:
+      label: What's wrong?
+      multiple: true
+      options:
+        - Field / major tag
+        - Type (internship, co-op, research...)
+        - Eligible years
+        - Location or state
+        - Paid / unpaid / stipend
+        - Citizenship or sponsorship
+        - Term or dates
+        - Posting is closed
+        - Not a student role
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: shown
+    attributes:
+      label: What InternScout shows
+  - type: input
+    id: correct
+    attributes:
+      label: What it should be
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else?

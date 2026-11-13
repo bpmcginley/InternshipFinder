@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Workday listbox fixture</title>
+<style>
+body{font:15px/1.5 system-ui,sans-serif;max-width:640px;margin:30px auto;padding:0 16px}
+label{display:block;margin:14px 0 4px} input{width:100%;padding:6px;font:inherit}
+button[aria-haspopup]{width:100%;text-align:left;padding:6px;font:inherit;background:#fff;border:1px solid #888}
+[role=listbox]{border:1px solid #888;background:#fff;max-height:220px;overflow:auto}
+[role=option]{padding:4px 8px;cursor:pointer} [role=option]:hover{background:#def}
+#log{margin-top:30px;padding:8px;background:#eee;font:12px monospace;white-space:pre-wrap}
+</style></head><body>
+<!-- Workday's markup, simplified: each dropdown is a button[aria-haspopup=listbox] inside a
+     formField div; clicking it draws a popup of [role=option][data-automation-id=promptOption] at the
+     end of the body (as Workday does), and a pick sets the button's text and closes the popup.
+     Used by the browser check for fastFill's Workday dropdowns (agent/dom.js, 2026-10-01). -->
+<h1>My Information</h1>
+
+<div data-automation-id="formField-legalNameSection_firstName"><label for="fn">Given Name(s)<abbr>*</abbr></label><input id="fn" data-automation-id="legalNameSection_firstName"></div>
+<div data-automation-id="formField-legalNameSection_lastName"><label for="ln">Family Name<abbr>*</abbr></label><input id="ln" data-automation-id="legalNameSection_lastName"></div>
+<div data-automation-id="formField-countryDropdown"><label for="country">Country<abbr>*</abbr></label>
+  <button type="button" id="country" aria-haspopup="listbox" data-automation-id="countryDropdown" data-options="Canada|United Kingdom|United States of America">Select One</button></div>
+<div data-automation-id="formField-addressLine1"><label for="a1">Address Line 1<abbr>*</abbr></label><input id="a1" data-automation-id="addressSection_addressLine1"></div>
+<div data-automation-id="formField-city"><label for="city">City<abbr>*</abbr></label><input id="city" data-automation-id="addressSection_city"></div>
+<div data-automation-id="formField-countryRegion"><label for="state">State<abbr>*</abbr></label>
+  <button type="button" id="state" aria-haspopup="listbox" data-automation-id="addressSection_countryRegion" data-options="Maine|Maryland|Massachusetts|Michigan|New Hampshire|New York">Select One</button></div>
+<div data-automation-id="formField-postalCode"><label for="zip">Postal Code<abbr>*</abbr></label><input id="zip" data-automation-id="addressSection_postalCode"></div>
+<div data-automation-id="formField-phoneType"><label for="ptype">Phone Device Type<abbr>*</abbr></label>
+  <button type="button" id="ptype" aria-haspopup="listbox" data-automation-id="phone-device-type" data-options="Home|Mobile|Work">Select One</button></div>
+<div data-automation-id="formField-phone"><label for="ph">Phone Number<abbr>*</abbr></label><input id="ph" data-automation-id="phone-number"></div>
+
+<h1>Application Questions</h1>
+<div data-automation-id="formField-q1"><label for="q1">Are you legally authorized to work in the United States?<abbr>*</abbr></label>
+  <button type="button" id="q1" aria-haspopup="listbox" data-options="Yes|No">Select One</button></div>
+<div data-automation-id="formField-q2"><label for="q2">Will you now or in the future require sponsorship for employment visa status (e.g., H-1B)?<abbr>*</abbr></label>
+  <button type="button" id="q2" aria-haspopup="listbox" data-options="Yes|No">Select One</button></div>
+<div data-automation-id="formField-q3"><label for="q3">How did you hear about us?<abbr>*</abbr></label>
+  <button type="button" id="q3" aria-haspopup="listbox" data-options="Job Board|LinkedIn|Referral">Select One</button></div>
+<div data-automation-id="formField-q4"><label for="q4">Are you able to work without sponsorship? (asked the other way round)</label>
+  <button type="button" id="q4" aria-haspopup="listbox" data-options="Yes|No">Select One</button></div>
+
+<h1>Voluntary Disclosures</h1>
+<div data-automation-id="formField-gender"><label for="g">Gender</label>
+  <button type="button" id="g" aria-haspopup="listbox" data-options="Male|Female|I do not wish to disclose">Select One</button></div>
+<div data-automation-id="formField-veteran"><label for="v">Veteran Status</label>
+  <button type="button" id="v" aria-haspopup="listbox" data-options="I am a veteran|I am not a veteran|I don't wish to answer">Select One</button></div>
+
+<div id="log"></div>
+<script>
+let open = null;
+function closeMenu() { if (open) { open.menu.remove(); open.btn.setAttribute("aria-expanded", "false"); open = null; } }
+document.querySelectorAll("button[aria-haspopup=listbox]").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    if (open && open.btn === btn) return closeMenu();
+    closeMenu();
+    const menu = document.createElement("div");
+    menu.setAttribute("role", "listbox");
+    for (const text of btn.dataset.options.split("|")) {
+      const o = document.createElement("div");
+      o.setAttribute("role", "option"); o.setAttribute("data-automation-id", "promptOption"); o.textContent = text;
+      o.addEventListener("click", () => { btn.textContent = text; btn.value = text; closeMenu(); });
+      menu.appendChild(o);
+    }
+    const r = btn.getBoundingClientRect();
+    menu.style.cssText = `position:absolute;left:${r.left + scrollX}px;top:${r.bottom + scrollY}px;width:${r.width}px`;
+    document.body.appendChild(menu);
+    btn.setAttribute("aria-expanded", "true");
+    open = { btn, menu };
+  });
+});
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeMenu(); });
+</script>
+</body></html>

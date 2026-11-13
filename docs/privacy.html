@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Privacy policy · InternScout</title>
+<meta name="description" content="What data InternScout touches, where it goes, and how to delete it."/>
+<!-- Link previews and a tab icon. Chrome Web Store review opens these two pages straight from the
+     listing, and a policy page that renders as a blank favicon and an untitled card reads as
+     abandoned. icon128.png and icon48.png sit in this same docs/ folder (copied from
+     extension/icons), so a plain relative path is all GitHub Pages needs. -->
+<meta property="og:title" content="Privacy policy · InternScout"/>
+<meta property="og:description" content="What data InternScout touches, where it goes, and how to delete it."/>
+<meta property="og:type" content="website"/>
+<!-- 2026-10-27: use the clean URL already published in sitemap.xml. was: /privacy.html.
+     Revert: restore the .html URL and remove the canonical below. -->
+<meta property="og:url" content="https://internscout.org/privacy"/>
+<link rel="canonical" href="https://internscout.org/privacy"/>
+<!-- Facebook rejects an og:image under 200x200 and X wants 144x144+, so the 128x128 favicon made a
+     forwarded link to this page a title-only card. og-preview.png is the same 1200x630 card
+     index.html and install.html use (scripts/make_og_image.py); absolute, because a relative
+     og:image is a second, independent reason a scraper comes back with no image. -->
+<!-- was: <meta property="og:image" content="icon128.png"/> and twitter:card "summary" -->
+<meta property="og:image" content="https://internscout.org/og-preview.png"/>
+<meta name="twitter:card" content="summary_large_image"/>
+<link rel="icon" href="icon128.png"/>
+<link rel="apple-touch-icon" href="icon128.png"/>
+<style>
+  /* The site's self-hosted faces (2026-10-14, docs/fonts/). This page named IBM Plex Sans and Source Serif 4
+     but never loaded them, so it drew in Segoe UI and Georgia. */
+  @font-face{font-family:"IBM Plex Sans";src:url(/fonts/ibm-plex-sans-latin.woff2) format("woff2");font-weight:100 700;font-style:normal;font-display:swap;unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+  @font-face{font-family:"Source Serif 4";src:url(/fonts/source-serif-4-latin.woff2) format("woff2");font-weight:600;font-style:normal;font-display:swap;unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+  :root{
+    --paper:#f6f4ef; --panel:#fffefb; --sunk:#efece5;
+    --ink:#17191c; --ink2:#454a52; --ink3:#646a73; --rule:#e2ded4;
+    /* ink2/ink3 were #4b5058/#868b92 here and #b3b1aa/#7d7c77 in dark: ink3 was 3.1:1 on this paper
+       (4.4:1 in dark), under AA for body-size text. Same values as the dashboard now. */
+    --accent:#1d5c46; --accent-soft:#e3eee8; --amber:#9a6412;
+    --serif:"Source Serif 4",Georgia,"Times New Roman",serif;
+    --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+    color-scheme:light;
+  }
+  @media (prefers-color-scheme:dark){:root{
+    --paper:#131416; --panel:#1a1b1e; --sunk:#232427;
+    --ink:#ecebe6; --ink2:#b8b6af; --ink3:#95948e; --rule:#2c2d31;
+    --accent:#7cc3a1; --accent-soft:#1c2a24; --amber:#e0b25e;
+    color-scheme:dark;
+  }}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.65 var(--sans);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:740px;margin:0 auto;padding:0 20px 64px}
+  header.top{display:flex;align-items:baseline;justify-content:space-between;gap:8px 20px;flex-wrap:wrap;padding:22px 0 14px;border-bottom:1px solid var(--ink)}
+  .mark{font:600 22px/1 var(--serif);letter-spacing:-.3px;color:var(--ink);text-decoration:none}
+  nav{display:flex;gap:4px 16px;flex-wrap:wrap}
+  nav a{color:var(--ink2);font-size:14px;text-decoration:none}
+  nav a{transition:color 140ms ease-out}
+  nav a:hover{color:var(--ink)}
+  nav a[aria-current=page]{color:var(--accent);font-weight:600}
+  h1{font:600 34px/1.15 var(--serif);letter-spacing:-.5px;margin:36px 0 4px}
+  .meta{color:var(--ink3);font-size:14px;margin:0 0 20px}
+  .lede{font-size:18px;color:var(--ink2);margin:0 0 8px}
+  h2{font:600 22px/1.25 var(--serif);margin:40px 0 10px;padding-top:20px;border-top:1px solid var(--rule)}
+  h3{font-size:16px;margin:22px 0 4px}
+  p,li,td{color:var(--ink2)}
+  strong,th{color:var(--ink)}
+  a{color:var(--accent)}
+  ul,ol{padding-left:22px}
+  li{margin:5px 0}
+  code,kbd{font:14px var(--mono);background:var(--sunk);padding:1px 6px;border-radius:4px;overflow-wrap:anywhere}
+  /* was: a 3px accent (or amber) bar down the left edge. One even border now, tinted for a warning. */
+  .box{background:var(--panel);border:1px solid var(--rule);border-radius:6px;padding:6px 18px;margin:22px 0}
+  .box.warn{border-color:color-mix(in srgb,var(--amber) 45%,var(--rule))}
+  .box h3{margin-top:12px}
+  .box h2{font:inherit;font-size:16px;font-weight:700;margin:12px 0 4px;padding:0;border:0}
+  .table{overflow-x:auto;margin:12px 0}
+  table{border-collapse:collapse;width:100%;font-size:15px}
+  th,td{text-align:left;vertical-align:top;padding:9px 12px 9px 0;border-bottom:1px solid var(--rule)}
+  th{font-weight:600}
+  footer{margin-top:48px;padding-top:16px;border-top:1px solid var(--rule);color:var(--ink3);font-size:14px}
+  footer a{color:var(--ink2)}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  @media (max-width:480px){h1{font-size:28px}.lede{font-size:17px}}
+  @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a class="mark" href="index.html">InternScout</a>
+    <nav aria-label="Site">
+      <a href="index.html">Dashboard</a>
+      <a href="install.html">Install</a>
+      <a href="privacy.html" aria-current="page">Privacy</a>
+      <a href="terms.html">Terms</a>
+    </nav>
+  </header>
+
+  <main>
+    <h1>Privacy policy</h1>
+    <!-- The page tells people the date at the top is how they know it changed, so it moves with the
+         AI-transmission and chosen-states corrections made today. -->
+    <!-- was: <p class="meta">Last updated September 17, 2026</p> -->
+    <!-- was: <p class="meta">Last updated September 19, 2026</p>  (operator named, an email address,
+         and under-18 consent for paid plans added 2026-09-22) -->
+    <!-- was: <p class="meta">Last updated September 22, 2026</p>  (invites added 2026-09-24) -->
+    <!-- was: <p class="meta">Last updated September 24, 2026</p>  (what Delete my data keeps for invites,
+         and the pending invite code in local storage, added 2026-09-25) -->
+    <!-- was: <p class="meta">Last updated September 25, 2026</p>  (staying signed in and the Deep Dive
+         saved to your account added 2026-09-26) -->
+    <!-- was: <p class="meta">Last updated September 26, 2026</p>  (Supporter $5 and Pro $12 became $4 and
+         $8 on 2026-09-30) -->
+    <!-- was: <p class="meta">Last updated September 30, 2026</p>  (opening the invite link counted as a step,
+         and the invite suggestion's one setting in local storage, added 2026-10-02) -->
+    <!-- was: <p class="meta">Last updated October 2, 2026</p>  (the weekly email sign-up counted as a step
+         2026-10-06; the review suggestions, their local settings and the review link count, 2026-10-07) -->
+    <!-- was: <p class="meta">Last updated October 7, 2026</p>  (the Auto-Apply suggestion after opening a
+         posting, its two counts and its two browser settings, added 2026-10-13) -->
+    <!-- Still October 13, 2026: the employer interest form (#employers, docs/employers/index.html) was
+         added the same day, so the date stands for both changes. -->
+    <!-- was: <p class="meta">Last updated October 13, 2026</p>  (the paid listings section, #paid-listings,
+         and the remembered posting's three-day deletion, added 2026-10-14; then paid listings on the dashboard and their
+         counts, added with the launch PR, S8 and S9: set this to the day it is merged) -->
+    <!-- was: <p class="meta">Last updated October 14, 2026</p>  (the paid listings section, live with the employer terms on 2026-10-19) -->
+    <!-- was: <p class="meta">Last updated October 19, 2026</p>  (the paid listings section went live with the employer terms) -->
+    <!-- was: <p class="meta">Last updated October 20, 2026</p>  (tab-scoped anonymous campaign
+         intent totals added 2026-10-27; no change to the employer terms) -->
+    <p class="meta">Last updated November 10, 2026</p>
+    <!-- Paid plans went live on 2026-09-19 (worker/wrangler.toml PAYMENTS_ENABLED = "1"), so calling
+         the whole product "free" without qualification is no longer true. Search still is. -->
+    <!-- was: <p class="lede">InternScout is a free internship search tool made by a UMass Amherst student. This page explains what data it uses, where that data goes, and how to delete it.</p> -->
+    <p class="lede">InternScout is an internship search tool made by a UMass Amherst student. Searching is free and needs no sign-in; AI features have a free monthly allowance, and optional paid plans raise it. This page explains what data it uses, where that data goes, and how to delete it.</p>
+
+    <div class="box">
+      <!-- An h2 since 2026-10-14 (U12): an h3 straight after the h1 (axe heading-order). Drawn as before. -->
+      <h2>The short version</h2>
+      <ul>
+        <li>Searching needs no account.</li>
+        <!-- This bullet said files "stay" on the device, which extension/background/tailor.js line 185
+             and extension/onboarding/onboarding.js line 68 both contradict: a PDF resume is sent to
+             the AI whole, as base64. Storage and transmission are two different promises; only the
+             storage one was ever true. -->
+        <!-- was: <li>Your profile, resume and files stay in your browser and the extension.</li> -->
+        <!-- "We never keep a copy" stopped being true on 2026-09-26: the extension now saves the Deep Dive
+             profile to the student's account by default (extension/lib/sync.js, PUT /profile). Files
+             still never leave for storage, and the six demographic answers, saved logins and API keys
+             are left out of the saved copy, so those promises are kept and named. -->
+        <!-- was: <li>Your profile, resume and files are stored only in your browser and the extension. We never keep a copy.</li> -->
+        <li>Your resume and other files are stored only in your browser and the extension. We never keep a copy of them.</li>
+        <li>The profile your Deep Dive builds is saved to your InternScout account by default, encrypted, so it's there on your other devices. You can turn that off in the extension, which deletes our copy. Your demographic answers, saved logins and API keys are never saved to your account. <a href="#saved">Details below</a>.</li>
+        <li>You stay signed in on a device until you sign out. Your browser keeps a random sign-in code; our server keeps only a fingerprint of it.</li>
+        <li>Stored is not the same as never sent. The Deep Dive and resume tailoring do send your resume and some other files to the AI, in the request itself. Details below.</li>
+        <li>AI requests pass through our server to Google's paid Gemini API. We don't store them, and they aren't used to train AI.</li>
+        <!-- "only" stopped being true once paid plans went live: a subscriber also has a plan row. -->
+        <!-- was: <li>We keep only a scrambled sign-in ID, your monthly usage counts and the states you picked.</li> -->
+        <!-- "Nothing else." is contradicted by this same page three sections down: the What we store
+             table lists a monthly cost figure in cents and per-minute and per-day call counters, and
+             the paid-plan section lists the Stripe customer and subscription IDs, the paid-through
+             date and the IDs of payment events already processed. A one-line summary that the page
+             itself disproves is worse than none, so this one points at the full list instead of
+             closing the subject off. -->
+        <!-- was: <li>We keep a scrambled sign-in ID, your monthly usage counts, the states you picked, and — only if you subscribe — which plan you are on. Nothing else.</li> -->
+        <!-- was: <li>We keep a scrambled sign-in ID, your monthly usage and cost counts, the states you picked, and — only if you subscribe — your plan and your Stripe IDs. The full list is below.</li> -->
+        <!-- was: <li>We keep a scrambled sign-in ID, when we first saw it, your monthly usage and cost counts, the states you picked, your invite code and extra runs if you use invites, and, only if you subscribe, your plan and your Stripe IDs. The full list is below.</li>
+             Sessions and the saved Deep Dive (2026-09-26) are two more things the server keeps. -->
+        <li>We keep a scrambled sign-in ID, when we first saw it, your monthly usage and cost counts, the states you picked, a fingerprint of each sign-in, your saved Deep Dive (encrypted, unless you turn saving off), your invite code and extra runs if you use invites, and, only if you subscribe, your plan and your Stripe IDs. The full list is below.</li>
+        <!-- Added with the weekly email sign-up (docs/js/app.js Digest). It is the one place a student
+             hands over an email address on purpose, so the short version says who ends up holding it. -->
+        <li>If you sign up for the weekly email, your address and the fields you tick go to Buttondown, the service that sends it, not to our server. Buttondown also records the IP address you sign up from. <a href="#digest">Details below</a>.</li>
+        <!-- Added 2026-10-13 with the employer page. Its form is the one place InternScout's own server keeps
+             a name and an email address, so the short version says so. -->
+        <li>If you're an employer and fill in the interest form on <a href="/employers/">internscout.org/employers</a>, we keep what you type there, for up to a year, only to contact you about InternScout for employers. <a href="#employers">Details below</a>.</li>
+        <li>If you order a paid listing, we keep your contact and order details to confirm your email, review and run the listing, and keep the sale record. <a href="#employer-orders">What we keep and for how long</a>.</li>
+        <!-- Added with paid listings (S8, 2026-10-14). -->
+        <li>Some searches and pages show one paid listing, in its own box headed "Paid listing" with "Ad" before the company name. An employer paid for that box. It only ever shows a role that already matches what you searched for or picked, it doesn't change how any listing is ranked, scored or filtered, and it is never chosen from your profile or anything else about you. <a href="#paid-listings">Details below</a>.</li>
+        <li>We never see your password.</li>
+        <!-- was: <li>You can delete it at any time. The current month's counts stay until the month ends, so deleting can't be used to reset a limit.</li>
+             The invite records Delete my data keeps (see #delete) are part of what "it" covers, so the
+             short version names them too. -->
+        <!-- was: <li>You can delete it at any time. The current month's counts stay until the month ends, and a few invite records (your hashed ID with a date or a count) stay after that, so deleting can't be used to reset a limit. <a href="#delete">Details below</a>.</li> -->
+        <li>You can delete it at any time. Delete my data also removes your saved Deep Dive and signs you out everywhere. The current month's counts stay until the month ends, and a few invite records (your hashed ID with a date or a count) stay after that, so deleting can't be used to reset a limit. <a href="#delete">Details below</a>.</li>
+      </ul>
+    </div>
+
+    <h2>Searching listings</h2>
+    <ul>
+      <li>You don't need an account or sign-in to search.</li>
+      <li>The dashboard is a static page hosted on GitHub Pages. The listings are public job posts.</li>
+      <!-- "They are not sent to us" swept the chosen states in with everything else, and docs/js/core.js
+           line 440 posts those states to the Worker's /demand endpoint. What the endpoint accepts is
+           narrow and worth stating exactly: worker/src/demand.js cleanStates() rejects anything that is
+           not a USPS code or REMOTE, so no listing id, status or filter could travel that route even by
+           accident. The statuses themselves really never leave, which is why this is split in two. -->
+      <!-- was: <li>Your saved statuses (like Interested or Applied), filters and profile are saved in your browser's local storage. They are not sent to us.</li> -->
+      <!-- docs/js/core.js INVITE_KEY ("internscout.invite.v1"): app.js stores the ?ref= code from an
+           invite link there and sends it to POST /invite/claim only once the student signs in, then
+           drops it; core.js's Delete my data removes it too. It is a classmate's random code, not
+           anything about this student, but the list says what the dashboard keeps, so it is here. -->
+      <!-- was: <li>Your saved statuses (like Interested or Applied), your filters and your profile are saved in your browser's local storage. <strong>Which listings you saved, and what you marked them, is never sent to us.</strong></li> -->
+      <!-- 2026-09-26: the dashboard now keeps a sign-in there too (docs/js/core.js SESSION_KEY,
+           "internscout.session": the session code, a short account ID, the email, provider, tier and
+           expiry), and the dashboard profile it hands the extension is part of what the extension
+           saves to the account (dashboard_profile in the synced subset). -->
+      <!-- was: <li>Your saved statuses (like Interested or Applied), your filters and your profile are saved in your browser's local storage. <strong>Which listings you saved, and what you marked them, is never sent to us.</strong> If you arrive through a classmate's invite link, its invite code is kept there too, and is sent to us only when you sign in, to accept the invite. Delete my data clears it.</li> -->
+      <!-- was: ... Delete my data clears it. If the extension ...
+           The one-time invite suggestion (docs/js/core.js INVITE_NUDGE_KEY) added 2026-10-02. -->
+      <!-- was (2026-10-14): the same item without the remembered posting and the sign-in offer. -->
+      <li>Your saved statuses (like Interested or Applied), your filters and your profile are saved in your browser's local storage. <strong>Which listings you saved, and what you marked them, is never sent to us.</strong> If you arrive through a classmate's invite link, its invite code is kept there too, and is sent to us only when you sign in, to accept the invite. Delete my data clears it. Once the dashboard has suggested inviting a classmate, it also keeps the date, or that you waved it off or opened your link, so the suggestion appears only once; that is never sent to us. If you hide the dashboard's suggestion to review the extension, it keeps that one setting so the suggestion stays hidden; that is never sent to us either. Once the dashboard has shown its one suggestion to get the weekly email, it keeps that it was shown, dismissed or opened, so it appears only once; that is never sent to us. After you open a posting, the site may suggest the Auto-Apply extension once per browser session; your browser keeps that it was shown for the session, and the date if you dismiss it, so it stays away for 14 days. Neither is sent to us. If you press that suggestion's add-to-Chrome link, or a page's "Auto-Apply this" link, your browser also keeps which posting it was (its link, company and title) so the extension can offer to Auto-Apply it once it is set up. The extension removes it when it reads it. If it hasn't after three days, the site deletes it the next time you open the dashboard or one of its internship pages. It is not sent to us. If the extension is installed, the dashboard also hands it your profile, and the extension saves that with your Deep Dive (see <a href="#saved">below</a>). If you are signed in on the dashboard but not in the extension, the dashboard also offers the extension that sign-in; the extension checks it with our server and uses it only if you press "Use my dashboard sign-in" in the extension. Pressing it gets the extension its own sign-in for the same account from our server, so signing out of the dashboard or the extension leaves the other signed in. If you hide paid listings, or hide the notice that they started, your browser keeps that one setting so they stay hidden; neither is sent to us.</li>
+      <li>When you sign in, the dashboard keeps your sign-in in local storage too: a random sign-in code, a short account ID, and your email address, only so it can show which account is signed in. It stays until you sign out, press Delete my data, or the sign-in ends.</li>
+      <li>One thing does go: the list of states you picked. While you are signed in, the dashboard sends just those two-letter state codes (plus REMOTE, if you ticked it) to our Worker, stored against your scrambled sign-in ID. It is sent once per change, not per listing. The server accepts nothing else on that route, and the scanner only ever reads the totals per state, so it can fetch fuller listings where students are actually looking.</li>
+      <!-- was: "...loads fonts and code libraries from public servers (such as Google Fonts)." The fonts are
+           self-hosted since 2026-10-14 (docs/fonts/); React still comes from jsDelivr. -->
+      <li>GitHub hosts the page and may keep normal web server logs under its own policy. The dashboard's fonts come from our own site; it loads its code library (React) from a public server, jsDelivr.</li>
+      <!-- was: <li>We don't use analytics, ad trackers or cookies of our own.</li>
+           Cloudflare Web Analytics was added 2026-09-22 (the beacon before </body> on every page), so
+           "no analytics" stopped being true. What it collects is what Cloudflare documents for the
+           beacon: it sets no cookies and no local storage and does not fingerprint, so this names the
+           tool and says what it does rather than keeping the old absolute. -->
+      <!-- was: <li>We count page visits with <a href="https://www.cloudflare.com/web-analytics/" ...>Cloudflare Web Analytics</a>. It uses no cookies and doesn't identify you: it sees which page was loaded, the referring site, your browser type, a rough country and how fast the page loaded. We don't use ad trackers, and we set no cookies of our own.</li>
+           Our own counter (docs/js/count.js, worker/src/visits.js) was added 2026-09-30, because
+           Cloudflare samples page loads. It sends the path, the referring host and utm_source /
+           utm_medium; the Worker keeps only daily totals by page kind and source. The address is held
+           in memory for the current minute to stop floods and never written, which is why it is named. -->
+      <li>We count page visits with <a href="https://www.cloudflare.com/web-analytics/" target="_blank" rel="noopener">Cloudflare Web Analytics</a>. It uses no cookies and doesn't identify you: it sees which page was loaded, the referring site, your browser type, a rough country and how fast the page loaded.</li>
+      <!-- was: ... (pressing a link to the Chrome Web Store, signing in, saving a first profile, starting Auto-Apply, opening a plan's checkout), as totals ...
+           "invite_open" joined worker/src/visits.js EVENTS on 2026-10-02. -->
+      <!-- was: ... (pressing a link to the Chrome Web Store, signing in, saving a first profile, starting Auto-Apply, opening your invite link, opening a plan's checkout), as totals that say nothing about who. ...
+           2026-10-04: "posting_click" from the site, and the steps only the Worker sees (visits.js
+           SERVER_EVENTS: a first-seen account, a sign-in from the extension, an account's first
+           Auto-Apply of the month, a run refused at the monthly limit, a plan bought), all into the
+           same daily totals with no account attached. -->
+      <!-- 2026-10-06: "digest_signup" (docs/js/count.js), sending a weekly email sign-up form, joined the
+           same totals, by the kind of page the form was on. Only that the form was sent: count.js never
+           reads the address or the ticked fields, which go from the browser to Buttondown alone.
+           was: ... (pressing a link to the Chrome Web Store, opening a posting, our server seeing ...) -->
+      <!-- 2026-10-13: "apply_offer_shown" and "apply_offer_click" (docs/js/offer.js), the Auto-Apply
+           suggestion shown after opening a posting and its store link pressed, joined the same totals.
+           was: ... pressing a link to review the extension there, opening a posting, sending the weekly email's ... -->
+      <!-- 2026-10-27: campaign/content attribution is tab-scoped and aggregate. Revert: restore the
+           previous sentence after removing event_attribution and count.js session context. -->
+      <li>Because Cloudflare only samples visits, our own server also counts them. Each page load sends the page's address, the name of the site that linked to it (such as google.com, not the full link) and any short campaign tags on the link. We keep only daily totals by kind of page and where visits came from, for example "landing pages, from search: 12". If a tagged link brought you here, its short source, medium, campaign and content labels stay in this tab until you close it. They have no visitor ID and are used only to add anonymous daily totals for a Chrome Web Store click, a weekly email form submission or an employer order form submission. The detailed campaign rows are deleted after 400 days. Those totals do not say that an extension was installed, an email subscription was confirmed or an order was paid. The same way, we count how many times a day a few steps happen (pressing a link to the Chrome Web Store, pressing a link to review the extension there, opening a posting, seeing or pressing the "Add to Chrome" suggestion that can appear after you open one, seeing a weekly email invitation, pressing its link or sending its sign-up form (only the invitation's position and that it was seen, pressed or sent, never the address you typed or whether you confirmed), our server seeing an account for the first time, signing in on the site or in the extension, saving a first profile, starting Auto-Apply, a first Auto-Apply of the month, reaching a monthly limit, opening your invite link, opening a plan's checkout, buying a plan), as totals that say nothing about who.
+      <p data-counter-disclosure>When these features and their counters are enabled, we also count expanding a company's results, choosing a major, saving a role, opening My list, pressing a share link, opening our GitHub list or widget page, seeing the out-of-runs panel, and pressing its invite, top-up or plan controls. This includes opening or sending a company or search email-follow form, reaching its confirmation page, playing the demo, and pressing Print on a flyer. Each of these browser steps is counted at most once per page load, as a daily total by step and kind of page. These stored totals contain no account ID, email address, company, role, chosen major or search terms. They do not prove that an email subscription was confirmed, a purchase completed, or a flyer printed. These aggregate totals have no automatic expiry and cannot identify a person's activity for individual deletion.</p>
+      We count <a href="#paid-listings">paid listings</a> the same way: how many times a day each one was shown and opened, by kind of page, and nothing else. Your IP address is seen only to stop floods of fake visits; it's held in memory for a minute and never saved. If you open any page with <code>?nocount=1</code> at the end of its address, your browser keeps one setting that turns this counting off for it; <code>?nocount=0</code> turns it back on.</li>
+      <li>We don't use ad trackers, and we set no cookies of our own.</li>
+    </ul>
+
+    <h2>Your profile and files</h2>
+    <ul>
+      <!-- Second copy of the "stays on your device" claim, corrected the same way as the short version.
+           "chosen states" is dropped from this list because those do go to the server (see Searching
+           listings above); leaving it here is what made the two sections contradict each other. -->
+      <!-- was: <li>Your majors, class year, chosen states, work authorization, resume, transcript, cover letter, writing samples and saved answers stay on your device. They live in browser storage (dashboard) or Chrome extension storage.</li> -->
+      <!-- Third pass, 2026-09-26: the profile half of this sentence is no longer true by default. The
+           extension saves the Deep Dive profile to the account (extension/lib/sync.js, PUT /profile);
+           the files half still is, so the files keep the promise and the profile gets its own section. -->
+      <!-- was: <li>Your majors, class year, work authorization, resume, transcript, cover letter, writing samples and saved answers are stored on your device only. They live in browser storage (dashboard) or Chrome extension storage. We keep no copy of any of it, and nothing here is uploaded for safekeeping or backup.</li> -->
+      <li>Your resume, CV, transcript, cover letter and writing samples are stored on your device only. They live in browser storage (dashboard) or Chrome extension storage. We keep no copy of them, and they are never uploaded for safekeeping or backup.</li>
+      <li>Your profile (majors, class year, work authorization, the facts and stories from your Deep Dive and your saved answers) is kept on your device too, and by default the extension also saves a copy to your InternScout account. What is saved and what never is: <a href="#saved">Your Deep Dive, saved to your account</a>.</li>
+      <li><strong>Some of these files are sent to the AI when you run a feature that reads them.</strong> They go inside the request, through our Worker to Google's Gemini API, and are not stored at either end (see <a href="#ai">AI features</a>). Which file goes depends on the feature and on the file's format:
+        <ul>
+          <li><strong>The Deep Dive</strong> reads your resume and CV to fill in your profile, and your cover letter and writing samples to learn your writing voice. A PDF is sent as the file itself. A Word or plain-text file is read on your device first and only the text it contains is sent, up to 60,000 characters.</li>
+          <li><strong>Tailoring your resume</strong> sends your resume when it is a PDF: the whole PDF goes, so the AI can transcribe its layout and the tailored copy can keep it. That reading is cached on your device and reused, so the file is sent once per resume, not once per application. If your resume is a Word file, the extension opens it locally and sends only the bullet text; <em>that file never leaves your device</em>.</li>
+          <li><strong>Your transcript is never sent to the AI.</strong> It is only ever attached to an employer's own form when their site asks for one.</li>
+        </ul>
+      </li>
+      <!-- The old line claimed the sign-up email was never sent to the AI. It is: agent.js accountLine()
+           puts it into the ACCOUNT line of every Auto-Apply snapshot, because the agent has to know
+           which address to register or sign in with. The password claim is correct and stays — the
+           fill_secret tool (agent.js line 720) fills it from local storage and the value never enters
+           the conversation, which is why the tool description tells the model it will not see it. -->
+      <!-- was: <li>The extension can create accounts on employer application sites for you. It saves the sign-up email and those site passwords in extension storage on your device. They are never sent to us or to the AI.</li> -->
+      <li>The extension can create accounts on employer application sites for you. It saves the sign-up email and those site passwords in extension storage on your device. <strong>The passwords are never sent to us or to the AI</strong>: the extension types them into the page itself, and the AI is only told to ask for one, never given it. The sign-up email address <em>is</em> included in each Auto-Apply request, because the AI has to know which address to register or sign in with.</li>
+      <!-- Added 2026-10-07 (extension/lib/review.js): the review suggestion's bookkeeping, under the key
+           review_ask in chrome.storage.local. The background never sends it; the ping reply to the dashboard
+           carries one true/false (review_line), which stays inside the browser. -->
+      <li>The extension keeps a count of the applications it has filled on this device, and what you chose on its suggestion to leave a Chrome Web Store review (Leave a review, Not now or Don't ask again), so it asks at most twice. This stays in extension storage and is never sent to us. The only thing it tells the dashboard, inside your browser, is whether the dashboard may show its own review suggestion.</li>
+      <li>Chrome does not encrypt extension storage. Anyone who can use your computer account could read it.</li>
+      <!-- was: <li>We have no copy of any of this. If you clear it, it's gone.</li> -->
+      <li>We have no copy of your files, your demographic answers or your saved logins. If you clear them, they're gone. Your profile can be restored from your account if you left saving on.</li>
+    </ul>
+
+    <!-- Added 2026-09-26 with profile sync (extension/lib/sync.js; worker GET/PUT/DELETE /profile).
+         What is saved is the synced subset: `profile` (facts, education, experience, projects,
+         skills, links, stories, goals, voice, extra) minus the six demographic keys in profile.facts
+         (gender, race, hispanic, veteran, disability, lgbtq), plus settings.onboarded,
+         settings.deep_dive_at and dashboard_profile (majors, minors, class year, graduation term,
+         stages, terms, states, work authorization). Never uploaded: files, `accounts`, ai.apiKey,
+         ai.geminiKey, settings.master_password, settings.signup_email, the `answers` log and the job
+         queue. The Worker also strips the demographic keys before storing, and encrypts each profile
+         with AES-GCM-256 under a key derived per account from a server secret. -->
+    <h2 id="saved">Your Deep Dive, saved to your account</h2>
+    <p>When you are signed in, the extension saves the profile your Deep Dive builds to your InternScout account, so it's there when you sign in on another computer or reinstall the extension. This is on by default.</p>
+    <ul>
+      <li><strong>What is saved:</strong> the profile the Deep Dive builds. That is the facts it collects about you (such as your name, contact details, address, work authorization and the other standard application questions), your education, experience, projects, skills and links, your stories and goals, your writing voice, and your answers to its questions. It also includes the profile you set on the dashboard (your majors, class year, graduation term, the kinds of roles, terms and states you picked, and your work authorization), and whether and when you finished the Deep Dive.</li>
+      <li><strong>What is never saved to your account:</strong> your resume, CV, transcript, cover letter, writing samples and any other file; your answers to the six demographic questions (gender, race, Hispanic or Latino, veteran status, disability and LGBTQ+); the logins and passwords the extension saved for employer sites; your own API keys; and your list of past application answers and jobs. These stay on your device. Our server also removes the demographic answers from anything it is sent, as a second check.</li>
+      <li><strong>Encrypted at rest.</strong> The saved profile is encrypted on our server with a key made for your account alone. It is stored against your scrambled sign-in ID, with the time it was last changed and its size. It is decrypted only to send it back to your own extension while you are signed in.</li>
+      <li>It is not used for anything else: not for the AI (the extension sends the AI what each feature needs from the copy on your device, as described under <a href="#ai">AI features</a>), not for ads, and not shared or sold.</li>
+      <li><strong>Turning it off:</strong> untick <em>Save my Deep Dive to my account</em> in the extension. It asks you to confirm, then deletes the copy on our server right away and stops saving. Your profile on the device is untouched.</li>
+      <li><strong>Delete my data</strong> (in the extension or on the dashboard) deletes the saved profile too, along with every sign-in, so every device is signed out.</li>
+    </ul>
+
+    <!-- id added so the files section above can link straight here. -->
+    <!-- was: <h2>AI features</h2> -->
+    <h2 id="ai">AI features</h2>
+    <p>Tailored resumes, the Deep Dive, Auto-Apply and short answers use AI. Here is what happens when you run one:</p>
+    <ol>
+      <!-- "parts of your resume and profile, and the questions on an application page" was a fair
+           description of the tailoring call and a bad one of Auto-Apply. Each turn sends the snapshot
+           built by extension/agent/dom.js snapshot() and formatted by background/agent.js
+           formatSnapshot(), which is a good deal more than the questions: the URL, the title, the
+           headings, any visible error text, and — when the page has fewer than four form fields, so
+           there is nothing else to go on — up to 2,500 characters of the page's visible text. Listing
+           it out is the only honest way to describe an agent that reads the page it is working on. -->
+      <!-- was: <li>The extension sends the text the task needs to our server, a Cloudflare Worker. For example: parts of your resume and profile, and the questions on an application page.</li> -->
+      <!-- "Every AI task sends your profile" and "here it is in full" were both too strong, and the
+           second was what made the first tempting. The profile only goes on two of the AI paths:
+           extension/background/agent.js line 616 puts profileForModel(store) in the Auto-Apply system
+           prompt, and extension/onboarding/onboarding.js interviewSystem() puts the profile minus
+           voice and saved answers in the interview's. The other paths do not: tailor.js line 104
+           defines voiceOf() as career goal plus voice summary and that is all tailorDocx() and
+           tailorPdf() send about the student, and onboarding.js extract(), the voice step and
+           distill() each send only their own files, samples or transcript. Naming the feature next to
+           the data is the only way this stays true as features are added. -->
+      <!-- was: <li>The extension sends what the task needs to our server, a Cloudflare Worker. That is more than the questions alone, so here it is in full. Every AI task sends your profile: your name, contact details, education, experience, the stories from your Deep Dive and your writing voice. On top of that: -->
+      <!-- Second pass, 2026-09-19: "Only two ... Everything else sends much less" was an overclaim that the tailoring bullet below disproves in its own last clause - the no-resume path sends experience and education, two of the five items that sentence used to define "your profile". The count and the reassurance both go; the per-feature bullets carry it. -->
+      <!-- was: ...so here is what each one sends. Only two of them send your profile - your name, contact details, education, experience and the stories from your Deep Dive. Those two are Auto-Apply, which sends all of it including your writing voice, and the Deep Dive's interview step, which sends all of it except your voice and your saved answers. Everything else sends much less: -->
+      <li>The extension sends what the task needs to our server, a Cloudflare Worker. That is more than the questions alone, and it is not the same for every feature, so here is what each one sends. Two of them send your whole stored profile (your name, contact details, education, experience and the stories from your Deep Dive): Auto-Apply, which adds your writing voice, and the Deep Dive's interview step, which leaves out your voice and your saved answers. The rest each send only what their own bullet names below, which for one tailoring path is still most of your experience and education:
+        <ul>
+          <!-- Three things the old bullet left out, all of which a reader would want counted as
+               "sent": extension/background/agent.js formatSnapshot() also writes each field's
+               required marker, placeholder= and maxlength=; agent.js line 607 pushes a "Pre-filled:"
+               line listing what the extension already typed; and agent.js jobIntro() sends the
+               posting itself on the first turn, capped at 5,000 characters of description. -->
+          <!-- was: <li><strong>Auto-Apply</strong> sends a snapshot of the application page on each step: its web address and page title, the address of any form frame inside it, the headings, which step of the form you are on, whether a CAPTCHA is showing, any error messages the site is displaying, and every visible form field with its label, the question around it, what is currently in it, its options and its own error. It also sends the buttons on the page, and your sign-up email for that site. When a page has fewer than four fields — a sign-in wall, an interstitial, a page that failed to load — it sends up to 2,500 characters of the page's visible text instead, so the AI can tell what it is looking at.</li> -->
+          <li><strong>Auto-Apply</strong> sends your whole profile on every turn, and the sign-up email it uses for that site. On the first turn it also sends the posting: company, title, location, apply link and the first 5,000 characters of the description. Then, on each step, a snapshot of the application page: its web address and page title, the address of any form frame inside it, the headings, which step of the form you are on, whether a CAPTCHA is showing, any error messages the site is displaying, and every visible form field with its label, the question around it, what is currently in it, its options, whether it is required, its placeholder text, its length limit and its own error. It also sends the buttons on the page and a list of anything the extension has already filled in for you. When a page has fewer than four fields (a sign-in wall, an interstitial, a page that failed to load), it sends up to 2,500 characters of the page's visible text instead, so the AI can tell what it is looking at.</li>
+          <!-- "your profile" was true of one of the three tailoring paths only. In
+               extension/background/tailor.js, tailorDocx() and tailorPdf() both build their prompt as
+               jobText(job) + voiceOf(store) + the resume, and line 104 defines voiceOf() as exactly
+               {career_goal, voice} — no name, contact details, education or experience. Only
+               tailorFromProfile(), the path taken when there is no resume file, sends
+               tailorInput(store), and even that is experience, projects, skills, education, career
+               goal and voice: the name and contact details are put on the PDF here on the device. -->
+          <!-- was: <li><strong>Tailored resumes</strong> send the job posting's title, company and description, your profile, and your resume — the whole PDF if it is a PDF, or just its bullet text if it is a Word file.</li> -->
+          <!-- Second pass, 2026-09-19: the previous sentence promised the name, contact details and education are not sent here, which is false for a PDF resume. extension/background/tailor.js layoutOf() sends {type:"document", media_type:"application/pdf", data: orig.b64} - the whole file, with everything printed on it. The stored profile really is withheld; the file is not, and the two are different claims. -->
+          <!-- was: ...or just its bullet text if it is a Word file. Your name, contact details and education are not sent on this path. If you have no resume on file... -->
+          <li><strong>Tailored resumes</strong> send the job posting's title, company and the first 6,000 characters of its description, your career goal and your writing voice, and your resume: the whole PDF file if it is a PDF, or just its bullet text if it is a Word file. Your stored profile is not sent on this path, but the resume file is: a PDF goes whole, so whatever is printed on it (your name, your contact details, your education) goes with it, and a Word file is read here on your device and only its bullet text is sent. If you have no resume on file, the fixed template is built instead from your experience, projects, skills, education, career goal and voice; your name and contact details are printed onto it here on your device and never leave it.</li>
+          <!-- The Deep Dive is four separate calls that send four different things, and rolling them
+               into one sentence was how "the files listed above" came to stand for all of them. Read
+               off extension/onboarding/onboarding.js: extract() sends only the resume and CV document
+               blocks plus its extraction prompt, interviewSystem() sends the profile with voice and
+               saved answers destructured out, the voice step sends the samples, the cover letter and
+               up to 20,000 characters of the student's own chat replies, and distill() sends the
+               transcript plus the existing stories and goals. -->
+          <!-- was: <li><strong>The Deep Dive</strong> sends the files listed above and your answers from the interview step.</li> -->
+          <li><strong>The Deep Dive</strong> sends something different at each step. <em>Read my resume</em> sends your resume and CV files and nothing else; on a first run there is no profile yet, because that call is what fills it in. <em>The interview</em> sends your profile (all of it except your writing voice and your saved answers) along with the conversation so far. <em>Analyze my writing</em> sends your writing samples, your cover letter and up to 20,000 characters of your own interview replies. <em>Finish &amp; save stories</em> sends the interview transcript plus the stories and goals you already have.</li>
+        </ul>
+      </li>
+      <li>The Worker checks your sign-in and your monthly allowance.</li>
+      <li>It forwards the request to Google's <strong>paid</strong> Gemini API and passes the reply back to you.</li>
+    </ol>
+    <!-- Worth saying plainly, because the list above reads worse than the behaviour is. The only
+         always-on content script in extension/manifest.json is the dashboard bridge; the agent reads
+         an application page by injecting into the tab it opened for that job, on the application-site
+         domains the manifest lists. -->
+    <p>Auto-Apply only reads a page while it is working on an application you started, in the tab it opened for that job. It does not watch your other tabs, and nothing is sent for a page you merely have open.</p>
+    <ul>
+      <li><strong>We don't store or log</strong> what you send or what the AI replies. The Worker only records that a task ran and how many tokens it used, so we can track cost.</li>
+      <li><strong>No training.</strong> We use Google's paid API. Under Google's terms for paid services, Google does not use your prompts or replies to improve its products. Google may keep them for a limited time to detect abuse, under its own terms.</li>
+      <li>Cloudflare runs the Worker and handles the network connection under its own privacy policy.</li>
+    </ul>
+    <p><strong>Using your own key (advanced).</strong> If you enter your own Anthropic or Google API key in the extension, requests go straight from your device to that company. They don't pass through our server, and that company's terms apply.</p>
+
+    <h2>Sign-in</h2>
+    <ul>
+      <!-- was: <li>You sign in only to use AI features and to save your chosen states. Search never needs it.</li> -->
+      <li>You sign in only to use AI features, to save your chosen states and to save your Deep Dive to your account. Search never needs it.</li>
+      <li>You sign in with any Google or Microsoft account. You type your password on the provider's own page. <strong>We never see or receive your password.</strong></li>
+      <!-- 2026-09-26: the provider's token is now traded once for a session (worker POST /session,
+           schema.sql `sessions`) so a student stays signed in. The session code is
+           "iss_" + 32 random bytes; the Worker stores only its SHA-256, the hashed account ID, the
+           tier, the provider and created / last used / expires dates, with a 365-day sliding expiry
+           and at most 20 per account. The old wording (token kept only for the browser session) is
+           what the dashboard still falls back to when the Worker can't make a session. -->
+      <!-- was: <li>The provider gives back a short-lived token. The Worker checks it on each request and does not save it. It reads the email in the token only to see whether it is a verified school (.edu) address, which gets a larger AI allowance. The email is never stored.</li> -->
+      <li>The provider gives back a short-lived token. The Worker checks it and does not save it. It reads the email in the token only to see whether it is a verified school (.edu) address, which gets a larger AI allowance. The email is never stored on our server.</li>
+      <!-- was: <li>Your browser keeps the token only for the current session. It's gone when you close the browser or when it expires.</li> -->
+      <li><strong>Staying signed in.</strong> The Worker then gives your browser or extension a random sign-in code, and that code is what signs you in from then on, so you stay signed in on that device until you sign out. Your device keeps the code, with your email address so it can show which account is signed in. Our server keeps only a fingerprint of the code (a one-way hash it can't be turned back into), your scrambled sign-in ID, your allowance tier, whether you used Google or Microsoft, and when the sign-in was made, last used and ends.</li>
+      <li>A sign-in ends when you sign out, when you press Delete my data (which ends all of them), or after a year without being used. Each device or browser has its own, and we keep at most 20 per account, dropping the oldest.</li>
+      <li>If our server can't start a sign-in like this, the dashboard falls back to keeping the provider's token for the current browser session only. It's gone when you close the browser or when it expires, about an hour later.</li>
+      <li>From the token, the Worker makes a one-way hash: a scrambled code that can't be turned back into your name or email. We don't store your name or email.</li>
+    </ul>
+
+    <h2>What we store</h2>
+    <!-- "everything" was not true while the paid-plan section further down this page lists four more
+         things kept about a subscriber (plan, Stripe customer and subscription IDs, paid-through
+         date, processed event IDs). Saying which reader the table is complete for costs one clause
+         and stops the two sections contradicting each other. -->
+    <!-- was: <p>This is everything our server keeps about you:</p> -->
+    <p>This table covers your student account. If you have joined a paid plan, add the plan and billing records listed under <a href="#paid">If you join a paid plan</a>. Employer <a href="#employers">interest forms</a> and <a href="#employer-orders">paid-listing orders</a> have separate records described below.</p>
+    <div class="table">
+      <table>
+        <thead><tr><th scope="col">Data</th><th scope="col">Why</th></tr></thead>
+        <tbody>
+          <tr><td>Hashed sign-in ID</td><td>To tie your usage counts together without knowing who you are.</td></tr>
+          <!-- Added 2026-09-26: worker/schema.sql `sessions` and `profiles`. The table is the complete
+               list, so both new tables get a row. -->
+          <tr><td>For each device you are signed in on: a fingerprint of its sign-in code (never the code itself), your hashed sign-in ID, your allowance tier, whether you used Google or Microsoft, and when the sign-in was made, last used and ends</td><td>So you stay signed in on that device. Deleted when you sign out there, after a year without use, or when you press Delete my data. At most 20 per account.</td></tr>
+          <!-- Added 2026-10-14: worker/schema.sql `session_copies` (POST /session/copy). -->
+          <tr><td>If the extension took over your dashboard sign-in: the fingerprints of both sign-ins and your hashed sign-in ID, with the date</td><td>So one sign-in can be passed on only once. Deleted when you press Delete my data, or once both sign-ins have ended.</td></tr>
+          <tr><td>Unless you turn saving off: your Deep Dive profile, encrypted, with when it last changed and its size (what is in it and what is left out: <a href="#saved">see above</a>)</td><td>So your Deep Dive is there on your other devices. Deleted when you turn saving off or press Delete my data.</td></tr>
+          <tr><td>Monthly usage counts per AI task (for example, "3 tailored resumes in September"), with a random ID for each run</td><td>To enforce the monthly allowance.</td></tr>
+          <tr><td>One number per month: roughly what your AI use has cost us, in cents</td><td>So a single account can't use up the budget that pays for everyone's AI. It is removed when the month ends.</td></tr>
+          <tr><td>Short-term call counters (per minute and per day)</td><td>To stop abuse.</td></tr>
+          <tr><td>The states you picked, and when you last changed them</td><td>So the scanner fetches fuller listings where students are looking. The scanner only gets totals per state, never who picked what. Picks stop counting after 90 days without activity.</td></tr>
+          <!-- Added because the table claims to be the whole list and this row was missing from it:
+               worker/src/limits.js deleteUser() inserts a `forget` row (your hashed ID and the month
+               you deleted in) inside the same batch as the deletions, and cleanup() uses it to sweep
+               the counts that had to be kept, then deletes the row itself once the month is past. -->
+          <tr><td>If you press Delete my data: your hashed ID and the month you did it in</td><td>So the counts that have to survive until the month ends are swept automatically once it does. This marker is deleted with them.</td></tr>
+          <!-- Invites (worker/src/referral.js, schema.sql: accounts, invite_codes, referrals, bonus),
+               added 2026-09-24. The table is introduced as the complete list, so each new row is here. -->
+          <!-- 2026-09-25: Delete my data used to remove the first-seen date and so reopened the first
+               week, and the 10-invite limit was a count of rows that deletion blanks, so deleting
+               reset it. referral.js forgetStatements() now keeps the `accounts` row and the new
+               `inviters` row (schema.sql), and these rows say so, next to the invitee row that was
+               already kept for the same reason. For accounts from before invites, schema.sql dates
+               the first-seen row from the account's earliest usage month, states or plan. -->
+          <!-- was: <tr><td>The date our server first saw your account</td><td>Only accounts in their first week can accept an invite.</td></tr> -->
+          <tr><td>The date our server first saw your account (for accounts from before invites started, the earliest month we have usage counts for, or when you first picked states or a plan)</td><td>Only accounts in their first week can accept an invite. <strong>Kept after Delete my data</strong>, so deleting and signing in again can't make an account new again.</td></tr>
+          <tr><td>If you open Invite classmates: a random invite code</td><td>It makes your invite link. The code says nothing about who you are.</td></tr>
+          <!-- was: <tr><td>If you join through an invite: that you did, when, and the inviter's hashed ID</td><td>So an account can accept only one invite, and an inviter is credited for at most 10.</td></tr> -->
+          <tr><td>If you join through an invite: that you did, when, and the inviter's hashed ID</td><td>So an account can accept only one invite. <strong>Kept after Delete my data</strong>, without the inviter's ID, so deleting and signing in again can't accept a second one.</td></tr>
+          <tr><td>If your invites earn you extra runs: how many invites have, in total</td><td>An inviter is credited for at most 10 invites, ever. <strong>Kept after Delete my data</strong> (just your hashed ID and that number), so deleting and signing in again can't start the count over.</td></tr>
+          <tr><td>Extra AI runs from invites: how many you were given and how many you have used</td><td>They are used after your monthly allowance and don't expire.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <!-- There is a second whole-service total now: worker/src/limits.js daySpend()/addDaySpend()
+         keep one per day, and admit() stops AI for the rest of the day when it reaches the day's
+         share of the budget. Like the monthly one it is stored against a sentinel that is not a
+         hashed account, so it says nothing about any individual — but the table above is introduced
+         as the complete list, so leaving it unmentioned made that introduction stale. -->
+    <!-- was: <p>We also keep one total of AI spend for the month. It isn't linked to anyone.</p> -->
+    <!-- Second pass, 2026-09-19: the day total is not service-wide. worker/src/limits.js charges it inside `if (plan === "free")`, and the comment above that line says a paid call neither reads nor writes the row, so it measures the free tier's share of the month. -->
+    <!-- was: ...one for the month, and one for the current day, so a single busy day can't empty the month's budget. These are service-wide figures. -->
+    <!-- was: <p>Separately from the table, we keep running totals of what AI costs the whole service: ... Neither is linked to any account, and neither says anything about who used what.</p>
+         2026-10-04: worker/src/limits.js cleanup() now keeps run_hist (schema.sql) when it deletes a
+         past month's runs: a count of runs per month, task and calls bucket, with no account in it.
+         The table is introduced as the complete list, so the one new service-wide figure is named. -->
+    <p>Separately from the table, we keep running totals of what AI costs the whole service: one for the month across the whole service, and one for the day's free-allowance share, so a single busy day can't empty the month's budget. When a month's per-run counts are deleted, we keep how many runs of each AI task that month took 1, 2, 3 to 4 and so on AI calls, counted across the whole service. None of these is linked to any account, and none says anything about who used what. The same goes for the daily totals of how often each paid listing was shown and opened (see <a href="#paid-listings">Paid listings</a>).</p>
+    <!-- was: <p>We don't store names, emails, passwords, resumes, files, prompts or AI replies. We don't sell or share data, and we don't show ads.</p>
+         The saved Deep Dive (2026-09-26) has the student's name and contact email in it, so the flat
+         "names, emails" no longer holds without naming that one exception. -->
+    <!-- was: <p>Apart from what is inside your saved Deep Dive (which has your name and contact details in it, encrypted), we don't store names, emails, passwords, resumes, files, prompts or AI replies. We don't sell or share data, and we don't show ads.</p>
+         The employer interest form (2026-10-13) keeps a name and a work email in worker/schema.sql
+         `employer_leads`, so it is named as the second exception. -->
+    <!-- was: <p>Apart from ... we don't store names, emails, passwords, resumes, files, prompts or AI replies. We don't sell or share data, and we don't show ads.</p>
+         Paid listings (S8, 2026-10-14) are advertising, so "we don't show ads" stopped being true the day the first one went live. -->
+    <p>Apart from what is inside your saved Deep Dive (which has your name and contact details in it, encrypted), and what an employer sends us through the <a href="#employers">employer interest form</a> or a <a href="#employer-orders">paid-listing order</a>, we don't store names, emails, passwords, resumes, files, prompts or AI replies. We don't sell or share data. The only paid content on InternScout is the labelled paid listing described under <a href="#paid-listings">Paid listings</a>, and it is never chosen from data about you.</p>
+    <!-- The weekly email adds nothing to the table above: the form posts from the browser straight to
+         Buttondown and never touches the Worker. This line is here so "we don't store emails" isn't
+         read as "no one keeps the address you gave for the email". -->
+    <p>If you sign up for the weekly email, Buttondown keeps your address, not our server. See <a href="#digest">If you sign up for the weekly email</a>.</p>
+
+    <!-- Given an id so the "What we store" paragraph above can link here instead of asking the
+         reader to go hunting for the section that completes that table. -->
+    <!-- was: <h2>If you join a paid plan</h2> -->
+    <h2 id="paid">If you join a paid plan</h2>
+    <!-- The plans are switched on as of 2026-09-19, so "only appear when they are switched on" now
+         describes a state nobody is in and reads as hedging. -->
+    <!-- was: <p>The paid plans are optional, and only appear when they are switched on. Search and the free AI allowance never need one.</p> -->
+    <p>The paid plans are optional. Supporter is $4/month and Pro is $8/month; both raise your monthly AI allowance and nothing else. Search and the free AI allowance never need one.</p>
+    <ul>
+      <li><strong>Stripe handles the payment, not us.</strong> Pressing Supporter or Pro sends you to Stripe's own checkout page. Your card number, billing name and billing email go to Stripe and are never sent to, or seen by, our server. Changing or cancelling happens on Stripe's own billing page too.</li>
+      <li>All Stripe learns about you from us is your hashed ID, so a payment can be matched to an account without Stripe being told which student it is.</li>
+      <li>Stripe is the seller of record for the paid plans, so its checkout also asks for your name and billing address to work out sales tax or VAT. That stays with Stripe; we are never sent it.</li>
+      <li>What we keep: your hashed ID, which plan you are on and whether it is active, the Stripe customer and subscription IDs, the date it is paid through, and the IDs of payment events we've already processed (so a repeated message can't charge or credit you twice).</li>
+      <li>Stripe processes payments under <a href="https://stripe.com/privacy" target="_blank" rel="noopener">its own privacy policy</a>.</li>
+      <li>While a subscription is live, <strong>Delete my data</strong> is refused with a message asking you to cancel first, so nothing keeps billing a card for an account that no longer exists here. Cancel on Stripe's billing page, then delete.</li>
+    </ul>
+
+    <!-- Facts from the sign-up form in docs/js/app.js (Digest) and Buttondown's docs:
+         docs.buttondown.com/building-your-subscriber-base (the form posts email, tag and embed),
+         /tags (a repeat sign-up adds tags, never removes them) and /double-opt-in (a confirmation
+         email first; nothing is sent until its link is clicked). Not stated here yet: open and click
+         tracking. Whether Buttondown records opens and clicks depends on the newsletter's settings,
+         which were not checked; if it is on, add a line saying so. -->
+    <h2 id="digest">If you sign up for the weekly email</h2>
+    <!-- was: "...You sign up with the form under the listings on the dashboard." Since 2026-10-06 the same
+         form (backend/internscout/seo_pages.py signup_form) is on each field's page, /internships/new/
+         and /digest/, posting to the same Buttondown list in the same way. -->
+    <p>The weekly email is optional. Search, your profile and everything else on InternScout work without it. You sign up with a form: under the listings on the dashboard, on each field's page and the "New internships this week" page under <a href="/internships/">internscout.org/internships</a>, or on <a href="/digest/">internscout.org/digest</a>. Every one of them works the same way, as described here.</p>
+    <ul>
+      <!-- was: <li><strong>What it contains:</strong> internships InternScout found in the past week, picked for the fields you ticked, with links to the postings. If you ticked none, it covers every field.</li>
+           growth/digest_send.py sends one email to every subscriber, built from the fields with the most new
+           roles that week, so "picked for the fields you ticked" promised a matching the sender doesn't do. -->
+      <li><strong>What it contains:</strong> the internships InternScout found in the past week, grouped by field: the fields with the most new roles that week, each with a few postings and a link to the rest. For now everyone gets the same email. The fields you tick are saved with your subscription so it can be matched to them later.</li>
+      <li><strong>How often:</strong> once a week. Buttondown first sends one confirmation email, and nothing else arrives until you click its link.</li>
+      <li><strong>Buttondown holds your address, not us.</strong> The form sends your email address, and the fields you ticked, straight from your browser to Buttondown, the service that sends the email. They never pass through or get stored on InternScout's servers, which is why the <em>What we store</em> table above has no row for them. Buttondown keeps them under <a href="https://buttondown.com/legal/privacy" target="_blank" rel="noopener">its own privacy policy</a>.</li>
+      <!-- was: <li>The person running InternScout can see the subscriber list in Buttondown's dashboard: your address, the fields you ticked and whether you have confirmed. ...</li>
+           That read as the whole record. Buttondown also keeps the IP address a subscriber signed up from, a
+           rough location from it, and the page the form was on, and shows them on the subscriber's record. -->
+      <li>The person running InternScout can see the subscriber list in Buttondown's dashboard: your address, the fields you ticked, whether you have confirmed, and what Buttondown records when you sign up: the IP address you signed up from, a rough location worked out from it, and the page the form was on. Open and click tracking is switched off for this email. The list is used only to send this email, is never sold or shared, and is not copied anywhere else.</li>
+      <!-- Added 2026-10-06: the everyone-send in .github/workflows/digest.yml passes --public-archive, and the
+           forms link the archive (Buttondown's page, not ours) as "See last Monday's email". -->
+      <li><strong>Past emails are public.</strong> Each week's email is also posted on the newsletter's web archive at Buttondown, which the sign-up forms link as "See last Monday's email", so you can read one before signing up. The email is the same for everyone and has nothing about any subscriber in it. The archive is Buttondown's page, so opening it is a visit to Buttondown under its privacy policy.</li>
+      <li>Signing up again with other fields adds them to the ones you had; it doesn't remove any. To drop a field, write to us, or unsubscribe and sign up again.</li>
+      <li><strong>Unsubscribing:</strong> every email has an unsubscribe link at the bottom, and it stops the emails. To have your address deleted from Buttondown's list as well, write to us at the address under <em>Contact</em> below.</li>
+    </ul>
+
+    <!-- Facts from worker/src/leads.js and worker/schema.sql `employer_leads` (added 2026-10-13): what the
+         row holds, that no IP address is in it, the salted-hash day counter in `rate` (swept by
+         limits.js cleanup() two days on), and dropOldLeads(), which deletes rows older than 365 days. -->
+    <h2 id="employers">If you fill in the employer interest form</h2>
+    <!-- was: <p>The form on <a href="/employers/">internscout.org/employers</a> is for companies that might want featured listings or promoted roles later. Students never see it or need it, and nothing on it is sold or paid for.</p>
+         Changed with paid listings (S8, 2026-10-14): the form now leads to something that is sold. -->
+    <p>The form on <a href="/employers/">internscout.org/employers</a> is for companies that want to ask about a <a href="#paid-listings">paid listing</a>, or to have their job board added or their details corrected, which is free. Students never see it or need it. Sending it costs nothing and commits no one to anything.</p>
+    <ul>
+      <li><strong>What we keep:</strong> what you type into the form (your name, work email and company, and, if you fill them in, your role or title, who you're hiring for, the boxes you tick and your message), and when you sent it. It is stored on InternScout's server (a Cloudflare database). Your IP address is not kept with it.</li>
+      <li><strong>Why:</strong> only so the person running InternScout can read it and contact you about InternScout for employers. It isn't added to the weekly email, sold, shared, or used for anything else.</li>
+      <li><strong>Stopping spam:</strong> to stop one place from flooding the form, our server counts how many times it was sent from each network address that day. The count is kept under a scrambled form of the address (a salted hash), never the address itself, and is deleted within two days.</li>
+      <li><strong>How long:</strong> up to a year from when you sent it, then it is deleted automatically.</li>
+      <li><strong>Deleting it sooner:</strong> write to us at the address under <em>Contact</em> below, from the email you used or naming it, and we'll delete it.</li>
+    </ul>
+
+    <!-- Added 2026-10-19 with self-serve orders (worker/ORDERS.md, worker/src/orders.js). -->
+    <h2 id="employer-orders">If you buy a paid listing on our site</h2>
+    <p>Students never see or need this. When an employer orders a <a href="#paid-listings">paid listing</a> on <a href="/employers/buy/">internscout.org/employers/buy</a>:</p>
+    <ul>
+      <li><strong>What we keep:</strong> your name, work email and company, the roles and dates you chose, whether you said you are a nonprofit or public body, any pilot code, which version of our terms you accepted and when, and the Stripe references for your payment and any refund. Stripe handles the card and the invoice; card details never reach us. Our server keeps the link we email you only in a scrambled form (a hash).</li>
+      <!-- 2026-10-23: was: the service-email examples omitted the completed campaign report. Revert: remove the report clarification. -->
+      <li><strong>Why:</strong> to confirm the email is yours, to review and run the paid listing, to send you emails about it (confirmation, approval or refusal, a completed campaign's aggregate report, and the choice of credit or refund if the role closes early), and to keep a record of the sale. A campaign report may link to the order page if you choose to promote another open role; it never renews or charges you automatically.</li>
+      <li><strong>Report emails:</strong> an unsent campaign report's address and message are removed after 30 days. Once sent, the queued copy is erased; a small record of when it was sent stays with the order. Counts are rounded totals, not information about individual students.</li>
+      <li><strong>How long:</strong> an order whose email is never confirmed is deleted after 7 days. A confirmed order is kept for 7 years as the record of a sale, then deleted.</li>
+      <li><strong>Who else sees it:</strong> Stripe, which takes the payment, and Cloudflare, which runs our server and sends our emails. Stripe also handles your payment details under its own privacy policy (<a href="https://stripe.com/privacy">stripe.com/privacy</a>). It isn't added to the weekly email, sold or shared with anyone else.</li>
+      <li><strong>Deleting it sooner:</strong> we have to keep the record of a sale, but you can ask us to remove your name and email from it once the paid listing has ended; we keep the company, amounts and dates.</li>
+      <li><strong>Stopping spam:</strong> orders are counted per network address per day the same way as the interest form above.</li>
+    </ul>
+
+    <!-- Facts from backend/internscout/placements.py (resolve, MAX_PER_PAGE) and seo_pages.py
+         (placement_box, add_paid_boxes), and docs/js/count.js, which leaves clicks inside li.paid out of
+         posting_click (2026-10-14). The paid box's "Why am I seeing this?" link points here. -->
+    <h2 id="paid-listings">Paid listings</h2>
+    <!-- was: <p>Some internship pages can show one box headed "Paid listing", ...</p>
+         The dashboard shows the box too since the launch PR (S8, 2026-10-14; docs/js/placements.js pick, PaidBox). -->
+    <p>Some internship pages, and the dashboard after you search or pick a field, can show one box headed "Paid listing", with "Ad" before the company name. It means the employer has a business arrangement with InternScout to show that role in that spot: it paid, or it is trying paid listings in a free pilot.</p>
+    <ul>
+      <li><strong>Only roles already listed:</strong> the box always points at a role InternScout already found on the employer's own job site, and the same role is also in the page's normal list. Paying can't add a listing or change one.</li>
+      <li><strong>Nothing else changes:</strong> paying never changes match scores, the order of the list, filters, counts or what Auto-Apply does.</li>
+      <li><strong>At most one per page,</strong> and it goes away on its end date. A box is dropped if the role closes, its deadline passes, its link changes, or it says it is unpaid (unless the employer is a nonprofit or government body).</li>
+      <!-- was: ... like any other link on the page. We don't count who sees the box or opens it.</li>
+           S9 (2026-10-14) counts how many times each box is shown and opened (docs/js/count.js,
+           worker/src/visits.js countPlacementHit), never who, so the sentence now says both. -->
+      <li><strong>Nothing about you goes to the employer:</strong> "Open posting" goes straight to the employer's own posting, like any other link on the page. We count how many times the box is shown and opened, never who saw or opened it (see below).</li>
+      <!-- Added with the launch PR (S8 and S9, 2026-10-14; B1-data-privacy.md section 7.1.f). Facts from
+           docs/js/placements.js (pick, PaidBox), docs/js/count.js and worker/src/placements.js
+           (placementReport, rollupPlacementCounts) and visits.js. -->
+      <li><strong>When it shows on the dashboard:</strong> only after you search for something or pick a field, and only for a role that is already in your results (when you search, among the 50 closest matches). If more than one could show, each has the same chance; the price never decides.</li>
+      <li><strong>It isn't chosen from your data:</strong> which paid listing you see depends only on what you searched for or picked and the page you're on. It is never chosen using your majors, class year, saved or applied listings, Deep Dive, sign-in, plan, or anything in the extension. The extension never shows paid listings.</li>
+      <li><strong>Your saved profile can only hide one.</strong> If you have saved a profile on the dashboard, the dashboard uses it, inside your browser, to hide a paid listing that doesn't fit you (your class year, citizenship, eligibility or season). It is never used to pick one, and it never leaves your browser.</li>
+      <li><strong>You can hide them:</strong> press "Hide paid listings" in the dashboard's box, or turn off "Show paid listings" under More filters. Your browser keeps that one setting, and it is never sent to us.</li>
+      <li><strong>What we count:</strong> how many times a day each paid listing was shown (at least half of its box on your screen, once per page load) and opened (its "Open posting" link pressed, once per page load), by kind of page: the dashboard or our internship pages. Your browser sends only the paid listing's id and the address of the page. These are totals that say nothing about who. Opening a page with <code>?nocount=1</code> turns this off too.</li>
+      <li><strong>What the employer gets:</strong> those totals, for a whole calendar month once it has ended, rounded down to the nearest 10. Any number under 10 is shown as "fewer than 10", and the totals are split by kind of page only when every number in the split is 10 or more. Employers never get anything about any student. We don't see applications, so we can't tell them who applied or how many did.</li>
+      <li><strong>What we keep about a paid listing:</strong> which listing it is, the employer's name, its dates, whether it is on, and the totals above. Nothing about any student. Daily totals are kept for 400 days, then combined into one total per month.</li>
+      <li>No ad network, tracking pixel or cookie is involved. A paid listing is an ad, not a recommendation: check it the same way as any other posting.</li>
+    </ul>
+
+    <h2 id="delete">Delete your data</h2>
+    <ol>
+      <!-- was: <li><strong>On our server:</strong> sign in, then press <strong>Delete my data</strong> in the extension or on the dashboard. Your chosen states, your plan record, your invite code and extra runs, and everything from earlier months are removed right away. If you joined through an invite, the record that you did stays without the inviter's ID, so an account can't accept a second one. This month's counts (your hashed ID and a few numbers, nothing else) stay until the month ends, because removing them on request would let anyone reset their limits by deleting and signing in again. They are then deleted automatically, within a day of the month ending.</li>
+           The first-seen date and the inviter's lifetime count are now kept too (referral.js
+           forgetStatements(), 2026-09-25), so this list names all three kept invite records. -->
+      <!-- was: <li><strong>On our server:</strong> sign in, then press <strong>Delete my data</strong> in the extension or on the dashboard. Your chosen states, your plan record, your invite code and extra runs, and everything from earlier months are removed right away. Three invite records stay ...
+           DELETE /me also removes the saved profile and every session (2026-09-26). -->
+      <li><strong>On our server:</strong> sign in, then press <strong>Delete my data</strong> in the extension or on the dashboard. Your chosen states, your saved Deep Dive, every sign-in (so every device is signed out), your plan record, your invite code and extra runs, and everything from earlier months are removed right away. Three invite records stay, each just your hashed ID with a date or a number, because without them deleting and signing in again would get around the invite rules: the date we first saw your account (so it can't count as new again); if you joined through an invite, the record that you did, without the inviter's ID (so you can't accept a second one); and if your invites earned you extra runs, how many did (so the limit of 10 can't start over). This month's counts (your hashed ID and a few numbers, nothing else) stay until the month ends, because removing them on request would let anyone reset their limits by deleting and signing in again. They are then deleted automatically, within a day of the month ending.</li>
+      <li><strong>In your browser:</strong> clear site data for <code>internscout.org</code> (and for <code>bpmcginley.github.io</code>, the address InternScout used before September 2026, if you visited it then). In Chrome, click the icon left of the address bar, then <em>Site settings</em>, then <em>Delete data</em>. This removes your dashboard profile and saved statuses.</li>
+      <!-- was: <li><strong>In the extension:</strong> remove it at <code>chrome://extensions</code>. Chrome deletes its storage, including your files and saved site passwords.</li> -->
+      <li><strong>In the extension:</strong> remove it at <code>chrome://extensions</code>. Chrome deletes its storage, including your files and saved site passwords. That doesn't reach the copy of your Deep Dive saved to your account: turn saving off or press Delete my data first.</li>
+      <!-- Delete my data only reaches the Worker, and the weekly email's list lives at Buttondown. -->
+      <li><strong>The employer interest form:</strong> write to us at the address below and we'll delete what you sent. <strong>Delete my data</strong> doesn't cover it, since it isn't tied to a sign-in. It is deleted automatically a year after you sent it.</li>
+      <li><strong>The weekly email:</strong> use the unsubscribe link in any of the emails. <strong>Delete my data</strong> can't reach it, because the address is kept by Buttondown, not by our server. To have it deleted from Buttondown's list as well, write to us at the address below.</li>
+    </ol>
+    <!-- was: <p>We can only find your server rows through your sign-in, because we don't know who you are. If you can no longer sign in, your state picks stop counting after 90 days of no use.</p>
+         A saved profile has no automatic expiry (worker/schema.sql `profiles`), so this says so. -->
+    <p>We can only find your server rows through your sign-in, because we don't know who you are. If you can no longer sign in, your state picks stop counting after 90 days of no use and your sign-ins end after a year. A saved Deep Dive can only be reached through a sign-in to the same account, so delete it (or turn saving off) while you still can.</p>
+
+    <h2>Chrome Web Store: limited use</h2>
+    <p>The extension's use of data follows the <a href="https://developer.chrome.com/docs/webstore/program-policies/user-data-faq">Chrome Web Store User Data Policy</a>, including the Limited Use requirements. In plain words:</p>
+    <ul>
+      <li>Data is used only for the extension's single purpose: helping you fill out internship applications, plus the AI help that goes with it.</li>
+      <!-- was: <li>Data is only sent where that purpose needs it (to Google's Gemini API through our Worker), or where the law requires.</li> -->
+      <li>Data is only sent where that purpose needs it (to Google's Gemini API through our Worker, and your Deep Dive profile to your own InternScout account unless you turn that off), or where the law requires.</li>
+      <li>Data is never sold.</li>
+      <!-- was: <li>Data is never used for ads, including personalized ads.</li> -->
+      <li>Data is never used for ads, including personalized ads. The extension never shows paid listings, and nothing in it is used to choose the ones the website shows.</li>
+      <li>Data is never used to decide credit, lending or anything like it.</li>
+      <li>No person reads your data, unless you give clear permission (for example, you paste it into a bug report), it's needed for security, or the law requires it.</li>
+    </ul>
+
+    <!-- The paid plans this page describes were sold with no word on who may agree to pay for them,
+         while this section set the floor at 13. The terms now say a parent or guardian agrees to a
+         paid plan for anyone under 18; both pages have to say the same thing. -->
+    <h2>Children</h2>
+    <p>InternScout is built for college students. It isn't meant for anyone under 13. If you're under
+      18, a parent or guardian has to agree to the <a href="terms.html">terms</a> with you before you
+      start a paid plan. Paid listings are never aimed at anyone, of any age: they depend only on what is
+      searched for or picked and the page being viewed. If you believe a child under 13 has given us data,
+      write to us at the address below and we'll delete it.</p>
+
+    <h2>Changes</h2>
+    <p>If this policy changes, we'll update the date at the top. Big changes will also get a notice on the dashboard.</p>
+
+    <h2>Contact</h2>
+    <!-- A named operator and a direct address: a privacy policy for a paid service needs one, and a
+         form alone leaves the person behind it unnamed. -->
+    <p>InternScout is run by Bruce McGinley, an independent student project in Massachusetts, USA.
+      Email <a href="mailto:brucepmcginley@gmail.com">brucepmcginley@gmail.com</a>.</p>
+    <!-- A GitHub issue was the only route offered, which needs a GitHub account and publishes whatever
+         you write. That is the wrong default for a privacy request, and the Chrome Web Store wants a
+         support contact that any user can actually reach. The feedback form (the same one the
+         dashboard uses, docs/index.html window.CONFIG.formUrl) needs no account and is not public. -->
+    <!-- was: <p>Questions or requests: <a href="https://github.com/bpmcginley/InternshipFinder/issues">open a GitHub issue</a>. Issues are public, so please don't put personal details in them.</p> -->
+    <p>Questions, privacy requests or anything else: <a href="https://docs.google.com/forms/d/e/1FAIpQLSevENYXxAtJg-suzwhBTwi8a2bosYHV27NcveE7eCYXo5Jdjw/viewform" target="_blank" rel="noopener">use the InternScout feedback form</a>. It needs no account and only the person running InternScout reads it. Expect a reply within a few days; this is a one-student project, not a support desk.</p>
+    <p>For bugs you don't mind discussing in the open, you can also <a href="https://github.com/bpmcginley/InternshipFinder/issues">open a GitHub issue</a>. Issues are public, so please don't put personal details in them.</p>
+  </main>
+
+  <footer>
+    <a href="index.html">Back to InternScout</a> · <a href="terms.html">Terms</a> · Not affiliated with UMass Amherst.
+  </footer>
+</div>
+<!-- Cloudflare Web Analytics: page views only. No cookies, no local storage, no fingerprinting,
+     and nothing that identifies a visitor; see privacy.html. The token is public by design. -->
+<script defer src="/js/count.js"></script>
+<script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "38ed84192bd7457894a9a318562674ce"}'></script>
+</body>
+</html>

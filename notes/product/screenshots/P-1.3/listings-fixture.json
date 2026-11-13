@@ -1,0 +1,238 @@
+[
+  {
+    "stage": [
+      "internship"
+    ],
+    "years": [],
+    "field_tags": [
+      "swe"
+    ],
+    "term": "Summer 2027",
+    "salary": "$25 - $30/hour",
+    "status": "open",
+    "is_new": false,
+    "first_seen": "2026-11-10T12:00:00Z",
+    "score_parts": {
+      "source": 2.5
+    },
+    "insights": {},
+    "id": "p13-pay",
+    "company_name": "Fixture Robotics",
+    "title": "Software Engineering Intern",
+    "posted_at": "2026-11-08T15:00:00Z",
+    "state": "RI",
+    "regions": [
+      {
+        "loc": "North Kingstown, Rhode Island, USA",
+        "kind": "us",
+        "state": "RI"
+      },
+      {
+        "loc": "Boston, Massachusetts, USA",
+        "kind": "us",
+        "state": "MA"
+      }
+    ],
+    "ats": "ashby",
+    "apply_url": "https://jobs.example.com/p13-pay"
+  },
+  {
+    "stage": [
+      "internship"
+    ],
+    "years": [],
+    "field_tags": [
+      "swe"
+    ],
+    "term": "Summer 2027",
+    "salary": null,
+    "status": "open",
+    "is_new": false,
+    "first_seen": "2026-11-10T12:00:00Z",
+    "score_parts": {
+      "source": 2.5
+    },
+    "insights": {
+      "pay": "stipend"
+    },
+    "id": "p13-stipend",
+    "company_name": "Fixture Research",
+    "title": "Research Intern",
+    "posted_at": "2026-11-09",
+    "state": "MA",
+    "regions": [
+      {
+        "loc": "Boston, MA, USA",
+        "kind": "us",
+        "state": "MA"
+      }
+    ],
+    "ats": "ashby",
+    "apply_url": "https://jobs.example.com/p13-stipend"
+  },
+  {
+    "stage": [
+      "internship"
+    ],
+    "years": [],
+    "field_tags": [
+      "swe"
+    ],
+    "term": "Summer 2027",
+    "salary": null,
+    "status": "open",
+    "is_new": false,
+    "first_seen": "2026-11-10T12:00:00Z",
+    "score_parts": {
+      "source": 2.5
+    },
+    "insights": {
+      "pay": "unpaid"
+    },
+    "id": "p13-canada",
+    "company_name": "Élan Fixture Labs",
+    "title": "Design Intern",
+    "posted_at": "2026-11-10",
+    "state": "QC",
+    "regions": [
+      {
+        "loc": "Montréal, Québec, Canada",
+        "kind": "canada",
+        "state": "QC"
+      }
+    ],
+    "ats": "lever",
+    "apply_url": "https://jobs.example.com/p13-canada"
+  },
+  {
+    "stage": [
+      "internship"
+    ],
+    "years": [],
+    "field_tags": [
+      "swe"
+    ],
+    "term": "Summer 2027",
+    "salary": null,
+    "status": "open",
+    "is_new": false,
+    "first_seen": "2026-11-10T12:00:00Z",
+    "score_parts": {
+      "source": 2.5
+    },
+    "insights": {},
+    "id": "p13-unknown",
+    "company_name": "Fixture Design",
+    "title": "Product Design Intern",
+    "posted_at": null,
+    "state": "Remote",
+    "regions": [
+      {
+        "loc": "Remote",
+        "kind": "remote",
+        "state": "Remote"
+      }
+    ],
+    "ats": "other",
+    "apply_url": "https://jobs.example.com/p13-unknown",
+    "is_remote": true
+  },
+  {
+    "stage": [
+      "internship"
+    ],
+    "years": [],
+    "field_tags": [
+      "swe"
+    ],
+    "term": "Summer 2027",
+    "salary": null,
+    "status": "open",
+    "is_new": false,
+    "first_seen": "2026-11-10T12:00:00Z",
+    "score_parts": {
+      "source": 2.5
+    },
+    "insights": {},
+    "id": "p13-future",
+    "company_name": "Fixture Tomorrow",
+    "title": "Data Intern",
+    "posted_at": "2026-11-12",
+    "state": "NY",
+    "regions": [
+      {
+        "loc": "New York, New York, United States",
+        "kind": "us",
+        "state": "NY"
+      }
+    ],
+    "ats": "ashby",
+    "apply_url": "https://jobs.example.com/p13-future"
+  },
+  {
+    "stage": [
+      "internship"
+    ],
+    "years": [],
+    "field_tags": [
+      "swe"
+    ],
+    "term": "Summer 2027",
+    "salary": null,
+    "status": "open",
+    "is_new": false,
+    "first_seen": "2026-11-10T12:00:00Z",
+    "score_parts": {
+      "source": 2.5
+    },
+    "insights": {},
+    "id": "p13-remote",
+    "company_name": "Fixture Remote",
+    "title": "Engineering Intern",
+    "posted_at": "2026-11-07",
+    "state": "TX",
+    "regions": [
+      {
+        "loc": "Remote, Texas, USA",
+        "kind": "us",
+        "state": "TX",
+        "remote": true
+      }
+    ],
+    "ats": "ashby",
+    "apply_url": "https://jobs.example.com/p13-remote",
+    "is_remote": true
+  },
+  {
+    "stage": [
+      "internship"
+    ],
+    "years": [],
+    "field_tags": [
+      "swe"
+    ],
+    "term": "Summer 2027",
+    "salary": "$0",
+    "status": "open",
+    "is_new": false,
+    "first_seen": "2026-11-10T12:00:00Z",
+    "score_parts": {
+      "source": 2.5
+    },
+    "insights": {},
+    "id": "p13-zero",
+    "company_name": "Fixture Arts",
+    "title": "Creative Intern",
+    "posted_at": "2026-11-06",
+    "state": "MA",
+    "regions": [
+      {
+        "loc": "Worcester, MA",
+        "kind": "us",
+        "state": "MA"
+      }
+    ],
+    "ats": "Other",
+    "apply_url": "https://jobs.example.com/p13-zero"
+  }
+]

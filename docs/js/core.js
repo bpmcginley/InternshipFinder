@@ -1,0 +1,1279 @@
+// InternScout dashboard logic with no UI: profile, data loading, scoring, sign-in, extension bridge.
+// Plain browser JS (no build step). Exposes window.IS; reads window.CONFIG from index.html.
+(function () {
+  "use strict";
+  const C = window.CONFIG || {};
+  const DAY = 864e5;
+
+  // ---------- vocabularies ----------
+  const US_STATES = {
+    AL: "Alabama", AK: "Alaska", AZ: "Arizona", AR: "Arkansas", CA: "California", CO: "Colorado", CT: "Connecticut",
+    DE: "Delaware", DC: "District of Columbia", FL: "Florida", GA: "Georgia", HI: "Hawaii", ID: "Idaho", IL: "Illinois",
+    IN: "Indiana", IA: "Iowa", KS: "Kansas", KY: "Kentucky", LA: "Louisiana", ME: "Maine", MD: "Maryland",
+    MA: "Massachusetts", MI: "Michigan", MN: "Minnesota", MS: "Mississippi", MO: "Missouri", MT: "Montana",
+    NE: "Nebraska", NV: "Nevada", NH: "New Hampshire", NJ: "New Jersey", NM: "New Mexico", NY: "New York",
+    NC: "North Carolina", ND: "North Dakota", OH: "Ohio", OK: "Oklahoma", OR: "Oregon", PA: "Pennsylvania",
+    RI: "Rhode Island", SC: "South Carolina", SD: "South Dakota", TN: "Tennessee", TX: "Texas", UT: "Utah",
+    VT: "Vermont", VA: "Virginia", WA: "Washington", WV: "West Virginia", WI: "Wisconsin", WY: "Wyoming",
+    PR: "Puerto Rico",
+  };
+  // Canada since 2026-09-30: listings are filed by province, and "Canada" holds the ones that name no
+  // province (remote ones too). None of these codes is also a US state's.
+  const CA_PROVINCES = {
+    ON: "Ontario", QC: "Quebec", BC: "British Columbia", AB: "Alberta", MB: "Manitoba", SK: "Saskatchewan",
+    NS: "Nova Scotia", NB: "New Brunswick", NL: "Newfoundland and Labrador", PE: "Prince Edward Island",
+    NT: "Northwest Territories", NU: "Nunavut", YT: "Yukon",
+  };
+  const CANADA_KEYS = [...Object.keys(CA_PROVINCES), "Canada"];
+  const isCanadaKey = k => k === "Canada" || !!CA_PROVINCES[k];
+  const BASELINE = (C.baselineStates && C.baselineStates.length) ? C.baselineStates : ["MA", "CT", "RI", "NH", "VT", "ME", "NY", "NJ"];
+  const REGION_SHORTCUTS = [
+    ["Northeast", ["MA", "CT", "RI", "NH", "VT", "ME", "NY", "NJ", "PA"]],
+    ["New England", ["MA", "CT", "RI", "NH", "VT", "ME"]],
+    ["Mid-Atlantic", ["NY", "NJ", "PA", "DE", "MD", "DC", "VA"]],
+    ["Southeast", ["FL", "GA", "NC", "SC", "TN", "AL", "MS", "KY", "WV", "LA", "AR"]],
+    ["Midwest", ["IL", "OH", "MI", "IN", "WI", "MN", "IA", "MO", "KS", "NE", "ND", "SD"]],
+    ["Southwest", ["TX", "AZ", "NM", "NV", "OK"]],
+    ["West Coast", ["CA", "OR", "WA", "AK", "HI"]],
+    ["Mountain West", ["CO", "UT", "ID", "MT", "WY", "NV"]],
+    ["Canada", CANADA_KEYS],
+    ["Ontario + Quebec", ["ON", "QC"]],
+  ];
+  const YEARS = [["first_year", "First-year"], ["sophomore", "Sophomore"], ["junior", "Junior"], ["senior", "Senior"], ["masters", "Master's"], ["phd", "PhD"]];
+  const YEAR_LABEL = Object.fromEntries(YEARS);
+  const YEAR_PLURAL = { first_year: "first-years", sophomore: "sophomores", junior: "juniors", senior: "seniors", masters: "master's students", phd: "PhD students" };
+  const STAGES = [["internship", "Internship"], ["co_op", "Co-op"], ["research", "Research (REU, RA)"], ["fellowship", "Fellowship"],
+    ["early_insight", "Early insight / discovery program"], ["part_time", "Part-time or semester role"], ["apprenticeship", "Apprenticeship"]];
+  const STAGE_LABEL = Object.fromEntries(STAGES.map(([k, v]) => [k, v.replace(/ \(.*\)$/, "").replace(/ \/ .*$/, "")]));
+  const STAGE_DEFAULTS = {
+    first_year: ["early_insight", "research", "internship"],
+    sophomore: ["early_insight", "research", "internship"],
+    junior: ["internship", "co_op", "research"],
+    senior: ["internship", "co_op", "fellowship", "research"],
+    masters: ["internship", "co_op", "fellowship", "research"],
+    phd: ["research", "internship", "fellowship"],
+  };
+  // The terms still worth applying for, worked out from today's date so the list never goes stale
+  // (it was a fixed list that ended at Summer 2027, while the data already had Winter and Fall 2027).
+  // Each season stays on the list until about a month after it starts: [season, last month shown, 0-11].
+  const SEASONS = [["Winter", 0], ["Spring", 1], ["Summer", 5], ["Fall", 9]];
+  function upcomingTerms(now) {
+    const out = [], y0 = now.getFullYear(), m0 = now.getMonth();
+    for (let y = y0; out.length < 5; y++) for (const [season, last] of SEASONS) if ((y > y0 || last >= m0) && out.length < 5) out.push(`${season} ${y}`);
+    return out;
+  }
+  const TERMS = [...upcomingTerms(new Date()), "Year-round"];
+  const DEFAULT_TERM = TERMS.find(t => t.startsWith("Summer"));
+  const WORK_AUTH = [
+    ["citizen", "U.S. citizen"],
+    ["permanent", "U.S. permanent resident (green card)"],
+    ["visa", "Student visa (e.g. F-1), will need sponsorship"],
+    ["canada", "Can work in Canada (citizen, permanent resident or permit)"],
+    ["other", "Other / prefer not to say"],
+  ];
+  const FIELD_NAMES = { swe: "Software", ml: "ML / AI", pm: "Product / program mgmt", hr: "HR", ui: "UI", ux: "UX", co_op: "Co-op" };
+  const fieldLabel = t => FIELD_NAMES[t] || (t.length <= 3 ? t.toUpperCase() : (t[0].toUpperCase() + t.slice(1)).replace(/_/g, " "));
+  // was: remote, US, then US_STATES only
+  const keyLabel = k => k === "remote" ? "US remote" : k === "US" ? "US (no state listed)" : k === "Canada" ? "Canada (no province listed)"
+    : US_STATES[k] ? `${US_STATES[k]} (${k})` : CA_PROVINCES[k] ? `${CA_PROVINCES[k]} (${k})` : k;
+  const termText = t => t ? String(t).replace(/\s*\bNone\b/g, "").trim() || null : null;
+
+  // ---------- storage ----------
+  const ls = {
+    get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { } },
+    del(k) { try { localStorage.removeItem(k); } catch (e) { } },
+  };
+  const ss = {
+    get(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } },
+    set(k, v) { try { sessionStorage.setItem(k, v); } catch (e) { } },
+    del(k) { try { sessionStorage.removeItem(k); } catch (e) { } },
+  };
+
+  const PROFILE_KEY = "internscout.profile.v1";
+  const emptyProfile = () => ({
+    v: 1, majors: [], minors: [], fields: [], class_year: "", grad_term: "",
+    stages: [], terms: [DEFAULT_TERM], paid_only: false, states: [], remote: true, work_auth: "",
+  });
+  const loadProfile = () => { const p = ls.get(PROFILE_KEY, null); return p && typeof p === "object" ? { ...emptyProfile(), ...p } : null; };
+  // Set by "Delete my data" and cleared by the next save. Without it the next page load asked the
+  // extension for its copy of the profile and the deleted profile was back.
+  const DELETED_KEY = "internscout.profile.deleted";
+  const saveProfile = p => { const out = { ...p, v: 1, updated: new Date().toISOString() }; ls.set(PROFILE_KEY, out); ls.del(DELETED_KEY); return out; };
+  const profileDeleted = () => !!ls.get(DELETED_KEY, false);
+
+  // ---------- locations ----------
+  const REMOTE_RE = /\b(remote|anywhere|work from home|virtual)\b/i;
+  // One entry per location: {loc, kind, state}. Current exports carry x.regions; older data is guessed.
+  function regs(x) {
+    if (x._regs) return x._regs;
+    let out;
+    if (x.regions && x.regions.length) out = x.regions;
+    else {
+      const locs = (x.region_locations && x.region_locations.length ? x.region_locations : (x.location_raw || "").split(";")).map(s => s.trim()).filter(Boolean);
+      out = locs.map(loc => {
+        const m = /,\s*([A-Z]{2})\b/.exec(loc), s = m && US_STATES[m[1]] ? m[1] : null;
+        if (s) return { loc, kind: "us", state: s };
+        if (REMOTE_RE.test(loc)) return { loc, kind: "remote", state: "Remote" };
+        return null;
+      }).filter(Boolean);
+      if (!out.length && x.state) out = [{ loc: locs[0] || x.state, kind: x.state === "Remote" ? "remote" : "us", state: x.state }];
+    }
+    Object.defineProperty(x, "_regs", { value: out, enumerable: false });
+    return out;
+  }
+  // The data files a listing belongs in, same rule as backend export_static.shard_keys.
+  function shardKeys(x) {
+    if (x._keys) return x._keys;
+    const ks = new Set();
+    for (const g of regs(x)) {
+      if (g.state && g.state !== "Remote") ks.add(g.state);
+      else ks.add(g.kind === "remote" ? "remote" : g.kind === "canada" ? "Canada" : "US");
+    }
+    if (!ks.size && x.state) ks.add(x.state === "Remote" ? "remote" : x.state);
+    Object.defineProperty(x, "_keys", { value: ks, enumerable: false });
+    return ks;
+  }
+  const profileKeys = p => {
+    if (!p) return [...BASELINE, "remote"];
+    const ks = (p.states && p.states.length ? p.states : BASELINE).slice();
+    if (p.remote) ks.push("remote", "US");
+    return ks;
+  };
+  // What the list covers (2026-10-14). was: the State filter's picks, else profileKeys(p), so with no
+  // profile (or a profile with no states) the dashboard held only the eight baseline states and remote,
+  // 3,086 of 14,799 open roles, under a hero offering to "Search 14,799 internships". No state picked
+  // now means every state; ALL_KEY is the State picker's "Everywhere". { all, keys, noRemote }: keys
+  // are the files to show when the scope is not everywhere.
+  const ALL_KEY = "all";
+  function viewScope(p, picked) {
+    if (picked && picked.includes(ALL_KEY)) return { all: true, keys: [], noRemote: false };
+    if (picked && picked.length) return { all: false, keys: picked.slice(), noRemote: false };
+    if (p && p.states && p.states.length) return { all: false, keys: profileKeys(p), noRemote: false };
+    // A profile with no states that turned "U.S. remote" off still leaves the remote files out.
+    return { all: true, keys: [], noRemote: !!(p && !p.remote) };
+  }
+  // With every state in scope, these files load first, so the first rows paint as fast as they did
+  // when they were all the page loaded; the rest follow once a search or filter needs them.
+  const FIRST_KEYS = [...BASELINE, "remote"];
+
+  // ---------- the dashboard's filters in its address (U10, 2026-10-14) ----------
+  // The filters are mirrored in the URL, so a copied link opens on the same list, and a page the browser
+  // reloads on Back (when it can't keep it in its back-forward cache) comes back as it was left. The
+  // names are the ones the landing pages already link with (field, state, company, new, stage, year,
+  // paid), plus q, sort, sector, where, status, progress, eligible and citizen. Only what differs from the
+  // student's own defaults is written, so the plain address stays plain and opens the same list as before.
+  // Every value read is checked against what the dashboard can show; anything else is ignored.
+  const FILTER_PARAMS = ["q", "field", "state", "company", "new", "stage", "year", "paid", "sector", "where", "status", "progress", "eligible", "citizen", "sort"];
+  const SORTS = ["score", "new", "company", "comp"];
+  const PROGRESS = ["none", "interested", "applied", "interviewing", "rejected", "offer", "auto"];
+  function filtersFromUrl(search) {
+    // was (in app.js fromLink): field, state, company, new, stage, year and paid=1 only.
+    const q = new URLSearchParams(search || ""), list = (k, ok, max = 6) => (q.get(k) || "").split(",").filter(v => ok.test(v)).slice(0, max);
+    // ?company= comes from an employer's page (every spelling its listings use) and matches names exactly;
+    // ?state=all is the State picker's "Everywhere", from the pages that cover every state.
+    const f = { fields: list("field", /^[a-z_]{2,32}$/), states: list("state", /^(?:[A-Z]{2}|remote|Canada|all)$/, 80),
+      company: q.getAll("company").filter(c => c && c.length <= 120).slice(0, 8) };
+    if (q.get("new") === "1") f.new_only = true;
+    const stage = q.get("stage"), year = q.get("year"), paid = q.get("paid"), text = q.get("q"), sort = q.get("sort"), sector = q.get("sector"),
+      where = q.get("where"), status = q.get("status"), progress = q.get("progress"), citizen = q.get("citizen");
+    if (stage && STAGES.some(([k]) => k === stage)) f.stage = stage;
+    if (year && YEARS.some(([k]) => k === year)) f.year = year;
+    if (paid === "1") f.paid = "paid"; else if (paid === "no_unpaid") f.paid = "no_unpaid"; else if (paid === "any") f.paid = "";
+    if (text && text.trim()) f.q = text.slice(0, 200);
+    if (SORTS.includes(sort)) f.sort = sort;
+    if (sector && /^[a-z_]{2,40}$/.test(sector)) f.sector = sector;
+    if (where === "onsite" || where === "remote") f.where = where;
+    if (status === "closed") f.status = "closed"; else if (status === "any") f.status = "";
+    if (PROGRESS.includes(progress)) f.app_state = progress;
+    if (q.get("eligible") === "1") f.eligible = true;
+    if (citizen === "hide") f.hide_citizen = true; else if (citizen === "show") f.hide_citizen = false;
+    return f;
+  }
+  // [name, value] pairs for the filters in `f` that differ from `d` (the defaults: no search, nothing
+  // picked, open postings, and the sort, pay and citizen settings the student's profile implies).
+  function filterParams(f, d) {
+    const out = [], text = String(f.q || "").trim();
+    if (text) out.push(["q", text]);
+    if (f.fields && f.fields.length) out.push(["field", f.fields.join(",")]);
+    if (f.states && f.states.length) out.push(["state", f.states.join(",")]);
+    (f.company || []).forEach(c => out.push(["company", c]));
+    if (f.new_only) out.push(["new", "1"]);
+    if (f.stage) out.push(["stage", f.stage]);
+    if (f.year) out.push(["year", f.year]);
+    if ((f.paid || "") !== (d.paid || "")) out.push(["paid", f.paid === "paid" ? "1" : f.paid || "any"]);
+    if (f.sector) out.push(["sector", f.sector]);
+    if (f.where) out.push(["where", f.where]);
+    if (f.status !== "open") out.push(["status", f.status || "any"]);
+    if (f.app_state) out.push(["progress", f.app_state]);
+    if (f.eligible) out.push(["eligible", "1"]);
+    if (!!f.hide_citizen !== !!d.hide_citizen) out.push(["citizen", f.hide_citizen ? "hide" : "show"]);
+    if (f.sort && f.sort !== d.sort) out.push(["sort", f.sort]);
+    return out;
+  }
+  // The address's query with the filter names replaced by `f`; other names (admin, utm_source...) are kept
+  // in their place. Commas stay commas, as the landing pages write them.
+  function filterSearch(search, f, d) {
+    const q = new URLSearchParams(search || "");
+    FILTER_PARAMS.forEach(k => q.delete(k));
+    const mine = filterParams(f, d).map(([k, v]) => k + "=" + encodeURIComponent(v).replace(/%2C/gi, ",")).join("&");
+    const s = [q.toString(), mine].filter(Boolean).join("&");
+    return s ? "?" + s : "";
+  }
+  // The files to load, in order: `first` (a place named in the search, then the first files or the
+  // scoped ones) and `rest` (the remaining states, only once `everything` is asked for).
+  function loadPlan(scope, indexKeys, queryKeys, everything) {
+    const uniq = a => [...new Set(a)];
+    if (!scope.all) return { first: uniq([...queryKeys, ...scope.keys]), rest: [] };
+    const all = (indexKeys || []).filter(k => !(scope.noRemote && (k === "remote" || k === "US")));
+    const first = uniq([...queryKeys, ...FIRST_KEYS.filter(k => all.includes(k))]);
+    return { first, rest: everything ? all.filter(k => !first.includes(k)) : [] };
+  }
+  // was: every picked state. The Worker's /demand accepts US codes only until it is redeployed with the
+  // provinces, and one code it refuses fails the whole save, so provinces stay on this device for now.
+  // was: .filter(s => US_STATES[s]). The Worker accepts province codes since 2026-10-01; "Canada" (the
+  // file of roles naming no province) is not a place to scan, so it stays on this device.
+  const demandStates = p => [...(p.states || []).filter(s => US_STATES[s] || CA_PROVINCES[s]), ...(p.remote ? ["REMOTE"] : [])];
+  // A Canadian role is usually open only to people allowed to work in Canada, which a US student
+  // generally is not without a permit. The card says so rather than leave it to the posting.
+  const inCanadaOnly = x => { const r = regs(x); return r.length > 0 && r.every(g => g.kind === "canada"); };
+  const isRemote = x => !!x.is_remote || regs(x).some(g => g.kind === "remote" || g.remote || REMOTE_RE.test(g.loc || ""));
+  const realSalary = x => {
+    // 2026-10-23: was zero-only. Match backend/pay.py without inventing pay.
+    // Revert: restore the zero-only check here and in backend/pay.py together.
+    const s = String(x.salary || "").trim(), nums = (s.match(/\d[\d,]*(?:\.\d+)?\s*[kK]?/g) || []).map(n => Number(n.replace(/[,kK\s]/g, "")) * (/[kK]\s*$/.test(n) ? 1000 : 1));
+    const tinyAnnual = /\$/.test(s) && /\b(year|yr|annum|annual|annually)\b/i.test(s) && nums.length && Math.max(...nums) < 1000;
+    const negative = /^\s*(?:(?:USD|CAD|US|CA)\s*)?-\s*\$|\$\s*-\s*\d/i.test(s);
+    return s && !negative && (!nums.length || (nums[0] !== 0 && !tinyAnnual)) ? s : "";
+  };
+  // ---------- search (moved here from app.js 2026-10-14, so it can be tested) ----------
+  // Every word must appear; -word excludes; "quoted phrase" matches as a phrase. Place names (states,
+  // provinces, "new england", "nyc", "remote") filter by location, and the words seen in a few
+  // listings' locations ("boston") match anything but the description.
+  const parseQuery = q => (q.match(/-?"[^"]+"|\S+/g) || []).map(t => { const neg = t.length > 1 && t[0] === "-"; return { t: (neg ? t.slice(1) : t).replace(/"/g, "").toLowerCase(), neg }; }).filter(x => x.t);
+  const PLACES = { "new england": { states: ["MA", "CT", "RI", "NH", "VT", "ME"] }, "nyc metro": { kind: "nyc_metro" }, "new york city": { kind: "nyc_metro" }, nyc: { kind: "nyc_metro" }, remote: { kind: "remote" } };
+  Object.entries(US_STATES).forEach(([c, n]) => { PLACES[n.toLowerCase()] = { states: [c] }; });
+  Object.entries(CA_PROVINCES).forEach(([c, n]) => { PLACES[n.toLowerCase()] = { states: [c] }; });
+  PLACES.canada = { states: CANADA_KEYS };
+  ["ma", "ct", "ri", "nh", "vt", "nj", "ny", "ca", "tx", "fl", "nv", "wa", "il", "ga", "nc", "az", "dc", "mi", "mn", "md", "pa", "va", "tn"].forEach(c => { PLACES[c] = { states: [c.toUpperCase()] }; });
+  const PLACE_KEYS = Object.keys(PLACES).sort((a, b) => b.length - a.length);
+  function splitPlaces(q) {
+    const places = []; let rest = " " + q + " ";
+    for (const k of PLACE_KEYS) {
+      const re = new RegExp(`\\s(-?)${k.replace(/[-.]/g, "\\$&")}(?=\\s)`, "gi");
+      rest = rest.replace(re, (m, neg) => { places.push({ ...PLACES[k], neg: !!neg }); return " "; });
+    }
+    return { rest, places };
+  }
+  // The data files a place in the search lives in (2026-10-14). was: none, so "nursing alabama" looked
+  // only through the files already loaded (the Northeast) and found nothing while 18 existed.
+  const PLACE_KIND_KEYS = { nyc_metro: ["NY", "NJ", "CT"], remote: ["remote"] };
+  const queryKeys = q => [...new Set(splitPlaces(q || "").places.filter(pl => !pl.neg).flatMap(pl => pl.states || PLACE_KIND_KEYS[pl.kind] || []))];
+  const placeHit = (x, pl) => pl.kind === "remote" ? isRemote(x) : regs(x).some(g => pl.kind ? g.kind === pl.kind : pl.states.includes(g.state));
+  const NOT_PLACE = new Set(["new", "city", "north", "south", "east", "west", "park", "hill", "hills", "beach", "heights", "falls", "center", "village", "island", "lake", "port", "united", "states", "usa", "hybrid", "office", "onsite", "the", "and", "area", "metro", "county", "greater",
+    // words the boards put in a "location" that are not places
+    "home", "work", "from", "remote", "headquarters", "campus", "corporate", "global", "site", "main", "street", "plant", "laboratory", "lab", "hospital", "university", "college", "school", "medical", "health", "nursing", "research", "science", "technology", "building", "floor", "suite"]);
+  const locText = x => [...regs(x).map(g => g.loc), x.location_raw || ""].join(" \n ").toLowerCase();
+  // Words seen in at least three listings' locations ("boston", "austin").
+  function placeWords(rows) {
+    const seen = new Map();
+    for (const x of rows) new Set(locText(x).split(/[^a-z]+/)).forEach(t => { if (t.length >= 3 && !NOT_PLACE.has(t)) seen.set(t, (seen.get(t) || 0) + 1); });
+    const words = new Set(); seen.forEach((n, t) => { if (n >= 3) words.add(t); });
+    return words;
+  }
+
+  // Matching by word start, ranked by where a word matched (2026-10-14). was: each word a substring of
+  // one long text that included the description, and the list sorted by date alone, so "cs" matched
+  // 994 roles through "physics" and "analytics", "nurse" (28) and "nursing" (11) found different sets,
+  // and 7 of the top 20 for "software" had software in the title or field.
+  // Text is lowercased, accents and punctuation become spaces (c++ and c# keep theirs), and each part
+  // is padded with spaces so " word" finds a word start.
+  const norm = s => " " + String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9+#]+/g, " ").trim() + " ";
+  // Light stemming, so one word finds its other forms by prefix: nurse, nurses, nursing -> "nurs";
+  // engineering -> "engineer"; finance -> "financ" (financial); biology -> "biolog" (biological).
+  // Five letters or more, and never shorter than four ("sales" stays "sales").
+  function stem(t) {
+    if (t.length < 5 || /[^a-z]/.test(t)) return t;
+    const s = t.replace(/(?:ings?|ies|es|ed|(?<!s)s|e|y)$/, "");
+    return s.length >= 4 ? s : t;
+  }
+  // Short forms students type, also searched as what they stand for. "cs" includes the Software field
+  // (tag "swe"), which every computer science role carries.
+  const ALIASES = { cs: ["computer science", "swe"], swe: ["software engineer"], ml: ["machine learning"], ai: ["artificial intelligence"],
+    ux: ["user experience"], ui: ["user interface"], hr: ["human resources"], ee: ["electrical engineer"],
+    pm: ["product manag", "program manag", "project manag"], rn: ["registered nurse"], bsn: ["nursing"] };
+  // The " word" needles for one search word. `exact` is the word as typed, `loose` its stem or a looser
+  // prefix, which counts for less: "marketing" puts Marketing roles ahead of "Capital Markets", while
+  // "nurse" still finds Nursing. Two letters match only a whole word, so "cs" is no longer inside
+  // "physics"; three letters match a whole word or its plural first ("art", "arts") and a longer word
+  // only loosely ("artificial").
+  function needles(t) {
+    let exact, loose = [];
+    if (t.includes(" ")) exact = [" " + t];
+    else if (t.length <= 2) exact = [" " + t + " "];
+    else if (t.length === 3) { exact = [" " + t + " ", " " + t + "s "]; loose = [" " + t]; }
+    else { exact = [" " + t]; const st = stem(t); if (st !== t) loose = [" " + st]; }
+    for (const a of ALIASES[t] || []) exact.push(" " + a + (a.length <= 3 ? " " : ""));
+    return { exact, loose };
+  }
+  const hit = (s, ns) => { for (const n of ns) if (s.includes(n)) return true; return false; };
+  // A listing's searchable text, by part, kept beside the row (a WeakMap, so it goes with the row).
+  const SX = new WeakMap();
+  function sx(x) {
+    let s = SX.get(x);
+    if (!s) {
+      const tags = x.field_tags || [];
+      s = {
+        title: norm(x.title),
+        field: norm(tags.map(t => t + " " + fieldLabel(t)).join(" ")),
+        company: norm(x.company_name),
+        meta: norm([(x.stage || []).join(" "), (x.stage || []).map(st => STAGE_LABEL[st] || "").join(" "), x.sector, locText(x), (x.region_locations || []).join(" "),
+          x.state, x.term, x.ats, ((x.insights || {}).skills || []).map(k => k.name).join(" ")].filter(Boolean).join(" ")),
+        descSrc: null, desc: " ",
+      };
+      SX.set(x, s);
+    }
+    // The description arrives later, from a sidecar file (createStore().descs).
+    if (s.descSrc !== (x.description || "")) { s.descSrc = x.description || ""; s.desc = norm(s.descSrc); }
+    return s;
+  }
+  // Where a word matched, best first. A word as typed scores its part's weight; matched only by its
+  // stem, 3 less (never under 1). Matching in both the title and a field tag adds 1.
+  const PARTS = [["title", 10], ["field", 8], ["company", 6], ["meta", 4], ["desc", 2]];
+  function termScore(s, tm) {
+    let best = 0, title = false, field = false;
+    for (const [part, w] of PARTS) {
+      if (part === "desc" && (tm.place || best)) break;
+      const text = s[part];
+      const v = hit(text, tm.ns.exact) ? w : tm.ns.loose.length && hit(text, tm.ns.loose) ? Math.max(1, w - 3) : 0;
+      if (v) { if (part === "title") title = true; if (part === "field") field = true; if (v > best) best = v; }
+    }
+    return best ? best + (title && field ? 1 : 0) : 0;
+  }
+  // `words`: placeWords() of the loaded rows. Returns null for an empty search.
+  function compileQuery(q, words) {
+    if (!q || !q.trim()) return null;
+    const { places, rest } = splitPlaces(q);
+    const terms = parseQuery(rest).map(({ t, neg }) => {
+      const n = norm(t).trim();
+      return n ? { neg, place: !!(words && words.has(n)), ns: needles(n) } : null;
+    }).filter(Boolean);
+    return { places, terms };
+  }
+  // 0 when the listing doesn't match. Otherwise how well it does, higher first: 100 times the weakest
+  // word's score plus all of them, so a role with every word in its title beats one with a word only in
+  // the description. A search of place names only (or none) gives every match 1, so the sort decides.
+  function matchScore(x, cq) {
+    if (!cq) return 1;
+    for (const pl of cq.places) if (placeHit(x, pl) === pl.neg) return 0;
+    const s = cq.terms.length ? sx(x) : null;
+    let min = Infinity, sum = 0, any = false;
+    for (const tm of cq.terms) {
+      const v = termScore(s, tm);
+      if (tm.neg) { if (v) return 0; continue; }
+      if (!v) return 0;
+      if (tm.place) continue;
+      any = true; if (v < min) min = v; sum += v;
+    }
+    return any ? min * 100 + sum : 1;
+  }
+
+  const applicationBatch = (list, max = 100) => {
+    const unique = [...new Map(list.filter(x => x.apply_url).map(x => [String(x.id), x])).values()];
+    return { batch: unique.slice(0, max), remaining: unique.slice(max) };
+  };
+  const queuedListingIds = (ids, queue) => ids.map(id => queue && queue.jobs && queue.jobs[id]).filter(j => j && j.listingId != null).map(j => String(j.listingId));
+  // The rows of a batch the extension took care of: added, or skipped because a job already holds the
+  // same listing or the same apply link (extension/background/queue.js addJobs). 85 apply links are
+  // shared by two or more listings; matching on the listing id alone left the second one selected for
+  // good. Answers listing ids as strings.
+  function handledListingIds(batch, res, queue) {
+    const jobs = (queue && queue.jobs) || {};
+    const held = [...((res && res.added) || []), ...((res && res.skipped) || [])].map(id => jobs[id]).filter(Boolean);
+    const ids = new Set(held.filter(j => j.listingId != null).map(j => String(j.listingId)));
+    const urls = new Set(held.map(j => j.apply_url).filter(Boolean));
+    return batch.filter(r => ids.has(String(r.id)) || (r.apply_url && urls.has(r.apply_url))).map(r => String(r.id));
+  }
+  // Apply links held by a queued, running or finished job. The extension skips a listing with one of
+  // these, so the header checkbox leaves it alone.
+  const heldUrls = queue => new Set(Object.values((queue && queue.jobs) || {}).filter(j => j && j.apply_url && j.status !== "failed").map(j => j.apply_url));
+
+  // ---------- selecting rows for Auto-Apply ----------
+  const SELECT_MAX = 100;
+  // The header checkbox. Checked when it has nothing left to add: every shown row that can be picked is
+  // picked, or the selection is full and holds some of them. was: checked only when the first 100
+  // shown were all picked, which stayed false once a row picked further down filled the selection, so
+  // a click could never clear it.
+  const headerChecked = (selectable, sel, max = SELECT_MAX) => selectable.length > 0
+    && (selectable.every(r => sel.has(r.id)) || (sel.size >= max && selectable.some(r => sel.has(r.id))));
+  // A header click: add the shown rows up to the limit, or take them all off.
+  function selectRows(sel, selectable, on, max = SELECT_MAX) {
+    const n = new Set(sel); let omitted = 0;
+    selectable.forEach(r => { if (!on) n.delete(r.id); else if (n.has(r.id) || n.size < max) n.add(r.id); else omitted++; });
+    return { sel: n, omitted };
+  }
+
+  // ---------- list order ----------
+  // The list's sort, with each row's keys worked out once instead of in every comparison. On a slowed
+  // CPU the old comparators (two score lookups and up to two localeCompare calls each, hundreds of
+  // thousands of calls for 28,000 rows) took most of the time spent as each state's file landed.
+  // The order is the same as before (tests/site/core.test.mjs checks it against the old comparators
+  // on the real data):
+  //  - the same expressions on the same values, and Array.prototype.sort is stable;
+  //  - posted_at and first_seen are ISO 8601 text, where localeCompare and plain comparison agree;
+  //  - company names go through one Intl.Collator, which is what localeCompare uses with no arguments.
+  // Sorts `list` in place and returns it, like Array.prototype.sort.
+  let collator = null;
+  const textCmp = (a, b) => (collator || (collator = new Intl.Collator())).compare(a, b);
+  const codeCmp = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+  function sortRows(list, sort, scoreOf, rel) {
+    if (!["score", "new", "company", "comp"].includes(sort)) return list;
+    const d = list.map(x => {
+      const s = sort === "company" ? null : scoreOf(x);
+      return {
+        x, mm: s && s.mismatch, sc: s && s.score, rel: rel ? rel.get(x) : 0,
+        dated: x.posted_at ? 1 : 0, pa: x.posted_at || "", fs: x.first_seen || "",
+        pay: sort === "comp" && realSalary(x) ? 1 : 0, co: x.company_name,
+      };
+    });
+    const R = (a, b) => rel ? b.rel - a.rel : 0;
+    const newer = (a, b) => (b.dated - a.dated) || codeCmp(b.pa, a.pa) || codeCmp(b.fs, a.fs);
+    if (sort === "score") d.sort((a, b) => (a.mm - b.mm) || R(a, b) || (b.sc - a.sc) || newer(a, b));
+    else if (sort === "new") d.sort((a, b) => (a.mm - b.mm) || R(a, b) || newer(a, b));
+    else if (sort === "company") d.sort((a, b) => textCmp(a.co, b.co));
+    else d.sort((a, b) => (b.pay - a.pay) || R(a, b) || b.sc - a.sc);
+    for (let i = 0; i < d.length; i++) list[i] = d[i].x;
+    return list;
+  }
+
+  // The dashboard's list (2026-10-14, B2 plan section 5): every search word, filter and the chosen sort,
+  // applied to the rows in view. Moved here from app.js unchanged, so it can be tested on its own
+  // (tests/site/core.test.mjs checks it against the old inline code). It reads only its three arguments:
+  //   inView: the loaded rows the scope covers; f: the filters (app.js `f`);
+  //   env: { cq, scoreOf, p, elig, blockers, appStates, jobs }: the compiled search (or null), the
+  //   memoised IS.score, the saved profile, the eligibility profile, app.js blockers(), the student's own
+  //   marks and the Auto-Apply jobs by listing id.
+  // Returns { rows, rel, ranked }: the list in order; each row's search relevance (a Map, or null with no
+  // search); and whether the search has words to rank by.
+  // was (app.js): const ranked = ...; const rows = useMemo(() => { ... IS.sortRows(...); return r; }, [...]);
+  function listRows(inView, f, env) {
+    const { cq, scoreOf, p, elig, blockers, appStates, jobs } = env;
+    const st = id => appStates[id] || "none";
+    const ranked = !!(cq && cq.terms.some(t => !t.neg && !t.place));
+    let r, rel = null;
+    if (cq) { rel = new Map(); r = []; for (const x of inView) { const m = matchScore(x, cq); if (m) { rel.set(x, m); r.push(x); } } }
+    else r = inView.slice();
+    if (f.company.length) r = r.filter(x => f.company.includes(x.company_name));
+    if (f.fields.length) r = r.filter(x => (x.field_tags || []).some(t => f.fields.includes(t)));
+    if (f.where === "onsite") r = r.filter(x => regs(x).some(g => g.kind !== "remote"));
+    else if (f.where === "remote") r = r.filter(isRemote);
+    if (f.stage) r = r.filter(x => (x.stage || []).includes(f.stage));
+    if (f.year) r = r.filter(x => !(x.years && x.years.length) || x.years.includes(f.year));
+    if (f.sector) r = r.filter(x => x.sector === f.sector);
+    if (f.paid === "paid") r = r.filter(x => ["paid", "stipend"].includes(payOf(x)));
+    else if (f.paid === "no_unpaid") r = r.filter(x => payOf(x) !== "unpaid");
+    if (f.hide_citizen) r = r.filter(x => !citizenBlocked(x, p ? p.work_auth : ""));
+    if (f.eligible && elig) r = r.filter(x => !scoreOf(x).mismatch && !blockers(x, elig).length);
+    // Looking at your own applications: a posting that has since closed still belongs in the list.
+    if (f.status && !f.app_state) r = r.filter(x => x.status === f.status);
+    if (f.new_only) r = r.filter(x => x.is_new);
+    if (f.app_state === "auto") r = r.filter(x => jobs[String(x.id)]);
+    else if (f.app_state) r = r.filter(x => st(x.id) === f.app_state);
+    // The order: newest first means dated postings first, newest first. first_seen is only the scan
+    // that found the row, which is today for nearly everything, so using it for undated rows put every
+    // undated posting on top. A search ranks by how well each role matches it, with the chosen sort as
+    // the tiebreak.
+    sortRows(r, f.sort, scoreOf, ranked ? rel : null);
+    return { rows: r, rel, ranked };
+  }
+
+  // ---------- eligibility helpers ----------
+  const restr = x => x.restrictions || [];
+  const citizenRule = x => restr(x).includes("us_citizen_only") ? "citizen" : ((x.insights || {}).citizenship || null);
+  const noSponsorship = x => restr(x).includes("no_sponsorship") || !!(x.insights || {}).no_sponsorship;
+  const payOf = x => {
+    const r = restr(x).find(t => t === "paid" || t === "unpaid" || t === "stipend");
+    return r || (x.insights || {}).pay || (realSalary(x) ? "paid" : null);
+  };
+  // Hidden for this student because of citizenship rules. With no work authorization given, hide any citizen rule.
+  function citizenBlocked(x, workAuth) {
+    const c = citizenRule(x);
+    if (!c) return false;
+    if (workAuth === "citizen") return false;
+    if (workAuth === "permanent") return c === "citizen";
+    return true;
+  }
+  const yearsFit = (x, p) => !p || !p.class_year || !(x.years && x.years.length) || x.years.includes(p.class_year);
+  const yearsText = ys => ys.map(y => YEAR_PLURAL[y] || y).join(", ");
+
+  // ---------- scoring (plan 3b) ----------
+  const WEIGHTS = { field: 35, fit: 20, location: 20, freshness: 15, openness: 5, source: 5 };
+  const PART_LABEL = { field: "Field fit", fit: "Stage and year", location: "Location", freshness: "Freshness", openness: "Still open", source: "Source" };
+  const SOURCE_BY_ATS = { greenhouse: 1, lever: 1, ashby: 1, workday: 1, smartrecruiters: .9, icims: .9, icims_site: .9, taleo: .9, oracle: .9, workable: .9, bamboohr: .9 };
+
+  // Field tags a profile counts as direct (1.0) and related (0.6).
+  function profileFields(p, majorsData) {
+    const direct = new Set(), related = new Set();
+    if (!p) return { direct, related };
+    const byName = new Map(((majorsData && majorsData.majors) || []).map(m => [m.name, m]));
+    for (const n of p.majors || []) { const m = byName.get(n); if (m) { m.tags.forEach(t => direct.add(t)); m.related.forEach(t => related.add(t)); } }
+    for (const t of p.fields || []) direct.add(t);
+    for (const n of p.minors || []) { const m = byName.get(n); if (m) m.tags.forEach(t => related.add(t)); }
+    direct.forEach(t => related.delete(t));
+    return { direct, related };
+  }
+
+  // The single tag a student's own coverage should be judged by. profileFields above returns a Set,
+  // which loses both order and which major a tag came from, so anything reading it can only take a
+  // maximum, and the maximum is the wrong number here. majors.json lists a major's own field first
+  // and its broader siblings after ("Nursing" is ["nursing", "health"], "Art (Studio)" is
+  // ["arts", "design"]), and in docs/data/stats.json (generated_at 2026-09-18) nursing has 16 open
+  // against health's 98, so the largest tag is usually a sibling shared with dozens of other majors.
+  // tags[0] is the field the student actually came for. "Exploratory / Undeclared" and "Individual
+  // Concentration (BDIC)" are the only two majors in majors.json with an empty tags array, so for
+  // them the answer is the first field the student picked by hand.
+  function primaryField(p, majorsData) {
+    if (!p) return null;
+    const byName = new Map(((majorsData && majorsData.majors) || []).map(m => [m.name, m]));
+    for (const n of p.majors || []) {
+      const m = byName.get(n), t = m && (m.tags || []).find(x => x && x !== "other");
+      if (t) return t;
+    }
+    for (const t of p.fields || []) if (t && t !== "other") return t;
+    return null;
+  }
+
+  function termFit(x, terms) {
+    if (!terms || !terms.length) return 1;
+    const t = termText(x.term);
+    if (!t) return .6;
+    const lo = t.toLowerCase();
+    if (terms.some(w => w === "Year-round" ? /year[- ]round|academic year/.test(lo) : lo.includes(w.toLowerCase()))) return 1;
+    // same season, different or unknown year ("Summer" vs "Summer 2027")
+    if (terms.some(w => w !== "Year-round" && lo.split(/[\s/]+/).includes(w.split(" ")[0].toLowerCase()) && !/\d{4}/.test(lo))) return .8;
+    return .2;
+  }
+
+  // ctx = {p, direct, related, keys:Set, anywhere?}
+  function score(x, ctx) {
+    const p = ctx.p;
+    const tags = x.field_tags || [];
+    let field;
+    if (ctx.direct.size || ctx.related.size) field = tags.some(t => ctx.direct.has(t)) ? 1 : tags.some(t => ctx.related.has(t)) ? .6 : 0;
+    else field = tags.some(t => t !== "other") ? 1 : .4;
+
+    const mismatch = !yearsFit(x, p);
+    let fit = 0;
+    if (!mismatch) {
+      const st = x.stage || [];
+      const stageFit = !p || !(p.stages && p.stages.length) ? 1 : !st.length ? .6 : st.some(s => p.stages.includes(s)) ? 1 : .3;
+      fit = .6 * stageFit + .4 * termFit(x, p && p.terms);
+    }
+
+    const ks = shardKeys(x);
+    let location = .3;
+    // ctx.anywhere (2026-10-14): no states picked, so no place is preferred. was: the baseline states
+    // scored full marks and every other state .3, for a student who never chose the Northeast.
+    if (ctx.anywhere) location = 1;
+    else for (const k of ks) {
+      if (k !== "remote" && k !== "US" && ctx.keys.has(k)) { location = 1; break; }
+      if ((k === "remote" || k === "US") && ctx.keys.has(k)) location = Math.max(location, .8);
+    }
+
+    // Counted from the day the employer posted it, not the day we found it: 2,800 open listings
+    // were first seen more than the whole 21-day window after they were posted, and 568 of those
+    // more than six months after, so a job posted in March scored as new. With no posting date the
+    // age is unknown, which is worth the same .5 a listing with no date at all has always been
+    // worth; giving it the benefit of first_seen would rank the boards that withhold the date
+    // above the ones that publish it. Keep this in step with _freshness() in backend score.py.
+    const postedAt = x.posted_at ? new Date(x.posted_at).getTime() : NaN;
+    const seen = x.first_seen ? new Date(x.first_seen).getTime() : NaN;
+    const decay = t => Math.max(0, 1 - (Date.now() - t) / DAY / 21);
+    const freshness = !isNaN(postedAt) ? decay(postedAt) : isNaN(seen) ? .5 : Math.min(.5, decay(seen));
+    const openness = x.status === "open" ? 1 : 0;
+    const sp = x.score_parts && x.score_parts.source;
+    const source = sp != null ? Math.min(1, sp / 5) : (SOURCE_BY_ATS[x.ats] || .5);
+
+    const v = { field, fit, location, freshness, openness, source };
+    const parts = {};
+    let total = 0;
+    for (const k in WEIGHTS) { parts[k] = Math.round(WEIGHTS[k] * v[k] * 10) / 10; total += parts[k]; }
+    return { score: Math.round(total), parts, mismatch };
+  }
+
+  // ---------- data loading (sharded, with the single-file fallback) ----------
+  // timeoutMs is how long a download may go with no bytes at all: before the response, or between two
+  // pieces of the body. A slow file that keeps arriving is never cut off. (was: the limit covered the
+  // whole download, so on slow Wi-Fi CA.json was cancelled on both tries and California never loaded.)
+  // At most this many downloads run at once, below the browser's six connections per host, so the
+  // quiet timer never runs while a request is only queued in the browser behind other files (at
+  // 50 KB/s the 9th and 10th state files waited more than 15 s for a connection and were retried).
+  const MAX_DOWNLOADS = 4;
+  let downloads = 0;
+  const queued = [];
+  async function getJSON(url, bust, timeoutMs = 15000) {
+    if (downloads >= MAX_DOWNLOADS) await new Promise(r => queued.push(r));   // handed a slot directly
+    else downloads++;
+    try { return await download(url, bust, timeoutMs); }
+    finally { if (queued.length) queued.shift()(); else downloads--; }
+  }
+  async function download(url, bust, timeoutMs) {
+    const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+    let timer, fail;
+    const stalled = new Promise((_, reject) => { fail = reject; });
+    const quiet = () => {
+      clearTimeout(timer);
+      if (timeoutMs) timer = setTimeout(() => { fail(new Error("Download timed out")); if (controller) controller.abort(); }, timeoutMs);
+    };
+    const request = async () => {
+      // A request the page head already started for this address (index.html, window.__early), used once.
+      const early = !bust && window.__early && window.__early[url];
+      if (early) delete window.__early[url];
+      const r = await (early || fetch(url + (bust ? (url.includes("?") ? "&" : "?") + "t=" + Date.now() : ""), { cache: "no-cache", ...(controller ? { signal: controller.signal } : {}) }));
+      quiet();
+      if (!r.ok) { const e = new Error("HTTP " + r.status + " for " + url); e.status = r.status; throw e; }
+      const reader = r.body && typeof r.body.getReader === "function" && typeof TextDecoder !== "undefined" ? r.body.getReader() : null;
+      if (!reader) return r.json();   // no streamed body: the timer then covers the rest of the download
+      const decoder = new TextDecoder(), parts = [];
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        quiet();
+        parts.push(decoder.decode(value, { stream: true }));
+      }
+      parts.push(decoder.decode());
+      return JSON.parse(parts.join(""));
+    };
+    quiet();
+    try {
+      return await Promise.race([request(), stalled]);
+    } finally { clearTimeout(timer); }
+  }
+
+  function createStore({ timeoutMs = 15000, retryDelayMs = 1200 } = {}) {
+    let base = C.dataUrl || "./data/";
+    let index = null, legacy = false, bust = false;
+    const loaded = new Map();   // key -> Promise
+    const descd = new Map();    // key -> Promise (description sidecars)
+    const byId = new Map();
+    let version = 0;
+    let generation = 0;
+
+    // apply_url ends up in an href and in the Auto-Apply queue, so anything that is not plain http(s)
+    // (javascript:, data:) is dropped here, once, before any of the page sees it.
+    function add(list) {
+      for (const x of list || []) {
+        if (!x || x.id == null || byId.has(x.id)) continue;
+        if (x.apply_url && !/^https?:\/\//i.test(x.apply_url)) x.apply_url = "";
+        byId.set(x.id, x);
+      }
+      version++;
+    }
+
+    async function init(fromRaw) {
+      bust = !!fromRaw;
+      base = fromRaw ? C.rawDataFallback : (C.dataUrl || "./data/");
+      generation++; loaded.clear(); descd.clear(); failed.clear(); byId.clear(); index = null; legacy = false; version++;
+      const bases = fromRaw ? [C.rawDataFallback] : [C.dataUrl || "./data/", C.rawDataFallback].filter(Boolean);
+      for (const b of bases) {
+        for (const path of ["listings/index.json", "index.json"]) {
+          try {
+            const idx = await getJSON(b + path, bust, Math.min(timeoutMs, 5000));
+            if (idx && idx.files) { index = idx; base = b; index._dir = path.includes("/") ? "listings/" : ""; return { index, legacy: false }; }
+          } catch (e) { /* try next */ }
+        }
+      }
+      // no shards: the old single file
+      for (const b of bases) {
+        try { const all = await getJSON(b + "listings.json", bust, Math.min(timeoutMs, 5000)); base = b; legacy = true; add(all); return { index: null, legacy: true }; }
+        catch (e) { var last = e; }
+      }
+      throw last || new Error("No listing data found");
+    }
+
+    // Resolves to the keys that could not be loaded, so the page can say so instead of showing
+    // "no listings" for a state whose file simply failed to download.
+    const failed = new Set();
+    async function ensure(keys, onProgress = () => {}) {
+      if (legacy || !index) return [];
+      const jobs = [];
+      const epoch = generation, requestBase = base, requestBust = bust;
+      for (const k of new Set(keys)) {
+        const meta = index.files[k];
+        if (!meta) continue;
+        // Already asked for: wait for it as well. Skipping a shard still in flight painted the list
+        // without its rows when states were changed quickly.
+        if (loaded.has(k)) { jobs.push(loaded.get(k).then(onProgress)); continue; }
+        const file = meta.file || (index._dir + k + ".json");
+        const get = () => getJSON(requestBase + file, requestBust, timeoutMs);
+        // One quiet retry: a dropped connection is the usual reason a shard fails.
+        const pr = get().catch(() => new Promise(r => setTimeout(r, retryDelayMs)).then(get))
+          .then(d => { if (epoch === generation) { failed.delete(k); add(d); } })
+          .catch(e => { if (epoch === generation) { loaded.delete(k); failed.add(k); console.warn("InternScout: couldn't load", file, e); } });
+        loaded.set(k, pr);
+        jobs.push(pr.then(onProgress));
+      }
+      await Promise.all(jobs);
+      return [...new Set(keys)].filter(k => failed.has(k));
+    }
+
+    // The first screen (2026-10-14, P2): data/first.json, the top rows of a first visit's list (no
+    // profile, newest first, the Northeast and remote), written by the export with the state files
+    // (backend/internscout/export_static.py first_screen). One small request, so the list can paint
+    // before the 550 KB of state files arrive. The rows are copies of rows in those files, and add()
+    // keeps the first copy of an id, so nothing changes when the files land. Fetched once per
+    // init; a missing or failed file is no loss, the state files carry every row anyway.
+    let primed = null;
+    function primer() {
+      if (legacy || !index || !index.first || !index.first.file || !index.first.rows) return Promise.resolve(false);
+      if (primed && primed.epoch === generation) return primed.pr;
+      const epoch = generation;
+      const pr = getJSON(base + index.first.file, bust, Math.min(timeoutMs, 5000))
+        .then(d => { if (epoch !== generation || !Array.isArray(d)) return false; add(d); return true; })
+        .catch(() => false);
+      primed = { epoch, pr };
+      return pr;
+    }
+
+    // Descriptions live beside each shard (<file> -> <file>.desc.json, {id: text}) so the list
+    // loads without them; they are fetched only for search and Auto-Apply. Older exports carry
+    // them inline on the row, and then the sidecar simply doesn't exist.
+    async function descs(keys) {
+      if (legacy || !index) return [];
+      const jobs = [];
+      const bad = new Set(), epoch = generation, requestBase = base, requestBust = bust;
+      for (const k of new Set(keys)) {
+        const meta = index.files[k];
+        if (!meta) continue;
+        if (descd.has(k)) { jobs.push(descd.get(k).then(ok => { if (!ok) bad.add(k); })); continue; }
+        const file = meta.desc || (meta.file || (index._dir + k + ".json")).replace(/\.json$/, ".desc.json");
+        const get = () => getJSON(requestBase + file, requestBust, timeoutMs);
+        const pr = Promise.resolve(loaded.get(k)).then(() => {
+          if (failed.has(k)) throw new Error("Listings have not loaded");
+          // The same one quiet retry a listing file gets (was: none, so one dropped connection meant
+          // pressing Try again). A missing sidecar (404) is an answer, not a dropped connection.
+          return get().catch(e => e.status === 404 ? Promise.reject(e) : new Promise(r => setTimeout(r, retryDelayMs)).then(get));
+        }).then(m => {
+          if (epoch !== generation) return false;
+          let n = 0;
+          for (const id in m) {
+            const x = byId.get(id) || byId.get(Number(id));
+            if (x && !x.description && m[id]) { x.description = m[id]; delete x._hay; n++; }
+          }
+          if (n) version++;
+          return true;
+        }).catch(e => {
+          if (epoch === generation) descd.delete(k);
+          return !meta.desc && e.status === 404; // Legacy exports may keep descriptions inline.
+        });
+        descd.set(k, pr);
+        jobs.push(pr.then(ok => { if (!ok) bad.add(k); }));
+      }
+      await Promise.all(jobs);
+      return [...bad];
+    }
+
+    return {
+      init, ensure, descs, primer,
+      all: () => [...byId.values()],
+      version: () => version,
+      index: () => index,
+      isLegacy: () => legacy,
+      loadedKeys: () => [...loaded.keys()],
+      base: () => base,
+    };
+  }
+
+  // The major a landing page's "Rank these for your major" link stands for (?field=nursing), to prefill
+  // the setup card with (2026-10-14). A major page sends all of its tags (?field=mechanical,aerospace).
+  // The major whose tags are exactly those, else the one major led by the first tag, else one led by it
+  // whose name says the field ("Data" in "Statistics and Data Science"); null when it is a guess.
+  function majorForFields(fields, majorsData) {
+    const list = ((majorsData && majorsData.majors) || []).filter(m => m.tags && m.tags[0] === (fields || [])[0]);
+    if (!list.length) return null;
+    const same = list.find(m => m.tags.length === fields.length && m.tags.every(t => fields.includes(t)));
+    if (same) return same.name;
+    if (list.length === 1) return list[0].name;
+    const label = fieldLabel(fields[0]).toLowerCase();
+    const named = list.filter(m => m.level !== "grad" && m.name.toLowerCase().includes(label));
+    return named.length === 1 ? named[0].name : null;
+  }
+
+  async function loadMajors() {
+    for (const b of [C.dataUrl || "./data/", C.rawDataFallback].filter(Boolean)) {
+      try { const m = await getJSON(b + "majors.json"); if (m && m.majors) return m; } catch (e) { }
+    }
+    return null;
+  }
+  // What step 1 of the setup card says in place of the major pickers. loadMajors() resolves with null
+  // only once every source has failed, but before it resolves the page holds null too, so null alone
+  // cannot mean "failed": on a slow first load the card said the list "didn't load" while majors.json
+  // was still downloading. `settled` is set when loadMajors() resolves, whichever way it went.
+  const majorsNote = (majors, settled) => majors && majors.majors ? null
+    : settled ? "The major list didn't load. Pick the fields you're interested in below instead."
+      : "Loading the list of majors…";
+  async function loadStats() {
+    for (const b of [C.dataUrl || "./data/", C.rawDataFallback].filter(Boolean)) {
+      try { return await getJSON(b + "stats.json"); } catch (e) { }
+    }
+    return null;
+  }
+
+  // ---------- extension bridge (extension/bridge/bridge.js relays window messages) ----------
+  const ext = (() => {
+    let n = 0; const waiting = new Map(); const subs = new Set();
+    window.addEventListener("message", e => {
+      if (e.source !== window || !e.data || !e.data.__internscout) return;
+      const d = e.data;
+      if (d.__internscout === "res" && waiting.has(d.id)) { waiting.get(d.id)(d.result); waiting.delete(d.id); }
+      else if (d.__internscout === "push" || d.__internscout === "hello" || d.__internscout === "gone") subs.forEach(f => f(d));
+    });
+    return {
+      present: () => !!document.documentElement.dataset.internscout,
+      call: (msg, timeout = 5000) => new Promise(res => {
+        const id = ++n; waiting.set(id, res);
+        window.postMessage({ __internscout: "req", id, msg }, location.origin);
+        setTimeout(() => { if (waiting.has(id)) { waiting.delete(id); res({ error: "no_extension" }); } }, timeout);
+      }),
+      on: f => { subs.add(f); return () => subs.delete(f); },
+    };
+  })();
+  const bridgeProfile = p => ({
+    majors: p.majors || [], minors: p.minors || [], class_year: p.class_year || "", grad_term: p.grad_term || "",
+    // was: states: demandStates(p). That now leaves provinces out (for the Worker), and the extension's
+    // copy is read back into this page, so it gets every picked state and province.
+    stages: p.stages || [], terms: p.terms || [], states: [...(p.states || []), ...(p.remote ? ["REMOTE"] : [])], work_auth: p.work_auth || "",
+  });
+  const fromBridgeProfile = b => {
+    if (!b || typeof b !== "object") return null;
+    const states = (b.states || []).filter(s => s !== "REMOTE");
+    return { ...emptyProfile(), ...b, states, remote: (b.states || []).includes("REMOTE") || !states.length };
+  };
+
+  // ---------- Google / Microsoft sign-in (implicit id_token flow, see worker/API.md) ----------
+  // The provider's ID token lasts about an hour, and sessionStorage goes when the tab closes, so the
+  // dashboard used to sign out that often. After the redirect the ID token is now traded once for a
+  // Worker session (POST /session): an opaque "iss_..." code kept in localStorage until sign-out, or
+  // until the Worker forgets it after a year unused. The ID token stays the fallback for a Worker
+  // that doesn't know /session yet (404), is down (5xx) or can't be reached.
+  const TOKEN_KEY = "internscout.idtoken";
+  const SESSION_KEY = "internscout.session";
+  const workerOn = () => !!C.workerUrl && !/\.example\.|example\.workers\.dev/.test(C.workerUrl);
+  const workerBase = () => C.workerUrl.replace(/\/$/, "");
+  function decodeJwt(t) {
+    try {
+      let s = t.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+      s += "===".slice((s.length + 3) % 4);
+      return JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(s), c => c.charCodeAt(0))));
+    } catch (e) { return null; }
+  }
+  const isSession = t => typeof t === "string" && t.startsWith("iss_");
+  const storedSession = () => { const r = ls.get(SESSION_KEY, null); return r && typeof r === "object" && isSession(r.token) ? r : null; };
+  // Tokens the Worker answered 401 for on this page. The page's own copies are dropped at once
+  // (forget), and this lets a token the page didn't store (the extension's) read as signed out too.
+  const rejected = new Set();
+  // The one place that reads who a sign-in belongs to and when it ends, for either kind:
+  //   a session record, as stored here { token, account, email, provider, tier, expires: ISO } or as
+  //   the extension's bridge sends it { token, email, account, expires: ms };
+  //   a legacy ID token (a JWT string, or { token: JWT } from an older extension);
+  //   a bare "iss_..." string, looked up in this page's stored record;
+  //   or this function's own result.
+  // Returns { token, email, sub, exp (ms), signin, session } or null. `sub` is the provider's sub for
+  // an ID token and the session's `account` for a session (both are stable per account, which is all
+  // the dedupe keys need). `signin` changes with each new sign-in: the ID token's iat, or the tail of
+  // the session code.
+  // was: callers ran decodeJwt(token).email / .sub / .exp and tokenOk(token) themselves, which a
+  // session code can't answer.
+  function authInfo(x) {
+    if (!x) return null;
+    if (typeof x === "string") {
+      if (isSession(x)) { const r = storedSession(); return r && r.token === x ? authInfo(r) : null; }
+      const p = decodeJwt(x);
+      return p ? { token: x, email: p.email || "", sub: p.sub || "", exp: (Number(p.exp) || 0) * 1000, signin: String(p.iat || ""), session: false } : null;
+    }
+    if (typeof x !== "object" || typeof x.token !== "string") return null;
+    if (!isSession(x.token)) {
+      const i = authInfo(x.token);
+      return i && x.email && !i.email ? { ...i, email: x.email } : i;
+    }
+    const exp = typeof x.exp === "number" ? x.exp : typeof x.expires === "number" ? x.expires : Date.parse(x.expires || "") || 0;
+    return { token: x.token, email: x.email || "", sub: x.sub || x.account || "", exp, signin: x.signin || x.token.slice(-8), session: true };
+  }
+  // Signed in and good for at least another minute, and not refused by the Worker on this page.
+  const authOk = x => { const i = authInfo(x); return !!(i && i.exp > Date.now() + 60000 && !rejected.has(i.token)); };
+  // was: const tokenOk = t => { const p = t && decodeJwt(t); return !!(p && p.exp && p.exp * 1000 > Date.now() + 60000); };
+  // Kept under its old name for anything still calling it; it understands sessions now.
+  const tokenOk = authOk;
+  // was: const storedToken = () => { const t = ss.get(TOKEN_KEY); if (t && tokenOk(t)) return t; if (t) ss.del(TOKEN_KEY); return null; };
+  // The session first (it outlives the tab), then this tab's ID token. Expired ones are removed.
+  const storedToken = () => {
+    const r = storedSession();
+    if (r && authOk(r)) return r.token;
+    if (ls.get(SESSION_KEY, null) != null) ls.del(SESSION_KEY);
+    const t = ss.get(TOKEN_KEY); if (t && authOk(t)) return t; if (t) ss.del(TOKEN_KEY); return null;
+  };
+  // Drop this page's copy of a token the Worker refused (401). Only that token: a 401 for the
+  // extension's token mustn't sign out the page's own session, or the other way round.
+  function forget(token) {
+    if (!token) return;
+    rejected.add(token);
+    const r = storedSession(); if (r && r.token === token) ls.del(SESSION_KEY);
+    if (ss.get(TOKEN_KEY) === token) ss.del(TOKEN_KEY);
+  }
+  // The Worker slides a session's expiry to a year from its last use. The record here keeps the
+  // expiry it was created with, so after a successful call move it forward the same way (a day
+  // short, since the Worker refreshes at most once a day); otherwise a student who uses InternScout
+  // every day would still be signed out here a year after signing in.
+  function touchSession(token) {
+    const r = storedSession();
+    if (!r || r.token !== token) return;
+    const next = Date.now() + 364 * DAY;
+    if ((Date.parse(r.expires) || 0) < next - DAY) ls.set(SESSION_KEY, { ...r, expires: new Date(next).toISOString() });
+  }
+  const randomHex = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, "0")).join("");
+  const redirectUri = () => C.redirectUri || (location.origin + location.pathname.replace(/index\.html$/, ""));
+
+  // Trade a checked ID token for a session. Returns the stored record, { error } for a 401 (the
+  // Worker refused the ID token itself), or null when sessions aren't available (404, 5xx, network,
+  // or any other answer without a session in it) and the caller keeps the ID token instead.
+  async function startSession(idToken) {
+    if (!workerOn()) return null;
+    const ctl = new AbortController(); const timer = setTimeout(() => ctl.abort(), 8000);
+    try {
+      const r = await fetch(workerBase() + "/session", { method: "POST", headers: { Authorization: "Bearer " + idToken }, signal: ctl.signal });
+      if (r.status === 401) { const b = await r.json().catch(() => ({})); return { error: (b && b.message) || "Sign-in check failed. Try again." }; }
+      if (!r.ok) return null;
+      const b = await r.json().catch(() => null);
+      if (!b || !isSession(b.session) || !(Date.parse(b.expires) > Date.now())) return null;
+      const rec = { token: b.session, account: b.account || "", email: b.email || "", provider: b.provider || "", tier: b.tier || "", expires: b.expires };
+      ls.set(SESSION_KEY, rec);
+      return rec;
+    } catch (e) { return null; } finally { clearTimeout(timer); }
+  }
+
+  // was: // Reads the #id_token=... hash the provider sends back. Returns null, {token}, or {error}.
+  // was: function handleRedirect() { ... ss.set(TOKEN_KEY, t); return { token: t }; }
+  // Reads the #id_token=... hash the provider sends back and, when the Worker has sessions, trades the
+  // token for one. Resolves to null (no sign-in in the address), { token, session } (session: the
+  // stored record, or null when the ID token was kept instead), or { error }. Async now, because the
+  // trade is a network call; the hash is still read and cleared before the first await.
+  async function handleRedirect() {
+    const h = location.hash || "";
+    if (!/[#&](id_token|error)=/.test(h)) return null;
+    const q = new URLSearchParams(h.slice(1));
+    history.replaceState(null, "", location.pathname + location.search);
+    const state = ss.get("internscout.auth.state"), nonce = ss.get("internscout.auth.nonce");
+    ss.del("internscout.auth.state"); ss.del("internscout.auth.nonce");
+    if (q.get("error")) return { error: q.get("error_description") || q.get("error") };
+    const t = q.get("id_token");
+    if (!state || q.get("state") !== state) return { error: "Sign-in state didn't match. Try again." };
+    const p = decodeJwt(t);
+    if (!p || p.nonce !== nonce) return { error: "Sign-in check failed. Try again." };
+    // was: if (!tokenOk(t)) return { error: "Sign-in expired. Try again." };
+    if (!authOk(t)) return { error: "Sign-in expired. Try again." };
+    // A new sign-in replaces whatever this browser held before.
+    ls.del(SESSION_KEY); ss.del(TOKEN_KEY);
+    const s = await startSession(t);
+    if (s && s.error) return { error: s.error };
+    count("signin");
+    if (s) return { token: s.token, session: s };
+    // was: ss.set(TOKEN_KEY, t); return { token: t };
+    ss.set(TOKEN_KEY, t);
+    return { token: t, session: null };
+  }
+
+  async function fetchWorkerConfig() {
+    if (!workerOn()) return null;
+    const ctl = new AbortController(); const timer = setTimeout(() => ctl.abort(), 4000);
+    try {
+      const r = await fetch(C.workerUrl.replace(/\/$/, "") + "/config", { signal: ctl.signal });
+      if (!r.ok) return null;
+      const cfg = await r.json();
+      const providers = (cfg && Array.isArray(cfg.providers) ? cfg.providers : []).filter(p => p && p.id && p.client_id && p.authorize_url);
+      return providers.length ? { ...cfg, providers } : null;
+    } catch (e) { return null; } finally { clearTimeout(timer); }
+  }
+
+  const PROVIDER_LABELS = { google: "Google", microsoft: "Microsoft" };
+
+  // Anyone can sign in; a verified school .edu email gets the larger AI allowance (the Worker decides).
+  // One step toward using InternScout, for the daily step totals (js/count.js, worker/src/visits.js
+  // EVENTS). Queued when count.js has not run yet; it sends the queue when it does.
+  const count = (event) => { (window.ISCountQ = window.ISCountQ || []).push(event); };
+
+  function startSignIn(cfg, providerId) {
+    const p = (cfg.providers || []).find(x => x.id === providerId);
+    if (!p) return;
+    count("signin_start");
+    const state = randomHex(), nonce = randomHex();
+    ss.set("internscout.auth.state", state); ss.set("internscout.auth.nonce", nonce);
+    const q = new URLSearchParams({
+      client_id: p.client_id, response_type: "id_token", redirect_uri: redirectUri(),
+      scope: (p.scopes || ["openid", "email", "profile"]).join(" "), nonce, state, response_mode: "fragment", prompt: "select_account",
+    });
+    location.assign(p.authorize_url + (p.authorize_url.includes("?") ? "&" : "?") + q.toString());
+  }
+  // was: const signOut = () => ss.del(TOKEN_KEY);
+  // Removes this page's sign-in. With `everywhere` (the Sign out button) it also ends the session on
+  // the Worker: DELETE /session, best effort, since a failure still signs out here and an unused
+  // session lapses by itself after a year. Without it (an expiry) there is nothing to end.
+  function signOut(everywhere) {
+    const r = storedSession();
+    ls.del(SESSION_KEY); ss.del(TOKEN_KEY);
+    if (everywhere && r && workerOn()) {
+      try { fetch(workerBase() + "/session", { method: "DELETE", headers: { Authorization: "Bearer " + r.token }, keepalive: true }).catch(() => { }); } catch (e) { }
+    }
+  }
+
+  async function postDemand(token, p) {
+    if (!workerOn() || !token || !p) return false;
+    const states = demandStates(p);
+    if (!states.length) return false;
+    // was: const sub = (decodeJwt(token) || {}).sub || "";
+    // A session's account stands in for the sub, so the first send after the switch repeats once.
+    const sub = (authInfo(token) || {}).sub || "";
+    const key = sub + "|" + states.slice().sort().join(",");
+    if (ls.get("internscout.demand.sent", "") === key) return true;
+    try {
+      const r = await fetch(C.workerUrl.replace(/\/$/, "") + "/demand", {
+        method: "POST", headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+        body: JSON.stringify({ states }),
+      });
+      if (r.ok) { ls.set("internscout.demand.sent", key); return true; }
+      // was: if (r.status === 401) signOut();
+      if (r.status === 401) forget(token);
+    } catch (e) { }
+    return false;
+  }
+
+  // GET /me: this month's allowance ({tier, paused, allowance:{task:{used,limit}}}), or null.
+  async function fetchMe(token) {
+    if (!workerOn() || !token) return null;
+    try {
+      const r = await fetch(C.workerUrl.replace(/\/$/, "") + "/me", { headers: { Authorization: "Bearer " + token } });
+      // was: if (r.status === 401) { signOut(); return null; }
+      if (r.status === 401) { forget(token); return null; }
+      if (r.ok) touchSession(token);
+      return r.ok ? await r.json() : null;
+    } catch (e) { return null; }
+  }
+  // Referral credits (worker/src/referral.js). A classmate's invite code rides in on ?ref= and waits
+  // here until the student signs in; GET /invite is the student's own link, POST /invite/claim uses one.
+  const INVITE_KEY = "internscout.invite.v1";
+  // sessionStorage: the sign-in sub of the account the Worker last answered "edu_only" for, so the
+  // dashboard asks for that account once per session instead of on every page load.
+  const INVITE_EDU_KEY = "internscout.invite.edu_only";
+  // sessionStorage: "sub|iat|code" of the sign-in whose claim last failed for a passing reason (the
+  // Worker unreachable, a 5xx, 429, or a 401 while Google rotates its keys). The code stays in
+  // localStorage, and the dashboard tries again on the next sign-in or the next session instead of
+  // on every page load with the same token.
+  const INVITE_TRIED_KEY = "internscout.invite.tried";
+  const INVITE_CODE = /^[a-hj-km-np-z2-9]{8}$/;
+  // The invite nudge (added 2026-10-02). The invite used to live only in the Account menu, where few
+  // students look. It is offered once, right after a good moment (a first Auto-Apply queued or a first
+  // profile saved), as a notice the student can wave off. localStorage holds the day it was shown,
+  // then "dismissed" (Not now) or "opened" (the invite panel was opened, from here or the menu); any
+  // value at all means this browser never sees it again.
+  const INVITE_NUDGE_KEY = "internscout.invite_nudge";
+  // Pure, so the rule is tested (tests/site/core.test.mjs): signed in, the Worker offers invites with a
+  // reward to name, the panel isn't already open, and this browser hasn't had the nudge before.
+  function inviteNudgeDue({ signedIn, offer, panelOpen, seen }) {
+    return !!(signedIn && offer && offer.bonus && Object.keys(offer.bonus).length && !panelOpen && !seen);
+  }
+  const inviteNudgeSeen = () => ls.get(INVITE_NUDGE_KEY, null) != null;
+  // how: "dismissed" or "opened"; with nothing, the day it was shown, so a reload doesn't show it twice.
+  const markInviteNudge = how => ls.set(INVITE_NUDGE_KEY, how || new Date().toISOString().slice(0, 10));
+  // One quiet email invitation per browser, after an explicit useful action. Keep no profile,
+  // listing ID or email here. Fail closed if persistence is blocked: a reload must not nag again.
+  const DIGEST_NUDGE_KEY = "internscout.digest_nudge.v1";
+  function createDigestNudge(storage) {
+    let used = false;
+    return {
+      claim(action, { enabled = false, blocked = false, manual = false } = {}) {
+        if (used || !enabled || blocked || !manual || !["interested", "profile"].includes(action)) return false;
+        // Checks storage works (fail closed), but keeps "shown" only from shown(), once it is on screen.
+        try {
+          const target = storage || localStorage;
+          if (target.getItem(DIGEST_NUDGE_KEY) !== null) return false;
+          target.setItem(DIGEST_NUDGE_KEY, "shown");
+          const ok = target.getItem(DIGEST_NUDGE_KEY) === "shown";
+          target.removeItem(DIGEST_NUDGE_KEY);
+          if (!ok) return false;
+        } catch (e) { return false; }
+        used = true;
+        return true;
+      },
+      shown() {
+        if (!used) return;
+        try { const t = storage || localStorage; if (t.getItem(DIGEST_NUDGE_KEY) === null) t.setItem(DIGEST_NUDGE_KEY, "shown"); } catch (e) { }
+      },
+      finish(how) {
+        if (!["dismissed", "opened"].includes(how)) return;
+        used = true;
+        try { (storage || localStorage).setItem(DIGEST_NUDGE_KEY, how); } catch (e) { }
+      },
+    };
+  }
+  async function fetchInvite(token) {
+    if (!workerOn() || !token) return null;
+    try {
+      const r = await fetch(C.workerUrl.replace(/\/$/, "") + "/invite", { headers: { Authorization: "Bearer " + token } });
+      return r.ok ? await r.json() : null;
+    } catch (e) { return null; }
+  }
+  // was: // { ok, bonus } or { error, message } from the Worker; null when it couldn't be reached (try later).
+  // { ok, bonus } or { error, message } from the Worker; null when the answer says nothing about the
+  // invite itself (try later): unreachable, 5xx, 429, or 401. A 401 ("Sign in first", "Unknown
+  // signing key; sign in again") is about the token, e.g. mid Google key rotation, not the code.
+  async function claimInvite(token, code) {
+    if (!workerOn() || !token) return null;
+    try {
+      const r = await fetch(C.workerUrl.replace(/\/$/, "") + "/invite/claim", {
+        method: "POST", headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" }, body: JSON.stringify({ code }),
+      });
+      // was: if (r.status >= 500) return null;
+      if (r.status >= 500 || r.status === 401 || r.status === 429) return null;
+      return await r.json().catch(() => null);
+    } catch (e) { return null; }
+  }
+  const ALLOWANCE_LABELS = { autofill: "Auto-Apply runs", resume_tailor: "Tailored resumes", deep_dive: "Deep Dives" };
+  // A label as it reads mid-sentence: "tailored resumes", but Auto-Apply and the Deep Dive keep their capitals.
+  const midSentence = l => /^(Auto-Apply|Deep Dive)/.test(l) ? l : l.charAt(0).toLowerCase() + l.slice(1);
+  // Fallback names for the paid tiers. /config carries the real labels; this is for when it hasn't
+  // loaded yet, or an older page meets a tier it doesn't know.
+  const PLAN_LABELS = { supporter: "Supporter", pro: "Pro" };
+  // The plans announcement (added 2026-10-04): what free and each paid plan give in Auto-Apply runs,
+  // read from the Worker's /config (allowance tables and payments.plans), so it can never state a
+  // number the server doesn't serve. null when payments are off, the tables are missing, or the
+  // student already pays. PLANS_BANNER_KEY remembers a dismissal by announcement, so a later one shows.
+  const PLANS_BANNER_KEY = "internscout.plans_banner";
+  const PLANS_BANNER_ID = "2026-10-plans";
+  function plansBanner(cfg, me) {
+    const pay = cfg && cfg.payments, al = cfg && cfg.allowance;
+    if (!pay || !pay.enabled || !al || !al.edu || !al.general) return null;
+    if (me && me.plan && me.plan !== "free") return null;
+    const runs = t => t && t.autofill;
+    const plans = (pay.plans || []).filter(pl => runs(al[pl.plan]) && pl.price)
+      .sort((a, b) => a.multiplier - b.multiplier)
+      .map(pl => ({ plan: pl.plan, label: pl.label || PLAN_LABELS[pl.plan] || pl.plan, price: pl.price, runs: runs(al[pl.plan]) }));
+    if (!plans.length || runs(al.general) == null || runs(al.edu) == null) return null;
+    return { free: runs(al.general), edu: runs(al.edu), plans, from: plans[0].price };
+  }
+
+  // The dashboard's review line (added 2026-10-07; docs/js/app.js). Only for a student whose extension
+  // is set up and has filled applications: the extension says so in its ping reply (review_line, true
+  // or false, extension/lib/review.js), and false also means they reviewed or chose "Don't ask again"
+  // there. An extension from before that field falls back to the queue holding a filled application.
+  // Nothing about it leaves the browser; REVIEW_LINE_KEY is the one setting "Hide" keeps.
+  const REVIEW_LINE_KEY = "internscout.review_line";
+  const REVIEWS_URL = "https://chromewebstore.google.com/detail/internscout-auto-apply/hpnbbpmalfjijnmpoihhjgjolhabjpgi/reviews";
+  function reviewLineDue(info, queue) {
+    if (!info || !info.installed || !info.onboarded) return false;
+    if (typeof info.review_line === "boolean") return info.review_line;
+    const jobs = Object.values((queue && queue.jobs) || {});
+    return jobs.some(j => j && (j.status === "ready_to_submit" || j.status === "submitted"));
+  }
+
+  const leftOf = (me, task) => { const a = me && me.allowance && me.allowance[task]; return a ? Math.max(0, (a.limit || 0) - (a.used || 0)) : null; };
+  // "Auto-Apply runs: 20 of 20 left" lines plus the tier, for a tooltip.
+  function allowanceText(me) {
+    if (!me || !me.allowance) return "";
+    // limit null = no monthly cap on that task (the Deep Dive)
+    const lines = Object.keys(ALLOWANCE_LABELS).filter(k => me.allowance[k]).map(k => me.allowance[k].limit == null
+      ? `${ALLOWANCE_LABELS[k]}: unlimited`
+      : `${ALLOWANCE_LABELS[k]}: ${leftOf(me, k)} of ${me.allowance[k].limit} left`);
+    // was: lines.push(me.tier === "edu" ? "School (.edu) allowance: twice the standard." : "Standard allowance. A Google account with a .edu email gets twice as much.");
+    // worker/src/auth.js grants the "edu" tier on a verified .edu address from Microsoft as well as
+    // Google, so naming only Google told half the students here that they couldn't qualify.
+    lines.push(me.tier === "edu" ? "School (.edu) allowance: twice the standard." : "Standard allowance. A Google or Microsoft account with a verified .edu email gets twice as much.");
+    // The Worker already counts invite units in `limit`; say where they came from.
+    const extra = Object.keys(ALLOWANCE_LABELS).filter(k => me.allowance[k] && me.allowance[k].bonus > 0)
+      .map(k => `${me.allowance[k].bonus} ${midSentence(ALLOWANCE_LABELS[k])}`);
+    if (extra.length) lines.push(`Includes ${extra.join(" and ")} from invites. They don't expire.`);
+    if (me.plan && me.plan !== "free") lines.push((PLAN_LABELS[me.plan] || me.plan) + " plan" + (me.plan_renews ? ", renews " + String(me.plan_renews).slice(0, 10) : "") + ". Thank you.");
+    if (me.paused) lines.push("AI is paused for everyone until next month; search still works.");
+    return lines.join("\n");
+  }
+
+  // Upgrade ("checkout", with which tier) or change/cancel ("portal"). The Worker talks to Stripe;
+  // we only get a URL to send the student to. No card details ever touch this page.
+  async function billingUrl(token, kind, plan) {
+    if (!workerOn() || !token) return { error: "Sign in first." };
+    try {
+      const r = await fetch(C.workerUrl.replace(/\/$/, "") + "/billing/" + kind, {
+        method: "POST",
+        headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+        body: JSON.stringify(plan ? { plan } : {}),
+      });
+      // was: if (r.status === 401) { signOut(); return { error: "Sign in again." }; }
+      if (r.status === 401) { forget(token); return { error: "Sign in again." }; }
+      const b = await r.json().catch(() => ({}));
+      if (r.ok && b.url) return { url: b.url };
+      return { error: b.message || "That didn't work. Try again later." };
+    } catch (e) { return { error: "Couldn't reach the server." }; }
+  }
+
+  // "Delete my data": server rows (if signed in), then everything this page keeps in the browser.
+  async function deleteMyData(token) {
+    let server = null, blocked = false;
+    if (workerOn() && token) {
+      try {
+        const r = await fetch(C.workerUrl.replace(/\/$/, "") + "/me", { method: "DELETE", headers: { Authorization: "Bearer " + token } });
+        server = r.ok;
+        // A live subscription would keep billing a card for an account we'd just erased, so the
+        // Worker refuses until it is cancelled. Leave the browser copy alone and say so.
+        if (r.status === 409) return { server: false, blocked: true };
+      } catch (e) { server = false; }
+    }
+    ls.del(PROFILE_KEY); ls.del("internscout.demand.sent"); ls.del(INVITE_KEY); ls.del(DIGEST_NUDGE_KEY); ls.set(DELETED_KEY, true);
+    // was: ss.del(TOKEN_KEY);
+    // The invite check now keeps the account's sub for the session; it comes from the token and goes with it.
+    // was: ss.del(TOKEN_KEY); ss.del(INVITE_EDU_KEY);
+    // was: ss.del(TOKEN_KEY); ss.del(INVITE_EDU_KEY); ss.del(INVITE_TRIED_KEY);
+    // DELETE /me also ends every session of the account on the Worker, so the record here goes too.
+    ss.del(TOKEN_KEY); ls.del(SESSION_KEY); ss.del(INVITE_EDU_KEY); ss.del(INVITE_TRIED_KEY);
+    return { server };
+  }
+
+  // ---------- feedback links ----------
+  function reportUrl(x) {
+    if (C.formUrl) return C.formUrl.includes("{id}") ? C.formUrl.split("{id}").join(encodeURIComponent(x.id)) : C.formUrl;
+    const title = `Wrong tag: listing ${x.id} (${x.company_name} - ${x.title})`;
+    return `https://github.com/${C.repo}/issues/new?template=${encodeURIComponent(C.reportTemplate || "wrong_tag.yml")}&title=${encodeURIComponent(title)}`;
+  }
+
+  // ---------- weekly email ----------
+  // The newsletter's public web archive on Buttondown, worked out from the sign-up form's address
+  // (CONFIG.digest.formAction, the one place it is pasted): ".../api/emails/embed-subscribe/NAME" ->
+  // "https://buttondown.com/NAME/archive/". "" for any other address, so the dashboard shows no
+  // "See last Monday's email" link it can't vouch for. backend/internscout/seo_pages.py digest_archive
+  // does the same for the landing pages (added 2026-10-06).
+  function digestArchive(formAction) {
+    const m = /^https:\/\/buttondown\.(?:com|email)\/api\/emails\/embed-subscribe\/([A-Za-z0-9_-]+)\/?$/.exec(String(formAction || ""));
+    return m ? `https://buttondown.com/${m[1]}/archive/` : "";
+  }
+
+  window.IS = {
+    C, DAY, US_STATES, CA_PROVINCES, CANADA_KEYS, isCanadaKey, inCanadaOnly, BASELINE, REGION_SHORTCUTS, YEARS, YEAR_LABEL, YEAR_PLURAL, STAGES, STAGE_LABEL, STAGE_DEFAULTS, TERMS, upcomingTerms, WORK_AUTH,
+    fieldLabel, keyLabel, termText, ls, ss,
+    emptyProfile, loadProfile, saveProfile, profileKeys, demandStates, ALL_KEY, viewScope, FIRST_KEYS, loadPlan,
+    FILTER_PARAMS, filtersFromUrl, filterParams, filterSearch,
+    parseQuery, splitPlaces, queryKeys, placeWords, stem, compileQuery, matchScore, majorForFields,
+    regs, shardKeys, isRemote, realSalary, applicationBatch, queuedListingIds, handledListingIds, heldUrls, SELECT_MAX, headerChecked, selectRows, sortRows, listRows, citizenRule, noSponsorship, payOf, citizenBlocked, yearsFit, yearsText,
+    // was: WEIGHTS, PART_LABEL, profileFields, score,
+    // primaryField is exported because the dashboard's coverage line (docs/js/app.js) needs the
+    // student's own tag, not the biggest one in the Set profileFields returns.
+    WEIGHTS, PART_LABEL, profileFields, primaryField, score,
+    // termFit (2026-10-14): the dashboard's season check that can only hide a listing from its own box.
+    termFit,
+    createStore, loadMajors, majorsNote, loadStats,
+    ext, bridgeProfile, fromBridgeProfile,
+    // was: workerOn, decodeJwt, tokenOk, storedToken, handleRedirect, fetchWorkerConfig, ...
+    workerOn, decodeJwt, authInfo, authOk, tokenOk, storedToken, SESSION_KEY, handleRedirect, startSession, fetchWorkerConfig, startSignIn, count, PROVIDER_LABELS, signOut, postDemand, deleteMyData, profileDeleted,
+    fetchMe, leftOf, allowanceText, plansBanner, PLANS_BANNER_KEY, PLANS_BANNER_ID, billingUrl, PLAN_LABELS, INVITE_KEY, INVITE_EDU_KEY, INVITE_TRIED_KEY, INVITE_CODE, fetchInvite, claimInvite, ALLOWANCE_LABELS, midSentence,
+    INVITE_NUDGE_KEY, inviteNudgeDue, inviteNudgeSeen, markInviteNudge,
+    DIGEST_NUDGE_KEY, createDigestNudge,
+    REVIEW_LINE_KEY, REVIEWS_URL, reviewLineDue,
+    reportUrl, digestArchive, sectorLabel: s => s ? String(s).replace(/_/g, " ").replace(/^./, c => c.toUpperCase()) : "",
+  };
+})();

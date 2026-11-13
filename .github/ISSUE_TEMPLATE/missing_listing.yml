@@ -1,0 +1,59 @@
+name: Missing listing
+description: An internship, co-op, research or fellowship program that InternScout doesn't show.
+title: "[Missing] "
+labels: ["missing-listing"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping fill the gaps. This issue is public, so please don't include personal details.
+  - type: input
+    id: url
+    attributes:
+      label: Link to the posting
+      description: The employer's own page is best.
+      placeholder: https://
+    validations:
+      required: true
+  - type: input
+    id: employer
+    attributes:
+      label: Employer
+    validations:
+      required: true
+  - type: input
+    id: title
+    attributes:
+      label: Role title
+    validations:
+      required: true
+  - type: input
+    id: location
+    attributes:
+      label: Location
+      placeholder: Boston, MA / Remote (US)
+  - type: dropdown
+    id: stage
+    attributes:
+      label: Type
+      options:
+        - Internship
+        - Co-op
+        - Research
+        - Fellowship
+        - Early insight (first-year / sophomore program)
+        - Part-time
+        - Apprenticeship
+        - Not sure
+    validations:
+      required: true
+  - type: input
+    id: field
+    attributes:
+      label: Field or major it fits
+      placeholder: Nursing, museums, public policy...
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else?
+      description: For example, "this employer posts every year on iCIMS" or "none of their roles show up".

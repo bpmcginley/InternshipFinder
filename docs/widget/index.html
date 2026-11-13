@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, follow">
+<title>Open internships | InternScout widget</title>
+<style>
+  /* Self-contained widget styles. Scoped under .isw so they never leak
+     into the embedding page. No external dependencies. */
+  .isw, .isw * { box-sizing: border-box; }
+  .isw {
+    margin: 0; padding: 14px 16px 12px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+      Helvetica, Arial, sans-serif;
+    font-size: 14px; line-height: 1.45; color: #1a1a1a;
+    background: #ffffff;
+  }
+  .isw-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 12px; margin-bottom: 10px;
+  }
+  .isw-title { font-size: 15px; font-weight: 700; margin: 0; }
+  .isw-brand {
+    font-size: 11px; color: #6b7280; text-decoration: none; white-space: nowrap;
+  }
+  .isw-brand:hover { text-decoration: underline; }
+  .isw-list { list-style: none; margin: 0; padding: 0; }
+  .isw-item { padding: 9px 0; border-top: 1px solid #eef0f2; }
+  .isw-item:first-child { border-top: 0; padding-top: 0; }
+  .isw-job { font-weight: 600; color: #0b5fff; text-decoration: none; }
+  .isw-job:hover { text-decoration: underline; }
+  .isw-meta { margin-top: 2px; font-size: 12px; color: #6b7280; }
+  .isw-foot { margin-top: 10px; font-size: 12px; color: #6b7280; }
+  .isw-foot a { color: #0b5fff; text-decoration: none; }
+  .isw-foot a:hover { text-decoration: underline; }
+  .isw-empty, .isw-error { padding: 18px 4px; color: #6b7280; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="isw" id="isw" aria-busy="true">
+  <div class="isw-head">
+    <p class="isw-title" id="isw-title">Open internships</p>
+    <a class="isw-brand" href="https://internscout.org" target="_blank" rel="noopener">Powered by InternScout</a>
+  </div>
+  <ul class="isw-list" id="isw-list" aria-live="polite"><li class="isw-empty" role="status">Loading open internships.</li></ul>
+  <div class="isw-foot" id="isw-foot"></div>
+</div>
+<script>
+(function () {
+  "use strict";
+  var params = new URLSearchParams(window.location.search);
+  var rawField = (params.get("field") || "").trim().toLowerCase();
+  var limit = parseInt(params.get("limit") || "8", 10);
+  if (!isFinite(limit) || limit < 1) limit = 8;
+  if (limit > 12) limit = 12;
+
+  // Friendly aliases -> field tags used in the listings data.
+  var ALIASES = {
+    "cs": "swe", "computer-science": "swe", "software": "swe",
+    "software-engineering": "swe",
+    "data-science": "data", "datascience": "data",
+    "mechanical-engineering": "mechanical", "mech": "mechanical",
+    "electrical-engineering": "electrical",
+    "civil-engineering": "civil",
+    "chemical-engineering": "chemical",
+    "biomedical-engineering": "biomedical",
+    "computer-engineering": "hardware",
+    "accounting": "accounting", "marketing": "marketing",
+    "healthcare": "health",
+    "law": "law", "legal": "law",
+    "sales": "sales", "government": "government"
+  };
+  var tags = rawField ? rawField.split(",").map(function (t) {
+    t = t.trim();
+    return ALIASES[t] || t;
+  }).filter(Boolean) : [];
+
+  var listEl = document.getElementById("isw-list");
+  var footEl = document.getElementById("isw-foot");
+  var titleEl = document.getElementById("isw-title");
+
+  function esc(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+  function okUrl(u) {
+    return typeof u === "string" && /^https?:\/\//i.test(u);
+  }
+  function locOf(r) {
+    if (typeof r.location === "string") return r.location;
+    if (r.is_remote) return "Remote";
+    if (r.regions && r.regions.length && r.regions[0].loc) return r.regions[0].loc;
+    return r.state || "";
+  }
+
+  function render(rows, data) {
+    document.getElementById("isw").setAttribute("aria-busy", "false");
+    listEl.innerHTML = "";
+    if (!rows.length) {
+      listEl.innerHTML = '<li class="isw-empty">No open roles in this field right now. ' +
+        '<a href="https://internscout.org" target="_blank" rel="noopener">Browse all internships on InternScout</a>.</li>';
+      footEl.innerHTML = "";
+      return;
+    }
+    var html = "";
+    rows.slice(0, limit).forEach(function (r) {
+      var meta = [r.company_name, locOf(r)].filter(Boolean).join(" · ");
+      var bits = [];
+      if (r.salary) bits.push(r.salary);
+      if (Array.isArray(r.stage) && r.stage.length) bits.push(r.stage.join(", "));
+      var sub = bits.length ? esc(bits.join(" · ")) : "";
+      var href = okUrl(r.apply_url) ? ' href="' + esc(r.apply_url) + '" target="_blank" rel="noopener"' : "";
+      html += '<li class="isw-item">' +
+        '<a class="isw-job"' + href + '>' + esc(r.title || "Open role") + "</a>" +
+        (meta ? '<div class="isw-meta">' + esc(meta) + "</div>" : "") +
+        (sub ? '<div class="isw-meta">' + sub + "</div>" : "") +
+        "</li>";
+    });
+    listEl.innerHTML = html;
+    footEl.innerHTML = 'Updated ' + esc(data.generated_at.slice(0, 10)) + ' (UTC). <a href="https://internscout.org" target="_blank" rel="noopener">Search all ' +
+      esc(data.total.toLocaleString("en-US")) + ' open roles on InternScout</a>.';
+  }
+
+  if (rawField) {
+    titleEl.textContent = "Open internships: " + rawField;
+  }
+
+  // Built from the complete open corpus: newest 12 per field plus global newest 12, deduplicated.
+  // No embed downloads dozens of state files, and a field absent from the dashboard preview is not
+  // mistaken for an empty field. Download size and time are bounded even for a malformed response.
+  var MAX_BYTES = 2 * 1024 * 1024, MAX_ROWS = 12 * 129;
+  function readFeed(r) {
+    if (!r.ok || !r.body || !r.body.getReader || Number(r.headers.get("Content-Length")) > MAX_BYTES) throw new Error("feed unavailable");
+    var reader = r.body.getReader(), decoder = new TextDecoder(), text = "", bytes = 0;
+    function next() {
+      return reader.read().then(function (part) {
+        if (part.done) return JSON.parse(text + decoder.decode());
+        bytes += part.value.byteLength;
+        if (bytes > MAX_BYTES) { reader.cancel(); throw new Error("feed too large"); }
+        text += decoder.decode(part.value, { stream: true });
+        return next();
+      });
+    }
+    return next();
+  }
+  function validFeed(data) {
+    if (!data || data.schema !== 1 || data.per_field !== 12 || !Number.isInteger(data.total) || data.total < 0 ||
+        typeof data.generated_at !== "string" || !isFinite(Date.parse(data.generated_at)) ||
+        !Array.isArray(data.rows) || data.rows.length > MAX_ROWS || data.rows.length > data.total ||
+        !data.counts || typeof data.counts !== "object" || Array.isArray(data.counts)) throw new Error("incomplete feed");
+    var fields = Object.keys(data.counts), seen = new Set();
+    if (fields.length > 128) throw new Error("too many fields");
+    data.rows.forEach(function (r) {
+      if (!r || typeof r.id !== "string" || !r.id || seen.has(r.id) || typeof r.title !== "string" || !r.title.trim() ||
+          !okUrl(r.apply_url) || !Array.isArray(r.field_tags) || r.field_tags.some(function (f) { return typeof f !== "string" || !/^[a-z][a-z0-9_]{0,39}$/.test(f); })) throw new Error("invalid role");
+      seen.add(r.id);
+    });
+    fields.forEach(function (field) {
+      var count = data.counts[field];
+      if (!/^[a-z][a-z0-9_]{0,39}$/.test(field) || !Number.isInteger(count) || count < 1 || count > data.total ||
+          data.rows.filter(function (r) { return r.field_tags.indexOf(field) !== -1; }).length < Math.min(12, count)) throw new Error("incomplete field coverage");
+    });
+    if (data.rows.length < Math.min(12, data.total)) throw new Error("incomplete global coverage");
+    return data;
+  }
+  var controller = new AbortController();
+  var timer = setTimeout(function () { controller.abort(); }, 12000);
+  fetch("../data/widget.json", { cache: "no-store", signal: controller.signal })
+    .then(readFeed)
+    .then(validFeed)
+    .then(function (data) {
+      var rows = data.rows;
+      if (tags.length) {
+        rows = rows.filter(function (r) {
+          var ft = (r.field_tags || []).map(function (t) { return String(t).toLowerCase(); });
+          return tags.some(function (t) { return ft.indexOf(t) !== -1; });
+        });
+      }
+      render(rows, data);
+    })
+    .catch(function () {
+      controller.abort();  // release a rejected/oversized response instead of leaving its body open
+      document.getElementById("isw").setAttribute("aria-busy", "false");
+      listEl.innerHTML = '<li class="isw-error" role="alert">Could not load the full listings right now. Reload to try again, or ' +
+        '<a href="https://internscout.org" target="_blank" rel="noopener">Search internships on InternScout</a>.</li>';
+      footEl.innerHTML = "";
+    }).finally(function () { clearTimeout(timer); });
+})();
+</script>
+</body>
+</html>

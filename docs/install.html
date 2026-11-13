@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Install the extension · InternScout</title>
+<!-- was: <meta name="description" content="How to install the InternScout Auto-Apply extension by hand, until it's in the Chrome Web Store."/> -->
+<meta name="description" content="Add the free InternScout Auto-Apply extension from the Chrome Web Store. It fills internship applications from your profile and stops at the submit button."/>
+
+<!-- Link previews, same reasoning as index.html: this page is the one students actually forward, and
+     until today it forwarded as a bare grey URL. The description here is written for the preview rather
+     than reused from the meta above, because a link landing in a group chat has to answer "how long is
+     this going to take me" and "will it work on my phone" before anyone taps it.
+     og:image is the absolute URL of docs/og-preview.png, the same 1200x630 card index.html points at
+     (built by scripts/make_og_image.py), so a forwarded link looks identical whichever page it came
+     from. It pointed at icon128.png until 2026-09-19, which is genuinely 128x128: Facebook's scraper
+     rejects an og:image under 200x200 and X's card needs at least 144x144, so those two showed a
+     title-only card with no thumbnail. The URL is absolute because the OG spec asks for one.
+     icon128.png still serves the rel=icon and rel=apple-touch-icon links below.
+     was: "og:image is document-relative because the site lives under the /InternshipFinder/ project
+     path on github.io; scrapers resolve it against og:url." -->
+<meta property="og:title" content="Install InternScout Auto-Apply"/>
+<!-- was: <meta property="og:description" content="Load the InternScout Auto-Apply extension by hand in about three minutes. Chrome, Edge or Brave, on a laptop or desktop. Searching needs none of this."/> -->
+<meta property="og:description" content="Add InternScout Auto-Apply from the Chrome Web Store in about a minute. Chrome, Edge or Brave, on a laptop or desktop. Searching needs none of this."/>
+<meta property="og:type" content="article"/>
+<meta property="og:url" content="https://internscout.org/install.html"/>
+<!-- Landing pages link here as install.html?from=landing-page (see the script at the bottom); this
+     keeps every such address one page to search engines. -->
+<link rel="canonical" href="https://internscout.org/install.html"/>
+<!-- was: <meta property="og:image" content="icon128.png"/> -->
+<meta property="og:image" content="https://internscout.org/og-preview.png"/>
+<!-- was: <meta name="twitter:card" content="summary"/> -->
+<!-- Same card as index.html, so the same card type: summary would centre-crop 1200x630 to a square
+     and cut the icon and the tagline off it. -->
+<meta name="twitter:card" content="summary_large_image"/>
+<link rel="icon" type="image/png" sizes="48x48" href="icon48.png"/>
+<link rel="icon" type="image/png" sizes="128x128" href="icon128.png"/>
+<link rel="apple-touch-icon" href="icon128.png"/>
+<!-- 2026-10-14 (U6): the steps follow what happens after install. Setup opens by itself with sign-in on its
+     first screen, so "Set up Auto-Apply" is step 2 and pinning is an optional step 3. was: 2 Pin it,
+     3 Click the InternScout icon and choose Sign in. Step 1 also says what Chrome's permission dialog
+     will list (extension/manifest.json: tabs and webNavigation, shown as reading browsing history, and
+     19 job sites, shown as a number of websites). -->
+<!-- The install steps as a HowTo, dated (2026-10-05; the audit asked for a published and an updated
+     date on the page and in structured data). datePublished is the day this page was first committed
+     (git log), dateModified the last day its words changed: bump it when they do. The publisher is
+     the brand, by its @id from backend/internscout/seo_pages.py ORGANIZATION; no author, as on the
+     rest of the site. The steps are the three under the heading, in the same words. -->
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"HowTo","@id":"https://internscout.org/install.html#howto","name":"Install the InternScout Auto-Apply extension","description":"Add the free InternScout Auto-Apply extension from the Chrome Web Store in desktop Chrome, Edge or Brave. Set up Auto-Apply then opens in a new tab: sign in with Google or Microsoft and add your resume. About three minutes in all.","url":"https://internscout.org/install.html","inLanguage":"en-US","datePublished":"2026-09-15","dateModified":"2026-11-10","totalTime":"PT3M","publisher":{"@type":"Organization","@id":"https://internscout.org/#organization","name":"InternScout","url":"https://internscout.org/"},"isPartOf":{"@id":"https://internscout.org/#website"},"step":[{"@type":"HowToStep","position":1,"name":"Add it from the Chrome Web Store","text":"Open the listing, click Add to Chrome, then Add extension. In Edge, click Allow extensions from other stores first. Chrome will say the extension can read and change your data on a number of websites and read your browsing history: the websites are the job application systems it fills in, and it reads your tabs to find the application tab it opened.","url":"https://chromewebstore.google.com/detail/internscout-auto-apply/hpnbbpmalfjijnmpoihhjgjolhabjpgi"},{"@type":"HowToStep","position":2,"name":"Set up Auto-Apply","text":"Auto-Apply setup opens in a new tab: sign in and add your resume (about 2 minutes). Sign in with Google or a personal Microsoft account. Sign-in is only needed for AI features like Auto-Apply and tailored resumes."},{"@type":"HowToStep","position":3,"name":"Pin it to your toolbar (optional)","text":"Click the puzzle-piece icon next to the address bar, then the pin next to InternScout Auto-Apply."}]}
+</script>
+<style>
+  /* The site's self-hosted faces (2026-10-14, docs/fonts/). This page named IBM Plex Sans and Source Serif 4
+     but never loaded them, so it drew in Segoe UI and Georgia. */
+  @font-face{font-family:"IBM Plex Sans";src:url(/fonts/ibm-plex-sans-latin.woff2) format("woff2");font-weight:100 700;font-style:normal;font-display:swap;unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+  @font-face{font-family:"Source Serif 4";src:url(/fonts/source-serif-4-latin.woff2) format("woff2");font-weight:600;font-style:normal;font-display:swap;unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+  :root{
+    --paper:#f6f4ef; --panel:#fffefb; --sunk:#efece5;
+    --ink:#17191c; --ink2:#454a52; --ink3:#646a73; --rule:#e2ded4;
+    /* ink2/ink3 were #4b5058/#868b92 here and #b3b1aa/#7d7c77 in dark: ink3 was 3.1:1 on this paper
+       (4.4:1 in dark), under AA for body-size text. Same values as the dashboard now. */
+    --accent:#1d5c46; --accent-ink:#fff; --accent-soft:#e3eee8; --accent-hover:#164a38; --amber:#9a6412;
+    --serif:"Source Serif 4",Georgia,"Times New Roman",serif;
+    --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+    color-scheme:light;
+  }
+  @media (prefers-color-scheme:dark){:root{
+    --paper:#131416; --panel:#1a1b1e; --sunk:#232427;
+    --ink:#ecebe6; --ink2:#b8b6af; --ink3:#95948e; --rule:#2c2d31;
+    --accent:#7cc3a1; --accent-ink:#0f1a15; --accent-soft:#1c2a24; --accent-hover:#95d2b3; --amber:#e0b25e;
+    color-scheme:dark;
+  }}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.65 var(--sans);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:740px;margin:0 auto;padding:0 20px 64px}
+  header.top{display:flex;align-items:baseline;justify-content:space-between;gap:8px 20px;flex-wrap:wrap;padding:22px 0 14px;border-bottom:1px solid var(--ink)}
+  .mark{font:600 22px/1 var(--serif);letter-spacing:-.3px;color:var(--ink);text-decoration:none}
+  nav{display:flex;gap:4px 16px;flex-wrap:wrap}
+  nav a{color:var(--ink2);font-size:14px;text-decoration:none}
+  nav a{transition:color 140ms ease-out}
+  nav a:hover{color:var(--ink)}
+  nav a[aria-current=page]{color:var(--accent);font-weight:600}
+  h1{font:600 34px/1.15 var(--serif);letter-spacing:-.5px;margin:36px 0 4px}
+  .meta{color:var(--ink3);font-size:14px;margin:0 0 20px}
+  .permissions summary{cursor:pointer;min-height:44px;padding:8px 0;color:var(--accent);font-weight:600}
+  .permissions[open]{margin-bottom:12px}
+  .demo{border-style:dashed}
+  .lede{font-size:18px;color:var(--ink2);margin:0 0 8px}
+  h2{font:600 22px/1.25 var(--serif);margin:40px 0 10px;padding-top:20px;border-top:1px solid var(--rule)}
+  h3{font-size:17px;margin:0 0 4px;color:var(--ink)}
+  p,li{color:var(--ink2)}
+  strong{color:var(--ink)}
+  a{color:var(--accent)}
+  ul{padding-left:22px}
+  li{margin:5px 0}
+  code,kbd{font:14px var(--mono);background:var(--sunk);padding:1px 6px;border-radius:4px;overflow-wrap:anywhere}
+  /* was: a 3px accent (or amber) bar down the left edge. One even border now, tinted for a warning. */
+  .box{background:var(--panel);border:1px solid var(--rule);border-radius:6px;padding:6px 18px;margin:22px 0}
+  .box.warn{border-color:color-mix(in srgb,var(--amber) 45%,var(--rule))}
+  .box h3{margin-top:12px}
+  /* The step and box titles are h2 since 2026-10-14 (heading order, U12), drawn as the h3 they were. */
+  ol.steps>li h2,.box h2{font:inherit;font-size:17px;font-weight:700;margin:0 0 4px;padding:0;border:0;color:var(--ink)}
+  .box h2{margin-top:12px}
+  .btn{display:inline-block;margin:8px 0 4px;padding:10px 16px;border-radius:6px;background:var(--accent);color:var(--accent-ink);font-weight:600;text-decoration:none;
+    transition:background-color 140ms ease-out}
+  /* was: filter:brightness(1.1), a wash over the whole button. A darker (in dark mode, lighter) green
+     is a real change of state, and the press moves the button a pixel down. */
+  .btn:hover{background:var(--accent-hover)}
+  .btn:active{transform:translateY(1px)}
+  /* The review line under the store button: smaller and quieter than the step it sits in. */
+  ol.steps>li p.review-ask{margin-top:10px;font-size:14px;color:var(--ink3)}
+  ol.steps{list-style:none;counter-reset:step;padding:0;margin:28px 0 0}
+  ol.steps>li{counter-increment:step;position:relative;padding:0 0 22px 52px;margin:0}
+  ol.steps>li::before{content:counter(step);position:absolute;left:0;top:-2px;width:34px;height:34px;border-radius:50%;background:var(--accent-soft);color:var(--accent);font:600 16px/34px var(--sans);text-align:center}
+  ol.steps>li p{margin:4px 0}
+  footer{margin-top:48px;padding-top:16px;border-top:1px solid var(--rule);color:var(--ink3);font-size:14px}
+  footer a{color:var(--ink2)}
+  .distribution-links{display:flex;flex-wrap:wrap;gap:8px 24px;margin-bottom:16px}
+  .distribution-links a{display:inline-flex;align-items:center;min-height:44px}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  @media (max-width:480px){h1{font-size:28px}.lede{font-size:17px}ol.steps>li{padding-left:46px}}
+
+  /* Share control. .btn above was written for the <a> on step 1, so a real <button> needs the border
+     and font reset to land in the same place visually. */
+  button.btn{border:0;font:600 16px var(--sans);cursor:pointer}
+  .share-row{display:flex;align-items:center;gap:6px 12px;flex-wrap:wrap;margin:6px 0 4px}
+  .share-note{color:var(--ink3);font-size:14px;overflow-wrap:anywhere}
+  /* was: "...so they cannot load an extension from a folder, which is what step 5 below asks for. A
+     student who opens this page on a phone is reading seven steps they cannot perform."
+     Chrome, Edge and Brave on a phone or tablet can't add extensions from the Chrome Web Store (and
+     have no Developer mode for the by-hand route either). A student who opens this page on a phone is
+     reading steps they cannot perform. Show them that first, and give them the one useful action:
+     send the link to the laptop they will install from.
+     The query now tests the hardware only, because the copy in .phonebar is about the hardware. It
+     also used to fire at (max-width:640px), which is a window size and not a device: an ordinary
+     desktop browser in a side-by-side window matches it, and so does a 1280px window at 200% browser
+     zoom, which is 640 CSS px and is the low-vision case. Those readers were told the seven steps
+     underneath would not work for them, which is false and is contradicted by the steps themselves.
+     was: pointer:coarse with hover:none means touch and no mouse; a Windows touchscreen laptop reports
+     a coarse pointer but also hover:hover, so it installs extensions fine and still never sees this.
+     That credited the wrong half: `pointer` describes the PRIMARY pointing device, so a touchscreen
+     laptop reports pointer:fine because its trackpad is primary -- it is `any-pointer` that would read
+     coarse. The pair matches only where touch is the primary input and nothing hovers, which is a phone
+     or a tablet. A detachable in tablet mode does match, and that is accepted: it cannot install a
+     Chrome extension either. */
+  .phonebar{display:none}
+  /* was: @media (max-width:640px),(pointer:coarse) and (hover:none){.phonebar{display:block}} */
+  @media (pointer:coarse) and (hover:none){.phonebar{display:block}}
+  .phonebar{background:var(--panel);border:1px solid color-mix(in srgb,var(--amber) 45%,var(--rule));border-radius:6px;padding:14px 18px 16px;margin:0 0 24px}
+  .phonebar h2{font:600 18px/1.3 var(--sans);margin:0 0 4px;padding:0;border:0}
+  .phonebar p{margin:0 0 10px;font-size:15px}
+  @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+  @media (prefers-reduced-motion:reduce){.btn:active{transform:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a class="mark" href="index.html">InternScout</a>
+    <nav aria-label="Site">
+      <a href="index.html">Dashboard</a>
+      <a href="install.html" aria-current="page">Install</a>
+      <a href="pricing/">Pricing</a>
+      <a href="privacy.html">Privacy</a>
+      <a href="terms.html">Terms</a>
+    </nav>
+  </header>
+
+  <main>
+    <h1>Install the extension</h1>
+    <p class="lede"><strong>Your first minute:</strong> add Auto-Apply from the Chrome Web Store on your laptop or desktop. It fills applications from your resume; you review and press Submit.</p>
+    <p>Then setup opens in a new tab. Sign in and add your resume (about 2 more minutes).</p>
+    <a class="btn" href="https://chromewebstore.google.com/detail/internscout-auto-apply/hpnbbpmalfjijnmpoihhjgjolhabjpgi?utm_source=install-page">Add Auto-Apply to Chrome</a>
+    <!-- was: <p class="meta">About 3 minutes · Chrome, Edge or Brave on a laptop or desktop</p> -->
+    <!-- The dates match the HowTo block in the head: published is the day the page was first
+         committed, updated the last day its words changed. was: no dates on the page. -->
+    <p class="meta">About 3 minutes · Chrome, Edge or Brave on a laptop or desktop · Published <time datetime="2026-09-15">September 15, 2026</time> · Updated <time datetime="2026-11-10">November 10, 2026</time></p>
+
+    <!-- Phone-only banner. Hidden on desktop by CSS, not by script, so it is right even before the
+         page's JavaScript runs. See the .phonebar rules for why the media query is written as it is. -->
+    <aside class="phonebar" id="phone">
+      <h2>This one needs a laptop</h2>
+      <!-- was: <p>Chrome, Edge and Brave on phones and tablets can't install extensions at all, so the steps below
+         won't work here. Send yourself the link and open it on your laptop. Searching still works on this
+         phone: the <a href="index.html">dashboard</a> needs no extension and no account.</p> -->
+      <!-- "can't install extensions at all" is disprovable in ten seconds: Brave for Android ships a
+           small fixed list of extensions you can turn on. What is true of all three browsers on all
+           phones and tablets is that none of them expose the chrome://extensions Developer mode this
+           page needs, so none can load an extension from a folder - which is step 5 below. -->
+      <!-- was: <p>Chrome, Edge and Brave on phones and tablets can't load an extension from a folder, so the steps
+         below won't work here. ...</p> -->
+      <p>Chrome, Edge and Brave on phones and tablets can't add extensions from the Chrome Web Store, so
+         the steps below won't work here. Send yourself the link and open it on your laptop. Searching still
+         works on this phone: the <a href="index.html">dashboard</a> needs no extension and no account.</p>
+      <div class="share-row">
+        <button class="btn" type="button" data-share>Send this to my laptop</button>
+        <span class="share-note" role="status" aria-live="polite"></span>
+      </div>
+    </aside>
+
+    <!-- was: <p class="lede">The InternScout Auto-Apply extension isn't in the Chrome Web Store yet. Until it is, you install it by hand. These steps show you how.</p>
+         The store approved it on 2026-09-22, so the by-hand steps moved down to "Install by hand instead"
+         for the few people who still need them, and the store button is step 1. -->
+    <!-- was: <p class="lede">InternScout Auto-Apply is in the Chrome Web Store. Add it in a click, and it keeps itself up to date.</p>
+         Folded into the opening paragraph above (2026-10-05). -->
+    <p>You don't need the extension to search. The <a href="index.html">dashboard</a> works on its own. The extension adds Auto-Apply, which fills out applications and stops at the submit button.</p>
+
+    <!-- Step titles are h2 (2026-10-14, U12): they were h3 straight after the h1 (axe heading-order).
+         Drawn as before. -->
+    <ol class="steps">
+      <li>
+        <h2>Add it from the Chrome Web Store</h2>
+        <p>Open the listing, click <strong>Add to Chrome</strong>, then <strong>Add extension</strong>.</p>
+        <p><strong>Edge:</strong> click <strong>Allow extensions from other stores</strong> in the bar at the top of the listing first, then add it the same way. <strong>Brave</strong> works like Chrome.</p>
+        <details class="permissions">
+          <summary>What will Chrome ask?</summary>
+          <p class="perm">Before it adds the extension, Chrome lists what it can do, including <strong>Read and change your data on a number of websites</strong> and <strong>Read your browsing history</strong>. The websites are the job application systems it fills in, and it reads your tabs to find the application tab it opened.</p>
+        </details>
+        <a class="btn" href="https://chromewebstore.google.com/detail/internscout-auto-apply/hpnbbpmalfjijnmpoihhjgjolhabjpgi?utm_source=install-page">Open it in the Chrome Web Store</a>
+        <!-- Added 2026-10-07. Someone already using it lands here too (the help links point here), so the
+             review ask sits by the store button: same words for everyone, nothing offered for it.
+             js/count.js counts a click as "review_click", not "install_click". -->
+        <p class="review-ask">Using Auto-Apply? A short review helps other students find it. <a href="https://chromewebstore.google.com/detail/internscout-auto-apply/hpnbbpmalfjijnmpoihhjgjolhabjpgi/reviews">Leave a review</a></p>
+      </li>
+      <li>
+        <h2>Set up Auto-Apply</h2>
+        <p><strong>Set up Auto-Apply</strong> opens in a new tab: sign in and add your resume (about 2 minutes).</p>
+        <!-- was: <p>Click the InternScout icon and choose <strong>Sign in with Google (UMass email)</strong> or <strong>Sign in with Microsoft</strong>. ...</p>
+             <p>School Microsoft accounts (like your @umass.edu Outlook login) don't work yet: ... sign in with Google using your @umass.edu address. ...</p>
+             2026-10-04: any school works, and a .edu from any school gets the larger allowance (worker/src/auth.js), so
+             the steps no longer read as UMass-only. -->
+        <!-- was (step 3, "Sign in with Google or Microsoft"): <p>Click the InternScout icon and choose <strong>Sign in with Google</strong> ...
+             Sign-in is on setup's first screen. -->
+        <p>On its first screen, choose <strong>Sign in with Google</strong> or <strong>Sign in with Microsoft</strong>. Any Google account or personal Microsoft account works. A Google account with a .edu email gets about twice the monthly AI use. We never see your password.</p>
+        <p>School Microsoft accounts (your school's Microsoft login, the one you use for Outlook) don't work yet: they ask for your school's IT approval. To get the higher .edu allowance, sign in with Google using your school .edu address. If you don't have a Google account for it, create one with <em>Use your existing email</em> and enter your school .edu email.</p>
+        <p>Sign-in is only needed for AI features like Auto-Apply and tailored resumes.</p>
+        <!-- Paid plans went live 2026-09-19 (worker/wrangler.toml: PAYMENTS_ENABLED=1, SUPPORTER_PRICE_TEXT
+             $4/month, PRO_PRICE_TEXT $8/month). This page already told students about a monthly AI
+             allowance; leaving out what happens when it runs out, and what it costs, is the kind of
+             surprise that gets an extension one-starred. Stated here, at the step where the account is
+             created, rather than at the top where it would read as a paywall on a product that has none. -->
+        <p>Every account gets a free AI allowance each month. If you use it up, <strong>Supporter</strong>
+           ($4/month) or <strong>Pro</strong> ($8/month) raises it; both are optional, and Stripe handles
+           the payment and the cancelling. Searching, ranking and the <a href="index.html">dashboard</a>
+           stay free and need no account at all.</p>
+      </li>
+      <li>
+        <h2>Pin it to your toolbar (optional)</h2>
+        <p>Click the puzzle-piece icon next to the address bar, then the pin next to <strong>InternScout Auto-Apply</strong>.</p>
+      </li>
+    </ol>
+
+    <aside class="box demo" aria-labelledby="demo-title">
+      <h2 id="demo-title">Auto-Apply demo</h2>
+      <p>A short demo is not available yet. Use the setup steps above to get started.</p>
+    </aside>
+
+    <div class="box">
+      <h2>Next</h2>
+      <ul>
+        <!-- was: <li>Finish the <strong>Deep Dive</strong>: your resume, facts and a few short questions. Everything stays on your device.</li>
+             Not true since 2026-09-26: the profile is saved to the account by default (privacy.html#saved). -->
+        <!-- was: <li>Finish the <strong>Deep Dive</strong>: your resume, facts and a few short questions. ...
+             2026-10-14 (D29): the two-minute part is "Set up Auto-Apply"; "Deep Dive" names only the optional
+             Interview and Voice steps. -->
+        <li>After sign-in and your resume, <strong>Set up Auto-Apply</strong> offers quick facts and the optional <strong>Deep Dive</strong> (a short interview and your writing voice), which make the answers better; you can do them later. Your files stay on your device; the profile it builds is saved to your account so it's there on your other devices, unless you turn that off (<a href="privacy.html#saved">what is saved</a>).</li>
+        <li>Open the <a href="index.html">dashboard</a>, tick some listings and press <strong>Auto-Apply</strong>.</li>
+        <li>Most applications run on a system the extension already has access to. When one is on an employer's own careers site, the job pauses and the side panel shows an <strong>Allow <em>that site</em></strong> button. Chrome then asks about that one site. Nothing else is granted, and you can say no.</li>
+        <!-- was: <li>If it helps you, a rating on the <a href="...hpnbbpmalfjijnmpoihhjgjolhabjpgi?utm_source=install-page">Web Store listing</a> helps other students find it.</li>
+             2026-10-07: straight to the reviews page, and asked of everyone who uses it, not only those
+             it helped (a review either way is what the next student needs). -->
+        <li>Once you've used it on a few applications, a short review on the <a href="https://chromewebstore.google.com/detail/internscout-auto-apply/hpnbbpmalfjijnmpoihhjgjolhabjpgi/reviews">Chrome Web Store</a>, good or bad, helps other students find it and decide.</li>
+      </ul>
+    </div>
+
+    <!-- was: "Switching to the Web Store version later", written to the by-hand installer before the store
+         listing existed. Same facts, now addressed to someone who already has the by-hand copy: the store
+         assigned its own ID (hpnbb...) and the hand-installed copy keeps jmjj... from the manifest "key",
+         so Chrome can hold both, but nothing moves between them, and both would answer the dashboard. -->
+    <div class="box warn">
+      <h2>Installed it by hand before?</h2>
+      <p>The Web Store version is a separate extension from the one you loaded by hand, so nothing you saved in the old copy carries over. Before you switch:</p>
+      <ul>
+        <li>Keep your own copy of your resume and any files you uploaded.</li>
+        <li>Save the passwords for employer accounts it created in your password manager. They're under <strong>Accounts</strong> in the side panel, with a Copy button.</li>
+      </ul>
+      <p>Then add the Web Store version, sign in and set up Auto-Apply again. Once it works, remove the old copy at <code>chrome://extensions</code> (it's the InternScout card with a reload arrow), so the two don't both try to fill the same application. Your dashboard profile and application statuses are kept, because the dashboard saves them in your browser, separately from the extension.</p>
+    </div>
+
+    <!-- was: a three-step "Updating" section (download the new zip, replace the folder's files, reload).
+         That's only true of the by-hand copy now, so it moved into the section below. -->
+    <h2>Updating</h2>
+    <p>Nothing to do. Chrome updates Web Store extensions on its own, usually within a few hours of a new version.</p>
+
+    <h2 id="troubleshooting">Troubleshooting and support</h2>
+    <ul>
+      <li><strong>No "Add to Chrome" button:</strong> the store only offers it in desktop Chrome, Edge and Brave. On a school- or work-managed computer your IT department may block extensions; use your own laptop instead.</li>
+      <li><strong>Sign-in fails:</strong> try the other provider, or check that pop-ups aren't blocked. If you expected the larger school allowance, sign in with the account that has your .edu email. If it still fails, <a href="https://github.com/bpmcginley/InternshipFinder/issues">open an issue</a>.</li>
+      <li><strong>Remove it:</strong> go to <code>chrome://extensions</code> and click <em>Remove</em>. Chrome deletes everything the extension saved. See <a href="privacy.html#delete">how to delete your data</a>.</li>
+    </ul>
+    <p>Still stuck? <a href="https://docs.google.com/forms/d/e/1FAIpQLSevENYXxAtJg-suzwhBTwi8a2bosYHV27NcveE7eCYXo5Jdjw/viewform" target="_blank" rel="noopener">Send private feedback</a>, or <a href="https://github.com/bpmcginley/InternshipFinder/issues">report a public bug</a>. Include your browser, extension version and the step where it stopped. Leave out resumes, passwords and application answers. This is a one-student project; expect a reply within a few days.</p>
+
+    <!-- The steps this page used to lead with, kept for anyone the store route doesn't suit (a browser
+         that can't reach the store, or trying a GitHub release before the store has reviewed it). Same
+         wording as before; only the step numbers and the pointer to the sign-in step are new. -->
+    <h2 id="by-hand">Install by hand instead</h2>
+    <p>Only if the Web Store route doesn't work for you. The by-hand copy doesn't update itself.</p>
+    <!-- By-hand copies 0.4.2 and older only talk to bpmcginley.github.io, which now redirects to
+         internscout.org, so their dashboard link stopped working without any error. The dashboard's
+         profile and statuses live in the browser per address, so the old ones stay behind. -->
+    <p><strong>Installed by hand before September 22, 2026?</strong> That copy (0.4.2 or older) only works with the old bpmcginley.github.io address, so it no longer connects to the dashboard. Remove it at <code>chrome://extensions</code> and <a href="https://chromewebstore.google.com/detail/internscout-auto-apply/hpnbbpmalfjijnmpoihhjgjolhabjpgi?utm_source=install-page">add InternScout from the Chrome Web Store</a> (or load 0.4.3 or newer by hand). Your dashboard profile and saved statuses from the old address don't carry over to internscout.org, so set your profile up again there.</p>
+    <ol>
+      <li>Open the <a href="https://github.com/bpmcginley/InternshipFinder/releases/latest">latest release</a> on GitHub. Under <strong>Assets</strong>, download <code>internscout-extension-<em>version</em>.zip</code>. Don't pick "Source code".</li>
+      <li>Unzip it into a folder you'll keep, like Documents. <strong>Windows:</strong> right-click the zip, then <em>Extract All</em>. <strong>Mac:</strong> double-click the zip. Chrome runs the extension from this folder, so if you delete or move it, the extension stops working.</li>
+      <li>Type <code>chrome://extensions</code> in the address bar and press Enter. In Edge, use <code>edge://extensions</code>. (Browsers don't let you click these links, so type it.)</li>
+      <li>Flip the <strong>Developer mode</strong> switch. In Chrome it's at the top right. In Edge it's in the left sidebar.</li>
+      <li>Click <strong>Load unpacked</strong> and pick the folder you unzipped: the one with <code>manifest.json</code> directly inside. If Chrome says <em>"Manifest file is missing or unreadable"</em>, you picked the outer folder.</li>
+      <li>Sign in and pin it, as in steps 2 and 3 above.</li>
+    </ol>
+    <p><strong>Updating a by-hand copy:</strong> download the new zip, replace the files in your <strong>existing</strong> folder (keep it in the same place), then click the reload arrow on the InternScout card at <code>chrome://extensions</code>. Your profile and files are saved in Chrome, not in the folder, so they carry over.</p>
+    <p>Chrome may show a <strong>"Disable developer mode extensions"</strong> warning for extensions installed by hand. It's normal; close it to keep using InternScout.</p>
+
+    <!-- The same share control the phone banner uses, kept where a desktop reader ends up: the person
+         who just installed it is the likeliest person to pass it to a roommate. One handler serves both
+         buttons, so there is nothing to keep in sync. -->
+    <h2>Send this page on</h2>
+    <p>Pass the link to a friend, or to your own laptop if you're reading on a phone.</p>
+    <div class="share-row">
+      <button class="btn" type="button" data-share>Share this page</button>
+      <span class="share-note" role="status" aria-live="polite"></span>
+    </div>
+  </main>
+
+  <footer>
+    <nav class="distribution-links" aria-label="More ways to use InternScout">
+      <a href="https://github.com/bpmcginley/internships-every-major" data-distribution="list">Internships for every major on GitHub</a>
+      <a href="widget/builder.html" data-distribution="widget">Put live internships on your club or department site</a>
+    </nav>
+    <a href="index.html">Back to InternScout</a> · <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a> · Not affiliated with UMass Amherst.
+  </footer>
+</div>
+<script>
+// Our own links to this page say where they sit (install.html?from=landing-page). Pass that on as
+// the store links' utm_source, so the store's install analytics tell a landing-page reader from one
+// who came straight here. Only a short lowercase tag is taken; anything else keeps "install-page".
+(function () {
+  var m = /[?&]from=([a-z-]{1,32})(?:&|$)/.exec(location.search);
+  if (!m) return;
+  var links = document.querySelectorAll('a[href*="utm_source=install-page"]');
+  for (var i = 0; i < links.length; i++) links[i].href = links[i].href.replace("utm_source=install-page", "utm_source=" + m[1]);
+})();
+</script>
+<script>
+// Share control for the phone banner and the "Send this page on" row. No library and no build step:
+// this page carried no script at all until now, and two buttons don't justify starting one.
+(function () {
+  var buttons = document.querySelectorAll("[data-share]");
+  if (!buttons.length) return;
+  // was: var url = location.href.split("#")[0];  ("Drop any #fragment so the link that arrives opens
+  // at the top of the steps, not mid-page.") The query goes too now: ?from= says which of our own
+  // links brought this reader, and a friend they send it to didn't come from there.
+  var url = location.origin + location.pathname;
+
+  function note(btn, msg, keep) {
+    var el = btn.parentNode.querySelector(".share-note");
+    if (!el) return;
+    el.textContent = msg;
+    if (btn._clear) { clearTimeout(btn._clear); btn._clear = null; }
+    // An address printed on screen is there to be copied by hand, so it stays; "Copied" is just an ack.
+    if (!keep) btn._clear = setTimeout(function () { el.textContent = ""; }, 3000);
+  }
+
+  function showUrl(btn) { note(btn, url, true); }
+
+  function copy(btn) {
+    // navigator.clipboard is absent in older browsers and on any page served over plain http, so the
+    // last resort is printing the address rather than assuming the API is there.
+    if (!navigator.clipboard || !navigator.clipboard.writeText) { showUrl(btn); return; }
+    navigator.clipboard.writeText(url).then(function () { note(btn, "Copied"); }, function () { showUrl(btn); });
+  }
+
+  function share(btn) {
+    if (!navigator.share) { copy(btn); return; }
+    var p;
+    // was: text: "InternScout: internship search for UMass students, free to search."
+    try { p = navigator.share({ title: "InternScout", text: "InternScout: internship search for students in every major, free to search.", url: url }); }
+    catch (e) { copy(btn); return; }
+    if (!p || !p.then) return;
+    p.then(function () { note(btn, "Sent"); }, function (err) {
+      // Closing the share sheet rejects with AbortError. That is the student saying no, not a failure,
+      // so it must not read as an error or reach the console. Any other rejection means the sheet never
+      // worked, and copying the link is the honest second choice.
+      if (err && err.name === "AbortError") return;
+      copy(btn);
+    });
+  }
+
+  for (var i = 0; i < buttons.length; i++) {
+    buttons[i].addEventListener("click", function () { share(this); });
+  }
+})();
+</script>
+<!-- Cloudflare Web Analytics: page views only. No cookies, no local storage, no fingerprinting,
+     and nothing that identifies a visitor; see privacy.html. The token is public by design. -->
+<script defer src="/js/count.js"></script>
+<script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "38ed84192bd7457894a9a318562674ce"}'></script>
+</body>
+</html>

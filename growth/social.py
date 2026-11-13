@@ -1,0 +1,568 @@
+"""Short posts for InternScout's own social accounts, written from the week's data.
+
+Each run picks one field that gained listings in the Northeast or remote this week (a different one
+each run), writes a post naming a few of the employers and linking to that field's landing page, and
+sends it to whichever brand accounts have credentials in the environment:
+
+  * Bluesky    BLUESKY_HANDLE and BLUESKY_APP_PASSWORD (an app password, not the account password)
+  * Mastodon   MASTODON_URL (the instance, e.g. https://mastodon.social) and MASTODON_TOKEN
+  * Discord    DISCORD_WEBHOOK_URL (a channel in InternScout's own server)
+
+With none set it only prints the post, and the weekly growth report carries it as a draft.
+
+With --out=DIR it also writes what the picture channels need, from the same pick: DIR/post.json (the
+card's numbers, an Instagram caption and a LinkedIn draft) and DIR/card.jpg (growth/cards.py). The
+Brand posts workflow then puts the card where Instagram can fetch it and runs growth/instagram.py.
+LinkedIn has no posting API open to a page this size, so its text is saved as a draft for a person
+to post (save_drafts), and the private analytics page shows it ready to copy, with the card itself
+stored beside it so the page can offer it as a download (the page can't fetch images from GitHub).
+
+It posts nothing when the data export is more than STALE old: "this week" and the field it picks both
+come from the export's time, so a stalled ingest would post the same stale text run after run. When a
+configured account fails, the others are still tried, and then the run exits 1 so the Actions run
+shows red (a revoked app password used to leave it green). A failure prints only the exception's
+type, never a URL or token. The Brand posts workflow is skipped altogether while the repository
+variable SOCIAL_ENABLED is 0.
+
+These are posts by InternScout, on InternScout's accounts, saying what the data says. Nothing here
+posts as a person, replies to anyone or posts into other people's spaces.
+
+Run from the repo root:  python growth/social.py [docs] [--out=DIR] [--send]
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import os
+import re
+import sys
+import urllib.request
+from collections import Counter
+from datetime import datetime, timedelta, timezone
+from urllib.parse import quote
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(HERE, "..", "backend"))
+sys.path.insert(0, HERE)
+from internscout.site import assets as site_assets  # noqa: E402
+from internscout.site import rules as site_rules  # noqa: E402
+from internscout.site import digest as digest_model  # noqa: E402
+from internscout.site import source as site_source  # noqa: E402
+from internscout.site import taxonomy as site_taxonomy  # noqa: E402
+from internscout.site import text as site_text  # noqa: E402
+from internscout.console_log import console  # noqa: E402
+from internscout.public_data import public_data_dir  # noqa: E402
+import digest  # noqa: E402
+if __package__:
+    from .public_config import WORKER_URL
+else:
+    from public_config import WORKER_URL
+
+LIMIT = 300  # Bluesky's limit, in characters; Mastodon's is 500 and Discord's 2,000
+MIN_NEW = 5  # a field needs this many new nearby roles to be worth a post
+STALE = timedelta(
+    days=2
+)  # the ingest runs several times a day; an export older than this has stalled
+
+
+fresh = site_source.fresh  # found this week, and not an old posting a scan only just reached
+
+# The weekly email's sign-up page (2026-10-06). Once the sign-up form has an address, every post ends
+# with a line pointing there. The address is read from the one place it is pasted, CONFIG.digest.
+# formAction in docs/index.html (seo_pages.digest_form_action, which also decides whether /digest/ has
+# a form), so the line can't go out before people can sign up. Each channel's link names the channel
+# in utm_source, as the Worker spells them (worker/src/visits.js UTM_SOCIAL), with utm_medium=social,
+# the way growth/digest.py tags its own links (this file's links carried no tag before).
+DIGEST_URL = site_assets.SITE + digest_model.DIGEST_PATH
+SIGNUP = "Every Monday by email:"
+
+
+def signup_url(channel: str) -> str:
+    return f"{DIGEST_URL}?utm_source={channel}&utm_medium=social"
+
+
+def signup_line(channel: str) -> str:
+    return f"{SIGNUP} {signup_url(channel)}"
+
+
+def digest_live(site_dir: str) -> bool:
+    """Whether the weekly email's sign-up form has an address, so its page has a form."""
+    return bool(digest_model.digest_form_action(site_dir))
+
+
+def candidates(site_dir: str) -> tuple[list[tuple[str, list[dict]]], datetime, Counter]:
+    """(fields ranked by new nearby roles, the export's time, open roles per field)."""
+    d = site_source.load(site_dir)
+    now = site_source._when(d["generated_at"]) or datetime.now(timezone.utc)
+    by_field: dict[str, list[dict]] = {}
+    # was: for x in d["listings"]: if x["keys"] & site_source.HOME_STATES and fresh(x, now, d["baseline"]):
+    # New roles are counted as the digest counts them (digest.new_roles: one row per role within each
+    # employer), so a post and the week's email never give two numbers for the same thing.
+    for x in digest.new_roles(d, now):
+        if x["keys"] & site_source.HOME_STATES:
+            for t in set(x.get("field_tags") or []) - site_taxonomy.SKIP_FIELDS:
+                by_field.setdefault(t, []).append(x)
+    ranked = sorted(
+        ((t, v) for t, v in by_field.items() if len(v) >= MIN_NEW),
+        key=lambda tv: (-len(tv[1]), tv[0]),
+    )
+    # Open roles per field, counted as seo_pages.build counts them, to know whether the field has a page.
+    open_by_field = Counter(
+        t for x in d["listings"] for t in set(x.get("field_tags") or []) - site_taxonomy.SKIP_FIELDS
+    )
+    return ranked, now, open_by_field
+
+
+def link(field: str, open_count: int) -> str:
+    """The field's landing page when seo_pages.build makes one (digest.has_page: enough open roles, and
+    a slug that isn't a state's), else the dashboard filtered to the field. A post's link can't be
+    changed once it's out, so it must never point at a page that isn't there."""
+    if digest.has_page(field, open_count):
+        return f"{site_assets.SITE}/internships/{site_taxonomy.field_slug(field)}/"
+    return f"{site_assets.SITE}/?field={quote(field)}"
+
+
+def compose(field: str, items: list[dict], open_count: int, signup: str = "") -> tuple[str, str]:
+    """(text, url). The text ends with the url, and fits in LIMIT. With `signup` (signup_line, once the
+    weekly email is live) that line follows the url, and employers' names are dropped first to make
+    room for it; only a post too long even with none goes out without it."""
+    # was: url = f"{site_assets.SITE}/internships/{site_taxonomy.field_slug(field)}/", which 404s for a field with no page.
+    url = link(field, open_count)
+    name = site_text.lower_name(site_taxonomy.field_title(field))
+    head = f"{len(items)} new {name} internships in the Northeast and remote this week"
+    employers = [
+        c for c, _ in Counter(x.get("company_name") or "" for x in items).most_common(6) if c
+    ]
+    # was: one loop over n, with nothing after the url.
+    for tail in ([f"\n\n{signup}"] if signup else []) + [""]:
+        for n in range(min(4, len(employers)), -1, -1):
+            body = (
+                head
+                + (f", from {', '.join(employers[:n])} and more" if n else "")
+                + f".\n\n{url}"
+                + tail
+            )
+            if len(body) <= LIMIT:
+                return body, url
+    return f"{head}.\n\n{url}", url
+
+
+def pick(ranked: list[tuple[str, list[dict]]], now: datetime) -> tuple[str, list[dict]] | None:
+    """Rotate through the top fields run by run (runs are days apart), so the feed is not one field."""
+    top = ranked[:6]
+    return top[now.timetuple().tm_yday % len(top)] if top else None
+
+
+def _post_json(url: str, body: dict, headers: dict | None = None) -> dict:
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(body).encode(),
+        method="POST",
+        headers={
+            "Content-Type": "application/json",
+            # Cloudflare-fronted APIs (Discord among them) refuse Python's default agent.
+            "User-Agent": "InternScout-brand-posts/1.0 (+https://internscout.org)",
+            **(headers or {}),
+        },
+    )
+    with urllib.request.urlopen(req, timeout=30) as r:
+        raw = r.read()
+    return json.loads(raw) if raw else {}
+
+
+def to_bluesky(text: str, url: str) -> str:
+    handle, password = os.environ["BLUESKY_HANDLE"], os.environ["BLUESKY_APP_PASSWORD"]
+    s = _post_json(
+        "https://bsky.social/xrpc/com.atproto.server.createSession",
+        {"identifier": handle, "password": password},
+    )
+    record = {
+        "$type": "app.bsky.feed.post",
+        "text": text,
+        "createdAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+        "langs": ["en"],
+        # Without a facet the address shows as plain text: Bluesky links only what it is told to.
+        # was: one facet, for url; the weekly email's line (2026-10-06) is a second link.
+        "facets": link_facets(text),
+    }
+    r = _post_json(
+        "https://bsky.social/xrpc/com.atproto.repo.createRecord",
+        {"repo": s["did"], "collection": "app.bsky.feed.post", "record": record},
+        {"Authorization": f"Bearer {s['accessJwt']}"},
+    )
+    return r.get("uri", "sent")
+
+
+def link_facets(text: str) -> list[dict]:
+    """A Bluesky link facet for every web address in the text, placed by byte, as Bluesky counts."""
+    out = []
+    for m in re.finditer(r"https://\S+", text):
+        start = len(text[: m.start()].encode("utf-8"))
+        out.append(
+            {
+                "index": {"byteStart": start, "byteEnd": start + len(m.group(0).encode("utf-8"))},
+                "features": [{"$type": "app.bsky.richtext.facet#link", "uri": m.group(0)}],
+            }
+        )
+    return out
+
+
+def to_mastodon(text: str) -> str:
+    base = os.environ["MASTODON_URL"].rstrip("/")
+    r = _post_json(
+        f"{base}/api/v1/statuses",
+        {"status": text, "visibility": "public", "language": "en"},
+        {"Authorization": f"Bearer {os.environ['MASTODON_TOKEN']}"},
+    )
+    return r.get("url", "sent")
+
+
+def to_discord(text: str) -> str:
+    _post_json(
+        os.environ["DISCORD_WEBHOOK_URL"], {"content": text, "allowed_mentions": {"parse": []}}
+    )
+    return "sent"
+
+
+CHANNELS = [
+    ("Bluesky", ("BLUESKY_HANDLE", "BLUESKY_APP_PASSWORD"), lambda t, u: to_bluesky(t, u)),
+    ("Mastodon", ("MASTODON_URL", "MASTODON_TOKEN"), lambda t, u: to_mastodon(t)),
+    ("Discord", ("DISCORD_WEBHOOK_URL",), lambda t, u: to_discord(t)),
+]
+
+
+def chosen(site_dir: str) -> tuple[str, list[dict], int] | None:
+    """This run's (field, new roles, open roles in the field), or None when no field qualifies."""
+    ranked, now, open_by_field = candidates(site_dir)
+    c = pick(ranked, now)
+    return (c[0], c[1], open_by_field[c[0]]) if c else None
+
+
+def draft(site_dir: str, channel: str = "") -> tuple[str, str] | None:
+    """(text, url) of this run's post. With a channel ("bluesky", ...) and the weekly email live, the
+    text ends with the sign-up line tagged for that channel; without one (the printed copy and the
+    weekly report's draft), it has no sign-up line."""
+    c = chosen(site_dir)
+    if not c:
+        return None
+    return compose(*c, signup=signup_line(channel) if channel and digest_live(site_dir) else "")
+
+
+# Where growth/cards.py's JPEGs are served from: a branch of their own, so a card every few days never
+# lands in main's history, and raw.githubusercontent.com serves each one as image/jpeg as soon as it
+# is pushed (Instagram fetches a post's image from a public URL; it takes no upload).
+CARD_BRANCH = "social-cards"
+CARD_BASE = f"https://raw.githubusercontent.com/bpmcginley/InternshipFinder/{CARD_BRANCH}/"
+VIDEO_BASE = WORKER_URL + "/social-video/"
+IG_CAPTION_MAX = 2200  # Instagram's caption limit, in characters
+LINKEDIN_MAX = 3000  # a LinkedIn post's limit
+# Thursdays post a Reel instead of the picture card (growth/reels.py, added 2026-10-01); Tuesdays stay a
+# card, so the two can be compared. Monday is 0.
+REEL_WEEKDAY = 3
+REELS_FROM = "2026-10-08"  # the first Reel Thursday: 2026-10-01 stays a card, the first post since Meta's block
+SLOGAN = "Built by one student, made for all students."
+DISCLAIMER = "Not affiliated with UMass Amherst."
+
+
+def hashtag(field_title: str) -> str:
+    """A field's name as one hashtag from its first two words: 'Data science and analytics' -> #DataScience."""
+    words = [
+        w
+        for w in "".join(c if c.isalnum() else " " for c in field_title).split()
+        if w.lower() not in ("and", "of", "the", "or")
+    ]
+    return "#" + "".join(w[:1].upper() + w[1:] for w in words[:2]) if words else ""
+
+
+def card_data(site_dir: str, today: datetime | None = None) -> dict | None:
+    """Everything the picture channels need for this run's pick, or None when there is nothing to post.
+    The same field, count and employers as the text post, so every channel says the same thing."""
+    ranked, now, open_by_field = candidates(site_dir)
+    chosen = pick(ranked, now)
+    if not chosen:
+        return None
+    field, items = chosen
+    text, url = compose(field, items, open_by_field[field])
+    live = digest_live(site_dir)
+    title = site_taxonomy.field_title(field)
+    name = site_text.lower_name(title)
+    employers = [
+        c for c, _ in Counter(x.get("company_name") or "" for x in items).most_common(6) if c
+    ]
+    today = today or datetime.now(timezone.utc)
+    slug = site_taxonomy.field_slug(field)
+    tags = " ".join(
+        t
+        for t in (
+            hashtag(title),
+            "#internships",
+            "#summerinternship",
+            "#collegestudents",
+            "#studentjobs",
+            "#careers",
+        )
+        if t
+    )
+    named = ", ".join(employers[:4])
+    # Instagram doesn't make a caption's address a link, so it points at the one in the profile.
+    ig = (
+        f"{len(items)} new {name} internships in the Northeast and remote this week"
+        + (f", from {named} and more" if named else "")
+        + ".\n\n"
+        "Search every one free at internscout.org (link in bio), filtered to your major and the states you pick.\n\n"
+        # A caption's address isn't a link on Instagram, so this is the short form to type; the
+        # profile's own link to /digest/ is the one that carries utm_source=instagram.
+        + ("New ones by email every Monday: internscout.org/digest\n\n" if live else "")
+        + f"{SLOGAN} {DISCLAIMER}\n\n{tags}"
+    )
+    li = (
+        f"{len(items)} new {name} internships opened in the Northeast and remote this week."
+        + (f"\n\nEmployers hiring include {named}." if named else "")
+        + "\n\n"
+        "InternScout lists internships, co-ops and research programs for every major, refreshed several "
+        "times a day. Searching is free and needs no account.\n\n"
+        f"{url}\n\n"
+        + (f"{signup_line('linkedin')}\n\n" if live else "")
+        + f"{SLOGAN} {DISCLAIMER}\n\n{tags}"
+    )
+    card_name = f"{today:%Y-%m-%d}-{slug}.jpg"
+    # The Reel's role slides: one role per employer first, so four slides show four employers.
+    roles, seen = [], set()
+    for x in items:
+        if len(roles) == 4:
+            break
+        co = x.get("company_name") or ""
+        if co and co not in seen and x.get("title"):
+            seen.add(co)
+            roles.append(
+                {"company": co, "title": x["title"], "place": site_source.place(x), "pay": site_source.pay_text(x)}
+            )
+    return {
+        "field": field,
+        "slug": slug,
+        "url": url,
+        "text": text,
+        "count": len(items),
+        "eyebrow": f"New this week · {now:%b} {now.day}",
+        "headline": f"new {name} internships",
+        "where": "in the Northeast and remote",
+        "employers": employers[:5],
+        "card_name": card_name,
+        "card_url": CARD_BASE + card_name,
+        "reel_name": card_name.removesuffix(".jpg") + ".mp4",
+        "reel_url": VIDEO_BASE + card_name.removesuffix(".jpg") + ".mp4",
+        "instagram_caption": ig[:IG_CAPTION_MAX],
+        "linkedin_text": li[:LINKEDIN_MAX],
+        "roles": roles,
+        # The same tags as the captions, for channels that build their own text from post.json
+        # (growth/youtube.py's Short description, added 2026-10-02), so every channel tags alike.
+        "hashtags": tags.split(),
+        # The weekly email's link for channels that write their own text from post.json (growth/youtube.py),
+        # tagged for that channel; empty until the email is live (2026-10-06).
+        "signup": {"youtube": signup_url("youtube")} if live else {},
+        "reel": today.weekday() == REEL_WEEKDAY and f"{today:%Y-%m-%d}" >= REELS_FROM,
+    }
+
+
+def carousel(site_dir: str, out_dir: str, today: datetime) -> dict:
+    """The week's real-search carousel for Instagram (growth/campaign.py), drawn into out_dir: the
+    slides' file names and served URLs and its caption, or {} when there is no search to show or a
+    slide or the caption breaks campaign.lint. Since 2026-10-25 a Tuesday posts this on Instagram
+    instead of the count card: Heycatch's analytics gave the count cards 1 or 2 views each, against
+    about 900 for practical slideshows (growth/SOCIAL_PLAYBOOK.md). was: the card on every non-Reel day."""
+    import campaign
+
+    d = site_source.load(site_dir)
+    export = site_source._when(d["generated_at"]) or today
+    pick = campaign.search_pick(d["listings"], export)
+    if not pick:
+        return {}
+    slides = campaign.search_slides(pick, export, d["baseline"])
+    caption = campaign.captions(
+        slides, campaign.search_path(pick), f"weekly-{campaign.week_tag(today)}", "search"
+    )["instagram"]
+    if campaign.lint(caption) or any(campaign.lint(" ".join(s)) for s in slides):
+        return {}
+    stem = f"{today:%Y-%m-%d}-search-{site_taxonomy.field_slug(pick['field'])}"
+    names = []
+    for i, slide in enumerate(slides, 1):
+        name = f"{stem}-{i}.jpg"
+        campaign.draw(slide, "feed", i, len(slides)).save(
+            os.path.join(out_dir, name), "JPEG", quality=90, optimize=True
+        )
+        names.append(name)
+    return {
+        "carousel_names": names,
+        "carousel_urls": [CARD_BASE + n for n in names],
+        "carousel_caption": caption[:IG_CAPTION_MAX],
+    }
+
+
+def write_out(site_dir: str, out_dir: str, today: datetime | None = None) -> dict | None:
+    """post.json and card.jpg into out_dir, for the workflow's picture steps; on a day that is not a
+    Reel day, the search carousel's slides too (carousel)."""
+    data = card_data(site_dir, today)
+    if not data:
+        return None
+    os.makedirs(out_dir, exist_ok=True)
+    if not data.get("reel"):
+        try:
+            data.update(carousel(site_dir, out_dir, today or datetime.now(timezone.utc)))
+        except Exception as e:  # a missing font must not stop the card or the text posts
+            print(
+                f"[social] no carousel this time ({type(e).__name__}: {e}); Instagram gets the card"
+            )
+    with open(os.path.join(out_dir, "post.json"), "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=1)
+    import cards  # imported here: only the card needs Pillow, the text posts don't
+
+    cards.render(data, os.path.join(out_dir, "card.jpg"))
+    # On a Reel day the video goes beside the card. The card is still made: LinkedIn's draft carries
+    # it, and Instagram falls back to it if the video can't be made or published.
+    if data.get("reel"):
+        try:
+            import reels
+
+            reels.render(data, os.path.join(out_dir, "reel.mp4"))
+        except Exception as e:  # a missing ffmpeg or font must not stop the text posts
+            print(f"[social] no reel this time ({type(e).__name__}: {e}); Instagram gets the card")
+    return data
+
+
+def save_drafts(data: dict, token: str, card_path: str | None = None) -> None:
+    """The LinkedIn draft, into the app's D1 (table social_drafts), where the private analytics page
+    shows it ready to copy. Brand text only, like everything else growth/ writes there. The card JPEG
+    (about 90 KB) goes in as base64 too: the page can only reach D1, not GitHub, so this is how its
+    Download button gets the image."""
+    import base64
+    import metrics  # the same D1 helper and database the analytics copy uses
+
+    metrics.d1(
+        token,
+        "CREATE TABLE IF NOT EXISTS social_drafts (taken TEXT NOT NULL, channel TEXT NOT NULL, "
+        "text TEXT NOT NULL, image_url TEXT, url TEXT, image_b64 TEXT, PRIMARY KEY (taken, channel))",
+    )
+    # Tables made before 2026-10-06 have no image column. Inspect the schema before migrating:
+    # adding an existing column can fail with HTTPError, before d1's RuntimeError handling runs.
+    schema = metrics.d1(token, "PRAGMA table_info(social_drafts)")
+    columns = {row["name"] for row in schema["result"][0]["results"]}
+    if "image_b64" not in columns:
+        metrics.d1(token, "ALTER TABLE social_drafts ADD COLUMN image_b64 TEXT")
+    image = None
+    if card_path and os.path.exists(card_path):
+        with open(card_path, "rb") as f:
+            image = base64.b64encode(f.read()).decode("ascii")
+    taken = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    metrics.d1(
+        token,
+        "INSERT OR REPLACE INTO social_drafts (taken, channel, text, image_url, url, image_b64) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        [taken, "linkedin", data["linkedin_text"], data["card_url"], data["url"], image],
+    )
+    # A draft is only worth posting for a week or two; keep the last 20.
+    metrics.d1(
+        token,
+        "DELETE FROM social_drafts WHERE taken NOT IN "
+        "(SELECT taken FROM social_drafts ORDER BY taken DESC LIMIT 20)",
+    )
+
+
+def stale(site_dir: str, now: datetime | None = None) -> str | None:
+    """Why the export is too old to post from, or None. An export with no readable time counts as
+    stale: candidates would fall back to the clock, and the post would claim a week it can't see."""
+    index_path = os.path.join(public_data_dir(site_dir), "listings", "index.json")
+    with open(index_path, encoding="utf-8") as f:
+        stamp = json.load(f).get("generated_at")
+    made = site_source._when(stamp)
+    now = now or datetime.now(timezone.utc)
+    if made is None:
+        return "the data export has no generated_at time"
+    if now - made > STALE:
+        return f"the data export is from {made:%Y-%m-%d %H:%M} UTC, more than {STALE.days} days ago"
+    return None
+
+
+def main(argv: list[str]) -> int:
+    args = [a for a in argv[1:] if not a.startswith("--")]
+    site_dir = args[0] if args else "docs"
+    why = stale(site_dir)
+    if why:
+        # Nothing is wrong with posting itself, so the run stays green; the ingest's own run is what failed.
+        print(
+            f"[social] not posting: {why}. The ingest has probably stalled; a post now would repeat old news."
+        )
+        return 0
+    pick_ = chosen(site_dir)
+    if not pick_:
+        console("[social] no field gained enough new nearby listings this week; nothing to post")
+        return 0
+    text, url = compose(*pick_)
+    print(text)
+    # Each account's own copy (2026-10-06): the same post, ending with the weekly email's line tagged for
+    # that account once the email is live. was: one text for every account.
+    live = digest_live(site_dir)
+    texts = {
+        name: compose(*pick_, signup=signup_line(name.lower()) if live else "")[0]
+        for name, _, _ in CHANNELS
+    }
+    if live:
+        print(
+            f"[social] each account's copy ends with: {SIGNUP} {DIGEST_URL}?utm_source=<account>&utm_medium=social"
+        )
+    out_dir = next((a.split("=", 1)[1] for a in argv if a.startswith("--out=")), None)
+    data, failed = None, []
+    if out_dir:
+        # A card that can't be drawn (no Pillow, no font) must not stop the text posts below.
+        try:
+            data = write_out(site_dir, out_dir)
+            if data:
+                message = "[social] card and captions written"
+                if os.environ.get("INTERNSCOUT_LOG_FORMAT") != "json":
+                    message += f" to {out_dir}"
+                console(message)
+        except Exception as e:
+            print(f"[social] card failed: {type(e).__name__}: {e}")
+            failed.append("card")
+            for leftover in ("card.jpg", "post.json"):  # half a card must not reach Instagram
+                try:
+                    os.remove(os.path.join(out_dir, leftover))
+                except OSError:
+                    pass
+    if "--send" not in argv:
+        return 1 if failed else 0
+    if data and os.environ.get("CLOUDFLARE_API_TOKEN"):
+        try:
+            save_drafts(data, os.environ["CLOUDFLARE_API_TOKEN"], os.path.join(out_dir, "card.jpg"))
+            console("[social] LinkedIn draft saved for the analytics page")
+        except Exception as e:
+            console(
+                f"[social] LinkedIn draft failed: {type(e).__name__}",
+                level=logging.WARNING,
+                exception_type=type(e).__name__,
+            )
+            failed.append("LinkedIn draft")
+    for name, needs, send in CHANNELS:
+        if not all(os.environ.get(k) for k in needs):
+            continue
+        try:
+            print(f"[social] {name}: {send(texts[name], url)}")
+        except Exception as e:  # one account failing must not stop the others
+            # Only the type: an HTTPError's text can carry the webhook URL or the instance's answer.
+            console(
+                f"[social] {name} failed: {type(e).__name__}",
+                level=logging.WARNING,
+                exception_type=type(e).__name__,
+            )
+            failed.append(name)
+    # was: return 0, whatever failed, so a revoked app password left the Actions run green for weeks.
+    if failed:
+        console(
+            f"[social] {len(failed)} account(s) failed: {', '.join(failed)}. Check their secrets."
+        )
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

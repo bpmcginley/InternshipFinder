@@ -1,0 +1,104 @@
+# InternScout API: the product's only server. Setup steps are in README.md.
+name = "internscout-api"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+workers_dev = true
+
+# Workers Logs stay off: we promise not to keep request data.
+[observability]
+enabled = false
+
+# Daily cleanup of old rate buckets and runs; and, every half hour, the repository's clock: GitHub drops
+# most of its own scheduled runs here, so this starts "Keep schedule" (src/clock.js; needs the
+# GITHUB_DISPATCH_TOKEN secret, and does nothing without it).
+[triggers]
+# was: crons = ["17 7 * * *"]
+# 2026-10-23: reports get a separate small D1 budget after daily financial cleanup. Revert: omit 07:47.
+# 2026-10-23: student billing recovery gets a separate bounded request budget at 07:27 UTC.
+# was: recovery shared financial cleanup. Revert: remove 07:27 and its billing handler together.
+crons = ["17 7 * * *", "4,34 * * * *", "47 7 * * *", "27 7 * * *"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "internscout"
+database_id = "ef477808-f94c-4dce-a0b3-1198f00e5c39"
+
+# Email for the paid listing orders (src/mail.js, src/orders.js; worker/ORDERS.md "Turning it on").
+# Uncomment only AFTER internscout.org is onboarded in the Cloudflare dashboard (Compute > Email Service >
+# Email Sending > Onboard Domain); a live binding before then might fail the deploy. Sending to any
+# address needs the Workers Paid plan. Until it is set, env.EMAIL is missing and the orders stay off.
+[[send_email]]
+name = "EMAIL"
+allowed_sender_addresses = ["listings@internscout.org"]
+
+# was: # Secrets (set with `wrangler secret put`, never here): GEMINI_API_KEY, HASH_SALT, DEMAND_TOKEN,
+# Secrets (set with `wrangler secret put`, never here): GEMINI_API_KEY, HASH_SALT, DEMAND_TOKEN,
+# GITHUB_DISPATCH_TOKEN (a fine-grained GitHub token, InternshipFinder only, "Actions: Read and
+# write": lets src/clock.js start the catch-up workflow every half hour),
+# PROFILE_KEY (32 random bytes, base64; encrypts saved Deep Dives, and saving is off while it is unset),
+# ADMIN_TOKEN (any long random string; turns on the paid-listing admin routes in src/placements.js,
+# which answer 404 while it is unset; its own secret, not DEMAND_TOKEN, which CI also holds),
+# and for the optional paid plans: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_ID
+# (Supporter) and STRIPE_PRICE_ID_PRO (Pro). A plan whose price id is unset is simply not offered.
+# REVIEW_TO (2026-10-19): the address Bruce's paid listing review emails go to, and the reply-to of the
+# emails employers get (src/orders.js). The orders also need STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET and
+# ADMIN_TOKEN (which signs the review links).
+#
+# This block is the COMPLETE set of plain vars after every deploy. `wrangler deploy` defaults to
+# --keep-vars=false, so anything typed into the Cloudflare dashboard Variables panel and not repeated
+# here is deleted on the next deploy, without warning and without appearing in the diff. Write down
+# what that panel holds before deploying. Secrets are not affected: they live in a separate store and
+# survive a deploy either way.
+#
+# One var the code reads is deliberately absent: DAILY_BUDGET_CENTS (src/limits.js
+# dailyBudgetCents). Left unset it is a thirtieth of MONTHLY_BUDGET_CENTS, so raising the month
+# raises the day with it and the two cannot drift. Pinning it here would break that link. Set it only
+# to override the day's share by hand, and then remember it is the free tier's share alone.
+[vars]
+# Anyone with a Google or Microsoft account can sign in; a provider is off while its client ID is empty.
+GOOGLE_CLIENT_ID = "393696929617-g2ck4v93fdl54gioop0utk9c46p4thut.apps.googleusercontent.com"
+MS_CLIENT_ID = "06542657-1679-4c40-ae61-96dc9a0f1ca2"
+# Verified .edu emails (plus these non-.edu school domains, comma list) get the full allowance
+EDU_EXTRA_DOMAINS = ""
+# Everyone else gets this percent of it (minimum 1 per task)
+GENERAL_ALLOWANCE_PCT = "50"
+# Two extension origins. jmjj... is the ID the manifest "key" fixes for every Load unpacked copy;
+# hpnbb... is the ID the Chrome Web Store assigned when the item was created (the store zip has no
+# "key", so the store did not reuse jmjj...). Both have to be here or that copy's AI calls fail CORS.
+# internscout.org is the site's own domain; bpmcginley.github.io stays so a tab opened before the
+# switch keeps working until it is reloaded (GitHub Pages then redirects it to internscout.org).
+ALLOWED_ORIGINS = "https://internscout.org,https://bpmcginley.github.io,http://localhost:8000,chrome-extension://jmjjgnckddhjbohfpbekodkpbpbmfjag,chrome-extension://hpnbbpmalfjijnmpoihhjgjolhabjpgi"
+# What FREE accounts may spend on AI in a month, all together; free AI pauses until the 1st when it is
+# reached (and a thirtieth of it per day). Paid accounts are not counted or paused by it since
+# 2026-09-30: their own plan ceilings (src/config.js USER_BUDGET_CENTS) bound them. "0" pauses AI for
+# everyone at once. At ~2c an application, 7500 covers about 100 free students using their full
+# allowance in 2026, and about 60 after Gemini's price rise on 2027-01-01 (worker/README.md).
+MONTHLY_BUDGET_CENTS = "7500"
+# AI calls per minute across everyone, so a busy hour cannot spend the whole Gemini per-minute quota
+# and leave every student with upstream 429s. Your account's real number is at
+# aistudio.google.com/rate-limit -- set this under it, with headroom. "0" turns AI off immediately.
+GLOBAL_RPM = "120"
+# The paid plans are dormant until this is "1" and the Stripe secrets are set. While it is off,
+# nothing about paying is shown and the billing routes answer 404.
+PAYMENTS_ENABLED = "1"
+# Stripe Managed Payments: Stripe is the merchant of record, so it charges and remits sales tax or
+# VAT for the student's country and handles disputes. Needs Managed Payments activated at
+# dashboard.stripe.com/settings/managed-payments and an eligible tax code on both products, or
+# Stripe refuses the checkout session. "0" sends plain checkout sessions.
+STRIPE_MANAGED_PAYMENTS = "1"
+# Shown on the upgrade buttons. Stripe charges whatever the price in your Stripe dashboard says,
+# so keep these in step with it.
+# was: "$5/month" and "$12/month" (repriced 2026-09-30; the Stripe prices must match: worker/README.md)
+SUPPORTER_PRICE_TEXT = "$4/month"
+PRO_PRICE_TEXT = "$8/month"
+# Where Stripe sends students back to after checkout
+# was: SITE_URL = "https://bpmcginley.github.io/InternshipFinder"
+SITE_URL = "https://internscout.org"
+# Paid listings bought on the site (src/orders.js, worker/ORDERS.md): off until this is "1" AND the
+# secrets above (STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, ADMIN_TOKEN, REVIEW_TO) and the [[send_email]]
+# binding are set. While off, every /employer/* route but GET /employer/config answers 404.
+EMPLOYER_CHECKOUT = "1"
+# 2026-10-23: was: campaign reports were manual. Set 0 to pause delivery without losing tombstones.
+EMPLOYER_REPORTS = "1"
+# The sender of every order email. Must be an address at a domain onboarded to Email Sending.
+ORDER_FROM = "InternScout <listings@internscout.org>"

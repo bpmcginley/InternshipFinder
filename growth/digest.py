@@ -1,0 +1,615 @@
+"""The weekly new-internships email, written from the data. This builds the email; it never sends it.
+
+Each week's digest covers the fields that gained at least MIN_NEW roles this week (new by the same
+rule as /internships/new/), most new first, up to MAX_SECTIONS of them. Each field lists up to
+PER_SECTION roles, Northeast and remote first, and links to the field's landing page. A subscriber
+who picked fields gets only those. If none of their fields had MIN_NEW new roles, they get every
+field rather than an empty email.
+
+Nothing here sends mail or opens a network connection. Sending needs an email provider and a postal
+address first. A sender would take the HTML and text from render_html and render_text, replace
+{{ unsubscribe_url }} with the provider's own unsubscribe link, and pass in the postal address. The
+subscriber list would live with that provider. InternScout's own servers never store an email address.
+growth/digest_send.py is that sender, through Buttondown; this file stays unable to send.
+
+Paid listings: off unless the environment variable DIGEST_PLACEMENTS is "1". When it is on, the email
+can carry at most one paid listing, labelled "Paid listing" with "Ad" before the company name, inside
+the section for one of that listing's fields. It reads the placements file the site build writes
+(<site_dir>/data/placements.json, or --placements PATH) and keeps a placement only when it still
+resolves against this week's open listings, by the same checks the site makes. With no file, or the
+switch off, the email is exactly what it was. A placement never changes the subject, the preheader,
+any count, which roles a section lists or their order, and its link is the posting itself with no
+tracking added. The code says "placement", never "paid", because "paid" means a role that pays.
+
+Run from the repo root:  python growth/digest.py [docs] [--out DIR] [--placements PATH]
+    writes digest.html, digest.txt and digest.json into DIR (default ./digest-preview).
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import html
+import json
+import os
+import re
+import sys
+from collections import Counter
+from datetime import datetime, timezone
+from urllib.parse import quote
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(HERE, "..", "backend"))
+from internscout.site import assets as site_assets  # noqa: E402
+from internscout.site import digest as site_digest  # noqa: E402
+from internscout.site import rules as site_rules  # noqa: E402
+from internscout.site import source as site_source  # noqa: E402
+from internscout.site import taxonomy as site_taxonomy  # noqa: E402
+from internscout.site import text as site_text  # noqa: E402
+from internscout import placements  # noqa: E402
+from internscout.console_log import console  # noqa: E402
+
+# was: MIN_NEW = 3. It moved to seo_pages (2026-10-06) with the "new" rule below, so the sign-up
+# forms on the landing pages quote a field's number only when the email would give it a section.
+MIN_NEW = site_digest.DIGEST_MIN_NEW  # new roles a field needs this week to get a section
+MAX_SECTIONS = 8  # eight fields of five roles is already a long email
+PER_SECTION = 5  # roles shown per field; the field's page has the rest
+PER_EMPLOYER = 2  # ...and at most this many from one employer, so one big poster can't fill a field
+
+UTM = "utm_source=digest&utm_medium=email"
+HOME_URL = f"{site_assets.SITE}/?{UTM}"
+EVERY_MAJOR_URL = "https://github.com/bpmcginley/internships-every-major"
+EVERY_MAJOR_LABEL = "Internships for every major on GitHub"
+SLOGAN = "Built by one student, made for all students."
+WHY = "You're getting this because you signed up for new-internship emails at internscout.org."
+# The sender replaces this with the email provider's own unsubscribe link for each subscriber.
+UNSUBSCRIBE = "{{ unsubscribe_url }}"
+# CAN-SPAM requires a physical postal address in every commercial email. Until there is one (a PO box
+# keeps a home address off it), the email shows this where the address goes, so no one misses it.
+NO_ADDRESS = "[POSTAL ADDRESS REQUIRED BEFORE SENDING]"
+
+# The site's palette (seo_pages.CSS), light only: many email clients ignore dark-mode styles.
+INK, INK2, INK3 = "#17191c", "#454a52", "#646a73"
+ACCENT, PAPER, RULE = "#1d5c46", "#f6f4ef", "#e2ded4"
+SANS = "font-family:Helvetica,Arial,sans-serif"
+SERIF = "font-family:Georgia,'Times New Roman',serif"
+
+esc = html.escape
+# The state slugs are shared with seo_pages.build, which gives a field no page when its slug names a state.
+STATE_SLUGS = {site_taxonomy.state_slug(k) for k in site_taxonomy.US_STATES}
+
+
+# ---------------------------------------------------------------- building
+
+
+def _text(value) -> str:
+    """Job-board text on one line. A title with a newline or tab in it would break the text email's layout."""
+    return re.sub(r"\s+", " ", str(value or "")).strip()
+
+
+def _link(url) -> str | None:
+    """A web link, or None. safe_url keeps only http(s). A link with whitespace inside is not a real
+    address, and in the text email it would start a new line."""
+    u = site_text.safe_url(url)
+    return u if u and not re.search(r"\s", u) else None
+
+
+# Both moved to seo_pages (2026-10-06), so the landing pages' sign-up forms count new roles with this
+# same code; the names stay here for the growth scripts that call them (social, outreach, metrics,
+# every_major_list). was: def unique_roles(...) and def new_roles(...), the same bodies, here.
+unique_roles = site_source.unique_roles
+new_roles = site_source.new_roles
+
+
+def has_page(tag: str, open_count: int) -> bool:
+    """Whether seo_pages.build makes a landing page for this field: it needs MIN_OPEN open roles, and a
+    field whose slug names a state gets none (the state's page has that path)."""
+    return open_count >= site_rules.MIN_OPEN and site_taxonomy.field_slug(tag) not in STATE_SLUGS
+
+
+def field_url(tag: str, open_count: int) -> str:
+    """The field's landing page. When the field has no page, the dashboard filtered to that field
+    instead. A page needs MIN_OPEN open roles, and a field whose slug names a state gets none."""
+    # was: slug = site_taxonomy.field_slug(tag); if open_count >= site_rules.MIN_OPEN and slug not in STATE_SLUGS:
+    # The test moved into has_page so growth/social.py links only to pages that exist by the same rule.
+    if has_page(tag, open_count):
+        return f"{site_assets.SITE}/internships/{site_taxonomy.field_slug(tag)}/?{UTM}"
+    return f"{site_assets.SITE}/?field={quote(tag)}&{UTM}"
+
+
+def role(x: dict) -> dict:
+    pay = _text(x["salary"]) if x.get("salary") else ("Paid" if site_source.is_paid(x) else None)
+    return {
+        "id": x.get("id"),
+        "title": _text(x.get("title")),
+        "company": _text(x.get("company_name")),
+        "place": _text(site_source.place(x)),
+        "pay": pay,
+        "url": _link(x.get("apply_url")),
+        "nearby": bool(x["keys"] & site_source.HOME_STATES),
+    }
+
+
+def section(tag: str, items: list[dict], open_count: int) -> dict:
+    return {
+        "tag": tag,
+        "title": site_taxonomy.field_title(tag),
+        "new": len(items),
+        "open": open_count,
+        "url": field_url(tag, open_count),
+        "roles": [role(x) for x in varied(site_source.near_home_first(items))],
+    }
+
+
+def varied(ordered: list[dict]) -> list[dict]:
+    """The first PER_SECTION roles in order, at most PER_EMPLOYER from any one employer. When too few
+    employers are left to fill the section, the rest are filled in order after all."""
+    seen: Counter = Counter()
+    picked = []
+    for x in ordered:
+        if seen[x.get("company_name")] < PER_EMPLOYER:
+            seen[x.get("company_name")] += 1
+            picked.append(x)
+        if len(picked) == PER_SECTION:
+            return picked
+    return picked + [x for x in ordered if x not in picked][: PER_SECTION - len(picked)]
+
+
+def preheader(sections: list[dict]) -> str:
+    """The line an inbox shows after the subject: which fields the email covers."""
+    if not sections:
+        return "The roles InternScout found this week, Northeast and remote first."
+    names = ", ".join(s["title"] for s in sections[:3])
+    return f"New this week in {names}{' and more' if len(sections) > 3 else ''}. Northeast and remote roles first."
+
+
+def build(site_dir: str, now: datetime | None = None, placements_path: str | None = None) -> dict:
+    """This week's digest, from <site_dir>/data. now defaults to when the data was exported. Paid
+    listings are read only when DIGEST_PLACEMENTS is "1" (placements_on), from placements_path or
+    <site_dir>/data/placements.json, and they go in their own key: nothing else in the digest reads them."""
+    d = site_source.load(site_dir)
+    now = now or site_source._when(d["generated_at"]) or datetime.now(timezone.utc)
+    listings = d["listings"]
+    # was: new = unique_roles([x for x in listings if site_source.fresh(x, now, d["baseline"])])
+    new = new_roles(d, now)
+    # Open roles per field, counted as the field's landing page counts them, so "See all N" matches it.
+    open_by_field = Counter(
+        t for x in listings for t in set(x.get("field_tags") or []) - site_taxonomy.SKIP_FIELDS
+    )
+    by_field: dict[str, list[dict]] = {}
+    for x in new:
+        for t in set(x.get("field_tags") or []) - site_taxonomy.SKIP_FIELDS:
+            by_field.setdefault(t, []).append(x)
+    ranked = sorted(
+        ((t, v) for t, v in by_field.items() if len(v) >= MIN_NEW),
+        key=lambda tv: (-len(tv[1]), site_taxonomy.field_title(tv[0])),
+    )
+    sections = [section(t, v, open_by_field[t]) for t, v in ranked]
+    return {
+        "subject": f"{site_text.plural(len(new), 'new internship')} this week",
+        "preheader": preheader(sections[:MAX_SECTIONS]),
+        "week_ending": f"{now:%B} {now.day}, {now.year}",
+        "generated_at": now.isoformat(),
+        # /internships/new/ is built only when it has MIN_OPEN roles; below that, the dashboard's new filter.
+        "new_url": f"{site_assets.SITE}/internships/new/?{UTM}"
+        if len(new) >= site_rules.MIN_OPEN
+        else f"{site_assets.SITE}/?new=1&{UTM}",
+        "totals": {
+            "open": len(listings),
+            "new": len(new),
+            "nearby": sum(1 for x in new if x["keys"] & site_source.HOME_STATES),
+            "fields": len(sections),
+        },
+        "sections": sections[:MAX_SECTIONS],
+        # Fields past the cap. Everyone's email stops at MAX_SECTIONS, but a subscriber who picked one of
+        # these fields still gets it (pick_sections).
+        "more_sections": sections[MAX_SECTIONS:],
+        # Paid listings that still resolve this week; [] unless placements_on(). An email shows one at most.
+        "placements": (
+            resolve_placements(
+                read_placements(placements_path or os.path.join(site_dir, "data", PLACEMENTS_FILE)),
+                listings,
+                now.strftime("%Y-%m-%d"),
+            )
+            if placements_on()
+            else []
+        ),
+    }
+
+
+# ---------------------------------------------------------------- placements (paid listings)
+
+PLACEMENTS_ENV = (
+    "DIGEST_PLACEMENTS"  # "1" turns paid listings on; anything else, or unset, keeps them off
+)
+PLACEMENTS_FILE = "placements.json"  # in <site_dir>/data, the shape the site build writes
+PLACEMENT_HEADING = "Paid listing"
+PLACEMENT_AD = "Ad"
+PLACEMENT_WHY = (
+    "An employer paid to show this role here. It is not part of this week's list and "
+    "does not change which roles this email lists or their order."
+)
+
+
+def placements_on() -> bool:
+    return os.environ.get(PLACEMENTS_ENV, "").strip() == "1"
+
+
+def _citizen_only(x: dict) -> bool:
+    """A citizenship rule of any kind. The dashboard hides such a paid listing from a student who has
+    not said they can meet it (citizenBlocked with no work authorization), and an email reader has not."""
+    return "us_citizen_only" in (x.get("restrictions") or []) or bool(
+        (x.get("insights") or {}).get("citizenship")
+    )
+
+
+def read_placements(path: str) -> list:
+    """The placements list from the site build's file, or [] when it is missing or malformed."""
+    return placements.read(path)
+
+
+def resolve_placements(raw: list, listings: list[dict], day: str) -> list[dict]:
+    """The placements that still hold on day (YYYY-MM-DD), each with the listing it points at.
+    placements.resolve() makes the site's checks: the listing is among the open listings seo_pages.load
+    kept, its apply URL is the listing's own (a trailing slash aside), day is within its dates (start
+    inclusive, end exclusive), the deadline has not passed and the role is not marked unpaid (unless the
+    record carries unpaid_ok). The email adds one of its own: no citizenship rule. It is never matched by
+    URL alone (by_url=False): the site build already wrote the resolved listing id into the file, so a
+    placement that no longer names its listing shows nothing.
+    was: its own copy of those checks, until placements.resolve() landed (B2 plan PR 3)."""
+    by_id = {str(x["id"]): x for x in listings}
+    ok, _ = placements.resolve(raw, by_id, day, by_url=False)
+    kept = []
+    for p in ok:
+        x = by_id[p["listing_id"]]
+        if _citizen_only(x):
+            continue
+        tags = sorted(set(x.get("field_tags") or []) - site_taxonomy.SKIP_FIELDS)
+        if tags and _link(x.get("apply_url")):
+            kept.append({"id": p["id"], "tags": tags, "role": role(x)})
+    return kept
+
+
+def pick_placement(digest: dict, sections: list[dict]):
+    """(placement, section) for one email, or None: at most one per email. Candidates are tried in an
+    order set by a hash of the week and the placement id, so each has an equal chance and price never
+    matters. One goes in the first shown section for one of its fields; one with no shown field is
+    skipped, so a paid listing only ever appears inside a field the email already covers."""
+    week = str(digest.get("week_ending") or "")
+    cands = sorted(
+        digest.get("placements") or [],
+        key=lambda c: hashlib.sha256(f"{week}|{c['id']}".encode()).hexdigest(),
+    )
+    for p in cands:
+        for s in sections:
+            if s.get("tag") in p.get("tags", ()):
+                return p, s
+    return None
+
+
+# ---------------------------------------------------------------- rendering
+
+
+def pick_sections(digest: dict, fields=None) -> tuple[list[dict], str]:
+    """(sections, why) for one subscriber. fields are the field tags they picked. why is "picked" when
+    the email shows only those, "fallback" when none of them had a section this week and it shows
+    every field instead, and "" when they picked none."""
+    if isinstance(fields, str):
+        fields = fields.split(",")
+    wanted = {str(f).strip() for f in fields or () if str(f).strip()}
+    if not wanted:
+        return digest["sections"], ""
+    mine = [s for s in digest["sections"] + digest.get("more_sections", []) if s["tag"] in wanted]
+    if mine:
+        return mine[:MAX_SECTIONS], "picked"
+    return digest["sections"], "fallback"
+
+
+def intro(digest: dict, sections: list[dict]) -> str:
+    t = digest["totals"]
+    line = f"InternScout found {site_text.plural(t['new'], 'new student role')} this week"
+    if t["nearby"]:
+        line += f", {t['nearby']:,} of them in the Northeast or remote."
+        if sections:
+            line += " In each field below, those come first."
+    return line if line.endswith(".") else line + "."
+
+
+def note(why: str) -> str:
+    if why == "picked":
+        return "Showing only the fields you picked."
+    if why == "fallback":
+        return (
+            f"None of the fields you picked gained {MIN_NEW} or more new roles this week, "
+            "so here are the fields that did."
+        )
+    return ""
+
+
+def _address(postal_address) -> list[str] | None:
+    lines = [_text(line) for line in str(postal_address or "").splitlines()]
+    return [line for line in lines if line] or None
+
+
+def affiliation() -> str:
+    return (
+        "InternScout is a free internship search made by a UMass Amherst student. It is not "
+        "affiliated with UMass Amherst or with any employer listed here. These roles come from "
+        "public job boards, so always check the posting on the employer's own site before applying."
+    )
+
+
+def _a(url, label: str, style: str) -> str:
+    """A link, only when url is a web link; otherwise the label alone."""
+    u = _link(url)
+    return f'<a href="{esc(u)}" style="{style}">{esc(label)}</a>' if u else esc(label)
+
+
+def _role_html(r: dict) -> str:
+    meta = " · ".join(esc(_text(v)) for v in (r.get("place"), r.get("pay")) if _text(v))
+    title = _a(r.get("url"), _text(r.get("title")), f"color:{ACCENT};text-decoration:underline")
+    return (
+        f'<tr><td style="padding:12px 0;border-top:1px solid {RULE};{SANS};font-size:15px;'
+        f'line-height:1.45;color:{INK}">'
+        f'<div style="font-weight:bold">{esc(_text(r.get("company")))}</div>'
+        f'<div>{title}</div>'
+        + (f'<div style="font-size:13px;color:{INK3}">{meta}</div>' if meta else "")
+        + "</td></tr>"
+    )
+
+
+def _placement_html(r: dict) -> str:
+    """The paid listing, boxed apart from the roles: a "Paid listing" heading, "Ad" before the company
+    name, and the posting's own link with rel="sponsored" and no tracking added."""
+    meta = " · ".join(esc(_text(v)) for v in (r.get("place"), r.get("pay")) if _text(v))
+    url = _link(r.get("url"))
+    title = (
+        (
+            f'<a href="{esc(url)}" rel="sponsored noopener" style="color:{ACCENT};text-decoration:underline">'
+            f'{esc(_text(r.get("title")))}</a>'
+        )
+        if url
+        else esc(_text(r.get("title")))
+    )
+    return (
+        f'<tr><td style="padding:12px 0;border-top:1px solid {RULE};{SANS};font-size:15px;'
+        f'line-height:1.45;color:{INK}">'
+        f'<div style="padding:10px 12px;border:1px solid {RULE};border-radius:6px;background:#ffffff">'
+        f'<p style="margin:0 0 6px;font-size:13px;font-weight:bold;color:{INK2}">{esc(PLACEMENT_HEADING)}</p>'
+        f'<div style="font-weight:bold"><span style="display:inline-block;padding:0 5px;margin-right:6px;'
+        f'border:1px solid {INK3};border-radius:3px;font-size:12px;color:{INK2}">{esc(PLACEMENT_AD)}</span>'
+        f'{esc(_text(r.get("company")))}</div>'
+        f'<div>{title}</div>'
+        + (f'<div style="font-size:13px;color:{INK3}">{meta}</div>' if meta else "")
+        + f'<p style="margin:6px 0 0;font-size:13px;color:{INK3}">{esc(PLACEMENT_WHY)}</p>'
+        "</div></td></tr>"
+    )
+
+
+def _with_placement(items: list, extra) -> list:
+    """items with extra after the third (or after the last, when there are fewer), as the site places it."""
+    if extra is None:
+        return items
+    at = min(3, len(items))
+    return items[:at] + [extra] + items[at:]
+
+
+def _section_html(s: dict, placed: dict | None = None) -> str:
+    title = _text(s.get("title"))
+    rows = "".join(
+        _with_placement(
+            [_role_html(r) for r in s.get("roles") or []],
+            _placement_html(placed["role"]) if placed else None,
+        )
+    )
+    more = _a(
+        s.get("url"),
+        f"See all {s.get('open', 0):,} open {site_text.lower_name(title)} roles",
+        f"color:{ACCENT};font-weight:bold;text-decoration:underline",
+    )
+    return (
+        f'<tr><td style="padding:30px 0 6px">'
+        f'<h2 style="margin:0;{SERIF};font-size:21px;line-height:1.3;font-weight:bold;color:{INK}">{esc(title)}</h2>'
+        f'<p style="margin:4px 0 0;{SANS};font-size:14px;color:{INK3}">{s.get("new", 0):,} new this week</p>'
+        "</td></tr>"
+        '<tr><td><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">'
+        f"{rows}</table></td></tr>"
+        f'<tr><td style="padding:10px 0 0;border-top:1px solid {RULE};{SANS};font-size:14px">{more}</td></tr>'
+    )
+
+
+def render_html(digest: dict, fields=None, postal_address=None) -> str:
+    """The email's HTML part: inline styles and tables only, the way email clients render it, 600px wide
+    at most, with no stylesheets, scripts or images. Everything from a job board is escaped, and only
+    http(s) links are emitted, except the {{ unsubscribe_url }} placeholder the sender fills in."""
+    sections, why = pick_sections(digest, fields)
+    pre = preheader(sections) if why == "picked" else digest.get("preheader", "")
+    address = _address(postal_address)
+    address_html = (
+        "<br>".join(esc(line) for line in address)
+        if address
+        else f'<strong style="color:#9b1c1c">{esc(NO_ADDRESS)}</strong>'
+    )
+    extra = note(why)
+    extra_html = (
+        f'<p style="margin:12px 0 0;{SANS};font-size:15px;line-height:1.55;color:{INK2}">{esc(extra)}</p>'
+        if extra
+        else ""
+    )
+    new_url = _link(digest.get("new_url"))
+    button = (
+        (
+            f'<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:20px 0 0">'
+            f'<tr><td style="background:{ACCENT};border-radius:6px">'
+            f'<a href="{esc(new_url)}" style="display:inline-block;padding:11px 18px;{SANS};font-size:15px;'
+            # Buttondown adds an !important accent color to every link. Keep the
+            # button text light instead of allowing dark text on its dark background.
+            f'font-weight:bold;color:{PAPER}!important;text-decoration:none;border-radius:6px">See every new role</a>'
+            "</td></tr></table>"
+        )
+        if new_url
+        else ""
+    )
+    chosen = pick_placement(digest, sections)
+    body = "".join(
+        _section_html(s, chosen[0] if chosen and chosen[1] is s else None) for s in sections
+    )
+    subject = esc(_text(digest.get("subject")))
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="supported-color-schemes" content="light">
+<title>{subject}</title>
+</head>
+<body style="margin:0;padding:0;background:{PAPER}">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:{PAPER};font-size:1px;line-height:1px">{esc(_text(pre))}{"&zwnj;&nbsp;" * 40}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:{PAPER}">
+<tr><td align="center" style="padding:0 16px">
+<!--[if mso]><table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;{SANS};color:{INK}">
+<tr><td style="padding:24px 0 14px;border-bottom:1px solid {INK}">{_a(HOME_URL, "InternScout", f"{SERIF};font-size:22px;font-weight:bold;color:{INK};text-decoration:none")}</td></tr>
+<tr><td style="padding:24px 0 0">
+<h1 style="margin:0;{SERIF};font-size:28px;line-height:1.2;font-weight:bold;color:{INK}">{subject}</h1>
+<p style="margin:6px 0 0;{SANS};font-size:14px;color:{INK3}">Week ending {esc(_text(digest.get("week_ending")))}</p>
+<p style="margin:14px 0 0;{SANS};font-size:16px;line-height:1.55;color:{INK2}">{esc(intro(digest, sections))}</p>
+{extra_html}
+{button}
+</td></tr>
+{body}
+<tr><td style="padding:40px 0 32px">
+<div style="border-top:1px solid {RULE};padding-top:16px;{SANS};font-size:13px;line-height:1.55;color:{INK3}">
+<p style="margin:0 0 8px;font-size:14px;font-weight:bold;color:{INK}">{esc(SLOGAN)}</p>
+<p style="margin:0 0 8px">{esc(affiliation())}</p>
+<p style="margin:0 0 8px">{_a(EVERY_MAJOR_URL, EVERY_MAJOR_LABEL, f"color:{INK2};text-decoration:underline")}</p>
+<p style="margin:0 0 8px">{esc(WHY)} <a href="{UNSUBSCRIBE}" style="color:{INK2};text-decoration:underline">Unsubscribe</a></p>
+<p style="margin:0">{address_html}</p>
+</div>
+</td></tr>
+</table>
+<!--[if mso]></td></tr></table><![endif]-->
+</td></tr>
+</table>
+</body>
+</html>
+"""
+
+
+def render_text(digest: dict, fields=None, postal_address=None) -> str:
+    """The email's plain-text part: the same content as render_html, with every link written out."""
+    sections, why = pick_sections(digest, fields)
+    new_url = _link(digest.get("new_url"))
+    out = [
+        _text(digest.get("subject")),
+        f"Week ending {_text(digest.get('week_ending'))}",
+        "",
+        intro(digest, sections),
+    ]
+    if why:
+        out.append(note(why))
+    if new_url:
+        out += ["", f"See every new role: {new_url}"]
+    chosen = pick_placement(digest, sections)
+    for s in sections:
+        title = _text(s.get("title"))
+        head = f"{title}: {s.get('new', 0):,} new this week"
+        out += ["", "", head, "-" * len(head)]
+        blocks = []
+        for r in s.get("roles") or []:
+            company = _text(r.get("company"))
+            block = ["", f"* {_text(r.get('title'))}" + (f" at {company}" if company else "")]
+            meta = " · ".join(_text(v) for v in (r.get("place"), r.get("pay")) if _text(v))
+            if meta:
+                block.append(f"  {meta}")
+            if _link(r.get("url")):
+                block.append(f"  {_link(r.get('url'))}")
+            blocks.append(block)
+        if chosen and chosen[1] is s:
+            r = chosen[0]["role"]
+            block = [
+                "",
+                f"  {PLACEMENT_HEADING}",
+                f"* {PLACEMENT_AD}: {_text(r.get('company'))}",
+                f"  {_text(r.get('title'))}",
+            ]
+            meta = " · ".join(_text(v) for v in (r.get("place"), r.get("pay")) if _text(v))
+            if meta:
+                block.append(f"  {meta}")
+            if _link(r.get("url")):
+                block.append(f"  {_link(r.get('url'))}")
+            block.append(f"  {PLACEMENT_WHY}")
+            blocks = _with_placement(blocks, block)
+        for block in blocks:
+            out += block
+        if _link(s.get("url")):
+            out += [
+                "",
+                f"See all {s.get('open', 0):,} open {site_text.lower_name(title)} roles: {_link(s.get('url'))}",
+            ]
+    address = _address(postal_address)
+    out += [
+        "",
+        "",
+        "-" * 40,
+        SLOGAN,
+        "",
+        affiliation(),
+        "",
+        f"{EVERY_MAJOR_LABEL}: {EVERY_MAJOR_URL}",
+        "",
+        WHY,
+        f"Unsubscribe: {UNSUBSCRIBE}",
+        "",
+    ]
+    out += address or [NO_ADDRESS]
+    return "\n".join(out) + "\n"
+
+
+# ---------------------------------------------------------------- command line
+
+
+def main(argv: list[str]) -> int:
+    ap = argparse.ArgumentParser(
+        prog="digest.py", description="Write a preview of this week's email digest."
+    )
+    ap.add_argument(
+        "site_dir", nargs="?", default="docs", help="a copy of docs/ (reads <site_dir>/data)"
+    )
+    ap.add_argument(
+        "--out", default="digest-preview", help="folder for digest.html, digest.txt and digest.json"
+    )
+    ap.add_argument(
+        "--placements",
+        default=None,
+        help="the site build's placements.json (default <site_dir>/data/placements.json); "
+        "read only when DIGEST_PLACEMENTS=1",
+    )
+    args = ap.parse_args(argv[1:])
+    digest = build(args.site_dir, placements_path=args.placements)
+    os.makedirs(args.out, exist_ok=True)
+    for name, body in (
+        ("digest.html", render_html(digest)),
+        ("digest.txt", render_text(digest)),
+        ("digest.json", json.dumps(digest, ensure_ascii=False, indent=1) + "\n"),
+    ):
+        with open(os.path.join(args.out, name), "w", encoding="utf-8", newline="\n") as f:
+            f.write(body)
+    t = digest["totals"]
+    counts = (
+        f"{len(digest['sections'])} of {t['fields']} fields shown, "
+        f"{t['nearby']:,} new roles in the Northeast or remote"
+    )
+    if os.environ.get("INTERNSCOUT_LOG_FORMAT") == "json":
+        console(f"[digest] wrote digest preview ({counts})")
+    else:
+        console(
+            f"[digest] {digest['subject']}: {counts}; wrote digest.html, digest.txt and "
+            f"digest.json to {args.out}"
+        )
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
