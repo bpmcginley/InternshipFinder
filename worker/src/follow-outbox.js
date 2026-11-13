@@ -384,7 +384,9 @@ function issuedReceipt(results, credentials, checked, at, midnight, cap) {
   )
     return false;
   if (
-    [2, 3, 4].every((i) => r[i].changes === 1) &&
+    [1, 2, 3, 4].every((i) => r[i].changes === 1) &&
+    current.attempts >= 1 &&
+    current.attempts <= cap &&
     r[5].changes === 2 &&
     r[7].changes === 0 &&
     current.state === "attempting" &&
@@ -542,20 +544,30 @@ export async function authorizeFollowSnapshotTransport(
     const results = await db.batch([
       db
         .prepare(
-          "SELECT follow_digest_outbox.lease_until,follow_digest_outbox.expires_at FROM follow_digest_outbox " +
+          "SELECT follow_digest_outbox.lease_until,follow_digest_outbox.expires_at" +
+            (issued
+              ? ",follow_digest_outbox.id AS job_id,follow_digest_outbox.lease_token,follow_digest_outbox.subscriber_id,u.email,checked_m.token_hash AS management_hash,checked_m.generation AS management_generation,checked_m.expires_at AS management_expires_at,checked_v.token_hash AS unsubscribe_hash,checked_v.generation AS unsubscribe_generation"
+              : "") +
+            " FROM follow_digest_outbox " +
             "JOIN follow_subscribers u ON u.id=follow_digest_outbox.subscriber_id " +
+            (issued
+              ? "JOIN follow_tokens checked_m ON checked_m.subscriber_id=u.id AND checked_m.purpose='manage' AND checked_m.scope_key='' AND checked_m.owner_user_hash IS NULL JOIN follow_tokens checked_v ON checked_v.subscriber_id=u.id AND checked_v.token_hash=? "
+              : "") +
             "WHERE follow_digest_outbox.id=? AND state='attempting' AND lease_token=? " +
-            "AND subscriber_id=? AND u.email=? AND attempted_at<=? AND substr(attempted_at,1,10)=? " +
+            (issued ? "AND follow_digest_outbox.subscriber_id=?" : "AND subscriber_id=?") +
+            " AND u.email=? AND attempted_at<=? AND substr(attempted_at,1,10)=? " +
             "AND attempted_at<=strftime('%Y-%m-%dT%H:%M:%fZ','now') " +
             "AND substr(attempted_at,1,10)=date('now') " +
             "AND lease_until>strftime('%Y-%m-%dT%H:%M:%fZ','now') " +
-            "AND expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now') " +
+            (issued ? "AND follow_digest_outbox.expires_at" : "AND expires_at") +
+            ">strftime('%Y-%m-%dT%H:%M:%fZ','now') " +
             `AND ${consent("payload", "follow_digest_outbox.subscriber_id")} AND ${snapshotConsent}` +
             (issued
               ? ` AND EXISTS(SELECT 1 FROM follow_tokens m WHERE m.subscriber_id=u.id AND m.token_hash=? AND m.generation=? AND m.purpose='manage' AND m.scope_key='' AND m.owner_user_hash IS NULL AND m.expires_at=? AND m.expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now') AND NOT EXISTS(SELECT 1 FROM follow_tokens other WHERE other.subscriber_id=u.id AND other.purpose='manage' AND other.scope_key='' AND other.token_hash!=m.token_hash)) AND EXISTS(SELECT 1 FROM follow_tokens v WHERE v.subscriber_id=u.id AND v.token_hash=? AND v.generation=? AND v.purpose='unsubscribe' AND v.scope_key='' AND v.owner_user_hash IS NULL AND v.expires_at IS NULL)`
               : ""),
         )
         .bind(
+          ...(issued ? [issued.unsubscribeHash] : []),
           id,
           lease,
           subscriberId,
@@ -577,8 +589,30 @@ export async function authorizeFollowSnapshotTransport(
     const checked = budgetClock(clock).toISOString();
     if (issued) {
       const receipts = strictReceipts(results, 1);
-      const row = readFields(receipts[0], ["lease_until", "expires_at"]);
+      const row = readFields(receipts[0], [
+        "lease_until",
+        "expires_at",
+        "job_id",
+        "lease_token",
+        "subscriber_id",
+        "email",
+        "management_hash",
+        "management_generation",
+        "management_expires_at",
+        "unsubscribe_hash",
+        "unsubscribe_generation",
+      ]);
       return (
+        row !== null &&
+        row.job_id === id &&
+        row.lease_token === lease &&
+        row.subscriber_id === subscriberId &&
+        row.email === email &&
+        row.management_hash === issued.managementHash &&
+        row.management_generation === issued.managementGeneration &&
+        row.management_expires_at === expiry &&
+        row.unsubscribe_hash === issued.unsubscribeHash &&
+        row.unsubscribe_generation === issued.unsubscribeGeneration &&
         checked >= at &&
         checked.slice(0, 10) === at.slice(0, 10) &&
         checked < expiry &&

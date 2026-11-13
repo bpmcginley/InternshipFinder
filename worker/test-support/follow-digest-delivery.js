@@ -508,7 +508,17 @@ export async function capabilitiesLostAcknowledgementCannotReissue(db) {
 }
 
 export async function capabilitiesMalformedCommittedReceiptsHold(db) {
-  for (const mode of ["hole", "false", "string", "getter", "wrong-count", "missing-token"]) {
+  for (const mode of [
+    "hole",
+    "false",
+    "string",
+    "getter",
+    "wrong-count",
+    "missing-token",
+    "zero-budget",
+    "over-budget",
+    "unobserved",
+  ]) {
     await clearCapabilities(db);
     const f = await capabilityFixture(db);
     const database = intercept(db, async (statements, run) => {
@@ -526,6 +536,9 @@ export async function capabilitiesMalformedCommittedReceiptsHold(db) {
           });
         if (mode === "wrong-count") r[5].meta.changes = 1;
         if (mode === "missing-token") r[9].results = [];
+        if (mode === "zero-budget") r[8].results[0].attempts = 0;
+        if (mode === "over-budget") r[8].results[0].attempts = f.options.cap + 1;
+        if (mode === "unobserved") r[1].meta.changes = 0;
       }
       return r;
     });
@@ -694,5 +707,173 @@ export async function capabilitiesRejectAsyncClockWithoutLeaking(db) {
     await new Promise((resolve) => setTimeout(resolve, 0));
     assert.equal(f.calls(), 0);
     assert.equal(await f.budget(), phase === "early" ? null : 1);
+  }
+}
+
+export async function capabilitiesDeletedFinalReadCannotUseGenericDeadlineReceipt(db) {
+  const f = await capabilityFixture(db);
+  let deadlines,
+    empty = false;
+  const database = intercept(db, async (statements, run) => {
+    if (statements.length === 1 && deadlines) {
+      await db.prepare("DELETE FROM follow_subscribers WHERE id=?").bind(f.sub.subscriberId).run();
+      const r = await run();
+      empty = r[0].results.length === 0;
+      r[0].results = [deadlines];
+      return r;
+    }
+    const r = await run();
+    if (statements.length === 10)
+      deadlines = {
+        lease_until: r[8].results[0].lease_until,
+        expires_at: r[8].results[0].expires_at,
+      };
+    return r;
+  });
+  assert.deepEqual(await f.run({ db: database }), { status: "unavailable" });
+  assert.equal(empty, true);
+  assert.equal(f.calls(), 0);
+  assert.equal(await f.budget(), 1);
+}
+
+export async function capabilitiesFinalReceiptBindsActualIdentity(db) {
+  for (const field of [
+    "job_id",
+    "lease_token",
+    "subscriber_id",
+    "email",
+    "management_hash",
+    "management_generation",
+    "management_expires_at",
+    "unsubscribe_hash",
+    "unsubscribe_generation",
+  ]) {
+    await clearCapabilities(db);
+    const f = await capabilityFixture(db);
+    const database = intercept(db, async (statements, run) => {
+      const r = await run();
+      if (statements.length === 1) {
+        assert.equal(r[0].results.length, 1);
+        assert.ok(Object.hasOwn(r[0].results[0], field), field);
+        r[0].results[0][field] = "different";
+      }
+      return r;
+    });
+    assert.deepEqual(await f.run({ db: database }), { status: "uncertain" }, field);
+    assert.equal(f.calls(), 0);
+    assert.equal(await f.budget(), 1);
+  }
+}
+
+export async function capabilitiesBuilderCannotMutateCapturedPresentation(db) {
+  for (const withSimilar of [false, true]) {
+    await clearCapabilities(db);
+    const f = await capabilityFixture(db),
+      present = f.options.present,
+      builder = f.options.buildLinks;
+    const similar = withSimilar
+      ? [{ ...role, id: "2".repeat(16), apply_url: "https://posting.example.test/similar" }]
+      : [];
+    let value, inputRoles, forbidden;
+    assert.deepEqual(
+      await f.run({
+        present: async (input) => {
+          inputRoles = input.roles;
+          value = { ...(await present(input)), similar };
+          return value;
+        },
+        buildLinks: (credentials) => {
+          forbidden = `https://foreign.example.test/job?value=${credentials.unsubscribe}`;
+          if (withSimilar) similar[0].apply_url = forbidden;
+          else similar.push({ ...role, id: "2".repeat(16), apply_url: forbidden });
+          inputRoles[0].apply_url = forbidden;
+          value.from = "changed@example.test";
+          value.postalAddress = "changed presentation";
+          value.links.matchingPage = forbidden;
+          return {
+            ...builder(credentials),
+            similar,
+            from: value.from,
+            postalAddress: value.postalAddress,
+            matchingPage: forbidden,
+          };
+        },
+      }),
+      { status: "accepted" },
+    );
+    assert.equal(f.calls(), 1);
+    assert.equal(f.messages[0].text.includes(forbidden), false);
+    assert.equal(f.messages[0].text.includes("changed presentation"), false);
+    assert.equal(f.messages[0].text.includes("https://posting.example.test/similar"), withSimilar);
+    assert.ok(f.messages[0].text.includes("https://site.example.test/roles"));
+    assert.deepEqual(f.messages[0].from, { name: "Fixture", email: "sender@example.test" });
+  }
+}
+
+export async function capabilitiesBuilderCannotExpandTrustedOrigins(db) {
+  const f = await capabilityFixture(db),
+    present = f.options.present,
+    builder = f.options.buildLinks;
+  const origins = ["https://site.example.test", "https://internscout.org"],
+    before = await tokenRows(db);
+  assert.deepEqual(
+    await f.run({
+      present: async (input) => ({ ...(await present(input)), origins }),
+      buildLinks: (credentials) => {
+        origins.push("https://foreign.example.test");
+        return {
+          ...builder(credentials),
+          unsubscribe: `https://foreign.example.test/follows/unsubscribe?token=${credentials.unsubscribe}`,
+        };
+      },
+    }),
+    { status: "unavailable" },
+  );
+  assert.deepEqual(await tokenRows(db), before);
+  assert.equal(f.calls(), 0);
+  assert.equal(await f.budget(), null);
+}
+
+export async function capabilitiesPublicFactsRejectEncodedCredentialsAndAccessors(db) {
+  for (const mode of ["role", "nested-role", "public", "accessor"]) {
+    await clearCapabilities(db);
+    const f = await capabilityFixture(db),
+      present = f.options.present;
+    const synthetic = "00000000-0000-0000-0000-000000000000." + "a".repeat(64);
+    let builders = 0,
+      getters = 0;
+    assert.deepEqual(
+      await f.run({
+        present: async (input) => {
+          const p = await present(input);
+          const candidate = {
+            ...role,
+            id: "2".repeat(16),
+            apply_url: `https://posting.example.test/${mode === "nested-role" ? synthetic.replaceAll("a", "%2561") : synthetic}`,
+          };
+          if (mode === "public")
+            p.links.publicShare = `https://site.example.test/share?value=${synthetic}`;
+          else p.similar = [candidate];
+          if (mode === "accessor")
+            Object.defineProperty(candidate, "apply_url", {
+              enumerable: true,
+              get() {
+                getters++;
+                return "https://posting.example.test/safe";
+              },
+            });
+          return p;
+        },
+        buildLinks: (credentials) => {
+          builders++;
+          return f.options.buildLinks(credentials);
+        },
+      }),
+      { status: "unavailable" },
+    );
+    assert.equal(builders, 0);
+    assert.equal(getters, 0);
+    assert.equal(f.calls(), 0);
+    assert.equal(await f.budget(), null);
   }
 }

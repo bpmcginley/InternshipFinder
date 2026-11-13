@@ -10,6 +10,89 @@ import {
   finishFollowDigestAttempt,
 } from "./follow-outbox.js";
 
+// Capture only rendered public facts before exposing fresh capabilities to the builder.
+// Reuse the caller's already-required result/role bounds; no separate volume policy.
+function snapshotPresentation(input, matches, limits) {
+  let remaining = limits.maxResultBytes;
+  const maxRoles = limits.maxRoles;
+  if (
+    !Number.isSafeInteger(remaining) ||
+    remaining < 1 ||
+    !Number.isSafeInteger(maxRoles) ||
+    maxRoles < 1
+  )
+    throw new Error("Invalid digest presentation");
+  const field = (value, key, optional = false) => {
+    if (!value || ![Object.prototype, null].includes(Object.getPrototypeOf(value)))
+      throw new Error("Invalid digest presentation");
+    const d = Object.getOwnPropertyDescriptor(value, key);
+    if (!d && optional) return undefined;
+    if (!d?.enumerable || !Object.hasOwn(d, "value"))
+      throw new Error("Invalid digest presentation");
+    return d.value;
+  };
+  const text = (value, max = remaining) => {
+    if (typeof value !== "string" || value.length > max || value.length > remaining)
+      throw new Error("Invalid digest presentation");
+    remaining -= new TextEncoder().encode(value).length + 1;
+    if (remaining < 0) throw new Error("Invalid digest presentation");
+    return value;
+  };
+  const list = (value, max, copy) => {
+    if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype)
+      throw new Error("Invalid digest presentation");
+    const length = Object.getOwnPropertyDescriptor(value, "length").value;
+    if (length > max || length > remaining) throw new Error("Invalid digest presentation");
+    const result = [];
+    for (let i = 0; i < length; i++) {
+      const d = Object.getOwnPropertyDescriptor(value, i);
+      if (!d?.enumerable || !Object.hasOwn(d, "value"))
+        throw new Error("Invalid digest presentation");
+      result.push(copy(d.value));
+    }
+    return Object.freeze(result);
+  };
+  const publicUrl = (value) => {
+    const original = text(value, 2000);
+    let decoded = new URL(original).href;
+    // Each decoding reduces a bounded string. Reject capabilities even through nested escapes.
+    while (/%[a-f0-9]{2}/i.test(decoded)) {
+      const next = decodeURIComponent(decoded);
+      if (next === decoded) break;
+      decoded = next;
+    }
+    if (/[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}\.[a-f0-9]{64}/i.test(decoded))
+      throw new Error("Invalid digest public link");
+    return original;
+  };
+  const role = (value) =>
+    Object.freeze({
+      id: text(field(value, "id"), 16),
+      company_name: text(field(value, "company_name"), 200),
+      title: text(field(value, "title"), 300),
+      location: text(field(value, "location"), 300),
+      apply_url: publicUrl(field(value, "apply_url")),
+    });
+  const links = field(input, "links");
+  return Object.freeze({
+    from: text(field(input, "from")),
+    postalAddress: text(field(input, "postalAddress"), 500),
+    origins: list(field(input, "origins"), remaining, (v) => {
+      const value = text(v, 2000),
+        url = new URL(value);
+      if (url.protocol !== "https:" || ![url.origin, url.origin + "/"].includes(value))
+        throw new Error("Invalid digest origin");
+      return value;
+    }),
+    links: Object.freeze({
+      matchingPage: publicUrl(field(links, "matchingPage")),
+      publicShare: publicUrl(field(links, "publicShare")),
+    }),
+    matches: list(matches, maxRoles, role),
+    similar: list(field(input, "similar", true) ?? [], maxRoles, role),
+  });
+}
+
 function privateLinks(buildLinks, management, unsubscribe) {
   const values = buildLinks(Object.freeze({ management, unsubscribe }));
   if (values && typeof values.then === "function") {
@@ -94,6 +177,7 @@ export async function deliverFollowSnapshotDigest({
     let credentials = null,
       bound = presentation;
     if (buildLinks !== null) {
+      const snapshot = snapshotPresentation(presentation, matches, limits);
       const [management, unsubscribe] = await Promise.all([
         createFollowCapability(),
         createFollowCapability(),
@@ -107,14 +191,18 @@ export async function deliverFollowSnapshotDigest({
         unsubscribeGeneration: unsubscribe.generation,
       });
       bound = {
-        ...presentation,
+        ...snapshot,
         links: {
-          ...presentation?.links,
+          ...snapshot.links,
           ...privateLinks(buildLinks, management.raw, unsubscribe.raw),
         },
       };
     }
-    const envelope = renderFollowMail("digest", { ...bound, matches, to: recipient });
+    const envelope = renderFollowMail("digest", {
+      ...bound,
+      matches: credentials ? bound.matches : matches,
+      to: recipient,
+    });
     if (!envelope) return unavailable();
     const attempt = await beginBudgetedFollowSnapshotAttempt(
       db,
