@@ -535,6 +535,7 @@ def main():
     publication.add_argument("checkout", type=Path)
     publication.add_argument("state", type=Path)
     publication.add_argument("--message", required=True)
+    publication.add_argument("--github-output", type=Path)
     args = parser.parse_args()
     try:
         if args.command == "validate":
@@ -545,7 +546,12 @@ def main():
         else:
             message, commit = publish(args.checkout, args.state, args.message)
             print(message)
-            print(publication_marker(args.checkout, commit))
+            marker = publication_marker(args.checkout, commit)
+            print(marker)
+            if args.github_output is not None and message != "No changes.":
+                # Both values come from the same successful publication used by the log marker.
+                with args.github_output.open("a", encoding="utf-8") as output:
+                    output.write("\n".join(marker.split()[1:]) + "\n")
     except ValueError as error:
         parser.exit(1, f"{error}\n")
     except (OSError, tarfile.TarError):

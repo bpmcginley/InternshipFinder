@@ -1,0 +1,20 @@
+{
+  "count": 846,
+  "changed": [
+    "index.html",
+    "js/app/dashboard.mjs",
+    "js/app/follow.mjs",
+    "js/app/index.mjs",
+    "js/app/rows.mjs"
+  ],
+  "nativeGraphPathsMoved": 14,
+  "nativeBodiesChanged": [
+    "dashboard.mjs",
+    "follow.mjs",
+    "index.mjs",
+    "rows.mjs"
+  ],
+  "graph": "a9e1a0ae1865bb3eee474e01672c70705caf8f4ebcbe11744366b420604a535c",
+  "archiveSHA256": "56e77e53c10d515e8b661f20ff6ef7fddeeada33feb86bc81ae10da3de4944f3",
+  "gzipDeltaFourRawModules": 944
+}

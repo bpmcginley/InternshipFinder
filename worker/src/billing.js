@@ -5,8 +5,9 @@
 // date. Stripe holds the card, the name and the email; they never reach this Worker or D1.
 import { HttpError } from "./http.js";
 import { countEvent } from "./visits.js";
-import { listingEvent } from "./orders.js";
+import { listingEvent } from "./orders/settlement.js";
 import { studentCheckout, completeStudentCheckout } from "./student-checkout.js";
+import { topupWebhook, snapshotTopupHistoryInput } from "./topup-webhook.js";
 
 const API = "https://api.stripe.com/v1/";
 // The same version the webhook endpoint is set to, so events and API replies share one shape.
@@ -101,7 +102,7 @@ async function savePlan(db, user, { plan, status, customer, subscription, period
   return r.meta.changes > 0;
 }
 
-const managedPayments = (env) => String(env.STRIPE_MANAGED_PAYMENTS || "") === "1";
+export const managedPayments = (env) => String(env.STRIPE_MANAGED_PAYMENTS || "") === "1";
 // was: const siteUrl = (env) => ... (exported 2026-10-19 for orders.js)
 export const siteUrl = (env) => (env.SITE_URL || "https://internscout.org").replace(/\/+$/, "");
 
@@ -228,11 +229,15 @@ export function planFrom(env, config, o, fallback = "supporter") {
   return fallback;
 }
 
-export async function applyEvent(db, env, config, event, now, fetchImpl) {
+export async function applyEvent(db, env, config, event, now, fetchImpl, historyPolicy) {
+  let topupInput;
+  try { topupInput = snapshotTopupHistoryInput(env, event, historyPolicy); }
+  catch { throw billingRetry(); }
+  event = topupInput.event ?? event;
   const id = String(event.id || crypto.randomUUID());
   if (!(await firstTime(db, id, now))) return { ok: true, repeat: true };
   try {
-    return await applyFresh(db, env, config, event, now, fetchImpl);
+    return await applyFresh(db, env, config, event, now, fetchImpl, topupInput);
   } catch (e) {
     // The id was recorded before the change was made. If the change then failed, forget the id, or
     // Stripe's retry would be waved through as a repeat and a student who paid would stay on free.
@@ -286,10 +291,17 @@ async function reversedStudentPayment(db, env, event, fetchImpl) {
   return null;
 }
 
-async function applyFresh(db, env, config, event, now, fetchImpl) {
+async function applyFresh(db, env, config, event, now, fetchImpl, topupInput) {
   const o = (event.data && event.data.object) || {};
 
-  // Paid listings bought by employers (orders.js, added 2026-10-19) go first: a Checkout session whose
+  // Known top-ups stay inside the existing receipt and must never reach other billing handlers.
+  const topup = await topupWebhook({ db, env, event, fetchImpl, clock: () => now, ...topupInput });
+  if (topup) {
+    if (!["settled", "expired", "reconciled", "inactive", "ignored"].includes(topup.status)) throw billingRetry();
+    return ["inactive", "ignored"].includes(topup.status) ? { ok: true, ignored: true } : { ok: true };
+  }
+
+  // Paid listings bought by employers (orders.js, added 2026-10-19) precede subscriptions: a Checkout session whose
   // metadata.kind is "listing", and a dispute or refund on a payment that belongs to an order. They are
   // never a student's plan, and everything below is left exactly as it was. null means "not a listing".
   const listing = await listingEvent(db, env, event, now, fetchImpl);

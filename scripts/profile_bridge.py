@@ -9,7 +9,7 @@ import re
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = Path("shared/profile_bridge.json")
-DASHBOARD = Path("docs/js/core.js")
+DASHBOARD = Path("docs/js/core/bridge.mjs")
 BACKGROUND = Path("extension/background/index.js")
 GENERATOR = Path("scripts/profile_bridge.py")
 

@@ -2,13 +2,20 @@
 
 import os
 
-from internscout import seo_pages
-from test_seo_pages import _pay_site, _row, _site
+import pytest
+
+from internscout.site import sitemap
+from internscout.site.assets import SLOGAN
+from tests.seo_fixture_data import _pay_site, _row, _site
+from tests.site_publish_fixture import write_site
+
+
+pytestmark = pytest.mark.without_seo_facade
 
 
 def test_sitemap_and_robots(tmp_path):
     site = _site(tmp_path, {"MA": [_row(i) for i in range(5)]})
-    seo_pages.write(site, seo_pages.build(site))
+    write_site(site)
     sitemap = open(os.path.join(site, "sitemap.xml"), encoding="utf-8").read()
     assert "<loc>https://internscout.org/internships/massachusetts/</loc>" in sitemap
     assert "<loc>https://internscout.org/privacy</loc>" in sitemap
@@ -51,9 +58,8 @@ def test_google_and_bing_skip_the_feeds_and_everyone_else_is_unchanged(tmp_path)
     from internscout import feeds
 
     site = _site(tmp_path, {"MA": [_row(i) for i in range(5)]})
-    pages = seo_pages.build(site)
-    seo_pages.write(site, pages)
-    feeds.write_all(site, pages, seo_pages.GENERATED)
+    pages, state = write_site(site)
+    feeds.write_all(site, pages, state.generated)
     groups = _robots_groups(open(os.path.join(site, "robots.txt"), encoding="utf-8").read())
     assert groups["*"] == ["Allow: /"]
     for bot in ("Googlebot", "Bingbot"):
@@ -68,16 +74,16 @@ def test_google_and_bing_skip_the_feeds_and_everyone_else_is_unchanged(tmp_path)
 
 def test_live_paths_reads_the_previous_sitemap(tmp_path):
     site = _site(tmp_path, {"MA": [_row(i) for i in range(5)]})
-    seo_pages.write(site, seo_pages.build(site))
-    live = seo_pages.live_paths(os.path.join(site, "sitemap.xml"))
+    write_site(site)
+    live = sitemap.live_paths(os.path.join(site, "sitemap.xml"), sitemap.SITE_PATH)
     assert {"/", "/internships/", "/internships/massachusetts/"} <= set(live)
     assert live["/internships/massachusetts/"] == "2026-09-22" and live["/install.html"] == ""
-    assert seo_pages.live_paths(os.path.join(site, "missing.xml")) == {}
+    assert sitemap.live_paths(os.path.join(site, "missing.xml"), sitemap.SITE_PATH) == {}
 
 
 def test_llms_txt_links_the_key_pages_with_numbers_from_the_data(tmp_path):
     site = _pay_site(tmp_path)
-    seo_pages.write(site, seo_pages.build(site))
+    write_site(site)
     short = open(os.path.join(site, "llms.txt"), encoding="utf-8").read()
     full = open(os.path.join(site, "llms-full.txt"), encoding="utf-8").read()
     # llmstxt.org: an H1 name, a blockquote summary, then sections of markdown links.
@@ -105,7 +111,7 @@ def test_llms_txt_links_the_key_pages_with_numbers_from_the_data(tmp_path):
         "/llms-full.txt",
     ):
         assert f"](https://internscout.org{path})" in short, path
-    assert seo_pages.SLOGAN in short and "never submits" in short and "$4/month" in short
+    assert SLOGAN in short and "never submits" in short and "$4/month" in short
     assert "## Optional" in short
     assert full.startswith("# InternScout\n\n> ")
     assert (

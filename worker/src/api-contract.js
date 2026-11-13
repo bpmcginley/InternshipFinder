@@ -13,18 +13,82 @@ const route = (method, path, auth, request, response, gate = "none") =>
 
 export const ROUTES = Object.freeze([
   route(
+    "POST",
+    "/follows/confirm",
+    "follow-action-token",
+    "No query parameters. Exactly one confirmation token as a 101-byte text/plain body with an absolute 5-second read deadline.",
+    "Empty no-store 204 for confirmation, 410 for unavailable confirmation, 400 for malformed input, 503 with Retry-After: 60 for timeout/capacity/storage. GET/HEAD fall through to 404.",
+    "none; authorizes only an existing confirmation credential",
+  ),
+  route(
+    "POST",
+    "/follows/delete-request",
+    "follow-action-token",
+    "No query parameters. Exactly one fd_ request-deletion token as a 104-byte text/plain body with an absolute 5-second read deadline.",
+    "Empty no-store 204 for deletion/replay/unknown, 400 for malformed input, 503 with Retry-After: 60 for timeout/capacity/storage. GET/HEAD fall through to 404.",
+    "none; deletion remains available when signup or sending is off",
+  ),
+  route(
+    "POST",
+    "/follows/unsubscribe",
+    "follow-unsubscribe-token",
+    "Exactly one query parameter token=deletion-only UUID.secret; URL-encoded or multipart List-Unsubscribe=One-Click, at most 4,096 bytes with an absolute 5-second body-read deadline; no login, cookies or Origin required",
+    "Empty no-store 204 for deletion/replay/unknown/wrong-purpose; malformed 400; body timeout/capacity/storage 503 with Retry-After: 60; GET/HEAD fall through to 404 without mutation",
+    "none; deletion remains available when signup or sending is off",
+  ),
+  route(
+    "POST",
+    "/follows/manage/list",
+    "follow-management-token + site-origin",
+    "UTF-8 JSON [managementToken, null or cursor]. No query or fragment. Up to 16 KiB and five seconds to read.",
+    "No-store JSON {scopes: [{scope_key, created, confirmed_at}], next} 200; empty 410 unavailable capability; 400 malformed, 403 Origin, 415 media type, 503 retryable; 404 when disabled.",
+    "FOLLOW_MANAGEMENT_ENABLED",
+  ),
+  route(
+    "POST",
+    "/follows/manage/remove",
+    "follow-management-token + site-origin",
+    "UTF-8 JSON [managementToken, scopeKey]. No query or fragment. Up to 16 KiB and five seconds to read.",
+    "No-store JSON {removed} 200; empty 400 malformed, 403 Origin, 415 media type, 503 retryable; 404 when disabled.",
+    "FOLLOW_MANAGEMENT_ENABLED",
+  ),
+  route(
+    "POST",
+    "/follows/manage/delete",
+    "follow-management-token + site-origin",
+    "UTF-8 JSON [managementToken]. No query or fragment. Up to 16 KiB and five seconds to read.",
+    "No-store JSON {deleted} 200; empty 400 malformed, 403 Origin, 415 media type, 503 retryable; 404 when disabled.",
+    "FOLLOW_MANAGEMENT_ENABLED",
+  ),
+  route(
+    "POST",
+    "/follows/manage/request",
+    "site-origin",
+    "UTF-8 JSON {email}. No query or fragment. Up to 16 KiB and five seconds to read. Requires explicit TTL and daily cap.",
+    "Empty no-store 202 for accepted, unknown or duplicate requests; 400 malformed, 403 Origin, 415 media type, 503 retryable; 404 when disabled.",
+    "FOLLOW_MANAGEMENT_ENABLED and FOLLOW_MANAGEMENT_REQUEST_ENABLED",
+  ),
+  route(
+    "POST",
+    "/follows/signup",
+    "site-origin",
+    "UTF-8 JSON {email, link, scope}. No query or fragment. Scope is a company key or exact field/state arrays. Explicit link=true requires a current non-refreshing session. Up to 16 KiB and five seconds to read.",
+    "Empty no-store 202 for accepted or duplicate signup; 400 invalid, 403 Origin, 415 media type, 503 unavailable, 404 without qualified opt-in.",
+    "FOLLOW_SIGNUP_ENABLED and a current trusted release from FOLLOW_SIGNUP_RELEASE or the injected supplier",
+  ),
+  route(
     "GET",
     "/config",
     "public",
     "none",
-    "JSON {providers: Provider[], allowance: PlanAllowances, payments: {enabled, plans}, paused: boolean, invite: {bonus, max}, sessions: true, sync: boolean}",
+    "JSON {providers: Provider[], allowance: PlanAllowances, payments: {enabled, plans}, topups?: true, paused: boolean, invite: {bonus, max}, sessions: true, sync: boolean}",
   ),
   route(
     "GET",
     "/me",
     "user",
     "none",
-    "JSON {month, plan, plan_renews, can_upgrade, upgrade_offer, can_manage, tier, paused, allowance: {task: {used, limit, bonus?}}}",
+    "JSON {month, plan, plan_renews, can_upgrade, upgrade_offer, can_manage, can_recover_topup?: true, tier, paused, allowance: {task: {used, limit, bonus?, purchased?}}}",
   ),
   route(
     "POST",
@@ -86,6 +150,30 @@ export const ROUTES = Object.freeze([
     "JSON {url: string}",
     "payments",
   ),
+  route(
+    "GET",
+    "/billing/topup/offer",
+    "session + site-origin",
+    "First-party dashboard Origin and current session bearer. The server verifies the configured Price.",
+    "No-store JSON {enabled: true, offer: {amount, currency, units}} 200, auth 401, disallowed Origin 403, disabled or unavailable 503",
+    "TOPUPS_ENABLED and existing payment configuration",
+  ),
+  route(
+    "POST",
+    "/billing/topup/checkout",
+    "session + site-origin",
+    "First-party dashboard Origin and current session bearer. The server owns the offer and return URLs.",
+    "No-store JSON {status: open, url} 200, {status: pending} 202, auth 401, disallowed Origin 403, disabled or unavailable 503",
+    "TOPUPS_ENABLED and existing payment configuration",
+  ),
+  route(
+    "POST",
+    "/billing/topup/recover",
+    "session + site-origin",
+    "Current session bearer, first-party dashboard Origin, no body or query",
+    "No-store JSON {status: open, url} or {status: settled|expired|inactive} 200; pending 202, invalid 400, auth 401, disallowed Origin 403, wrong method 405, limited 429, disabled or unavailable 503",
+    "Historical top-up recovery configuration independent of sales",
+  ),
   route("POST", "/billing/portal", "user", "none", "JSON {url: string}", "payments"),
   route(
     "POST",
@@ -93,7 +181,7 @@ export const ROUTES = Object.freeze([
     "stripe-signature",
     "Raw signed event body; Stripe-Signature header",
     "JSON {ok: true, repeat?: true}; event-specific effects stay in existing handlers",
-    "payments-or-orders",
+    "payments-or-orders-or-historical-topups",
   ),
   route(
     "POST",
@@ -115,7 +203,7 @@ export const ROUTES = Object.freeze([
     "POST",
     "/hit",
     "site-origin",
-    "JSON/text-plain object {p?, r?, u?, m?, c?, t?, e?, s?}; bounded names and tags from visits.js",
+    "JSON/text-plain object {p?, r?, u?, m?, c?, t?, e?, s?}; optional gated organic {e: employer_posting_open, c: canonical key}; maximum 2,000 bytes",
     "204, no body",
   ),
   route(
@@ -144,8 +232,8 @@ export const ROUTES = Object.freeze([
     "GET",
     "/admin/employer-metrics",
     "admin",
-    "Query days?: integer 1..90, default 28",
-    "JSON {start, end_exclusive, days, currency, events, page_views, cash_cohort, campaign_reports_all_time, about}; no-store",
+    "Query days?: integer 1..90, default 28; optional gated organic_after cursor",
+    "JSON {start, end_exclusive, days, currency, events, page_views, cash_cohort, campaign_reports_all_time, about}; optional organic_posting_counts and organic_posting_readiness; no-store",
   ),
   route(
     "POST",
@@ -321,6 +409,11 @@ export const SPECIAL_ROUTES = Object.freeze([
 ]);
 
 export const AUTH = Object.freeze({
+  "follow-action-token": "Purpose-specific follow bearer in the POST body, checked against its stored hash.",
+  "follow-management-token":
+    "Purpose-specific management bearer in the JSON POST body, checked against its stored hash. Management routes require the exact https://internscout.org Origin and existing CORS permission.",
+  "follow-unsubscribe-token":
+    "Existing hashed, deletion-only follow token in the HTTPS URL query; never a confirmation, management or request-only deletion capability.",
   public: "No sign-in required; route-specific validation still applies.",
   user: "Provider ID token or live session bearer token, through the existing authenticateUser path.",
   "provider-id": "Fresh verified provider ID token only; session tokens cannot create sessions.",

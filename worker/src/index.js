@@ -7,21 +7,45 @@ import { authenticateUser, bearerOf, providers, userHash, verifyIdToken } from "
 import { copySession, createSession, dropExpiredSessions, endSession, isSessionToken, sessionInfo } from "./session.js";
 import { MAX_PROFILE_BYTES, deleteProfile, getProfile, putProfile, requireSync, syncOn } from "./profile.js";
 import { callGemini, costCents, estimateCents, readUsageFromSSE, sanitizeRequest } from "./gemini.js";
-import { admit, allowanceFor, cleanup, upgradeOffer, deleteUser, isPaused, monthOf, release, remainingOf, settle, shownLimit, usageFor } from "./limits.js";
+import { boundLegacySSE } from "./legacy-provider-response.js";
+import { allowanceFor, cleanup, upgradeOffer, deleteUser, globalRpm, isPaused, monthOf, release, remainingOf, settle, shownLimit, usageFor } from "./limits.js";
+import { admitAiLifecycle, fundedPurchaseCreationReady, respondFundedAi } from "./ai-lifecycle.js";
+import { purchasedRunsFor } from "./funded-purchase.js";
 import { bonusFor, claim, inviteInfo, noteAccount } from "./referral.js";
 import { cleanStates, demandCounts, dropStale, setDemand, touchSeen } from "./demand.js";
 import { countEvent, countHit } from "./visits.js";
-import { employerMetrics } from "./employer-metrics.js";
+import { createFollowManagementHttp } from "./follow-management-http.js";
+import { createFollowManagementRequestHttp } from "./follow-management-request-http.js";
+import { loadFollowCatalog, prepareFollowCatalogRelease } from "./follow-catalog-loader.js";
+import { createFollowSignupRoute } from "./follow-signup-route.js";
+import { prepareFollowSignupDeployment } from "./follow-signup-release.js";
+import { runFollowScheduledMaintenance } from "./follow-scheduled-maintenance.js";
+import { followTokenEndpoints } from "./follow-token-endpoint.js";
+import { followUnsubscribeEndpoint } from "./follow-unsubscribe-endpoint.js";
+import { topupCheckoutResponse, topupOfferResponse } from "./topup-checkout-http.js";
+import { canRecoverAttachedTopup } from "./topup-attached-recovery.js";
+import { topupRecoveryResponse } from "./topup-recovery-http.js";
+import { prepareTopupStripe, topupConfigured, topupRecoveryConfigured } from "./topup-stripe.js";
+import { createEmployerPostingRuntime, employerPostingReport } from "./employer-posting-runtime.js";
+const employerPostingRuntime = createEmployerPostingRuntime();
 import { CAMPAIGN_REPORT_CRON, expireCampaignReportMail, processCampaignReports } from "./campaign-reports.js";
 import { CLOCK_CRON, startCatchup } from "./clock.js";
+import { maintainEmployerPostings } from "./employer-posting-maintenance.js";
 import { MAX_LEAD_BYTES, dropOldLeads, takeLead } from "./leads.js";
 import { socialVideo } from "./social-video.js";
 import { MAX_ADMIN_BYTES, checkPlacement, createPlacement, endExpiredPlacements, endPlacement, listLeads, listPlacements,
   livePlacements, pausePlacement, placementReport, refusePlacement, requireAdmin, rollupPlacementCounts, switchOn,
   updatePlacement } from "./placements.js";
-import { applyEvent, blocksDeletion, canUpgrade, checkout, deletePlan, paymentsInfo, paymentsOn, planOf, portal, verifyWebhook, reconcileStudentBilling, STUDENT_BILLING_CRON } from "./billing.js";
-import { MAX_ORDER_BYTES, availability, chooseCredit, confirmOrder, createPilotCode, creditInfo, listOrders, orderConfig,
-  notePlacementFields, ordersCron, ordersOn, requireOrders, reviewDecision, reviewPage, takeOrder } from "./orders.js";
+import { applyEvent, blocksDeletion, canUpgrade, checkout, deletePlan, paymentsInfo, paymentsOn, planOf, portal, siteUrl, verifyWebhook, reconcileStudentBilling, STUDENT_BILLING_CRON } from "./billing.js";
+import { listOrders } from "./orders/admin.js";
+import { createPilotCode } from "./orders/pilot.js";
+import { availability, notePlacementFields } from "./orders/capacity.js";
+import { MAX_ORDER_BYTES } from "./orders/shared.js";
+import { ordersCron } from "./orders/cron.js";
+import { chooseCredit, creditInfo } from "./orders/refunds.js";
+import { reviewDecision, reviewPage } from "./orders/review.js";
+import { confirmOrder, takeOrder } from "./orders/checkout.js";
+import { orderConfig, ordersOn, requireOrders } from "./orders/access.js";
 
 const RUN_ID = /^[A-Za-z0-9_-]{1,64}$/;
 // InternScout's own extension IDs, named here instead of trusting every chrome-extension:// origin.
@@ -33,14 +57,15 @@ const EXTENSION_ORIGINS = [
 ];
 // internscout.org is the site's own domain. The github.io origin stays for tabs opened before the
 // switch; GitHub Pages redirects every new visit to internscout.org.
-const DEFAULT_ORIGINS = ["https://internscout.org", "https://bpmcginley.github.io", "http://localhost:8000", ...EXTENSION_ORIGINS].join(",");
+const DASHBOARD_ORIGINS = ["https://internscout.org", "https://bpmcginley.github.io"];
+const DEFAULT_ORIGINS = [...DASHBOARD_ORIGINS, "http://localhost:8000", ...EXTENSION_ORIGINS].join(",");
 
 // Which client sent a request, by its Origin, for the funnel steps the Worker counts (visits.js
 // countEvent, added 2026-10-04): "extension", "dashboard" (the site) or "worker" (anything else).
 function clientOf(request) {
   const origin = request.headers.get("Origin") || "";
   if (EXTENSION_ORIGINS.includes(origin)) return "extension";
-  if (/^https:\/\/(internscout\.org|bpmcginley\.github\.io)$/.test(origin)) return "dashboard";
+  if (DASHBOARD_ORIGINS.includes(origin)) return "dashboard";
   return "worker";
 }
 
@@ -58,6 +83,153 @@ function corsHeaders(request, env) {
     "Access-Control-Expose-Headers": "X-InternScout-Model, X-InternScout-Remaining",
     "Access-Control-Max-Age": "86400",
     Vary: "Origin",
+  };
+}
+
+// Keep concurrency per isolate while binding authority and storage to each request.
+const followManagement = createFollowManagementHttp({ enabled: true });
+const followManagementRequest = createFollowManagementRequestHttp({ enabled: true });
+const followSignup = createFollowSignupRoute({ enabled: true });
+const followOriginAllowed = (request, env) =>
+  request.headers.get("Origin") === "https://internscout.org" &&
+  !!corsHeaders(request, env)["Access-Control-Allow-Origin"];
+const followPolicyInteger = (value) => {
+  const parsed = typeof value === "string" ? Number(value) : NaN;
+  return String(parsed) === value ? parsed : NaN;
+};
+
+const manageFollow = (operation) => ({ request, env, db, d }) => {
+  if (env.FOLLOW_MANAGEMENT_ENABLED !== "1")
+    throw new HttpError(404, "not_found", "No such endpoint");
+  return followManagement[operation](request, {
+    db,
+    now: d.now,
+    originAllowed: (r) => followOriginAllowed(r, env),
+  });
+};
+
+const requestFollowManagement = ({ request, env, db }) => {
+  if (env.FOLLOW_MANAGEMENT_ENABLED !== "1" || env.FOLLOW_MANAGEMENT_REQUEST_ENABLED !== "1")
+    throw new HttpError(404, "not_found", "No such endpoint");
+  return followManagementRequest(request, {
+    db,
+    originAllowed: (r) => followOriginAllowed(r, env),
+    ttlMs: followPolicyInteger(env.FOLLOW_MANAGEMENT_REQUEST_TTL_MS),
+    dailyLimit: followPolicyInteger(env.FOLLOW_MANAGEMENT_REQUEST_DAILY_CAP),
+  });
+};
+
+const followSignupClosed = () => json({ error: "not_found", message: "No such endpoint" }, 404);
+
+function prepareFollowSignupAdmission({ db, now, d }) {
+  let policy, dailyLimit, latest = +now;
+  const clock = () => {
+    const value = d.now(), at = +value;
+    if (
+      !(value instanceof Date) || !Number.isSafeInteger(at) || at < latest ||
+      (policy && (at < policy.release.notBefore || at >= policy.release.expiresAt))
+    ) throw new Error("Follow signup clock unavailable");
+    latest = at;
+    return new Date(at);
+  };
+  try {
+    if (!Number.isSafeInteger(latest)) return followSignupClosed();
+    const supplied = d.followSignupRelease();
+    if (
+      !supplied ||
+      typeof supplied !== "object" ||
+      Array.isArray(supplied) ||
+      Object.keys(supplied).sort().join(",") !==
+        "dailyLimit,deadlineMs,maxBytes,maxKeys,origin,previousValid,release"
+    ) {
+      void Promise.prototype.then.call(Promise.resolve(supplied), undefined, () => {});
+      return followSignupClosed();
+    }
+    ({ dailyLimit } = supplied);
+    policy = prepareFollowCatalogRelease(supplied);
+    if (!Number.isSafeInteger(dailyLimit) || dailyLimit <= 0 ||
+        !Number.isFinite(+new Date(policy.release.expiresAt))) return followSignupClosed();
+    clock();
+  } catch {
+    return followSignupClosed();
+  }
+  return {
+    db,
+    dailyLimit,
+    clock,
+    loadCatalog: async () => {
+      const result = await loadFollowCatalog({
+        ...policy, enabled: true, fetch: d.fetch, now: () => +clock(),
+      });
+      return result.status === "available"
+        ? { ...result, expiresAt: policy.release.expiresAt }
+        : result;
+    },
+  };
+}
+
+const signupFollow = ({ request, env, db, now, d }) => {
+  if (env.FOLLOW_SIGNUP_ENABLED !== "1" ||
+      (typeof d.followSignupRelease !== "function" && typeof env.FOLLOW_SIGNUP_RELEASE !== "string"))
+    return followSignupClosed();
+  return followSignup(request, {
+    originAllowed: (r) => followOriginAllowed(r, env),
+    prepareAdmission: () => {
+      if (typeof d.followSignupRelease === "function")
+        return prepareFollowSignupAdmission({ db, now, d });
+      try {
+        return { db, ...prepareFollowSignupDeployment(env.FOLLOW_SIGNUP_RELEASE, {
+          fetch: d.fetch, now: d.now, initialTime: now instanceof Date ? +now : NaN,
+        }) };
+      } catch {
+        return followSignupClosed();
+      }
+    },
+  });
+};
+
+const topupOriginAllowed = (request, env) =>
+  DASHBOARD_ORIGINS.includes(request.headers.get("Origin")) &&
+  !!corsHeaders(request, env)["Access-Control-Allow-Origin"];
+
+const dashboardTopupConfigured = (env) =>
+  topupConfigured(env) &&
+  DASHBOARD_ORIGINS.includes(siteUrl(env)) &&
+  fundedPurchaseCreationReady(env);
+
+const dashboardRecoveryRoot = (env) => {
+  const root = siteUrl(env);
+  return DASHBOARD_ORIGINS.includes(root) ? root + "/" : undefined;
+};
+
+const recoverDashboardTopup = ({ request, env, d }) =>
+  topupRecoveryResponse({
+    request,
+    env,
+    fetchImpl: d.fetch,
+    clock: d.now,
+    originAllowed: topupOriginAllowed,
+    returnUrl: dashboardRecoveryRoot(env),
+  });
+
+function prepareDashboardTopup({ db, env, d }) {
+  const salesReady = () => dashboardTopupConfigured(env) && globalRpm(env, d.config) > 0;
+  return async (identity, fresh) => {
+    if (!salesReady()) return { enabled: false };
+    const canUseAutoApply = async () => {
+      const { plan } = await planOf(db, identity.user);
+      const at = fresh();
+      return (
+        allowanceFor(d.config, env, "autofill", identity.tier, plan, at) > 0 &&
+        !(await isPaused(db, env, d.config, at, plan))
+      );
+    };
+    if (!(await canUseAutoApply()) || !(Date.parse(identity.expires) > +fresh()) || !salesReady())
+      return { enabled: false };
+    const root = siteUrl(env) + "/";
+    const adapter = await prepareTopupStripe(env, { success: root, cancel: root }, d.fetch);
+    if (!adapter.enabled || !salesReady()) return { enabled: false };
+    return (await canUseAutoApply()) && salesReady() ? adapter : { enabled: false };
   };
 }
 
@@ -103,6 +275,9 @@ const allowanceTable = (config, fn) =>
  * @property {Date} now
  * @property {Parameters<typeof route>[2]} ctx
  * @property {Parameters<typeof route>[3]} d
+ * @property {URL} url
+ * @property {string} path
+ * @property {() => string} tier
  * @property {() => Promise<string>} signIn
  */
 /** @typedef {(context: SafeRouteContext) => Promise<Response>} SafeRouteHandler */
@@ -132,6 +307,16 @@ const withAdmin = (handler) => async (context) => {
 
 /** @type {Record<string, SafeRouteHandler>} */
 const safeRouteHandlers = {
+  // Token deletion stays available independently of future signup/sending switches.
+  "POST /follows/unsubscribe": async ({ request, db, now }) => followUnsubscribeEndpoint(request, db, now),
+  "POST /follows/confirm": async ({ request, db, d }) => followTokenEndpoints.confirm(request, db, d.now),
+  "POST /follows/delete-request": async ({ request, db, d }) => followTokenEndpoints.deleteRequest(request, db, d.now),
+  "POST /follows/manage/list": manageFollow("list"),
+  "POST /follows/manage/remove": manageFollow("remove"),
+  "POST /follows/manage/delete": manageFollow("deleteAll"),
+  "POST /follows/manage/request": requestFollowManagement,
+  "POST /follows/signup": signupFollow,
+
   // Stay signed in: trade a fresh provider ID token for a long-lived session token (session.js).
   // Only an ID token can start a session, so a stolen session token cannot make more of itself.
   "POST /session": async ({ request, env, db, now, ctx, d }) => {
@@ -194,9 +379,9 @@ const safeRouteHandlers = {
 
   // One page load on the site (docs/js/count.js, sent with sendBeacon): adds one to the day's exact
   // visit totals (visits.js). No sign-in, nothing about the visitor kept.
-  "POST /hit": async ({ request, db, now }) => {
+  "POST /hit": async ({ request, env, db, now, d }) => {
     const { body } = await readJson(request, 2_000);
-    await countHit(db, request, body, now);
+    await countHit(db, request, body, now, employerPostingRuntime.service(env, db, d.fetch, d.now));
     return new Response(null, { status: 204 });
   },
 
@@ -212,10 +397,7 @@ const safeRouteHandlers = {
   }),
 
   // 2026-10-23: aggregate employer funnel for the owner's terminal. Revert: remove this route.
-  "GET /admin/employer-metrics": withAdmin(async ({ request, db, now }) => {
-    return json(await employerMetrics(db, Number(new URL(request.url).searchParams.get("days") || 28), now),
-      200, { "Cache-Control": "no-store" });
-  }),
+  "GET /admin/employer-metrics": withAdmin(employerPostingReport),
 
   "GET /demand": async ({ request, env, db, d, now }) => {
     const token = (request.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
@@ -224,12 +406,334 @@ const safeRouteHandlers = {
     }
     return json(await demandCounts(db, d.config, now));
   },
+
+  "GET /config": async ({ db, env, d, now }) => {
+    const limits = (tier, plan = "free") => allowanceTable(d.config, (task) => allowanceFor(d.config, env, task, tier, plan, now));
+    return json({
+      providers: providers(env).map((p) => ({ ...p, scopes: d.config.SCOPES })),
+      // One table per plan, so the dashboard can say what each tier actually buys before
+      // a student pays. `general` is the non-.edu half of the free tier.
+      allowance: {
+        edu: limits("edu"),
+        general: limits("general"),
+        ...Object.fromEntries(d.config.PAID_PLANS.map((plan) => [plan, limits("edu", plan)])),
+      },
+      payments: paymentsInfo(env, d.config),
+      ...(dashboardTopupConfigured(env) ? { topups: true } : {}),
+      paused: await isPaused(db, env, d.config, now),
+      // What an invite is worth (REFERRAL in config.js), so the dashboard can offer it before sign-in.
+      invite: { bonus: d.config.REFERRAL.bonus, max: d.config.REFERRAL.maxRewards },
+      // "Stay signed in" (POST /session) is always on; saving the Deep Dive needs the PROFILE_KEY secret.
+      sessions: true,
+      sync: syncOn(env),
+    });
+  },
+
+  "GET /me": async ({ request, db, env, now, ctx, d, signIn, tier }) => {
+    const user = await signIn();
+    // was: later(ctx, Promise.all([touchSeen(db, user, now), noteAccount(db, user, now)]));
+    later(ctx, Promise.all([touchSeen(db, user, now), noteAccount(db, user, now, clientOf(request))]));
+    const month = monthOf(now);
+    const used = await usageFor(db, user, month);
+    const mine = await planOf(db, user);
+    const [extra, purchased] = await Promise.all([bonusFor(db, user), purchasedRunsFor(db, user)]);
+    const token = bearerOf(request);
+    const canRecover = topupRecoveryConfigured(env) && dashboardRecoveryRoot(env) &&
+      isSessionToken(token) && await canRecoverAttachedTopup(db, user, token);
+    const usablePurchased = purchased > 0 && fundedPurchaseCreationReady(env) ? purchased : 0;
+    const body = {
+      month,
+      plan: mine.plan,
+      plan_renews: mine.periodEnd,
+      can_upgrade: canUpgrade(env, d.config, mine.plan),
+      // The next plan up and its allowances at this student's tier (null when there is none).
+      upgrade_offer: upgradeOffer(env, d.config, tier(), mine.plan, now),
+      can_manage: paymentsOn(env, d.config) && !!mine.customer,
+      ...(canRecover ? { can_recover_topup: true } : {}),
+      tier: tier(),
+      // isPaused takes a plan because the day's stop only applies to free accounts (limits.js).
+      // `mine.plan` is already loaded above for plan/can_upgrade/allowance, so without passing it
+      // here /me told a Supporter or Pro "AI is paused" on a day that POST /ai would have served
+      // them. /config keeps the default, which is the honest answer before anyone has signed in.
+      // was: paused: await isPaused(db, env, d.config, now),
+      paused: await isPaused(db, env, d.config, now, mine.plan),
+      // was: allowance: allowanceTable(d.config, (task) => ({ used: used[task] || 0, limit: allowanceFor(d.config, env, task, tier(), mine.plan, now) })),
+      // Keep the compatibility remainder accurate while exposing the two credit sources separately.
+      allowance: allowanceTable(d.config, (task) => {
+        const limit = allowanceFor(d.config, env, task, tier(), mine.plan, now);
+        const usedRuns = used[task] || 0;
+        const invite = extra[task] || 0;
+        const bought = task === "autofill" ? purchased : 0;
+        const paidInLimit = bought && limit > 0 ? usablePurchased : 0;
+        return {
+          used: usedRuns,
+          limit: shownLimit(limit, usedRuns, invite + paidInLimit),
+          ...(limit != null && invite > 0 ? { bonus: invite } : {}),
+          ...(bought > 0 ? { purchased: bought } : {}),
+        };
+      }),
+    };
+    return json(body, 200, { "Cache-Control": "no-store" });
+  },
+
+  "DELETE /me": async ({ db, env, now, d, signIn }) => {
+    const user = await signIn();
+    if (await blocksDeletion(db, user, env, d.fetch)) {
+      throw new HttpError(409, "subscribed", "Cancel any active plan and finish or let your pending checkout expire before deleting your data. Contact support if a billing confirmation is pending.");
+    }
+    await deleteUser(db, user, now);
+    await deletePlan(db, user);
+    return json({ ok: true });
+  },
+
+  // Stripe hosts both pages; we only hand out the link.
+  "POST /billing/checkout": async ({ request, db, env, now, d, signIn }) => {
+    const user = await signIn();
+    // The plan is optional: an older extension or dashboard that predates the second tier sends
+    // nothing, and gets the cheapest plan on offer.
+    const { body } = await readJson(request, d.config.MAX_BODY_BYTES, true);
+    return json(await checkout(db, env, d.config, user, body.plan, now, d.fetch));
+  },
+
+  "GET /billing/topup/offer": async ({ request, db, env, d }) => {
+    const noStore = { "Cache-Control": "no-store" };
+    if (!dashboardTopupConfigured(env)) return json({ status: "disabled" }, 503, noStore);
+    if (!topupOriginAllowed(request, env))
+      return json({ status: "unavailable" }, 403, noStore);
+    return topupOfferResponse({
+      request,
+      db,
+      clock: d.now,
+      prepareAdapter: prepareDashboardTopup({ db, env, d }),
+    });
+  },
+
+  "POST /billing/topup/checkout": async ({ request, db, env, d }) => {
+    const noStore = { "Cache-Control": "no-store" };
+    if (env.TOPUPS_ENABLED !== "1" || !paymentsOn(env))
+      return json({ status: "disabled" }, 503, noStore);
+    if (!topupOriginAllowed(request, env))
+      return json({ status: "unavailable" }, 403, noStore);
+    return topupCheckoutResponse({
+      request,
+      db,
+      clock: d.now,
+      prepareAdapter: prepareDashboardTopup({ db, env, d }),
+    });
+  },
+
+  "POST /billing/topup/recover": recoverDashboardTopup,
+
+  "POST /billing/portal": async ({ db, env, d, signIn }) => {
+    const user = await signIn();
+    return json(await portal(db, env, d.config, user, d.fetch));
+  },
+
+  // Called by Stripe, not by a student: no sign-in, a signature instead.
+  // was: if (!paymentsOn(env, d.config) || !env.STRIPE_WEBHOOK_SECRET) throw ...
+  // Since 2026-10-19 the same endpoint also takes the paid listing orders' payments (orders.js), which
+  // can be on while the student plans are off.
+  "POST /billing/webhook": async ({ request, db, env, now, d }) => {
+    if ((!paymentsOn(env, d.config) && !ordersOn(env) && !topupRecoveryConfigured(env)) || !env.STRIPE_WEBHOOK_SECRET) throw new HttpError(404, "not_found", "No such endpoint");
+    const body = await request.text();
+    if (body.length > d.config.MAX_BODY_BYTES) throw new HttpError(400, "bad_request", "Request body is too large");
+    const event = await verifyWebhook(env.STRIPE_WEBHOOK_SECRET, request.headers.get("Stripe-Signature"), body, now);
+    return json(await applyEvent(db, env, d.config, event, now, d.fetch));
+  },
+
+  "POST /ai": async ({ request, db, env, now, ctx, d, url, signIn, tier }) => {
+    const user = await signIn();
+    const { body, bytes } = await readJson(request, d.config.MAX_BODY_BYTES);
+    const task = body.task;
+    if (typeof task !== "string" || !Object.hasOwn(d.config.TASKS, task)) {
+      throw new HttpError(400, "bad_task", "Unknown task");
+    }
+    if (body.run_id != null && !RUN_ID.test(String(body.run_id))) {
+      throw new HttpError(400, "bad_request", "run_id must be 1-64 letters, digits, - or _");
+    }
+    // no run_id: every call is its own run
+    const runId = body.run_id != null ? String(body.run_id) : "solo-" + crypto.randomUUID();
+    const taskMax = d.config.TASKS[task].maxBodyBytes;
+    if (taskMax && bytes > taskMax) throw new HttpError(400, "bad_request", "Request body is too large for this task");
+    const gem = sanitizeRequest(body.request, task, d.config);
+    const model = d.config.TASKS[task].model;
+    const stream = url.searchParams.get("stream") === "1";
+
+    const { plan } = await planOf(db, user);
+    // The estimate is charged before Gemini is called and corrected after, so a call whose Worker
+    // is cut off mid-reply (the student closes the tab) is still paid for in the books.
+    const estimate = estimateCents(model, bytes, gem.generationConfig.maxOutputTokens, d.config, now);
+    const admission = await admitAiLifecycle(db, env, d.config, user, task, runId, now, tier(), plan, estimate);
+    if (admission.kind === "funded") {
+      const result = await respondFundedAi(admission, { env, config: d.config, fetcher: d.fetch, model, gem, stream, now, db });
+      later(ctx, result.completion);
+      later(ctx, Promise.all([touchSeen(db, user, now), noteAccount(db, user, now, clientOf(request))]));
+      return result.response;
+    }
+    const admitted = admission.admitted;
+    let upstream;
+    try {
+      upstream = await callGemini(model, gem, stream, env, d.fetch);
+    } catch (e) {
+      await release(db, user, task, runId, admitted);
+      throw e;
+    }
+    // was: later(ctx, Promise.all([touchSeen(db, user, now), noteAccount(db, user, now)]));
+    later(ctx, Promise.all([touchSeen(db, user, now), noteAccount(db, user, now, clientOf(request))]));
+
+    const headers = { "X-InternScout-Model": model, "X-InternScout-Remaining": String(remainingOf(admitted)) };
+    const price = (usage) => (usage ? costCents(model, usage, d.config, now) : estimate);
+
+    if (stream) {
+      const bounded = boundLegacySSE(upstream.body);
+      const [client, meter] = bounded.body.tee();
+      later(ctx, readUsageFromSSE(meter).then(async (u) => {
+        // Retain first-autofill and ordinary error settlement. Only a byte cutoff
+        // discards provisional usage and keeps the already charged estimate.
+        const usage = await bounded.completed === "limited" ? null : u;
+        await settle(db, user, admitted, price(usage), usage, { task, model });
+      }));
+      return new Response(client, {
+        status: 200,
+        headers: { ...headers, "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },
+      });
+    }
+    const text = await upstream.text();
+    let usage = null;
+    try {
+      usage = JSON.parse(text).usageMetadata || null;
+    } catch {}
+    later(ctx, settle(db, user, admitted, price(usage), usage, { task, model }));
+    return new Response(text, { status: 200, headers: { ...headers, "Content-Type": "application/json" } });
+  },
+
+  // Referral credits (referral.js). The link a student shares, and a new classmate claiming it.
+  "GET /invite": async ({ db, env, now, d, signIn }) => {
+    const user = await signIn();
+    return json(await inviteInfo(db, env, d.config, user, now));
+  },
+
+  "POST /invite/claim": async ({ request, db, now, d, signIn, tier }) => {
+    const user = await signIn();
+    const { body } = await readJson(request, 1_000);
+    return json(await claim(db, d.config, user, tier(), body.code, now));
+  },
+
+  // Paid listings (placements.js, added 2026-10-14). The public read is for the site build, once per
+  // deploy; visitors never call it. Payment never changes a score, order, filter or count.
+  "GET /placements": async ({ db, now }) => {
+    return json(await livePlacements(db, now), 200, { "Cache-Control": "public, max-age=300" });
+  },
+
+  // Bruce's terminal only (scripts/placement.mjs): 404 until ADMIN_TOKEN is set, 403 from a browser,
+  // 401 without the token. The id goes in the body because the router matches exact paths.
+  "GET /admin/placements": async ({ request, db, env }) => {
+    await requireAdmin(request, env);
+    return json(await listPlacements(db));
+  },
+
+  // The employer report (S9): one placement, one ended month, rounded counts only (placements.js).
+  "POST /admin/placements/report": async ({ request, db, env, now }) => {
+    await requireAdmin(request, env);
+    const { body } = await readJson(request, MAX_ADMIN_BYTES);
+    return json({ report: await placementReport(db, body, now) });
+  },
+  "POST /admin/placements": changeAdminPlacement,
+  "POST /admin/placements/update": changeAdminPlacement,
+  "POST /admin/placements/check": changeAdminPlacement,
+  "POST /admin/placements/on": changeAdminPlacement,
+  "POST /admin/placements/pause": changeAdminPlacement,
+  "POST /admin/placements/end": changeAdminPlacement,
+  "POST /admin/placements/refuse": changeAdminPlacement,
+
+  // Paid listings bought on the site (orders.js, added 2026-10-19; worker/ORDERS.md). Every route but
+  // the config answers 404 until ordersOn(env). The order, confirm and credit choice take the site's
+  // Origin only; the review page is Bruce's, signed with ADMIN_TOKEN, and answers HTML.
+  "GET /employer/config": async ({ env }) => {
+    return json(orderConfig(env));
+  },
+
+  "GET /employer/availability": async ({ db, env, url, now, d }) => {
+    requireOrders(env);
+    return json(await availability(db, env, url.searchParams, now, d.fetch));
+  },
+
+  "POST /employer/order": async ({ request, db, env, now, d }) => {
+    requireOrders(env);
+    const { body } = await readJson(request, MAX_ORDER_BYTES);
+    return json(await takeOrder(db, env, request, body, now, d.fetch));
+  },
+
+  "POST /employer/order/confirm": async ({ request, db, env, now, d }) => {
+    requireOrders(env);
+    const { body } = await readJson(request, MAX_ORDER_BYTES);
+    return json(await confirmOrder(db, env, request, body, now, d.fetch));
+  },
+
+  "GET /employer/review": async ({ db, env, url, now, d }) => {
+    requireOrders(env);
+    return reviewPage(db, env, url.searchParams, now, d.fetch);
+  },
+
+  "POST /employer/review": async ({ request, db, env, now, d }) => {
+    requireOrders(env);
+    return reviewDecision(db, env, request, now, d.fetch);
+  },
+
+  "GET /employer/credit": async ({ db, env, url, now }) => {
+    requireOrders(env);
+    return json(await creditInfo(db, url.searchParams, now));
+  },
+
+  "POST /employer/credit": async ({ request, db, env, now, d }) => {
+    requireOrders(env);
+    const { body } = await readJson(request, MAX_ORDER_BYTES);
+    return json(await chooseCredit(db, env, request, body, now, d.fetch));
+  },
+
+  // Bruce's terminal (scripts/placement.mjs orders, pilot-code): the same admin rules as the placements.
+  // Not tied to ordersOn, so pilot codes can be made before buying opens.
+  "GET /admin/orders": async ({ request, db, env }) => {
+    await requireAdmin(request, env);
+    return json(await listOrders(db));
+  },
+
+  "POST /admin/pilot-codes": async ({ request, db, env, now }) => {
+    await requireAdmin(request, env);
+    const { body } = await readJson(request, MAX_ADMIN_BYTES, true);
+    if (Array.isArray(body)) throw new HttpError(400, "bad_request", "Body must be a JSON object");
+    return json(await createPilotCode(db, body, now));
+  },
 };
 
+/** @param {SafeRouteContext} context */
+async function changeAdminPlacement({ request, db, env, now, ctx, d, path }) {
+  await requireAdmin(request, env);
+  const { body } = await readJson(request, MAX_ADMIN_BYTES);
+  if (Array.isArray(body)) throw new HttpError(400, "bad_request", "Body must be a JSON object");
+  const act = { "/admin/placements": createPlacement, "/admin/placements/update": updatePlacement,
+    "/admin/placements/check": checkPlacement, "/admin/placements/on": switchOn, "/admin/placements/pause": pausePlacement,
+    "/admin/placements/end": endPlacement, "/admin/placements/refuse": refusePlacement }[path];
+  // These legacy admin writes do not share the order's atomic capacity transaction. Keep them
+  // unavailable during live checkout rather than allow a manual edit to bypass the field cap.
+  // Stops remain available; paid-order approval uses its own reserved, reviewed path.
+  if (ordersOn(env) && (path === "/admin/placements/on" || path === "/admin/placements/update")) {
+    throw new HttpError(409, "manual_capacity_hold", "Manual activation and edits are paused while employer checkout is open. Use the order review flow, or reconcile outstanding orders before maintenance. Pause and end remain available.");
+  }
+  // was: return json({ placement: await act(db, body, now) });
+  const placement = await act(db, body, now);
+  // A placement made by hand counts toward the orders' per-field cap under its role's fields (orders.js
+  // notePlacementFields; the daily cron catches any this misses).
+  if ((path === "/admin/placements" || path === "/admin/placements/update") && ordersOn(env)) {
+    later(ctx, notePlacementFields(db, env, placement.id, d.fetch, now));
+  }
+  return json({ placement });
+}
+
 // The API contract supplies the dispatch keys. Descriptive auth and gate text stays documentation.
-const safeRoutes = new Map(ROUTES.flatMap(({ method, path }) => {
+const exactRoutes = new Map(ROUTES.map(({ method, path }) => {
   const key = `${method} ${path}`;
-  return Object.hasOwn(safeRouteHandlers, key) ? [[key, safeRouteHandlers[key]]] : [];
+  return [key, safeRouteHandlers[key]];
 }));
 
 async function route(request, env, ctx, d) {
@@ -244,281 +748,15 @@ async function route(request, env, ctx, d) {
   // `later` carries a session's once-a-day refresh past the response (session.js sessionUser).
   const signIn = async () => (who = await authenticateUser(request, env,
     { fetch: d.fetch, now: now.getTime(), later: (p) => later(ctx, p) })).user;
-  const limits = (tier, plan = "free") => allowanceTable(d.config, (task) => allowanceFor(d.config, env, task, tier, plan, now));
 
   const key = `${request.method} ${path}`;
-  const safeHandler = safeRoutes.get(key);
-  if (safeHandler) return safeHandler({ request, env, db, now, ctx, d, signIn });
-
-  switch (key) {
-    case "GET /config": {
-      return json({
-        providers: providers(env).map((p) => ({ ...p, scopes: d.config.SCOPES })),
-        // One table per plan, so the dashboard can say what each tier actually buys before
-        // a student pays. `general` is the non-.edu half of the free tier.
-        allowance: {
-          edu: limits("edu"),
-          general: limits("general"),
-          ...Object.fromEntries(d.config.PAID_PLANS.map((plan) => [plan, limits("edu", plan)])),
-        },
-        payments: paymentsInfo(env, d.config),
-        paused: await isPaused(db, env, d.config, now),
-        // What an invite is worth (REFERRAL in config.js), so the dashboard can offer it before sign-in.
-        invite: { bonus: d.config.REFERRAL.bonus, max: d.config.REFERRAL.maxRewards },
-        // "Stay signed in" (POST /session) is always on; saving the Deep Dive needs the PROFILE_KEY secret.
-        sessions: true,
-        sync: syncOn(env),
-      });
-    }
-
-    case "GET /me": {
-      const user = await signIn();
-      // was: later(ctx, Promise.all([touchSeen(db, user, now), noteAccount(db, user, now)]));
-      later(ctx, Promise.all([touchSeen(db, user, now), noteAccount(db, user, now, clientOf(request))]));
-      const month = monthOf(now);
-      const used = await usageFor(db, user, month);
-      const mine = await planOf(db, user);
-      const extra = await bonusFor(db, user);
-      return json({
-        month,
-        plan: mine.plan,
-        plan_renews: mine.periodEnd,
-        can_upgrade: canUpgrade(env, d.config, mine.plan),
-        // The next plan up and its allowances at this student's tier (null when there is none).
-        upgrade_offer: upgradeOffer(env, d.config, who.tier, mine.plan, now),
-        can_manage: paymentsOn(env, d.config) && !!mine.customer,
-        tier: who.tier,
-        // isPaused takes a plan because the day's stop only applies to free accounts (limits.js).
-        // `mine.plan` is already loaded above for plan/can_upgrade/allowance, so without passing it
-        // here /me told a Supporter or Pro "AI is paused" on a day that POST /ai would have served
-        // them. /config keeps the default, which is the honest answer before anyone has signed in.
-        // was: paused: await isPaused(db, env, d.config, now),
-        paused: await isPaused(db, env, d.config, now, mine.plan),
-        // was: allowance: allowanceTable(d.config, (task) => ({ used: used[task] || 0, limit: allowanceFor(d.config, env, task, who.tier, mine.plan, now) })),
-        // `limit` takes in invite units (shownLimit), so limit - used stays what the student can run;
-        // `bonus`, only when there are any, is the invite units left, for a client that wants to say
-        // where the extra came from.
-        allowance: allowanceTable(d.config, (task) => {
-          const limit = allowanceFor(d.config, env, task, who.tier, mine.plan, now);
-          const out = { used: used[task] || 0, limit: shownLimit(limit, used[task] || 0, extra[task]) };
-          return limit != null && extra[task] ? { ...out, bonus: extra[task] } : out;
-        }),
-      });
-    }
-
-    case "DELETE /me": {
-      const user = await signIn();
-      if (await blocksDeletion(db, user, env, d.fetch)) {
-        throw new HttpError(409, "subscribed", "Cancel any active plan and finish or let your pending checkout expire before deleting your data. Contact support if a billing confirmation is pending.");
-      }
-      await deleteUser(db, user, now);
-      await deletePlan(db, user);
-      return json({ ok: true });
-    }
-
-    // Stripe hosts both pages; we only hand out the link.
-    case "POST /billing/checkout": {
-      const user = await signIn();
-      // The plan is optional: an older extension or dashboard that predates the second tier sends
-      // nothing, and gets the cheapest plan on offer.
-      const { body } = await readJson(request, d.config.MAX_BODY_BYTES, true);
-      return json(await checkout(db, env, d.config, user, body.plan, now, d.fetch));
-    }
-
-    case "POST /billing/portal": {
-      const user = await signIn();
-      return json(await portal(db, env, d.config, user, d.fetch));
-    }
-
-    // Called by Stripe, not by a student: no sign-in, a signature instead.
-    // was: if (!paymentsOn(env, d.config) || !env.STRIPE_WEBHOOK_SECRET) throw ...
-    // Since 2026-10-19 the same endpoint also takes the paid listing orders' payments (orders.js), which
-    // can be on while the student plans are off.
-    case "POST /billing/webhook": {
-      if ((!paymentsOn(env, d.config) && !ordersOn(env)) || !env.STRIPE_WEBHOOK_SECRET) throw new HttpError(404, "not_found", "No such endpoint");
-      const body = await request.text();
-      if (body.length > d.config.MAX_BODY_BYTES) throw new HttpError(400, "bad_request", "Request body is too large");
-      const event = await verifyWebhook(env.STRIPE_WEBHOOK_SECRET, request.headers.get("Stripe-Signature"), body, now);
-      return json(await applyEvent(db, env, d.config, event, now, d.fetch));
-    }
-
-    case "POST /ai": {
-      const user = await signIn();
-      const { body, bytes } = await readJson(request, d.config.MAX_BODY_BYTES);
-      const task = body.task;
-      if (typeof task !== "string" || !Object.hasOwn(d.config.TASKS, task)) {
-        throw new HttpError(400, "bad_task", "Unknown task");
-      }
-      if (body.run_id != null && !RUN_ID.test(String(body.run_id))) {
-        throw new HttpError(400, "bad_request", "run_id must be 1-64 letters, digits, - or _");
-      }
-      // no run_id: every call is its own run
-      const runId = body.run_id != null ? String(body.run_id) : "solo-" + crypto.randomUUID();
-      const taskMax = d.config.TASKS[task].maxBodyBytes;
-      if (taskMax && bytes > taskMax) throw new HttpError(400, "bad_request", "Request body is too large for this task");
-      const gem = sanitizeRequest(body.request, task, d.config);
-      const model = d.config.TASKS[task].model;
-      const stream = url.searchParams.get("stream") === "1";
-
-      const { plan } = await planOf(db, user);
-      // The estimate is charged before Gemini is called and corrected after, so a call whose Worker
-      // is cut off mid-reply (the student closes the tab) is still paid for in the books.
-      const estimate = estimateCents(model, bytes, gem.generationConfig.maxOutputTokens, d.config, now);
-      const admitted = await admit(db, env, d.config, user, task, runId, now, who.tier, plan, estimate);
-      let upstream;
-      try {
-        upstream = await callGemini(model, gem, stream, env, d.fetch);
-      } catch (e) {
-        await release(db, user, task, runId, admitted);
-        throw e;
-      }
-      // was: later(ctx, Promise.all([touchSeen(db, user, now), noteAccount(db, user, now)]));
-      later(ctx, Promise.all([touchSeen(db, user, now), noteAccount(db, user, now, clientOf(request))]));
-
-      const headers = { "X-InternScout-Model": model, "X-InternScout-Remaining": String(remainingOf(admitted)) };
-      const price = (usage) => (usage ? costCents(model, usage, d.config, now) : estimate);
-
-      if (stream) {
-        const [client, meter] = upstream.body.tee();
-        later(ctx, readUsageFromSSE(meter).then((u) => settle(db, user, admitted, price(u), u, { task, model })));
-        return new Response(client, {
-          status: 200,
-          headers: { ...headers, "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },
-        });
-      }
-      const text = await upstream.text();
-      let usage = null;
-      try {
-        usage = JSON.parse(text).usageMetadata || null;
-      } catch {}
-      later(ctx, settle(db, user, admitted, price(usage), usage, { task, model }));
-      return new Response(text, { status: 200, headers: { ...headers, "Content-Type": "application/json" } });
-    }
-
-    // Referral credits (referral.js). The link a student shares, and a new classmate claiming it.
-    case "GET /invite": {
-      const user = await signIn();
-      return json(await inviteInfo(db, env, d.config, user, now));
-    }
-
-    case "POST /invite/claim": {
-      const user = await signIn();
-      const { body } = await readJson(request, 1_000);
-      return json(await claim(db, d.config, user, who.tier, body.code, now));
-    }
-
-    // Paid listings (placements.js, added 2026-10-14). The public read is for the site build, once per
-    // deploy; visitors never call it. Payment never changes a score, order, filter or count.
-    case "GET /placements": {
-      return json(await livePlacements(db, now), 200, { "Cache-Control": "public, max-age=300" });
-    }
-
-    // Bruce's terminal only (scripts/placement.mjs): 404 until ADMIN_TOKEN is set, 403 from a browser,
-    // 401 without the token. The id goes in the body because the router matches exact paths.
-    case "GET /admin/placements": {
-      await requireAdmin(request, env);
-      return json(await listPlacements(db));
-    }
-
-    // The employer report (S9): one placement, one ended month, rounded counts only (placements.js).
-    case "POST /admin/placements/report": {
-      await requireAdmin(request, env);
-      const { body } = await readJson(request, MAX_ADMIN_BYTES);
-      return json({ report: await placementReport(db, body, now) });
-    }
-    case "POST /admin/placements":
-    case "POST /admin/placements/update":
-    case "POST /admin/placements/check":
-    case "POST /admin/placements/on":
-    case "POST /admin/placements/pause":
-    case "POST /admin/placements/end":
-    case "POST /admin/placements/refuse": {
-      await requireAdmin(request, env);
-      const { body } = await readJson(request, MAX_ADMIN_BYTES);
-      if (Array.isArray(body)) throw new HttpError(400, "bad_request", "Body must be a JSON object");
-      const act = { "/admin/placements": createPlacement, "/admin/placements/update": updatePlacement,
-        "/admin/placements/check": checkPlacement, "/admin/placements/on": switchOn, "/admin/placements/pause": pausePlacement,
-        "/admin/placements/end": endPlacement, "/admin/placements/refuse": refusePlacement }[path];
-      // These legacy admin writes do not share the order's atomic capacity transaction. Keep them
-      // unavailable during live checkout rather than allow a manual edit to bypass the field cap.
-      // Stops remain available; paid-order approval uses its own reserved, reviewed path.
-      if (ordersOn(env) && (path === "/admin/placements/on" || path === "/admin/placements/update")) {
-        throw new HttpError(409, "manual_capacity_hold", "Manual activation and edits are paused while employer checkout is open. Use the order review flow, or reconcile outstanding orders before maintenance. Pause and end remain available.");
-      }
-      // was: return json({ placement: await act(db, body, now) });
-      const placement = await act(db, body, now);
-      // A placement made by hand counts toward the orders' per-field cap under its role's fields (orders.js
-      // notePlacementFields; the daily cron catches any this misses).
-      if ((path === "/admin/placements" || path === "/admin/placements/update") && ordersOn(env)) {
-        later(ctx, notePlacementFields(db, env, placement.id, d.fetch, now));
-      }
-      return json({ placement });
-    }
-
-    // Paid listings bought on the site (orders.js, added 2026-10-19; worker/ORDERS.md). Every route but
-    // the config answers 404 until ordersOn(env). The order, confirm and credit choice take the site's
-    // Origin only; the review page is Bruce's, signed with ADMIN_TOKEN, and answers HTML.
-    case "GET /employer/config": {
-      return json(orderConfig(env));
-    }
-
-    case "GET /employer/availability": {
-      requireOrders(env);
-      return json(await availability(db, env, url.searchParams, now, d.fetch));
-    }
-
-    case "POST /employer/order": {
-      requireOrders(env);
-      const { body } = await readJson(request, MAX_ORDER_BYTES);
-      return json(await takeOrder(db, env, request, body, now, d.fetch));
-    }
-
-    case "POST /employer/order/confirm": {
-      requireOrders(env);
-      const { body } = await readJson(request, MAX_ORDER_BYTES);
-      return json(await confirmOrder(db, env, request, body, now, d.fetch));
-    }
-
-    case "GET /employer/review": {
-      requireOrders(env);
-      return reviewPage(db, env, url.searchParams, now, d.fetch);
-    }
-
-    case "POST /employer/review": {
-      requireOrders(env);
-      return reviewDecision(db, env, request, now, d.fetch);
-    }
-
-    case "GET /employer/credit": {
-      requireOrders(env);
-      return json(await creditInfo(db, url.searchParams, now));
-    }
-
-    case "POST /employer/credit": {
-      requireOrders(env);
-      const { body } = await readJson(request, MAX_ORDER_BYTES);
-      return json(await chooseCredit(db, env, request, body, now, d.fetch));
-    }
-
-    // Bruce's terminal (scripts/placement.mjs orders, pilot-code): the same admin rules as the placements.
-    // Not tied to ordersOn, so pilot codes can be made before buying opens.
-    case "GET /admin/orders": {
-      await requireAdmin(request, env);
-      return json(await listOrders(db));
-    }
-
-    case "POST /admin/pilot-codes": {
-      await requireAdmin(request, env);
-      const { body } = await readJson(request, MAX_ADMIN_BYTES, true);
-      if (Array.isArray(body)) throw new HttpError(400, "bad_request", "Body must be a JSON object");
-      return json(await createPilotCode(db, body, now));
-    }
-
-  }
+  const handler = exactRoutes.get(key);
+  if (handler) return handler({ request, env, db, now, ctx, d, url, path, signIn, tier: () => who.tier });
+  if (path === "/billing/topup/recover") return recoverDashboardTopup({ request, env, d });
   throw new HttpError(404, "not_found", "No such endpoint");
 }
 
-// deps (tests only): { fetch, now: () => Date, config }
+// deps (tests only): { fetch, now: () => Date, config, followSignupRelease }
 export async function handle(request, env, ctx, deps = {}) {
   const d = { fetch: (...args) => fetch(...args), now: () => new Date(), config: CONFIG, ...deps };
   let res;
@@ -537,6 +775,9 @@ export async function handle(request, env, ctx, deps = {}) {
     res.headers.set("Cache-Control", "no-store");
   }
   for (const [k, v] of Object.entries(corsHeaders(request, env))) res.headers.set(k, v);
+  if (res.status === 429 && res.headers.has("Access-Control-Allow-Origin") &&
+      new URL(request.url).pathname.replace(/\/+$/, "") === "/billing/topup/recover")
+    res.headers.append("Access-Control-Expose-Headers", "Retry-After");
   return res;
 }
 
@@ -546,6 +787,9 @@ export default {
     // The half-hourly trigger is the repository's clock (clock.js); the daily one is the cleanup.
     if (event && event.cron === CLOCK_CRON) {
       ctx.waitUntil(startCatchup(env).catch((e) => console.error("clock failed:", e && e.name)));
+      if (env.EMPLOYER_POSTING_MAINTENANCE_ENABLED === "1") {
+        ctx.waitUntil(maintainEmployerPostings(env.DB, { enabled: true }));
+      }
       return;
     }
     if (event && event.cron === STUDENT_BILLING_CRON) {
@@ -563,6 +807,19 @@ export default {
       ctx.waitUntil(reportJob());
       return;
     }
+    const followCron = env.FOLLOW_MAINTENANCE_CRON;
+    if (
+      typeof followCron === "string" &&
+      followCron.length > 0 &&
+      followCron !== "17 7 * * *" &&
+      event?.cron === followCron
+    ) {
+      if (env.FOLLOW_MAINTENANCE_ENABLED === "1") {
+        ctx.waitUntil(runFollowScheduledMaintenance(env.DB, env.FOLLOW_MAINTENANCE_POLICY));
+      }
+      return;
+    }
+    if (event?.cron !== "17 7 * * *") return;
     const now = new Date();
     // was: ctx.waitUntil(Promise.all([cleanup(env.DB, now), dropStale(env.DB, CONFIG, now)]));
     // was: ctx.waitUntil(Promise.all([cleanup(env.DB, now), dropStale(env.DB, CONFIG, now), dropExpiredSessions(env.DB, now)]));

@@ -16,6 +16,7 @@ import sys
 from urllib.parse import unquote, unquote_plus, urlsplit
 
 from .console_log import console
+from . import core_graph
 
 
 class AssetVersionError(ValueError):
@@ -121,14 +122,17 @@ class _AssetTags(HTMLParser):
     _NO_SELF_CLOSE = _TEXT_ONLY | {"script", "style", "plaintext", "noscript"}
 
     def __init__(
-        self, root: Path, path: Path, source: str, hashes: dict[Path, str], names: set[str]
+        self, root: Path, path: Path, source: str, hashes: dict[Path, str], names: set[str],
+        module_entries: dict[core_graph.Graph, str | None],
     ):
         super().__init__(convert_charrefs=False)
         self.root, self.path, self.source, self.hashes = root, path, source, hashes
         self.names = names
+        self.module_entries = module_entries
         self.lines = [0] + [match.end() for match in re.finditer("\n", source)]
         self.edits: list[tuple[int, int, str]] = []
         self.references, self.plaintext = 0, False
+        self.buy_marker = False
 
     def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         if self.plaintext:
@@ -156,16 +160,30 @@ class _AssetTags(HTMLParser):
         attribute = "src" if tag == "script" else None
         if tag == "link" and "stylesheet" in (values.get("rel") or "").lower().split():
             attribute = "href"
+        buy_marker = tag == "span" and values.get("id") == "buy-native-entry"
+        if buy_marker:
+            if (
+                self.buy_marker
+                or self.path.relative_to(self.root).as_posix() != "employers/buy/index.html"
+                or "hidden" not in values
+            ):
+                raise AssetVersionError("Invalid Buy module entry marker")
+            self.buy_marker = True
+            attribute = "data-src"
         if attribute is None:
             return
         url = values.get(attribute)
         if not url:
+            if buy_marker:
+                raise AssetVersionError("Missing Buy module entry URL")
             return
         try:
             parsed = urlsplit(url)
         except ValueError:
             raise AssetVersionError("Malformed asset URL") from None
         if parsed.scheme or parsed.netloc or not parsed.path:
+            if buy_marker:
+                raise AssetVersionError("Buy module entry must use a local URL")
             return
         decoded = unquote(parsed.path)
         if "\\" in decoded or "\0" in decoded or decoded.startswith("//"):
@@ -192,14 +210,26 @@ class _AssetTags(HTMLParser):
                 break
         if not asset.is_file() or asset.suffix.lower() in {".html", ".htm"}:
             raise AssetVersionError("Local asset must be a non-HTML file")
-        if asset not in self.hashes:
-            self.hashes[asset] = hashlib.sha256(asset.read_bytes()).hexdigest()[:12]
+        logical_name = logical.relative_to(self.root).as_posix()
+        graph = next((item for item in self.module_entries if item.is_entry(logical_name)), None)
+        if buy_marker != (graph == core_graph.BUY):
+            raise AssetVersionError("Buy module entry requires the checkout loader marker")
+        if graph is not None:
+            entry = self.module_entries[graph]
+            if not buy_marker and (tag != "script" or (values.get("type") or "").lower() != "module"):
+                raise AssetVersionError(f"{graph.name} entry must be loaded as a module")
+            if "?" in url or "#" in url or entry is None:
+                raise AssetVersionError(f"{graph.name} entry requires an unqualified graph URL")
+            versioned = entry
+        else:
+            if asset not in self.hashes:
+                self.hashes[asset] = hashlib.sha256(asset.read_bytes()).hexdigest()[:12]
+            versioned = _version_url(url, self.hashes[asset])
         self.references += 1
         raw = self.get_starttag_text()
         if raw is None:
             raise AssetVersionError("Missing asset tag source")
         begin, end, quote = _attribute_span(raw, attribute)
-        versioned = _version_url(url, self.hashes[asset])
         if versioned == url:
             return
         line, column = self.getpos()
@@ -213,7 +243,9 @@ class _AssetTags(HTMLParser):
         return result
 
 
-def version_assets(site_dir: str | Path) -> VersionReport:
+def version_assets(
+    site_dir: str | Path, *, retain_core_from: Path | None = None, retain_core_git: Path | None = None
+) -> VersionReport:
     """Validate every input before changing files; leave all asset contents untouched."""
     root = Path(site_dir)
     if _is_link(root):
@@ -221,17 +253,35 @@ def version_assets(site_dir: str | Path) -> VersionReport:
     root = root.resolve(strict=True)
     if not root.is_dir():
         raise AssetVersionError("Site directory is missing")
+    if retain_core_from is not None and retain_core_git is not None:
+        raise AssetVersionError("Select one source of retained Core modules")
     files, names = _site_files(root)
+    try:
+        history = core_graph.pin_history(retain_core_git) if retain_core_git is not None else None
+        module_entries: dict[core_graph.Graph, str | None] = {}
+        modules: dict[str, bytes] = {}
+        for graph in core_graph.GRAPHS:
+            previous = retain_core_from if graph == core_graph.CORE else None
+            entry, graph_files = core_graph.plan(root, previous, history, graph)
+            module_entries[graph] = entry
+            modules.update(graph_files)
+    except core_graph.CoreGraphError as error:
+        raise AssetVersionError(str(error)) from None
     hashes, planned, references = {}, [], 0
     for path in files:
         source = path.read_bytes().decode("utf-8")
-        parser = _AssetTags(root, path, source, hashes, names)
+        parser = _AssetTags(root, path, source, hashes, names, module_entries)
         parser.feed(source)
         parser.close()
         rewritten = parser.rewritten()
         references += parser.references
         if rewritten != source:
             planned.append((path, rewritten.encode("utf-8")))
+    for name, content in modules.items():
+        path = root / name
+        if not path.exists():
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(content)
     for path, content in planned:
         path.write_bytes(content)
     return VersionReport(len(files), len(planned), references)
@@ -240,9 +290,15 @@ def version_assets(site_dir: str | Path) -> VersionReport:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("site_dir", type=Path)
+    retention = parser.add_mutually_exclusive_group()
+    retention.add_argument("--retain-core-from", type=Path, metavar="DIRECTORY")
+    retention.add_argument(
+        "--retain-core-git", type=Path, metavar="REPOSITORY",
+        help="Retain immutable dashboard graphs from the checked-out Git history",
+    )
     args = parser.parse_args(argv)
     try:
-        report = version_assets(args.site_dir)
+        report = version_assets(args.site_dir, retain_core_from=args.retain_core_from, retain_core_git=args.retain_core_git)
     except (AssetVersionError, OSError, UnicodeError) as error:
         message = str(error) if isinstance(error, AssetVersionError) else "Unreadable site input"
         console(

@@ -22,7 +22,7 @@ export function generateApi() {
     "",
     "## Route contract",
     "",
-    "The router trims trailing slashes before exact matching. Global OPTIONS is handled first; the media prefix delegates validation and unsupported methods to social-video.js. Other unknown method/path pairs return 404. Common errors and CORS behavior remain documented below.",
+    "The router trims trailing slashes before exact matching. Global OPTIONS is handled first; the media prefix delegates validation and unsupported methods to social-video.js. The attached top-up recovery route returns 405 for other methods. Other unknown method/path pairs return 404. Common errors and CORS behavior remain documented below.",
     "",
     "| Method and path | Authentication | Feature gate | Request shape | Response shape |",
     "|---|---|---|---|---|",

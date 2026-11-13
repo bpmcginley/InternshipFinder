@@ -62,8 +62,18 @@ export function jobActions(j) {
     // Chrome only grants a site from a click on an extension page, which is what this is.
     else if (j.needs_host)
       btns.push(["allow_host", `Allow ${esc(hostOf(j.needs_host))}`, "primary"]);
-    // Out of this month's Auto-Apply runs, with a bigger plan on offer: checkout is on the dashboard
-    // (it holds the sign-in Stripe needs). Resume once the plan is active, or after the 1st.
+    // Allowance options are also useful without a higher plan. The dashboard checks current
+    // allowance, invite eligibility and availability; this signal does not promise more runs.
+    else if (j.allowanceLimited) {
+      if (j.upgrade)
+        btns.push([
+          "upgrade",
+          esc(`Get ${j.upgrade.label}${j.upgrade.price ? ` · ${j.upgrade.price}` : ""}`),
+          "primary",
+        ]);
+      btns.push(["invite", "Invite a classmate", j.upgrade ? "" : "primary"], ["resume", "Resume"]);
+    }
+    // Preserve older queued upgrade offers that predate the distinct allowance signal.
     else if (j.upgrade)
       btns.push(
         [

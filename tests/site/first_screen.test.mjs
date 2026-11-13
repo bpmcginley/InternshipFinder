@@ -1,12 +1,12 @@
+import { readAppSource } from "./app-fixture.mjs";
 // The first-screen file (P2) and deferred React (P1). data/first.json is written by the backend export
 // (export_static.first_screen); the dashboard paints from it before the state files arrive.
+import { installCore } from "./core-fixture.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import vm from "node:vm";
 
 const read = (p) => readFileSync(new URL("../../" + p, import.meta.url), "utf8");
-const CORE = read("docs/js/core.js");
 const FIX = JSON.parse(read("tests/site/fixtures/first_screen.json"));
 
 function loadCore(fetchImpl, extra = {}) {
@@ -36,8 +36,7 @@ function loadCore(fetchImpl, extra = {}) {
     ...extra,
   };
   ctx.window = ctx;
-  vm.createContext(ctx);
-  vm.runInContext(CORE, ctx);
+  installCore(ctx);
   return ctx.IS;
 }
 const ok = (body) => Promise.resolve({ ok: true, status: 200, json: async () => body });
@@ -129,7 +128,7 @@ test("no first-screen file, or one that fails, changes nothing", async () => {
 });
 
 test("the dashboard uses the first-screen file only for the list it was written for", () => {
-  const app = read("docs/js/app.js");
+  const app = readAppSource();
   assert.match(
     app,
     /const prime = !p && !everything && scope\.all && !qKeys\.length && f\.sort === "new";/,
@@ -140,19 +139,23 @@ test("the dashboard uses the first-screen file only for the list it was written 
   );
 });
 
-test("React is deferred, ahead of core.js and app.js, so the static hero paints first (P1)", () => {
+test("React is deferred ahead of Core and App, so the static hero paints first (P1)", () => {
   const html = read("docs/index.html");
   const tags = [...html.matchAll(/<script\b[^>]*\bsrc="([^"]+)"[^>]*>/g)].map((m) => ({
     src: m[1],
     tag: m[0],
   }));
   const at = (s) => tags.findIndex((t) => t.src.includes(s));
-  for (const s of ["react.production", "react-dom.production", "js/core.js", "js/app.js"])
+  for (const s of ["react.production", "react-dom.production"])
     assert.match(tags[at(s)].tag, /\sdefer\b/, s);
+  assert.match(tags[at("js/core/entry.mjs")].tag, /type="module"/);
+  assert.doesNotMatch(tags[at("js/core/entry.mjs")].tag, /\sasync\b/);
+  assert.match(tags[at("js/app/entry.mjs")].tag, /type="module"/);
+  assert.doesNotMatch(tags[at("js/app/entry.mjs")].tag, /\sasync\b/);
   assert.ok(
     at("/react@") < at("/react-dom@") &&
-      at("/react-dom@") < at("js/core.js") &&
-      at("js/core.js") < at("js/app.js"),
+      at("/react-dom@") < at("js/core/entry.mjs") &&
+      at("js/core/entry.mjs") < at("js/app/entry.mjs"),
   );
   // No inline script may call React before the deferred ones have run.
   const inline = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)]
@@ -212,7 +215,7 @@ test("a request the page head started is used once, then fetches go out as usual
 
 test("the head starts the index and, on a plain first visit, the first-screen file", () => {
   const html = read("docs/index.html");
-  const core = read("docs/js/core.js");
+  const core = read("docs/js/core/profile.mjs");
   const params = JSON.parse(core.match(/const FILTER_PARAMS = (\[[^\]]+\]);/)[1]);
   const re = html.match(/!\/\[\?&\]\(([^)]+)\)=\/\.test\(location\.search\)/);
   assert.ok(re, "the first-visit check in index.html");

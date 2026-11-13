@@ -1,7 +1,7 @@
+import { createTestApp } from "./app-fixture.mjs";
+import { installCore } from "./core-fixture.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import vm from "node:vm";
 
 const ctx = {
   React: {
@@ -15,10 +15,8 @@ const ctx = {
   document: { documentElement: { dataset: {} }, addEventListener() {}, removeEventListener() {} },
 };
 ctx.window = ctx;
-vm.createContext(ctx);
-vm.runInContext(readFileSync(new URL("../../docs/js/core.js", import.meta.url), "utf8"), ctx);
-const source = readFileSync(new URL("../../docs/js/app.js", import.meta.url), "utf8");
-vm.runInContext(source.replace('ReactDOM.createRoot(document.getElementById("root")).render(h(App));', "window.ListTable = ListTable;"), ctx);
+installCore(ctx);
+const { ListTable } = createTestApp(ctx);
 const h = ctx.React.createElement;
 function nodes(tree, predicate) {
   if (!tree || typeof tree !== "object") return [];
@@ -26,7 +24,7 @@ function nodes(tree, predicate) {
 }
 const listings = n => Array.from({ length: n }, (_, i) => ({ id: "listing-" + i }));
 function render(shown, extra = {}) {
-  return ctx.ListTable({ shown, rows: shown, renderRow: row => h("tr", { "data-listing": row.id }), onMore() {}, ...extra });
+  return ListTable({ shown, rows: shown, renderRow: row => h("tr", { "data-listing": row.id }), onMore() {}, ...extra });
 }
 
 test("weekly invitation appears once after ten listings without changing order or pagination", () => {

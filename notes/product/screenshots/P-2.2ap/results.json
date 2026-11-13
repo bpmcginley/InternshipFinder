@@ -1,0 +1,168 @@
+[
+  {
+    "phase": "before",
+    "width": 1280,
+    "theme": "light",
+    "views": [
+      "allowance",
+      "account"
+    ],
+    "passiveRecoveryRequests": 0,
+    "externalRequests": 0
+  },
+  {
+    "phase": "before",
+    "width": 1280,
+    "theme": "dark",
+    "views": [
+      "allowance",
+      "account"
+    ],
+    "passiveRecoveryRequests": 0,
+    "externalRequests": 0
+  },
+  {
+    "phase": "before",
+    "width": 375,
+    "theme": "light",
+    "views": [
+      "allowance",
+      "account"
+    ],
+    "passiveRecoveryRequests": 0,
+    "externalRequests": 0
+  },
+  {
+    "phase": "before",
+    "width": 375,
+    "theme": "dark",
+    "views": [
+      "allowance",
+      "account"
+    ],
+    "passiveRecoveryRequests": 0,
+    "externalRequests": 0
+  },
+  {
+    "phase": "after",
+    "width": 1280,
+    "theme": "light",
+    "views": [
+      "allowance",
+      "account"
+    ],
+    "passiveRecoveryRequests": 0,
+    "externalRequests": 0
+  },
+  {
+    "phase": "after",
+    "width": 1280,
+    "theme": "dark",
+    "views": [
+      "allowance",
+      "account"
+    ],
+    "passiveRecoveryRequests": 0,
+    "externalRequests": 0
+  },
+  {
+    "phase": "after",
+    "width": 375,
+    "theme": "light",
+    "views": [
+      "allowance",
+      "account"
+    ],
+    "passiveRecoveryRequests": 0,
+    "externalRequests": 0
+  },
+  {
+    "phase": "after",
+    "width": 375,
+    "theme": "dark",
+    "views": [
+      "allowance",
+      "account"
+    ],
+    "passiveRecoveryRequests": 0,
+    "externalRequests": 0
+  },
+  {
+    "scenario": "keyboard pending retry terminal, one fresh balance and focus preserved",
+    "recoveryRequests": 2,
+    "terminalMeReads": 1,
+    "externalRequests": 0
+  },
+  {
+    "scenario": "ordinary Account recovery with sales off",
+    "externalRequests": 0
+  },
+  {
+    "scenario": "held recovery response after A-B-A does not navigate",
+    "externalRequests": 0
+  },
+  {
+    "scenario": "absent capability has no recovery action or request",
+    "externalRequests": 0
+  },
+  {
+    "scenario": "verified open navigates only to intercepted synthetic existing Stripe checkout",
+    "externalRequests": 0
+  },
+  {
+    "phase": "before",
+    "width": 1280,
+    "theme": "light",
+    "scenario": "409 preserves browser values and session",
+    "externalRequests": 0
+  },
+  {
+    "phase": "before",
+    "width": 1280,
+    "theme": "dark",
+    "scenario": "409 preserves browser values and session",
+    "externalRequests": 0
+  },
+  {
+    "phase": "before",
+    "width": 375,
+    "theme": "light",
+    "scenario": "409 preserves browser values and session",
+    "externalRequests": 0
+  },
+  {
+    "phase": "before",
+    "width": 375,
+    "theme": "dark",
+    "scenario": "409 preserves browser values and session",
+    "externalRequests": 0
+  },
+  {
+    "phase": "after",
+    "width": 1280,
+    "theme": "light",
+    "scenario": "409 preserves browser values and session",
+    "externalRequests": 0
+  },
+  {
+    "phase": "after",
+    "width": 1280,
+    "theme": "dark",
+    "scenario": "409 preserves browser values and session",
+    "externalRequests": 0
+  },
+  {
+    "phase": "after",
+    "width": 375,
+    "theme": "light",
+    "scenario": "409 preserves browser values and session",
+    "externalRequests": 0
+  },
+  {
+    "phase": "after",
+    "width": 375,
+    "theme": "dark",
+    "scenario": "409 preserves browser values and session",
+    "externalRequests": 0
+  }
+]

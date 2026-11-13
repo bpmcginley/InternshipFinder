@@ -4,6 +4,8 @@
   "scripts": {
     "typecheck:python": "node scripts/type_report.mjs python",
     "typecheck:worker": "node scripts/type_report.mjs worker",
+    "typecheck:site": "node scripts/type_report.mjs site",
+    "typecheck:extension": "node scripts/type_report.mjs extension",
     "lint:python": "node scripts/lint_report.mjs python",
     "lint:javascript": "node scripts/lint_report.mjs javascript",
     "format:python": "python -m ruff format backend growth scripts",

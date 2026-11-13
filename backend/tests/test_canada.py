@@ -2,13 +2,16 @@
 
 import pytest
 
-from internscout import seo_pages
 from internscout.export_static import shard_keys
 from internscout.geo import canada_of
 from internscout.region import classify_location, evaluate_locations, maybe_in_region
+from internscout.site import runtime, source, taxonomy
 from internscout.sources.lever import parse_lever
 from internscout.sources.workable import parse_workable
-from tests.test_seo_pages import _row, _site
+from tests.seo_fixture_data import _row, _site
+
+
+pytestmark = pytest.mark.without_seo_facade
 
 
 @pytest.mark.parametrize(
@@ -148,7 +151,9 @@ def test_canada_metro_and_province_pages(tmp_path):
             "MA": [_row(300 + i) for i in range(6)],
         },
     )
-    pages = {p["path"]: p for p in seo_pages.build(site)}
+    state = runtime.BuildState(near_on=False)
+    built = runtime.invoke(state, runtime.BuildHooks(), runtime.build, site)
+    pages = {p["path"]: p for p in built}
     paths = set(pages)
     assert {"/internships/ontario/", "/internships/toronto/", "/internships/canada/"} <= paths
     assert "/internships/mechanical-engineering/toronto/" in paths  # a field in a metro
@@ -168,7 +173,7 @@ def test_canada_metro_and_province_pages(tmp_path):
 
 def test_the_canada_views_do_not_count_as_extra_places():
     # A Toronto role is in ON, Toronto and Canada, but it is filed in one place.
-    assert {"ON", "Toronto", "Canada"} & seo_pages.PLACES == {"ON"}
+    assert {"ON", "Toronto", "Canada"} & taxonomy.PLACES == {"ON"}
 
 
 def test_an_in_person_canadian_role_ranks_like_an_in_person_us_one():
@@ -233,7 +238,7 @@ def test_the_first_canadian_scan_counts_as_new_only_what_was_posted_this_week():
     }
     both = {"regions": ca + us["regions"], "first_seen": "2026-09-30T19:00:00", "posted_at": None}
     rows = [old, recent, undated, later, us, both]
-    assert [seo_pages.fresh(x, now, seo_pages.FIRST_SEEN_SINCE) for x in rows] == [
+    assert [runtime.fresh(x, now, source.FIRST_SEEN_SINCE) for x in rows] == [
         False,
         True,
         False,
