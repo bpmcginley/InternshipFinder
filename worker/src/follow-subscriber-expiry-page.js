@@ -90,15 +90,16 @@ function page(db, o, kind, table, limit) {
           previous === null ||
           key > previous ||
           (after !== null && key <= rowid(after)) ||
-          (before !== null && (before >= key || (after !== null && before <= rowid(after))))
+          (before !== null && (before >= key || (after !== null && before <= rowid(after)))) ||
+          (examined === 1 && (key !== previous || before !== null)) ||
+          (examined > 1 && key === previous && before === null) ||
+          (examined < 3 && before !== null && key !== previous)
         )
           fail();
         const complete = !draining && key === high;
         return {
           complete,
-          next: complete
-            ? null
-            : { kind, after: draining ? (preceding ?? after) : candidate, through },
+          next: complete ? null : { kind, after: draining ? after : candidate, through },
         };
       },
       finish: (draining = false) => {
@@ -218,7 +219,8 @@ export async function expireFollowOrphanPage(db, options = {}) {
           .prepare(
             `DELETE FROM follow_subscribers NOT INDEXED WHERE ${selected} AND ${absent("follow_subscribers.id")}
         AND NOT EXISTS(SELECT 1 FROM follow_tokens t WHERE t.subscriber_id=follow_subscribers.id)
-        AND NOT EXISTS(SELECT 1 FROM follow_digest_outbox d WHERE d.subscriber_id=follow_subscribers.id)`,
+        AND NOT EXISTS(SELECT 1 FROM follow_digest_outbox d WHERE d.subscriber_id=follow_subscribers.id)
+        ${lookahead ? "RETURNING CAST(rowid AS TEXT) AS removed_rowid" : ""}`,
           )
           .bind(...p.args),
         db.prepare("SELECT changes() AS changed"),
@@ -241,7 +243,21 @@ export async function expireFollowOrphanPage(db, options = {}) {
     const tokensRemoved = changed(r[3], r[4], maxChildren, 4);
     const digestsRemoved = changed(r[5], r[6], maxChildren, 2);
     // Arbitrary children are gone; only the unique management job and owner reference can cascade.
-    const removed = changed(r[7], r[8], eligible, 3);
+    const removed = changed(lookahead ? { ...r[7], rows: [] } : r[7], r[8], eligible, 3);
+    if (lookahead) {
+      // Only the decisive mutation can certify advancement. A selector receipt alone
+      // cannot establish which root was removed, and drainage retains the incoming cursor.
+      if (r[7].rows.length !== removed) fail();
+      if (removed) {
+        const deleted = record(r[7].rows[0]);
+        if (
+          Object.keys(deleted).join() !== "removed_rowid" ||
+          deleted.removed_rowid !== eligibleRow.candidate
+        )
+          fail();
+        rowid(deleted.removed_rowid);
+      }
+    }
     if (!eligible && (tokensRemoved || digestsRemoved)) fail();
     const draining = eligible === 1 && removed === 0;
     if (lookahead && !eligible && (eligibleRow.candidate !== null || eligibleRow.previous !== null))

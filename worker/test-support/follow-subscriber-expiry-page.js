@@ -698,7 +698,7 @@ export async function orphanLookaheadRepeatsExactCandidateAfterPartialDrain(db) 
   let cursor = { kind: "orphans", after: "256", through: "450" };
   let r = await expireFollowOrphanPage(db, { ...options(cursor), maxRows: 128 });
   assert.equal(r.draining, true);
-  assert.equal(r.next.after, "299");
+  assert.equal(r.next.after, "256");
   assert.equal(r.next.through, "450");
   assert.equal(r.removed, 0);
   assert.equal(r.tokensRemoved, 2);
@@ -721,11 +721,14 @@ export async function orphanLookaheadRemovedReaddedCandidateAndNewScopeRemainSaf
     ...options({ kind: "orphans", after: "256", through: "450" }),
     maxRows: 128,
   });
-  assert.equal(r.next.after, "299");
+  assert.equal(r.next.after, "256");
   await db.prepare("DELETE FROM follow_subscribers WHERE id='scan-300'").run();
   await subscriber(db, "replacement", 300);
   await scope(db, "replacement");
   await children(db, "replacement", 1);
+  r = await expireFollowOrphanPage(db, { ...options(r.next), maxRows: 128 });
+  assert.equal(r.removed, 0);
+  assert.equal(r.next.after, "384");
   r = await expireFollowOrphanPage(db, { ...options(r.next), maxRows: 128 });
   assert.equal(r.removed, 1);
   assert.equal(r.next.after, "400");
@@ -762,7 +765,7 @@ export async function orphanLookaheadNoOrphanAndSignedEndpointReset(db) {
   await children(db, "last", 3);
   r = await expireFollowOrphanPage(db, { ...options(), maxRows: 128 });
   assert.equal(r.draining, true);
-  assert.equal(r.next.after, "0");
+  assert.equal(r.next.after, null);
   assert.equal(r.next.through, "9223372036854775807");
   await db.prepare("DELETE FROM follow_subscribers WHERE id='first'").run();
   r = await expireFollowOrphanPage(db, { ...options(r.next), maxRows: 128 });
@@ -834,7 +837,7 @@ export async function orphanLookaheadMalformedCandidateReceiptsNeverCertifyAdvan
     { ...options({ kind: "orphans", after: "256", through: "450" }), maxRows: 128 },
   );
   assert.equal(r.draining, true);
-  assert.equal(r.next.after, "299");
+  assert.equal(r.next.after, "256");
 }
 
 export async function orphanLookaheadCommitLossReturnsNoCursorAndNoRetry(db) {
@@ -908,4 +911,86 @@ export async function orphanLookaheadMaximumPageAndChildrenKeepFirstCandidate(db
   );
   if (metrics.length) console.log("synthetic maximum orphan lookahead", JSON.stringify(metrics));
   return metrics;
+}
+
+export async function orphanLookaheadBindsRemovedRootAgainstCandidateSubstitution(db) {
+  await subscriber(db, "first", 100);
+  await subscriber(db, "second", 200);
+  let calls = 0;
+  const r = await expireFollowOrphanPage(
+    wrap(db, async (statements) => {
+      calls++;
+      const result = await db.batch(statements);
+      assert.deepEqual(result[7].results, [{ removed_rowid: "100" }]);
+      result[2].results[0].candidate = "200";
+      result[2].results[0].previous = "100";
+      return result;
+    }),
+    { ...options(), maxRows: 128 },
+  );
+  assert.deepEqual(r, { status: "unavailable" });
+  assert.equal(calls, 1);
+  assert.deepEqual(
+    (await rows(db, "follow_subscribers")).map((r) => r.id),
+    ["second"],
+  );
+}
+
+export async function orphanLookaheadImpossibleCardinalityNeverAdvancesDrainage(db) {
+  await subscriber(db, "first", 9);
+  await children(db, "first", 6);
+  await subscriber(db, "second", 10);
+  await scope(db, "second");
+  const faults = [
+    (result) => {
+      result[1].results[0].examined = 1;
+    },
+    (result) => {
+      result[1].results[0].examined = 1;
+      result[2].results[0].candidate = "10";
+      result[2].results[0].previous = "9";
+    },
+    (result) => {
+      result[2].results[0].candidate = "10";
+    },
+    (result) => {
+      result[2].results[0].previous = "8";
+    },
+  ];
+  for (const fault of faults) {
+    let calls = 0;
+    const r = await expireFollowOrphanPage(
+      wrap(db, async (statements) => {
+        calls++;
+        const result = await db.batch(statements);
+        fault(result);
+        return result;
+      }),
+      { ...options(), maxRows: 128, maxChildren: 1 },
+    );
+    assert.deepEqual(r, { status: "unavailable" });
+    assert.equal(calls, 1);
+  }
+  assert.equal(await count(db, "follow_subscribers"), 2);
+  // Even a plausible substituted selector cannot move the draining cursor forward.
+  const r = await expireFollowOrphanPage(
+    wrap(db, async (statements) => {
+      const result = await db.batch(statements);
+      result[2].results[0].candidate = "10";
+      result[2].results[0].previous = "9";
+      return result;
+    }),
+    { ...options(), maxRows: 128, maxChildren: 1 },
+  );
+  assert.equal(r.draining, true);
+  assert.equal(r.next.after, null);
+  assert.equal(r.complete, false);
+  assert.equal(await count(db, "follow_subscribers"), 2);
+  const reset = await expireFollowOrphanPage(db, { ...options(), maxRows: 128 });
+  assert.equal(reset.removed, 1);
+  assert.equal(reset.next.after, "9");
+  assert.deepEqual(
+    (await rows(db, "follow_subscribers")).map((r) => r.id),
+    ["second"],
+  );
 }
