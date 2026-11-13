@@ -21,6 +21,7 @@ import { createFollowSignupRoute } from "./follow-signup-route.js";
 import { prepareFollowSignupDeployment } from "./follow-signup-release.js";
 import { runFollowScheduledMaintenance } from "./follow-scheduled-maintenance.js";
 import { runFollowScheduledLinks } from "./follow-scheduled-links.js";
+import { runFollowArchiveDeployment } from "./follow-archive-deployment.js";
 import { followTokenEndpoints } from "./follow-token-endpoint.js";
 import { followUnsubscribeEndpoint } from "./follow-unsubscribe-endpoint.js";
 import { followUnsubscribePreview } from "./follow-unsubscribe-preview.js";
@@ -829,7 +830,29 @@ export default {
       if (env.FOLLOW_LINKS_ENABLED === "1") ctx.waitUntil(runFollowScheduledLinks(env));
       return;
     }
-    if (event?.cron !== "17 7 * * *") return;
+    if (event?.cron !== "17 7 * * *") {
+      const archiveCron = env.FOLLOW_ARCHIVE_CRON;
+      if (
+        typeof archiveCron === "string" &&
+        archiveCron.length > 0 &&
+        event?.cron === archiveCron &&
+        env.FOLLOW_ARCHIVE_ENABLED === "1"
+      ) {
+        ctx.waitUntil(
+          runFollowArchiveDeployment({
+            enabled: true,
+            get descriptor() {
+              return env.FOLLOW_ARCHIVE_RELEASE;
+            },
+            get db() {
+              return env.DB;
+            },
+            fetch,
+          }),
+        );
+      }
+      return;
+    }
     const now = new Date();
     // was: ctx.waitUntil(Promise.all([cleanup(env.DB, now), dropStale(env.DB, CONFIG, now)]));
     // was: ctx.waitUntil(Promise.all([cleanup(env.DB, now), dropStale(env.DB, CONFIG, now), dropExpiredSessions(env.DB, now)]));
