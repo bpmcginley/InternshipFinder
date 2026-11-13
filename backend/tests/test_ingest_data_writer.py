@@ -322,6 +322,93 @@ class IngestWriterTests(unittest.TestCase):
         self.assertEqual(len(observations), 1)
         self.assertFalse(observations[0][1])
 
+    def test_direct_push_binds_the_raw_tree_with_a_local_replacement(self):
+        writer.prepare(self.data, self.primary, self.state)
+        write(self.state, Path(writer.STATE[0]).name, {"changed": True})
+        predecessor = writer.revision(self.remote, writer.BRANCH)
+        raw_git = writer.git
+        observed = []
+        replacement_tree = None
+
+        def replace_after_validation(checkout, *args, **kwargs):
+            nonlocal replacement_tree
+            result = raw_git(checkout, *args, **kwargs)
+            if args == ("rev-parse", "--verify", "HEAD") and replacement_tree is None:
+                candidate = result.stdout.decode("ascii").strip()
+                if candidate != predecessor:
+                    write(self.data, SHARD, [{"id": "different", "status": "open"}])
+                    raw_git(checkout, "add", SHARD)
+                    replacement_tree = (
+                        raw_git(checkout, "write-tree").stdout.decode("ascii").strip()
+                    )
+                    replacement = (
+                        raw_git(
+                            checkout,
+                            "commit-tree",
+                            replacement_tree,
+                            "-p",
+                            predecessor,
+                            "-m",
+                            "Synthetic replacement",
+                        )
+                        .stdout.decode("ascii")
+                        .strip()
+                    )
+                    raw_git(checkout, "replace", candidate, replacement)
+            return result
+
+        with patch.object(writer, "git", side_effect=replace_after_validation):
+            _, commit = writer.publish(
+                self.data,
+                self.state,
+                "Publish",
+                observe_push=lambda intent, acknowledged: observed.append((intent, acknowledged)),
+            )
+        self.assertIsNotNone(replacement_tree)
+        self.assertEqual(len(observed), 2)
+        self.assertTrue(observed[-1][1])
+        raw = writer.revision(self.remote, f"{commit}:{writer.PUBLIC}")
+        self.assertEqual(observed[-1][0].public_tree, raw)
+        self.assertNotEqual(writer.revision(self.data, f"{commit}:{writer.PUBLIC}"), raw)
+
+    def test_direct_push_acknowledgement_requires_one_stable_common_endpoint(self):
+        other = self.root / "alternate.git"
+        self.git(self.root, "clone", "--bare", str(self.remote), str(other))
+        before = writer.revision(self.remote, writer.BRANCH)
+        writer.prepare(self.data, self.primary, self.state)
+        write(self.state, Path(writer.STATE[0]).name, {"changed": True})
+        self.git(self.data, "remote", "set-url", "--push", "origin", str(other))
+        observed = []
+        _, commit = writer.publish(
+            self.data,
+            self.state,
+            "Publish",
+            observe_push=lambda intent, acknowledged: observed.append((intent, acknowledged)),
+        )
+        self.assertEqual(observed, [])
+        self.assertEqual(writer.revision(self.remote, writer.BRANCH), before)
+        self.assertEqual(writer.revision(other, writer.BRANCH), commit)
+
+    def test_direct_push_acknowledgement_withholds_evidence_if_endpoint_changes(self):
+        other = self.root / "alternate.git"
+        self.git(self.root, "clone", "--bare", str(self.remote), str(other))
+        before = writer.revision(self.remote, writer.BRANCH)
+        writer.prepare(self.data, self.primary, self.state)
+        write(self.state, Path(writer.STATE[0]).name, {"changed": True})
+        observed = []
+
+        def observe(intent, acknowledged):
+            observed.append((intent, acknowledged))
+            if not acknowledged:
+                self.git(self.data, "remote", "set-url", "origin", str(other))
+
+        with self.assertRaisesRegex(ValueError, "endpoint changed"):
+            writer.publish(self.data, self.state, "Publish", observe_push=observe)
+        self.assertEqual(len(observed), 1)
+        self.assertFalse(observed[0][1])
+        self.assertEqual(writer.revision(self.remote, writer.BRANCH), before)
+        self.assertEqual(writer.revision(other, writer.BRANCH), before)
+
     def test_direct_push_acknowledgement_binds_the_retry_candidate(self):
         writer.prepare(self.data, self.primary, self.state)
         write(self.state, Path(writer.STATE[0]).name, {"changed": True})
