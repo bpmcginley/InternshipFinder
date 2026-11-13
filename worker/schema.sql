@@ -745,8 +745,6 @@ CREATE TABLE IF NOT EXISTS follow_digest_outbox (
     (state NOT IN ('leased','attempting') AND lease_token IS NULL AND lease_until IS NULL))
 );
 CREATE INDEX IF NOT EXISTS follow_digest_outbox_due ON follow_digest_outbox (state, lease_until);
-CREATE INDEX IF NOT EXISTS follow_digest_outbox_created ON follow_digest_outbox (created);
-CREATE INDEX IF NOT EXISTS follow_digest_outbox_expiry ON follow_digest_outbox (state, expires_at);
 -- Cancelling every outstanding aggregate is conservative: no removed-scope roles can be sent.
 -- Already accepted mail cannot be recalled. The independent daily marker has no subscriber FK.
 CREATE TRIGGER IF NOT EXISTS follow_scope_cancel_digest AFTER DELETE ON follow_subscriptions
@@ -1245,3 +1243,6 @@ BEGIN
   UPDATE follow_delivery_owner SET management_id=NULL,management_expires_at=NULL
   WHERE management_id=OLD.id AND management_expires_at=OLD.expires_at;
 END;
+
+CREATE INDEX IF NOT EXISTS follow_digest_outbox_created ON follow_digest_outbox (created);
+CREATE INDEX IF NOT EXISTS follow_digest_outbox_expiry ON follow_digest_outbox (state, expires_at);

@@ -193,6 +193,9 @@ it("qualifies ordered expiry and bounded reads with 20000 healthy jobs", async (
   for (const plan of guarded) {
     for (const index of ["due", "expiry", "created"])
       expect(plan).toContain(`follow_digest_outbox_${index}`);
+    expect(plan).toMatch(
+      /SEARCH p USING INDEX sqlite_autoindex_follow_pending_progress_1 \(job_id=\?\)/,
+    );
   }
   expect(clock).toHaveLength(5);
   expect(reads).toHaveLength(5);
@@ -379,6 +382,12 @@ it("keeps disabled and malformed planning receipts away from mutations", async (
     (r) => {
       delete r.results[0].target;
     },
+    (r) => {
+      r.results[0].digest = "a".repeat(64);
+    },
+    (r) => {
+      delete r.results[0].snapshot_at;
+    },
   ]) {
     let batches = 0;
     const binding = {
@@ -408,4 +417,109 @@ it("keeps disabled and malformed planning receipts away from mutations", async (
     expect(batches).toBe(0);
   }
   expect(await snapshot(db)).toEqual(before);
+});
+
+it("fences the pending snapshot used for uncertain finalization", async () => {
+  const db = env.DB;
+  for (const mode of [
+    "digest",
+    "time",
+    "time-only",
+    "advances",
+    "remove",
+    "insert",
+    "stable",
+    "absent",
+  ]) {
+    await seed(db);
+    await job(db, "1", "a", "attempting", { created: old, lease: at }).run();
+    const advanceRows = [
+      { scopeKey: "scope", generation, confirmedAt: initial, from: initial, to: first },
+    ];
+    if (mode === "stable") {
+      const statements = [];
+      for (let index = 0; index < 182; index++) {
+        const scopeKey = index.toString(36);
+        const scopeGeneration = `00000000-0000-0000-0000-${String(index + 2).padStart(12, "0")}`;
+        statements.push(
+          db
+            .prepare("INSERT INTO follow_subscriptions VALUES('fixture',?,?,?,NULL)")
+            .bind(scopeKey, initial, initial),
+          db
+            .prepare("INSERT INTO follow_scope_progress VALUES('fixture',?,?,?)")
+            .bind(scopeKey, scopeGeneration, initial),
+        );
+        advanceRows.push({
+          scopeKey,
+          generation: scopeGeneration,
+          confirmedAt: initial,
+          from: initial,
+          to: first,
+        });
+      }
+      await db.batch(statements);
+    }
+    const advances = JSON.stringify(advanceRows).padEnd(32768);
+    expect(new TextEncoder().encode(advances)).toHaveLength(32768);
+    const put = (digest, snapshot, payload) =>
+      db
+        .prepare("INSERT INTO follow_pending_progress VALUES('a',?,?,?)")
+        .bind(digest, snapshot, payload);
+    if (!["insert", "absent"].includes(mode)) await put("a".repeat(64), first, advances).run();
+    let calls = 0;
+    const reads = [];
+    const binding = port(db, {
+      reads,
+      async mutate(stmts) {
+        calls++;
+        if (["digest", "time", "time-only", "advances", "remove"].includes(mode))
+          await db.prepare("DELETE FROM follow_pending_progress WHERE job_id='a'").run();
+        if (mode === "digest") await put("b".repeat(64), first, advances).run();
+        if (mode === "time")
+          await put("a".repeat(64), second, advances.replace(first, second)).run();
+        if (mode === "time-only") await put("a".repeat(64), second, advances).run();
+        if (mode === "advances") await put("a".repeat(64), first, advances.slice(0, -1)).run();
+        if (mode === "insert") await put("a".repeat(64), first, advances).run();
+        const receipts = await db.batch(stmts);
+        if (!["stable", "absent"].includes(mode))
+          expect(receipts.map((r) => r.meta.changes)).toEqual([0, 0]);
+        if (mode === "stable") {
+          const batchReads = receipts.map((r) => r.meta.rows_read);
+          const batchWrites = receipts.map((r) => r.meta.rows_written);
+          expect(batchReads[0]).toBeLessThan(10000);
+          expect(batchReads[1]).toBeLessThan(10);
+          expect(batchWrites[0]).toBeLessThanOrEqual(187);
+          console.log(
+            "packed digest candidate D1",
+            JSON.stringify({ reads, batchReads, batchWrites }),
+          );
+        }
+        return receipts;
+      },
+    });
+    const result = await expireFollowDigestCandidate(binding, enabled);
+    expect(calls).toBe(1);
+    if (["stable", "absent"].includes(mode)) {
+      expect(result).toEqual({
+        status: "maintained",
+        complete: false,
+        uncertain: 1,
+        cancelled: 0,
+        removed: 1,
+      });
+      expect(await rows(db, "SELECT id FROM follow_digest_outbox")).toEqual([]);
+    } else {
+      expect(result).toEqual({ status: "unavailable" });
+      expect(await rows(db, "SELECT state FROM follow_digest_outbox")).toEqual([
+        { state: "attempting" },
+      ]);
+    }
+    expect(reads).toHaveLength(1);
+    expect(reads[0]).toBeLessThan(50);
+    const progress = await rows(db, "SELECT watermark FROM follow_scope_progress");
+    const expectedWatermark = mode === "stable" ? first : initial;
+    expect(progress).toEqual(
+      Array.from({ length: advanceRows.length }, () => ({ watermark: expectedWatermark })),
+    );
+  }
 });

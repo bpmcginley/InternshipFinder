@@ -3,6 +3,7 @@ import { expiryReceipts } from "./follow-expiry-page.js";
 const { record, rowid, dense, receipt } = expiryReceipts;
 const unavailable = () => ({ status: "unavailable" });
 const DAY = 86400000;
+const encoder = new TextEncoder();
 const table = "follow_digest_outbox";
 
 // Do not take the first two in lease order unless the third-row probe proves
@@ -38,12 +39,18 @@ const selection = `WITH
           WHEN q.state IN ('queued','leased') AND q.expires_at<=?1 THEN 'cancelled' END,
         CASE WHEN q.created<=?2 THEN 1 ELSE 0 END) END AS target
     FROM attempt_set CROSS JOIN candidate LEFT JOIN ${table} q ON q.rowid=candidate.rid
+  ), proof AS (
+    SELECT plan.*, p.snapshot_digest AS digest,p.snapshot_at,p.advances
+    FROM plan LEFT JOIN follow_pending_progress p
+      ON json_extract(plan.target,'$[10]')='uncertain'
+        AND p.job_id=json_extract(plan.target,'$[1]')
   ) `;
 
-const selectPlan = `${selection} SELECT due,first,first_id,last,last_id,selected,target FROM plan`;
+const selectPlan = `${selection} SELECT due,first,first_id,last,last_id,selected,target,digest,snapshot_at,advances FROM proof`;
 const revalidate = `(${selection}
   SELECT target IS ?3 AND due=?4 AND first IS ?5 AND last IS ?6
-    AND first_id IS ?7 AND last_id IS ?8 FROM plan)`;
+    AND first_id IS ?7 AND last_id IS ?8
+    AND digest IS ?9 AND snapshot_at IS ?10 AND advances IS ?11 FROM proof)`;
 const returning = "RETURNING CAST(rowid AS TEXT) AS rowid,id";
 
 function fail() {
@@ -59,7 +66,10 @@ function onlyRow(value, keys) {
 }
 
 function checkedPlan(value) {
-  const plan = onlyRow(value, "due,first,first_id,last,last_id,selected,target");
+  const plan = onlyRow(
+    value,
+    "advances,digest,due,first,first_id,last,last_id,selected,snapshot_at,target",
+  );
   const { due, first, first_id, last, last_id, selected, target } = plan;
   if (due === 0) {
     if ([first, last, first_id, last_id].some((v) => v !== null)) fail();
@@ -72,8 +82,10 @@ function checkedPlan(value) {
   ) {
     fail();
   }
+  const pending = [plan.digest, plan.snapshot_at, plan.advances];
+  const absent = pending.every((v) => v === null);
   if (target === null) {
-    if (selected !== null || (due !== 0 && due !== 3)) fail();
+    if (selected !== null || !absent || (due !== 0 && due !== 3)) fail();
     return plan;
   }
   if (due === 3 || typeof target !== "string") fail();
@@ -91,6 +103,20 @@ function checkedPlan(value) {
   )
     fail();
   rowid(key);
+  // The deployed schema permits a noncanonical 24-character snapshot time. Pin
+  // its exact value and let the existing finalizer reject invalid chronology.
+  if (
+    !absent &&
+    (transition !== "uncertain" ||
+      typeof plan.digest !== "string" ||
+      !/^[0-9a-f]{64}$/.test(plan.digest) ||
+      typeof plan.snapshot_at !== "string" ||
+      [...plan.snapshot_at].length !== 24 ||
+      typeof plan.advances !== "string" ||
+      plan.advances.length > 32768 ||
+      encoder.encode(plan.advances).length > 32768)
+  )
+    fail();
   return { ...plan, id, transition, remove };
 }
 
@@ -129,16 +155,19 @@ export async function expireFollowDigestCandidate(db, options = {}) {
       plan.last,
       plan.first_id,
       plan.last_id,
+      plan.digest,
+      plan.snapshot_at,
+      plan.advances,
       plan.selected,
       plan.id,
     ];
-    const same = "rowid=CAST(?9 AS INTEGER) AND id=?10";
+    const same = "rowid=CAST(?12 AS INTEGER) AND id=?13";
     const mutation = [];
     if (plan.transition) {
       mutation.push(
         db
           .prepare(
-            `UPDATE ${table} NOT INDEXED SET state=?11,
+            `UPDATE ${table} NOT INDEXED SET state=?14,
         payload=NULL,lease_token=NULL,lease_until=NULL
         WHERE ${same} AND ${revalidate} ${returning}`,
           )
