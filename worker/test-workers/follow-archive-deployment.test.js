@@ -2,6 +2,8 @@ import { applyD1Migrations } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { beforeEach, expect, it } from "vitest";
 import { runFollowArchiveDeployment } from "../src/follow-archive-deployment.js";
+import { runFollowArchiveRelease } from "../src/follow-archive-release.js";
+import { prepareFollowCatalogDeployment } from "../src/follow-signup-release.js";
 import { followSnapshotDigest } from "../src/follow-matching.js";
 import { requestFollow, mintFollowToken, confirmFollow } from "../src/follows.js";
 
@@ -361,4 +363,124 @@ it("late headers and stalled predecessor bodies cancel without a current-catalog
     expect(f.gets).toEqual([f.priorUrl]);
     expect(await f.jobs()).toBe(0);
   }
+});
+
+it("unsafe plus-one scope bound and colliding acquisition targets reject before GET or D1", async () => {
+  const f = await fixture();
+  let prepares = 0,
+    batches = 0;
+  f.options.db = {
+    prepare() {
+      prepares++;
+      throw Error("unexpected");
+    },
+    batch() {
+      batches++;
+      throw Error("unexpected");
+    },
+  };
+  const base = JSON.stringify(f.input);
+  const cases = [(x) => (x.limits.maxFollows = Number.MAX_SAFE_INTEGER)];
+  for (const where of ["release", "predecessor"])
+    for (const path of [
+      "/data/follows/index.json",
+      "/%64ata/follows/index.json",
+      "/data%2Ffollows/index.json",
+      "/data/follows/%2569ndex.json",
+    ])
+      cases.push((x) => (x.catalog[where].url = origin + path));
+  cases.push((x) => (x.catalog.predecessor.url = origin + "/data/follows/%63urrent.json"));
+  for (const mutate of cases) {
+    const input = JSON.parse(base);
+    mutate(input);
+    expect(
+      (await runFollowArchiveDeployment({ ...f.options, descriptor: JSON.stringify(input) }))
+        .status,
+    ).toBe("unavailable");
+  }
+  expect(f.gets).toEqual([]);
+  expect(prepares).toBe(0);
+  expect(batches).toBe(0);
+  expect(await f.jobs()).toBe(0);
+});
+
+it("SQL rejects an unadmitted batch after the original outer wall deadline", async () => {
+  const f = await fixture(true);
+  f.input.budget.deadlineMs = 1000;
+  let samples = 0,
+    started,
+    attempted = false;
+  f.options.now = () => {
+    if (++samples === 1) started = Date.now() - 750;
+    return samples <= 2 ? started : Date.now();
+  };
+  f.options.monotonicNow = () => 0;
+  f.options.db = {
+    prepare: env.DB.prepare.bind(env.DB),
+    batch: async (list) => {
+      attempted = true;
+      await new Promise((resolve) => setTimeout(resolve, Math.max(0, started + 1050 - Date.now())));
+      expect(Date.now()).toBeGreaterThanOrEqual(started + 1000);
+      return env.DB.batch(list);
+    },
+  };
+  expect((await f.run()).status).toBe("unavailable");
+  expect(attempted).toBe(true);
+  expect(await f.jobs()).toBe(0);
+});
+
+it("SQL clips admission for monotonic time consumed before the inner runner starts", async () => {
+  const f = await fixture(true);
+  f.input.budget.deadlineMs = 1000;
+  let samples = 0,
+    late = false,
+    attempts = 0;
+  f.options.now = Date.now;
+  f.options.monotonicNow = () => (++samples <= 2 ? 0 : late ? 1050 : 750.2);
+  f.options.db = {
+    prepare: env.DB.prepare.bind(env.DB),
+    batch: async (list) => {
+      attempts++;
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      late = true;
+      return env.DB.batch(list);
+    },
+  };
+  expect((await f.run()).status).toBe("unavailable");
+  expect(attempts).toBe(1);
+  expect(await f.jobs()).toBe(0);
+});
+
+it("optional write ceiling rejects invalid synchronous receipts before an atomic batch", async () => {
+  const f = await fixture(true);
+  let batches = 0;
+  const { policy } = prepareFollowCatalogDeployment(f.input.catalog);
+  const options = {
+    ...f.options,
+    ...f.input,
+    enabled: true,
+    catalog: policy,
+    db: {
+      prepare: env.DB.prepare.bind(env.DB),
+      batch() {
+        batches++;
+        throw Error("unexpected");
+      },
+    },
+  };
+  for (const value of [null, "future", NaN, Number.MAX_SAFE_INTEGER, f.time]) {
+    expect((await runFollowArchiveRelease({ ...options, writeCutoff: () => value })).status).toBe(
+      "unavailable",
+    );
+  }
+  expect(
+    (
+      await runFollowArchiveRelease({
+        ...options,
+        writeCutoff: () => Promise.reject(Error("synthetic")),
+      })
+    ).status,
+  ).toBe("unavailable");
+  expect(batches).toBe(0);
+  expect(await f.jobs()).toBe(0);
 });

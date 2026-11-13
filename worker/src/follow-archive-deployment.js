@@ -13,6 +13,16 @@ const exact = (x, keys) =>
 const fail = () => {
   throw Error("Unavailable archive deployment");
 };
+function targetPath(url) {
+  let path = new URL(url).pathname;
+  // Reserve aliases of the manifest too; ordinary URL canonicalization does not
+  // decode escaped path characters. No server read is needed to reject a collision.
+  while (true) {
+    const decoded = decodeURIComponent(path);
+    if (decoded === path) return new URL(path, "https://internscout.org").pathname;
+    path = decoded;
+  }
+}
 function sample(clock) {
   const value = clock();
   if (typeof value !== "number" || !Number.isFinite(value)) {
@@ -91,9 +101,16 @@ export async function runFollowArchiveDeployment(options = {}) {
       !exact(
         limits,
         "maxBytes,maxFollows,maxMatches,maxResultBytes,maxRoles,maxTextBytes,maxWindowMs",
-      )
+      ) ||
+      limits.maxFollows >= Number.MAX_SAFE_INTEGER
     )
       fail();
+    const targets = [
+      archive.indexUrl,
+      policy.release.url,
+      ...(predecessor ? [predecessor.release.url] : []),
+    ].map(targetPath);
+    if (new Set(targets).size !== targets.length) fail();
     createFollowArchiveReader({
       ...archive,
       catalog: policy.previousValid,
@@ -161,6 +178,14 @@ export async function runFollowArchiveDeployment(options = {}) {
       limits,
       maxProgressBytes,
       maxPendingBytes,
+      writeCutoff: () => {
+        check();
+        return Math.min(
+          policy.release.expiresAt,
+          started + budget.deadlineMs,
+          wall + Math.floor(budget.deadlineMs - Math.max(wall - started, monotonic - mono)),
+        );
+      },
       budget: { ...budget, maxFetches: budget.maxFetches - fetchCalls, deadlineMs: remaining() },
     });
     check();
