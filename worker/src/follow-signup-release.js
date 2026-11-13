@@ -33,7 +33,7 @@ function uniqueMembers(text) {
 // maxBytes is PER catalog (at most two); maxKeys is the existing per-array bound.
 export function prepareFollowSignupDeployment(
   raw,
-  { fetch, now, monotonicNow = () => performance.now() } = {},
+  { fetch, now, initialTime, monotonicNow = () => performance.now() } = {},
 ) {
   if (typeof raw !== "string" || raw.length > 4096 || new TextEncoder().encode(raw).length > 4096)
     fail();
@@ -47,6 +47,7 @@ export function prepareFollowSignupDeployment(
     input.dailyLimit <= 0 ||
     input.maxBytes > 1000000 ||
     input.maxKeys > 10000 ||
+    (initialTime !== undefined && !Number.isSafeInteger(initialTime)) ||
     typeof fetch !== "function" ||
     typeof now !== "function" ||
     typeof monotonicNow !== "function"
@@ -65,7 +66,7 @@ export function prepareFollowSignupDeployment(
     });
     if (predecessor.release.url === policy.release.url) fail();
   }
-  let latest = -Infinity;
+  let latest = initialTime ?? -Infinity;
   const clock = () => {
     const sample = now();
     if (!(sample instanceof Date)) {

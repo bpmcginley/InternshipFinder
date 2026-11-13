@@ -450,3 +450,20 @@ export async function deploymentRejectsAsyncClocksWithoutEscapingRejections() {
   await new Promise((resolve) => setTimeout(resolve, 0));
   assert.equal(reads, 0);
 }
+
+export async function deploymentRejectsClockRollbackSinceTheRouteSample(db) {
+  const f = await fixture();
+  for (const first of [f.now + 1, f.descriptor.release.expiresAt]) {
+    let samples = 0;
+    const req = request();
+    const response = await handle(req, f.env(db), undefined, {
+      now: () => new Date(samples++ === 0 ? first : f.now),
+      fetch: f.fetch,
+    });
+    assert.equal(response.status, 404);
+    assert.equal(req.bodyUsed, false);
+    assert.equal(f.calls(), 0);
+    assert.equal(await count(db, "rate"), 0);
+    assert.equal(await count(db, "follow_confirmation_outbox"), 0);
+  }
+}

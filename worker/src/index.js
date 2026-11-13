@@ -178,7 +178,7 @@ const signupFollow = ({ request, env, db, now, d }) => {
         return prepareFollowSignupAdmission({ db, now, d });
       try {
         return { db, ...prepareFollowSignupDeployment(env.FOLLOW_SIGNUP_RELEASE, {
-          fetch: d.fetch, now: d.now,
+          fetch: d.fetch, now: d.now, initialTime: now instanceof Date ? +now : NaN,
         }) };
       } catch {
         return followSignupClosed();
