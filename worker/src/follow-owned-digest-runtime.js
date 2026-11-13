@@ -53,7 +53,7 @@ export function createOwnedFollowDigestRuntime(options = {}) {
   } = options;
   return async () => {
     if (enabled !== true) return { status: "disabled" };
-    let selected, transport, related, beforeAcquire;
+    let selected, transport, related, beforeAcquire, ownerExpiresAtMs;
     try {
       if (
         typeof policy !== "function" ||
@@ -81,6 +81,14 @@ export function createOwnedFollowDigestRuntime(options = {}) {
       )
         fail();
       beforeAcquire = admission?.value;
+      const cutoff = Object.getOwnPropertyDescriptor(options, "ownerExpiresAtMs");
+      if (
+        (cutoff && (!cutoff.enumerable || !Object.hasOwn(cutoff, "value"))) ||
+        (!cutoff && "ownerExpiresAtMs" in options) ||
+        (cutoff?.value !== undefined && (!Number.isSafeInteger(cutoff.value) || cutoff.value <= 0))
+      )
+        fail();
+      ownerExpiresAtMs = cutoff?.value;
       transport = createFollowEmailTransport({
         enabled: true,
         email,
@@ -89,7 +97,7 @@ export function createOwnedFollowDigestRuntime(options = {}) {
     } catch {
       return { status: "unavailable" };
     }
-    const acquired = await acquireFollowDeliveryOwner(db, beforeAcquire);
+    const acquired = await acquireFollowDeliveryOwner(db, beforeAcquire, ownerExpiresAtMs);
     if (acquired.status !== "acquired") return acquired;
     let result;
     try {

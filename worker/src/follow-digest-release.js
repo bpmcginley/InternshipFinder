@@ -214,6 +214,17 @@ export async function runFollowDigestRelease(options = {}) {
       check();
       return bytes;
     };
+    check();
+    // Freeze once, including validation/key/catalog time; never extend on owner-read delay.
+    const ownerExpiresAtMs =
+      wall +
+      Math.floor(
+        Math.min(
+          deadlineMs - Math.max(wall - started, monotonic - mono),
+          catalog.release.expiresAt - wall,
+        ),
+      );
+    if (!Number.isSafeInteger(ownerExpiresAtMs) || ownerExpiresAtMs <= wall) fail();
     const result = await createOwnedFollowDigestRuntime({
       enabled: true,
       db: database,
@@ -228,6 +239,7 @@ export async function runFollowDigestRelease(options = {}) {
         check();
         return true;
       },
+      ownerExpiresAtMs,
       policy,
       key,
       catalog: current.catalog.valid,
