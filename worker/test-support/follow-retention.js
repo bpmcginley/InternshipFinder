@@ -493,3 +493,4 @@ export async function managementExpiryIndexedSyntheticBacklog(db) {
   );
   return { rowsRead: receipt.meta.rows_read, rowsWritten: receipt.meta.rows_written, plan };
 }
+export * from "./follow-subscriber-expiry-page.js";
