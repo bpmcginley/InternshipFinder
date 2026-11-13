@@ -174,7 +174,7 @@ export async function readTopupReversalEvidence(
           item.status.length > 64 ||
           !Number.isSafeInteger(item.amount) ||
           item.amount <= 0 ||
-          item.amount > e.capturedAmount
+          (kind === "refunds" && item.amount > e.capturedAmount)
         )
           fail();
         seen.add(item.id);

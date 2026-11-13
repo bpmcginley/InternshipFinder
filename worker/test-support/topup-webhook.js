@@ -290,7 +290,8 @@ export async function signedTopupBeforeGrantAndReversals(db) {
   assert.equal((await f.post(f.event("refund.created", early, "evt_early"))).status, 200);
   const g = await fixture(db);
   assert.equal((await g.post()).status, 200);
-  g.disputes = [item("dispute", "under_review")];
+  // Stripe can report a larger dispute amount after an exchange rate changes.
+  g.disputes = [{ ...item("dispute", "under_review"), amount: g.charge.amount + 1 }];
   g.charge.disputed = true;
   const dispute = { ...g.disputes[0], payment_intent: null };
   g.calls = [];
