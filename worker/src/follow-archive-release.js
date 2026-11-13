@@ -76,6 +76,7 @@ export async function runFollowArchiveRelease(options = {}) {
     const o = record(options),
       db = o.db,
       get = o.fetch;
+    const writeCutoff = o.writeCutoff;
     const prepareMethod = db?.prepare,
       batchMethod = db?.batch;
     const now = o.now ?? Date.now,
@@ -91,6 +92,7 @@ export async function runFollowArchiveRelease(options = {}) {
       typeof get !== "function" ||
       typeof now !== "function" ||
       typeof monotonicNow !== "function" ||
+      (writeCutoff !== undefined && typeof writeCutoff !== "function") ||
       !db ||
       typeof prepareMethod !== "function" ||
       typeof batchMethod !== "function" ||
@@ -218,9 +220,18 @@ export async function runFollowArchiveRelease(options = {}) {
         const raw = owned.map((item) => item.raw);
         // Existing 0025 empty view admits this whole atomic batch at DB UTC.
         // It retains no release data; an already-admitted transaction completes atomically.
-        const cutoff = Math.floor(
+        let cutoff = Math.floor(
           Math.min(catalog.release.expiresAt, start + budget.deadlineMs, check() + remaining()),
         );
+        if (writeCutoff !== undefined) {
+          // An outer invocation may have consumed time before this runner started.
+          // Preserve its absolute admission ceiling, not only its sampled duration.
+          const outer = sample(writeCutoff),
+            at = check();
+          if (!Number.isSafeInteger(outer) || !Number.isFinite(+new Date(outer)) || outer <= at)
+            fail();
+          cutoff = Math.min(cutoff, outer);
+        }
         charge(raw.length + 1);
         const guard = prepare(
           "INSERT INTO follow_catalog_admissions(expires_at_ms) VALUES(?)",
