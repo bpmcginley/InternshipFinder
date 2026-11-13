@@ -352,3 +352,314 @@ it("competing scheduler passes delete the later orphan only once", async () => {
     41,
   );
 });
+
+const candidatePolicy = (extra = {}) =>
+  JSON.stringify({
+    deadlineMs: 30000,
+    maxD1Calls: 48,
+    maxRows: 128,
+    digestCandidates: true,
+    ...extra,
+  });
+
+async function digestFixture(db, healthy = 0, overlap = false) {
+  const at = await clock(db),
+    stamp = (days) => new Date(Date.parse(at) + days * 86400000).toISOString();
+  await db.batch([
+    db
+      .prepare(
+        "INSERT INTO follow_subscribers VALUES('digest-fixture','fixture@example.test',?,NULL,NULL)",
+      )
+      .bind(stamp(-10)),
+    db
+      .prepare("INSERT INTO follow_subscriptions VALUES('digest-fixture','scope',?,?,NULL)")
+      .bind(stamp(-10), stamp(-10)),
+    db
+      .prepare(
+        "INSERT INTO follow_scope_progress VALUES('digest-fixture','scope','00000000-0000-4000-8000-000000000001',?)",
+      )
+      .bind(stamp(-10)),
+  ]);
+  if (healthy)
+    await db
+      .prepare(
+        `WITH RECURSIVE n(v) AS(VALUES(1) UNION ALL SELECT v+1 FROM n WHERE v<?)
+    INSERT INTO follow_digest_outbox(rowid,id,subscriber_id,day,payload,created,expires_at,state)
+    SELECT v,'keep-'||v,'digest-fixture','keep-'||v,'[]',?,?,'queued' FROM n`,
+      )
+      .bind(healthy, at, stamp(1))
+      .run();
+  await db
+    .prepare(
+      `INSERT INTO follow_digest_outbox(rowid,id,subscriber_id,day,payload,created,expires_at,state,lease_token,lease_until,attempted_at)
+    VALUES(?,'due','digest-fixture','due','[]',?,?,?,?,?,?)`,
+    )
+    .bind(
+      healthy + 1,
+      overlap ? stamp(-8) : at,
+      stamp(-1),
+      overlap ? "attempting" : "queued",
+      overlap ? "lease" : null,
+      overlap ? stamp(-1) : null,
+      overlap ? stamp(-8) : null,
+    )
+    .run();
+  if (overlap)
+    await db
+      .prepare("INSERT INTO follow_pending_progress VALUES('due',?,?,?)")
+      .bind(
+        "a".repeat(64),
+        stamp(-8),
+        JSON.stringify([
+          {
+            scopeKey: "scope",
+            generation: "00000000-0000-4000-8000-000000000001",
+            confirmedAt: stamp(-10),
+            from: stamp(-10),
+            to: stamp(-8),
+          },
+        ]),
+      )
+      .run();
+  return { at, advanced: stamp(-8) };
+}
+
+function counted(db, after = async () => {}) {
+  const calls = [],
+    statementCounts = [];
+  return {
+    calls,
+    statementCounts,
+    prepare(sql) {
+      const wrap = (statement) => ({
+        sql,
+        statement,
+        bind: (...args) => wrap(statement.bind(...args)),
+        async all() {
+          const kind = sql.startsWith("WITH") ? "candidate" : "clock";
+          calls.push(kind);
+          statementCounts.push(1);
+          const result = await statement.all();
+          await after(kind, result);
+          return result;
+        },
+      });
+      return wrap(db.prepare(sql));
+    },
+    async batch(statements) {
+      const kind =
+        statements[0].sql.startsWith("UPDATE follow_digest_outbox") ||
+        statements[0].sql.startsWith("DELETE FROM follow_digest_outbox")
+          ? "mutation"
+          : "batch";
+      calls.push(kind);
+      statementCounts.push(statements.length);
+      const result = await db.batch(statements.map((s) => s.statement));
+      await after(kind, result);
+      return result;
+    },
+  };
+}
+
+it("candidate mode converges beyond 20000 healthy jobs without altering them", async () => {
+  await reset(env.DB);
+  await digestFixture(env.DB, 20000);
+  const legacy = counted(env.DB);
+  expect(
+    await runFollowScheduledMaintenance(legacy, candidatePolicy({ digestCandidates: false })),
+  ).toEqual({ status: "partial" });
+  expect(legacy.calls).toHaveLength(48);
+  expect(
+    await env.DB.prepare("SELECT state FROM follow_digest_outbox WHERE id='due'").first("state"),
+  ).toBe("queued");
+  const fast = counted(env.DB);
+  expect(await runFollowScheduledMaintenance(fast, candidatePolicy())).toEqual({
+    status: "pass-complete",
+  });
+  expect(fast.calls.filter((x) => ["clock", "candidate", "mutation"].includes(x))).toEqual([
+    "clock",
+    "candidate",
+    "mutation",
+    "clock",
+    "candidate",
+  ]);
+  expect(fast.calls).toHaveLength(11);
+  expect(
+    await env.DB.prepare("SELECT state FROM follow_digest_outbox WHERE id='due'").first("state"),
+  ).toBe("cancelled");
+  expect(
+    await env.DB.prepare(
+      "SELECT count(*) AS n FROM follow_digest_outbox WHERE id LIKE 'keep-%' AND state='queued' AND payload='[]'",
+    ).first("n"),
+  ).toBe(20000);
+});
+
+it("candidate overlap terminalizes before deletion in exactly three binding calls", async () => {
+  await reset(env.DB);
+  const { advanced } = await digestFixture(env.DB, 0, true);
+  const tracked = counted(env.DB);
+  expect(await runFollowScheduledMaintenance(tracked, candidatePolicy())).toEqual({
+    status: "pass-complete",
+  });
+  expect(tracked.calls.filter((x) => ["clock", "candidate", "mutation"].includes(x))).toEqual([
+    "clock",
+    "candidate",
+    "mutation",
+    "clock",
+    "candidate",
+  ]);
+  expect(tracked.calls).toHaveLength(11);
+  expect(tracked.statementCounts.slice(4, 7)).toEqual([1, 1, 2]);
+  expect(
+    await env.DB.prepare(
+      "SELECT watermark FROM follow_scope_progress WHERE subscriber_id='digest-fixture'",
+    ).first("watermark"),
+  ).toBe(advanced);
+  expect(await env.DB.prepare("SELECT count(*) AS n FROM follow_digest_outbox").first("n")).toBe(0);
+  expect(await env.DB.prepare("SELECT count(*) AS n FROM follow_pending_progress").first("n")).toBe(
+    0,
+  );
+});
+
+it("reserves three candidate calls but charges only two for an empty plan", async () => {
+  await reset(env.DB);
+  const held = counted(env.DB);
+  expect(await runFollowScheduledMaintenance(held, candidatePolicy({ maxD1Calls: 6 }))).toEqual({
+    status: "partial",
+  });
+  expect(held.calls).toEqual(["batch", "batch", "batch", "batch"]);
+  const empty = counted(env.DB);
+  expect(await runFollowScheduledMaintenance(empty, candidatePolicy())).toEqual({
+    status: "pass-complete",
+  });
+  expect(empty.calls).toEqual([
+    "batch",
+    "batch",
+    "batch",
+    "batch",
+    "clock",
+    "candidate",
+    "batch",
+    "batch",
+  ]);
+  const legacy = counted(env.DB);
+  expect(
+    await runFollowScheduledMaintenance(
+      legacy,
+      candidatePolicy({ digestCandidates: false, maxD1Calls: 6 }),
+    ),
+  ).toEqual({ status: "partial" });
+  expect(legacy.calls).toHaveLength(6);
+  expect(legacy.calls[4]).toBe("clock");
+});
+
+it.each(["clock", "candidate", "mutation"])(
+  "stops after a delayed %s result before the next binding call",
+  async (stage) => {
+    await reset(env.DB);
+    await digestFixture(env.DB);
+    let now = 0;
+    const tracked = counted(env.DB, async (kind) => {
+      if (kind === stage) now = 30000;
+    });
+    expect(await runFollowScheduledMaintenance(tracked, candidatePolicy(), () => now)).toEqual({
+      status: "partial",
+    });
+    expect(tracked.calls.at(-1)).toBe(stage);
+    expect(tracked.calls).toHaveLength({ clock: 5, candidate: 6, mutation: 7 }[stage]);
+    expect(
+      await env.DB.prepare("SELECT state FROM follow_digest_outbox WHERE id='due'").first("state"),
+    ).toBe(stage === "mutation" ? "cancelled" : "queued");
+  },
+);
+
+it("does not retry an ambiguous candidate mutation or a third-due-attempt hold", async () => {
+  await reset(env.DB);
+  await digestFixture(env.DB);
+  const uncertain = counted(env.DB, async (kind) => {
+    if (kind === "mutation") throw Error("Synthetic lost acknowledgement");
+  });
+  expect(await runFollowScheduledMaintenance(uncertain, candidatePolicy())).toEqual({
+    status: "unavailable",
+  });
+  expect(uncertain.calls).toHaveLength(7);
+  expect(uncertain.calls.filter((x) => x === "mutation")).toHaveLength(1);
+  await reset(env.DB);
+  await digestFixture(env.DB, 0, true);
+  await env.DB.prepare(
+    `INSERT INTO follow_digest_outbox(id,subscriber_id,day,payload,created,expires_at,state,lease_token,lease_until,attempted_at)
+    SELECT 'peer-'||v,'digest-fixture','peer-'||v,'[]',created,expires_at,state,lease_token,lease_until,attempted_at
+    FROM follow_digest_outbox CROSS JOIN (SELECT 1 AS v UNION ALL SELECT 2) WHERE id='due'`,
+  ).run();
+  const held = counted(env.DB);
+  expect(await runFollowScheduledMaintenance(held, candidatePolicy())).toEqual({
+    status: "unavailable",
+  });
+  expect(held.calls).toHaveLength(6);
+  expect(held.calls.includes("mutation")).toBe(false);
+});
+
+it("absent or false candidate mode preserves the pre-0033 schema path", async () => {
+  const db = env.MIGRATION_DB;
+  await applyD1Migrations(
+    db,
+    env.TEST_MIGRATIONS.filter((m) => Number(m.name.slice(0, 4)) <= 29),
+  );
+  for (const setting of [undefined, false]) {
+    await db.prepare("DELETE FROM follow_subscribers").run();
+    await digestFixture(db);
+    const tracked = counted(db),
+      raw = { deadlineMs: 30000, maxD1Calls: 48, maxRows: 128 };
+    if (setting !== undefined) raw.digestCandidates = setting;
+    expect(await runFollowScheduledMaintenance(tracked, JSON.stringify(raw))).toEqual({
+      status: "pass-complete",
+    });
+    expect(tracked.calls.includes("candidate")).toBe(false);
+    expect(
+      await db.prepare("SELECT state FROM follow_digest_outbox WHERE id='due'").first("state"),
+    ).toBe("cancelled");
+  }
+  await db.prepare("DELETE FROM follow_subscribers").run();
+  await digestFixture(db);
+  const missing = counted(db);
+  expect(await runFollowScheduledMaintenance(missing, candidatePolicy())).toEqual({
+    status: "unavailable",
+  });
+  expect(missing.calls).toEqual(["batch", "batch", "batch", "batch", "clock", "candidate"]);
+  expect(
+    await db.prepare("SELECT state FROM follow_digest_outbox WHERE id='due'").first("state"),
+  ).toBe("queued");
+});
+
+it("rejects nonboolean candidate selectors before D1", async () => {
+  const prepare = vi.fn(() => {
+    throw Error("No I/O");
+  });
+  for (const digestCandidates of [null, 0, 1, "false", "true", {}, []]) {
+    expect(
+      await runFollowScheduledMaintenance({ prepare }, candidatePolicy({ digestCandidates })),
+    ).toEqual({ status: "unavailable" });
+  }
+  expect(prepare).not.toHaveBeenCalled();
+});
+
+it("cannot exceed the exact remaining three-call allowance after a committed candidate", async () => {
+  await reset(env.DB);
+  await digestFixture(env.DB);
+  const tracked = counted(env.DB);
+  expect(await runFollowScheduledMaintenance(tracked, candidatePolicy({ maxD1Calls: 7 }))).toEqual({
+    status: "partial",
+  });
+  expect(tracked.calls).toEqual([
+    "batch",
+    "batch",
+    "batch",
+    "batch",
+    "clock",
+    "candidate",
+    "mutation",
+  ]);
+  expect(
+    await env.DB.prepare("SELECT state FROM follow_digest_outbox WHERE id='due'").first("state"),
+  ).toBe("cancelled");
+});
