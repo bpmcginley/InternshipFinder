@@ -91,15 +91,16 @@ function selected(r) {
   return r.results[0];
 }
 // Acquisition only reads one row and changes one row in a D1 transaction.
-export async function acquireFollowDeliveryOwner(db) {
+export async function acquireFollowDeliveryOwner(db, beforeAcquire) {
   try {
+    if (beforeAcquire !== undefined && typeof beforeAcquire !== "function") fail();
     const before = await db
       .prepare("SELECT * FROM follow_delivery_owner WHERE singleton=1")
       .first();
     owner(before);
     if (before.phase !== "ready") return { status: "held" };
     const generation = crypto.randomUUID().replaceAll("-", "");
-    const rows = await db.batch([
+    const statements = [
       db
         .prepare(
           "UPDATE follow_delivery_owner SET phase='running',generation=? WHERE singleton=1 AND version=1 AND phase='ready' AND generation=?",
@@ -110,7 +111,16 @@ export async function acquireFollowDeliveryOwner(db) {
           "SELECT * FROM follow_delivery_owner WHERE singleton=1 AND version=1 AND phase='running' AND generation=?",
         )
         .bind(generation),
-    ]);
+    ];
+    // Optional trusted synchronous admission fence; never race already-submitted D1 work.
+    if (beforeAcquire !== undefined) {
+      const admitted = beforeAcquire();
+      if (admitted !== true) {
+        void Promise.resolve(admitted).catch(() => {});
+        fail();
+      }
+    }
+    const rows = await db.batch(statements);
     if (!Array.isArray(rows) || rows.length !== 2 || !changed(rows[0])) return unavailable();
     const row = selected(rows[1]);
     const resume = owner(row);

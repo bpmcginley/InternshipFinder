@@ -106,7 +106,7 @@ export async function runFollowDigestRelease(options = {}) {
       send = email?.send;
     if ([prepare, batch, send].some((f) => typeof f !== "function")) fail();
     const database = { prepare: prepare.bind(db), batch: batch.bind(db) };
-    const binding = { send: send.bind(email) };
+    const boundSend = send.bind(email);
     const input = record(
       options.catalog,
       "deadlineMs,maxBytes,maxKeys,origin,predecessor,release,version",
@@ -217,7 +217,17 @@ export async function runFollowDigestRelease(options = {}) {
     const result = await createOwnedFollowDigestRuntime({
       enabled: true,
       db: database,
-      email: binding,
+      email: {
+        send: (message) => {
+          // After the final policy sample and adapter validation, immediately hand off.
+          check();
+          return boundSend(message);
+        },
+      },
+      beforeAcquire: () => {
+        check();
+        return true;
+      },
       policy,
       key,
       catalog: current.catalog.valid,

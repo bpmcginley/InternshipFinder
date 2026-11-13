@@ -5,6 +5,7 @@ import { runFollowDigestRelease as run } from "../src/follow-digest-release.js";
 import { followSnapshotDigest } from "../src/follow-matching.js";
 import { requestFollow, mintFollowToken, confirmFollow } from "../src/follows.js";
 import { enqueueFollowSnapshot } from "../src/follow-enqueue.js";
+import { acquireFollowDeliveryOwner } from "../src/follow-delivery-owner.js";
 
 const origin = "https://internscout.org",
   hour = 3600000;
@@ -434,5 +435,128 @@ it("closed policy remains delegated before owner after catalog acquisition", asy
   f.policy.sending = false;
   expect(await run(f.options)).toEqual({ status: "disabled" });
   expect(f.gets).toEqual([f.priorUrl, f.currentUrl]);
+  expect(await owner()).toEqual(before);
+});
+it.each(["wall", "mono"])("late owner read cannot admit acquisition (%s)", async (clock) => {
+  const f = await fixture();
+  const before = await owner();
+  const queueBefore = await env.DB.prepare("SELECT * FROM follow_digest_outbox").all();
+  let ownerReads = 0,
+    ownerBatches = 0;
+  const wrapped = {
+    prepare(sql) {
+      const statement = env.DB.prepare(sql);
+      if (sql !== "SELECT * FROM follow_delivery_owner WHERE singleton=1") return statement;
+      return {
+        async first() {
+          ownerReads++;
+          const row = await statement.first();
+          f.move(clock === "wall" ? 10000 : 0, clock === "mono" ? 10000 : 0);
+          return row;
+        },
+      };
+    },
+    batch(statements) {
+      ownerBatches++;
+      return env.DB.batch(statements);
+    },
+  };
+  expect(await run({ ...f.options, db: wrapped })).toEqual({ status: "unavailable" });
+  expect(ownerReads).toBe(1);
+  expect(f.messages).toHaveLength(0);
+  expect(f.gets).toEqual([f.priorUrl, f.currentUrl]);
+  expect(ownerBatches).toBe(0);
+  expect(await owner()).toEqual(before);
+  expect((await env.DB.prepare("SELECT * FROM follow_digest_outbox").all()).results).toEqual(
+    queueBefore.results,
+  );
+  expect(await env.DB.prepare("SELECT count(*) AS n FROM follow_send_budget").first("n")).toBe(0);
+  expect(await env.DB.prepare("SELECT state FROM follow_digest_outbox").first("state")).toBe(
+    "queued",
+  );
+});
+
+it("deadline crossing during final handoff policy read cannot send", async () => {
+  const f = await fixture();
+  let finalRead = false,
+    postReadPolicySamples = 0,
+    tokensAtFence;
+  const originals = new WeakMap();
+  function statement(raw, sql) {
+    const wrapped = {
+      bind: (...args) => statement(raw.bind(...args), sql),
+      first: (...args) => raw.first(...args),
+      all: (...args) => raw.all(...args),
+      run: (...args) => raw.run(...args),
+    };
+    originals.set(wrapped, { raw, sql });
+    return wrapped;
+  }
+  const db = {
+    prepare(sql) {
+      return statement(env.DB.prepare(sql), sql);
+    },
+    async batch(statements) {
+      const owned = statements.map((s) => originals.get(s));
+      const rows = await env.DB.batch(owned.map((s) => s.raw));
+      if (
+        owned.some((s) =>
+          s.sql.startsWith(
+            "SELECT follow_digest_outbox.lease_until,follow_digest_outbox.expires_at",
+          ),
+        )
+      ) {
+        expect(rows).toHaveLength(1);
+        expect(rows[0].results).toHaveLength(1);
+        tokensAtFence = (
+          await env.DB.prepare("SELECT * FROM follow_tokens ORDER BY token_hash").all()
+        ).results;
+        finalRead = true;
+      }
+      return rows;
+    },
+  };
+  const policy = () => {
+    if (finalRead && ++postReadPolicySamples === 2) f.move(0, 10000);
+    return f.policy;
+  };
+  expect(await run({ ...f.options, db, policy })).toEqual({ status: "unavailable" });
+  expect(finalRead).toBe(true);
+  expect(postReadPolicySamples).toBeGreaterThanOrEqual(2);
+  expect(tokensAtFence.length).toBeGreaterThan(0);
+  expect(
+    (await env.DB.prepare("SELECT * FROM follow_tokens ORDER BY token_hash").all()).results,
+  ).toEqual(tokensAtFence);
+  expect(await env.DB.prepare("SELECT attempts FROM follow_send_budget").first("attempts")).toBe(1);
+  expect(await env.DB.prepare("SELECT state FROM follow_digest_outbox").first("state")).toBe(
+    "attempting",
+  );
+  expect((await owner()).phase).toBe("held");
+  expect(f.messages).toHaveLength(0);
+});
+
+it("owner admission requires literal synchronous true without mutating on refusal", async () => {
+  const before = await owner();
+  let batches = 0;
+  const db = {
+    prepare: (sql) => env.DB.prepare(sql),
+    batch: (statements) => {
+      batches++;
+      return env.DB.batch(statements);
+    },
+  };
+  for (const guard of [
+    () => false,
+    () => undefined,
+    () => {
+      throw Error("closed");
+    },
+    async () => true,
+    async () => {
+      throw Error("closed");
+    },
+  ])
+    expect(await acquireFollowDeliveryOwner(db, guard)).toEqual({ status: "unavailable" });
+  expect(batches).toBe(0);
   expect(await owner()).toEqual(before);
 });
