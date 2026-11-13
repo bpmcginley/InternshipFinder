@@ -52,6 +52,9 @@ it("keeps the exact scheduled branch off or unavailable without falling through"
       Promise.all(run({ ...bindings, FOLLOW_MAINTENANCE_POLICY: malformed })),
     ).resolves.toEqual([{ status: "unavailable" }]);
   }
+  for (const mismatch of [undefined, "", "14 2 * * *"]) {
+    expect(run({ ...bindings, FOLLOW_MAINTENANCE_CRON: mismatch })).toEqual([]);
+  }
   expect(read).not.toHaveBeenCalled();
 });
 
@@ -167,4 +170,28 @@ it("reports a partial pass when the binding call budget cannot admit another pag
   expect(
     prepare.mock.calls.some(([sql]) => sql === "SELECT strftime('%Y-%m-%dT%H:%M:%fZ','now') AS at"),
   ).toBe(false);
+});
+
+it("does not admit the digest mutation after its database clock read spends the deadline", async () => {
+  await reset(env.DB);
+  let time = 0;
+  const batch = vi.fn((statements) => env.DB.batch(statements));
+  const db = {
+    batch,
+    prepare(sql) {
+      const statement = env.DB.prepare(sql);
+      if (!sql.startsWith("SELECT strftime(")) return statement;
+      return {
+        async all() {
+          const result = await statement.all();
+          time = 30000;
+          return result;
+        },
+      };
+    },
+  };
+  await expect(runFollowScheduledMaintenance(db, policy, () => time)).resolves.toEqual({
+    status: "partial",
+  });
+  expect(batch).toHaveBeenCalledTimes(4);
 });

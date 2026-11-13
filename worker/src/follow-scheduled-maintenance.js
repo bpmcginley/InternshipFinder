@@ -30,16 +30,44 @@ export async function runFollowScheduledMaintenance(db, rawPolicy, now = () => p
       latest = sample;
       return sample - start < deadlineMs;
     };
+    let remainingCalls = maxD1Calls;
+    let exhausted = false;
+    const admit = () => {
+      if (remainingCalls === 0 || !hasTime()) {
+        exhausted = true;
+        throw new Error("Maintenance budget exhausted");
+      }
+      remainingCalls--;
+    };
+    // The digest page reads D1 time before its batch. Fence both calls, including after that await.
+    const budgetedDb = {
+      prepare(sql) {
+        const statement = db.prepare(sql);
+        return sql.startsWith("SELECT strftime(")
+          ? {
+              all: () => {
+                admit();
+                return statement.all();
+              },
+            }
+          : statement;
+      },
+      batch(statements) {
+        admit();
+        return db.batch(statements);
+      },
+    };
     const page = { enabled: true, maxRows };
     const lanes = [
-      (cursor) => expireFollowPage(db, { ...page, kind: "confirmation", cursor }),
-      (cursor) => expireFollowPage(db, { ...page, kind: "tokens", cursor }),
-      (cursor) => expireFollowUnconfirmedPage(db, { ...page, cursor }),
-      (cursor) => expireFollowOrphanPage(db, { ...page, maxRows: 1, maxChildren: maxRows, cursor }),
-      (cursor) => expireFollowDigestPage(db, { ...page, maxRows: 1, cursor }),
-      (cursor) => expireFollowPage(db, { ...page, kind: "digest-days", cursor }),
+      (cursor) => expireFollowPage(budgetedDb, { ...page, kind: "confirmation", cursor }),
+      (cursor) => expireFollowPage(budgetedDb, { ...page, kind: "tokens", cursor }),
+      (cursor) => expireFollowUnconfirmedPage(budgetedDb, { ...page, cursor }),
+      (cursor) =>
+        expireFollowOrphanPage(budgetedDb, { ...page, maxRows: 1, maxChildren: maxRows, cursor }),
+      (cursor) => expireFollowDigestPage(budgetedDb, { ...page, maxRows: 1, cursor }),
+      (cursor) => expireFollowPage(budgetedDb, { ...page, kind: "digest-days", cursor }),
       async () => {
-        const result = await expireFollowManagementRequests(db, page);
+        const result = await expireFollowManagementRequests(budgetedDb, page);
         return {
           ...result,
           complete: result.status === "maintained" && result.removed < maxRows,
@@ -49,7 +77,6 @@ export async function runFollowScheduledMaintenance(db, rawPolicy, now = () => p
     ].map((run) => ({ run, complete: false, next: null }));
     const [, tokens, scopes, orphans, digests] = lanes;
 
-    let remainingCalls = maxD1Calls;
     while (remainingCalls > 0) {
       for (const lane of lanes) {
         if (lane.complete) continue;
@@ -57,8 +84,8 @@ export async function runFollowScheduledMaintenance(db, rawPolicy, now = () => p
           continue;
         const cost = lane === digests ? 2 : 1;
         if (remainingCalls < cost || !hasTime()) return { status: "partial" };
-        remainingCalls -= cost;
         const result = await lane.run(lane.next);
+        if (exhausted) return { status: "partial" };
         if (result.status !== "maintained") return { status: "unavailable" };
         if (!hasTime()) return { status: "partial" };
         lane.complete = result.complete;
