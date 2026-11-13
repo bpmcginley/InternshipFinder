@@ -786,11 +786,20 @@ export async function handle(request, env, ctx, deps = {}) {
   return res;
 }
 
+const digestPromiseThen = Promise.prototype.then;
+const digestPromiseSpecies = Object.getOwnPropertyDescriptor(Promise, Symbol.species)?.get;
+
 function discardDigestPromise(value) {
-  try { Promise.prototype.then.call(value, undefined, () => {}); } catch { /* Not a native promise. */ }
+  // Observe accidental ordinary async returns without consulting caller-defined species.
+  if (!value || Object.getPrototypeOf(value) !== Promise.prototype ||
+      Object.hasOwn(value, "constructor") ||
+      Object.getOwnPropertyDescriptor(Promise.prototype, "constructor")?.value !== Promise ||
+      Object.getOwnPropertyDescriptor(Promise, Symbol.species)?.get !== digestPromiseSpecies) return;
+  try { Reflect.apply(digestPromiseThen, value, [undefined, () => {}]); } catch { /* Not a native promise. */ }
 }
 
-// Trusted code dependency only. The default export supplies no digest authority.
+// Trusted synchronous dependency. The caller supplies an already platform-validated cron.
+// The default export supplies no digest authority.
 function scheduleFollowDigest(event, ctx, deps) {
   try {
     const slot = Object.getOwnPropertyDescriptor(deps, "followDigest");

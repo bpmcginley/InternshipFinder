@@ -295,6 +295,36 @@ it("invalid and rejecting synchronous supplier outputs enqueue nothing and inspe
   expect(await budget()).toBe(0);
 });
 
+it("rejects exotic promises without invoking a constructor or species getter", async () => {
+  const read = vi.fn(() => {
+    throw Error("private");
+  });
+  class SuppliedPromise extends Promise {
+    static get [Symbol.species]() {
+      return read();
+    }
+  }
+  const exotic = Object.defineProperty(Promise.reject(Error("synthetic")), "constructor", {
+    configurable: true,
+    get: read,
+  });
+  // The supplier owns exotic rejections. Attach a handler without invoking its getter.
+  const handleOwned = (value) => {
+    const constructor = Object.getOwnPropertyDescriptor(value, "constructor");
+    Object.defineProperty(value, "constructor", { configurable: true, value: Promise });
+    const handled = Reflect.apply(Promise.prototype.then, value, [undefined, () => {}]);
+    if (constructor) Object.defineProperty(value, "constructor", constructor);
+    else delete value.constructor;
+    return handled;
+  };
+  const subclass = new SuppliedPromise((_, reject) => reject(Error("synthetic")));
+  const handled = [handleOwned(exotic), handleOwned(subclass)];
+  for (const value of [exotic, subclass]) expect(invoke(selected(() => value))).toEqual([]);
+  await Promise.all(handled);
+  expect(read).not.toHaveBeenCalled();
+  expect(await budget()).toBe(0);
+});
+
 it("all earlier cron branches and disabled archive matches retain priority", async () => {
   vi.stubGlobal("fetch", () => {
     throw Error("unexpected outbound request");
