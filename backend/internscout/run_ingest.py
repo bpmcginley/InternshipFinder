@@ -255,7 +255,7 @@ def scan_boards(
     return out
 
 
-def main():
+def main(argv=None, *, follow_capture=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--lists", action="store_true", help="GitHub lists only")
     ap.add_argument("--ats", action="store_true", help="registered ATS boards only")
@@ -270,7 +270,7 @@ def main():
         metavar="PATH",
         help="write ingestion counts (defaults to export directory when exporting)",
     )
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
     metrics = IngestMetrics()
     raw: list[dict] = []
@@ -337,7 +337,8 @@ def main():
             f"{ {a: len(b) for a, b in reg.items()} }"
         )
 
-    run(raw, completed_boards=completed_boards, metrics=metrics)
+    follow_options = {} if follow_capture is None else {"follow_capture": follow_capture}
+    run(raw, completed_boards=completed_boards, metrics=metrics, **follow_options)
     save_cache()
     if args.export:
         from .export_static import export
@@ -354,7 +355,10 @@ def main():
             if raw_item.get(key)
         }
         exported = export(
-            args.export, completed_boards=completed_boards, observed_urls=observed_urls
+            args.export,
+            completed_boards=completed_boards,
+            observed_urls=observed_urls,
+            **follow_options,
         )
         metrics.export_result(exported["total"], open_count=exported["open"], held=exported["held"])
     metrics_path = args.metrics or (
