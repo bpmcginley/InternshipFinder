@@ -484,3 +484,106 @@ it("reports partial on an uncovered scope without advancing its watermark", asyn
       .first("watermark"),
   ).toBe(earlier);
 });
+async function emptySnapshot(f) {
+  const manifest = JSON.parse(f.files.get(indexUrl));
+  const prior = `${origin}/data/follows/${manifest.latest}.json`;
+  const snapshot = JSON.parse(f.files.get(prior));
+  snapshot.roles = [];
+  const wire = JSON.stringify(snapshot),
+    digest = await followSnapshotDigest(encode(wire));
+  manifest.latest = digest;
+  manifest.entries[0].sha256 = digest;
+  manifest.entries[0].bytes = encode(wire).length;
+  f.files.set(`${origin}/data/follows/${digest}.json`, wire);
+  const index = JSON.stringify(manifest);
+  f.files.set(indexUrl, index);
+  f.options.archive.indexSha256 = await followSnapshotDigest(encode(index));
+}
+it("distinguishes acknowledged empty-window advancement from a later empty result", async () => {
+  const f = await fixture(1);
+  await emptySnapshot(f);
+  expect(await runFollowArchiveRelease(f.options)).toMatchObject({
+    status: "pass-complete",
+    counts: { advanced: 1 },
+    statements: 5,
+  });
+  expect(await f.jobs()).toEqual([]);
+  expect(await runFollowArchiveRelease(f.options)).toMatchObject({
+    status: "pass-complete",
+    counts: { empty: 1 },
+  });
+});
+it.each([false, true])(
+  "keeps confirmed zero-row queued/empty CAS partial (empty=%s)",
+  async (empty) => {
+    const f = await fixture(1);
+    if (empty) await emptySnapshot(f);
+    f.options.db = {
+      prepare: (sql) => env.DB.prepare(sql),
+      batch: async (list) => {
+        await env.DB.prepare("DELETE FROM follow_subscriptions WHERE subscriber_id=?")
+          .bind(f.ids[0])
+          .run();
+        return env.DB.batch(list);
+      },
+    };
+    expect(await runFollowArchiveRelease(f.options)).toMatchObject({
+      status: "partial",
+      pages: 1,
+      counts: { conflict: 1 },
+    });
+    expect(await f.jobs()).toEqual([]);
+  },
+);
+it.each(["malformed", "substituted", "sparse", "changes", "empty"])(
+  "withholds acknowledgement for %s downstream queue receipt",
+  async (kind) => {
+    const f = await fixture();
+    let writes = 0;
+    f.options.db = {
+      prepare: (sql) => env.DB.prepare(sql),
+      batch: async (list) => {
+        writes++;
+        const rows = await env.DB.batch(list);
+        if (kind === "malformed") rows[3].results = [{ id: 1 }];
+        if (kind === "substituted")
+          rows[3].results = [{ id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" }];
+        if (kind === "sparse") delete rows[2];
+        if (kind === "changes") rows[2].meta.changes = 0;
+        if (kind === "empty") rows[3].results = [];
+        return rows;
+      },
+    };
+    expect(await runFollowArchiveRelease(f.options)).toMatchObject({
+      status: "unavailable",
+      pages: 0,
+      subscribers: 0,
+    });
+    expect(writes).toBe(1);
+    expect((await f.jobs()).length).toBe(1);
+  },
+);
+it("withholds ambiguous no-match progress receipt after an actual advance", async () => {
+  const f = await fixture(1);
+  await emptySnapshot(f);
+  f.options.db = {
+    prepare: (sql) => env.DB.prepare(sql),
+    batch: async (list) => {
+      const rows = await env.DB.batch(list);
+      rows[1].success = false;
+      return rows;
+    },
+  };
+  expect(await runFollowArchiveRelease(f.options)).toMatchObject({
+    status: "unavailable",
+    pages: 0,
+    subscribers: 0,
+  });
+  expect(await f.jobs()).toEqual([]);
+  const manifest = JSON.parse(f.files.get(indexUrl));
+  expect(
+    await env.DB.prepare("SELECT watermark FROM follow_scope_progress WHERE subscriber_id=?")
+      .bind(f.ids[0])
+      .first("watermark"),
+  ).toBe(manifest.high_water);
+});

@@ -165,10 +165,10 @@ export async function runFollowArchiveRelease(options = {}) {
       return get(...args);
     };
     const originals = new WeakMap();
-    function statement(raw) {
+    function statement(raw, sql, parameters = []) {
       const wrapped = {
         bind(...args) {
-          return statement(raw.bind(...args));
+          return statement(raw.bind(...args), sql, args);
         },
         async all() {
           charge(1);
@@ -183,16 +183,17 @@ export async function runFollowArchiveRelease(options = {}) {
           return value;
         },
       };
-      originals.set(wrapped, raw);
+      originals.set(wrapped, { raw, sql, parameters });
       return wrapped;
     }
     const database = {
       prepare(sql) {
         check();
-        return statement(prepare(sql));
+        return statement(prepare(sql), sql);
       },
       async batch(list) {
-        const raw = list.map((item) => originals.get(item) ?? fail());
+        const owned = list.map((item) => originals.get(item) ?? fail());
+        const raw = owned.map((item) => item.raw);
         // Existing 0025 empty view admits this whole atomic batch at DB UTC.
         // It retains no release data; an already-admitted transaction completes atomically.
         const cutoff = Math.floor(
@@ -212,7 +213,42 @@ export async function runFollowArchiveRelease(options = {}) {
           copied.push(receipt(d.value));
         }
         if (copied[0].meta.changes !== 0 || copied[0].results.length !== 0) fail();
-        return copied.slice(1);
+        const downstream = copied.slice(1);
+        if (downstream.length === 1) {
+          // Empty-window progress can advance several bounded scopes, or CAS zero.
+          if (
+            !owned[0].sql.includes("UPDATE follow_scope_progress") ||
+            downstream[0].results.length ||
+            downstream[0].meta.changes > limits.maxFollows
+          )
+            fail();
+        } else if (downstream.length === 3) {
+          const [job, pending, selected] = downstream;
+          if (
+            !owned[0].sql.includes("INSERT INTO follow_digest_outbox") ||
+            !owned[1].sql.startsWith("INSERT INTO follow_pending_progress") ||
+            !owned[2].sql.startsWith("SELECT o.id FROM follow_digest_outbox") ||
+            job.results.length ||
+            pending.results.length ||
+            job.meta.changes > 1 ||
+            pending.meta.changes !== job.meta.changes ||
+            selected.meta.changes !== 0 ||
+            selected.results.length > 1 ||
+            (job.meta.changes === 1 && selected.results.length !== 1)
+          )
+            fail();
+          if (selected.results.length) {
+            const row = selected.results[0];
+            if (
+              Object.keys(row).join(",") !== "id" ||
+              typeof row.id !== "string" ||
+              !/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/.test(row.id) ||
+              (job.meta.changes === 1 && row.id !== owned[0].parameters[1])
+            )
+              fail();
+          }
+        } else fail();
+        return downstream;
       },
     };
     const loaded = await loadFollowCatalog({
