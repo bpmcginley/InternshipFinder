@@ -448,3 +448,147 @@ test("absolute deadline rejects immediate responses after clock advance before t
     assert.equal(calls, delayedCall);
   }
 });
+
+test("optional manifest pin requires a primitive lowercase digest before I/O", () => {
+  let calls = 0;
+  for (const indexSha256 of [
+    null,
+    false,
+    1,
+    {},
+    new String("a".repeat(64)),
+    "",
+    "A".repeat(64),
+    "a".repeat(63),
+    "a".repeat(65),
+  ]) {
+    assert.throws(() =>
+      setup({
+        indexSha256,
+        fetch: async () => {
+          calls++;
+        },
+      }),
+    );
+  }
+  assert.equal(calls, 0);
+});
+
+test("a newly pinned forward manifest still serves the exact older queued snapshot", async () => {
+  const snapshot = JSON.parse(fixture.files[`data/follows/${latest.sha256}.json`]);
+  snapshot.generated_at = "2028-01-03T23:59:00.000Z";
+  snapshot.covers_after = "2027-12-31T23:59:00.000Z";
+  const body = JSON.stringify(snapshot),
+    bytes = enc.encode(body);
+  const next = {
+    ...latest,
+    bytes: bytes.length,
+    generated_at: snapshot.generated_at,
+    enqueue_until: "2028-01-04T23:59:00.000Z",
+    retain_until: "2028-01-07T23:59:00.000Z",
+    sha256: await followSnapshotDigest(bytes),
+  };
+  const raw = canonical({
+    ...initial,
+    checked_at: next.generated_at,
+    high_water: next.generated_at,
+    entries: [...initial.entries, next],
+    latest: next.sha256,
+  });
+  const s = setup({ indexSha256: await followSnapshotDigest(enc.encode(raw)) });
+  s.files[indexPath] = raw;
+  s.files[`data/follows/${next.sha256}.json`] = body;
+  s.at("2028-01-04T00:00:00.000Z");
+  const current = await s.reader.latestSnapshot();
+  assert.equal(current.status, "ready");
+  assert.equal(current.digest, next.sha256);
+  assert.equal(
+    new TextDecoder().decode(await s.reader.loadSnapshot(pin(older))),
+    fixture.files[`data/follows/${older.sha256}.json`],
+  );
+  assert.equal(s.calls.length, 4);
+});
+
+test("a coherent mutable-index rollback mismatches the pin before parse or any blob GET", async (t) => {
+  const indexSha256 = await followSnapshotDigest(enc.encode(fixture.files[indexPath]));
+  const rollback = canonical({
+    ...initial,
+    entries: [older],
+    latest: older.sha256,
+    high_water: older.generated_at,
+  });
+  const s = setup({ indexSha256 });
+  s.files[indexPath] = rollback;
+  let parses = 0;
+  t.mock.method(JSON, "parse", () => {
+    parses++;
+    throw new Error("Unexpected parse");
+  });
+  assert.deepEqual(await s.reader.latest({ effectiveLower: lower }), { status: "unavailable" });
+  assert.deepEqual(await s.reader.latestSnapshot(), { status: "unavailable" });
+  assert.equal(await s.reader.loadSnapshot(pin(older)), null);
+  assert.equal(parses, 0);
+  assert.deepEqual(
+    s.calls.map((c) => c.url),
+    [indexUrl, indexUrl, indexUrl],
+  );
+});
+
+test("a correct raw pin does not bypass manifest byte, canonical or original cutoff bounds", async () => {
+  for (const change of [(raw) => raw + "\n", (raw) => raw.repeat(5)]) {
+    const raw = change(fixture.files[indexPath]);
+    const s = setup({ indexSha256: await followSnapshotDigest(enc.encode(raw)) });
+    s.files[indexPath] = raw;
+    assert.equal(await s.reader.loadSnapshot(pin(older)), null);
+    assert.equal(s.calls.length, 1);
+  }
+  const s = setup({
+    indexSha256: await followSnapshotDigest(enc.encode(fixture.files[indexPath])),
+  });
+  s.at(latest.enqueue_until);
+  assert.deepEqual(await s.reader.latestSnapshot(), { status: "unavailable" });
+  assert(await s.reader.loadSnapshot(pin(older)));
+  s.at(older.retain_until);
+  assert.equal(await s.reader.loadSnapshot(pin(older)), null);
+});
+
+test("manifest hashing that reaches the absolute deadline cannot parse or fetch a blob", async (t) => {
+  const indexSha256 = await followSnapshotDigest(enc.encode(fixture.files[indexPath]));
+  let time = Date.parse("2028-01-03T00:00:00.000Z");
+  const digest = crypto.subtle.digest.bind(crypto.subtle);
+  const s = setup({ indexSha256, clock: () => new Date(time) });
+  t.mock.method(crypto.subtle, "digest", async (...args) => {
+    const result = await digest(...args);
+    time += bounds.deadlineMs;
+    return result;
+  });
+  assert.equal(await s.reader.loadSnapshot(pin(older)), null);
+  assert.deepEqual(
+    s.calls.map((c) => c.url),
+    [indexUrl],
+  );
+});
+
+test("timeout during noncooperative manifest hashing never starts a late blob request", async (t) => {
+  const indexSha256 = await followSnapshotDigest(enc.encode(fixture.files[indexPath]));
+  const bytes = Uint8Array.from(indexSha256.match(/../g), (h) => parseInt(h, 16));
+  let release;
+  t.mock.method(
+    crypto.subtle,
+    "digest",
+    () =>
+      new Promise((resolve) => {
+        release = resolve;
+      }),
+  );
+  const s = setup({ indexSha256, bounds: { ...bounds, deadlineMs: 15 } });
+  assert.deepEqual(await s.reader.latestSnapshot(), { status: "unavailable" });
+  assert.equal(typeof release, "function");
+  assert(s.calls[0].signal.aborted);
+  release(bytes.buffer);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.deepEqual(
+    s.calls.map((c) => c.url),
+    [indexUrl],
+  );
+});
