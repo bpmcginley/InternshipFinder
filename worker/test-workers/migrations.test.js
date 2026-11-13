@@ -43,6 +43,7 @@ const migrationNames = [
   "0030_topup_history_coverage.sql",
   "0031_follow_delivery_owner.sql",
   "0032_follow_finalize_attempt_cost.sql",
+  "0033_follow_digest_expiry_candidates.sql",
 ];
 const legacySql = [...env.TEST_SCHEMA_SQL, ...env.TEST_EXTRA_SCHEMA_SQL];
 const databases = [env.LEGACY_DB, env.MIGRATION_DB];
@@ -115,7 +116,7 @@ it("migrations create the complete legacy schema, including constraints and trig
   const expected = await schema(env.LEGACY_DB);
   expect(await schema(env.MIGRATION_DB)).toEqual(expected);
   expect(expected.objects.filter((row) => row.type === "table")).toHaveLength(68);
-  expect(expected.objects.filter((row) => row.type === "index")).toHaveLength(39);
+  expect(expected.objects.filter((row) => row.type === "index")).toHaveLength(41);
   expect(expected.objects.filter((row) => row.type === "trigger")).toHaveLength(20);
   expect(expected.objects.filter((row) => row.type === "view")).toHaveLength(4);
   expect(await ledger()).toEqual(migrationNames.map((name) => ({ name })));

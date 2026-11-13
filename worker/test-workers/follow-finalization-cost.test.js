@@ -120,7 +120,8 @@ it("0032 replaces the existing trigger and bounds reads with unrelated pending j
   await applyD1Migrations(env.DB, [latest]);
   const result = await complete(env.DB, "uncertain");
   expect(result.meta.rows_read).toBeLessThan(10000);
-  expect(result.meta.rows_written).toBeLessThanOrEqual(scopeCount + 3);
+  // State changes also maintain the expiry index introduced in 0033.
+  expect(result.meta.rows_written).toBeLessThanOrEqual(scopeCount + 4);
   expect(
     await env.DB.prepare("SELECT count(*) AS total FROM follow_pending_progress").first("total"),
   ).toBe(2000);
@@ -149,7 +150,7 @@ it.each([
   const result = await complete(env.DB, state);
   expect(result.success).toBe(true);
   expect(result.meta.rows_read).toBeLessThan(10000);
-  expect(result.meta.rows_written).toBeLessThanOrEqual(scopeCount + 3);
+  expect(result.meta.rows_written).toBeLessThanOrEqual(scopeCount + 4);
   await verify(env.DB, expected, state);
 });
 
