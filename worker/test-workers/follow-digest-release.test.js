@@ -6,6 +6,7 @@ import { followSnapshotDigest } from "../src/follow-matching.js";
 import { requestFollow, mintFollowToken, confirmFollow } from "../src/follows.js";
 import { enqueueFollowSnapshot } from "../src/follow-enqueue.js";
 import { acquireFollowDeliveryOwner } from "../src/follow-delivery-owner.js";
+import { createOwnedFollowDigestRuntime } from "../src/follow-owned-digest-runtime.js";
 
 const origin = "https://internscout.org",
   hour = 3600000;
@@ -559,4 +560,216 @@ it("owner admission requires literal synchronous true without mutating on refusa
     expect(await acquireFollowDeliveryOwner(db, guard)).toEqual({ status: "unavailable" });
   expect(batches).toBe(0);
   expect(await owner()).toEqual(before);
+});
+const DB_NOW_MS = "CAST(round((julianday('now')-2440587.5)*86400000) AS INTEGER)";
+const OWNER_UPDATE =
+  "UPDATE follow_delivery_owner SET phase='running',generation=? WHERE singleton=1 AND version=1 AND phase='ready' AND generation=?";
+function tracedDatabase(onBatch) {
+  const values = new WeakMap();
+  const wrap = (sql, args = []) => {
+    const raw = env.DB.prepare(sql).bind(...args);
+    const statement = {
+      bind: (...bound) => wrap(sql, bound),
+      first: (...a) => raw.first(...a),
+      all: (...a) => raw.all(...a),
+      run: (...a) => raw.run(...a),
+    };
+    values.set(statement, { raw, sql, args });
+    return statement;
+  };
+  return {
+    prepare: (sql) => wrap(sql),
+    batch: (statements) => onBatch(statements.map((s) => values.get(s))),
+  };
+}
+
+it("timely submitted owner batch arriving after SQLite cutoff leaves all state unchanged", async () => {
+  const f = await fixture(true),
+    before = await owner();
+  const queue = (await env.DB.prepare("SELECT * FROM follow_digest_outbox").all()).results;
+  f.options.now = Date.now;
+  const cutoff = Date.now() + 3000;
+  f.options.catalog.release.expiresAt = cutoff;
+  let calls = 0;
+  f.options.db = tracedDatabase(async (statements) => {
+    calls++;
+    expect(statements).toHaveLength(2);
+    expect(statements[0].sql).toBe(`${OWNER_UPDATE} AND ?>${DB_NOW_MS}`);
+    expect(statements[0].args[2]).toBe(cutoff);
+    expect(Date.now()).toBeLessThan(cutoff);
+    await new Promise((resolve) => setTimeout(resolve, Math.max(0, cutoff + 50 - Date.now())));
+    expect(await env.DB.prepare(`SELECT ${DB_NOW_MS} AS now`).first("now")).toBeGreaterThanOrEqual(
+      cutoff,
+    );
+    const rows = await env.DB.batch(statements.map((s) => s.raw));
+    expect(rows[0].meta.changes).toBe(0);
+    expect(rows[1].results).toEqual([]);
+    return rows;
+  });
+  expect(await run(f.options)).toEqual({ status: "unavailable" });
+  expect(calls).toBe(1);
+  expect(await owner()).toEqual(before);
+  expect((await env.DB.prepare("SELECT * FROM follow_digest_outbox").all()).results).toEqual(queue);
+  expect(await env.DB.prepare("SELECT count(*) n FROM follow_send_budget").first("n")).toBe(0);
+  expect(f.messages).toHaveLength(0);
+}, 15000);
+
+it.each(["lost", "late"])(
+  "already admitted owner retains %s acknowledgement uncertainty",
+  async (ack) => {
+    const f = await fixture(true),
+      before = await owner();
+    const queue = (await env.DB.prepare("SELECT * FROM follow_digest_outbox").all()).results;
+    let calls = 0;
+    f.options.db = tracedDatabase(async (statements) => {
+      calls++;
+      const rows = await env.DB.batch(statements.map((s) => s.raw));
+      expect(rows[0].meta.changes).toBe(1);
+      if (ack === "lost") throw Error("synthetic lost acknowledgement");
+      f.move(0, 10000);
+      return rows;
+    });
+    expect(await run(f.options)).toEqual({ status: "unavailable" });
+    expect(calls).toBe(1);
+    const after = await owner();
+    expect(after.generation).not.toBe(before.generation);
+    expect(after.phase).toBe(ack === "lost" ? "running" : "held");
+    expect((await env.DB.prepare("SELECT * FROM follow_digest_outbox").all()).results).toEqual(
+      queue,
+    );
+    expect(await env.DB.prepare("SELECT count(*) n FROM follow_send_budget").first("n")).toBe(0);
+    expect(f.messages).toHaveLength(0);
+  },
+);
+
+it("fixed cutoff accounts for input and catalog monotonic delay without extension", async () => {
+  const f = await fixture(true),
+    start = f.options.now(),
+    originalKey = f.options.key;
+  Object.defineProperty(f.options, "key", {
+    get() {
+      f.move(0, 4000);
+      return originalKey;
+    },
+  });
+  const fetch = f.options.fetch;
+  f.options.fetch = async (...a) => {
+    const response = await fetch(...a);
+    if (a[0] === f.currentUrl) f.move(0, 4000.5);
+    return response;
+  };
+  let cutoff;
+  f.options.db = tracedDatabase(async (statements) => {
+    if (statements[0].sql.startsWith(OWNER_UPDATE)) cutoff = statements[0].args[2];
+    return env.DB.batch(statements.map((s) => s.raw));
+  });
+  expect(await run(f.options)).toEqual({ status: "processed", counts: { accepted: 1 } });
+  expect(cutoff).toBe(start + 1999);
+  expect(f.messages).toHaveLength(1);
+  expect((await owner()).phase).toBe("ready");
+});
+
+it("same-statement SQLite equality refuses acquisition; omitted cutoff keeps exact query", async () => {
+  const before = await owner();
+  let calls = 0;
+  const cutoff = Date.now() + 10000;
+  const db = tracedDatabase(async (statements) => {
+    calls++;
+    expect(statements[0].sql).toBe(`${OWNER_UPDATE} AND ?>${DB_NOW_MS}`);
+    expect(statements[0].args[2]).toBe(cutoff);
+    // Substitute only the bound cutoff with the same native UTC expression. Both
+    // now evaluations are in one SQLite step, proving equality without timer races.
+    const equal = env.DB.prepare(statements[0].sql.replace("AND ?>", `AND ${DB_NOW_MS}>`)).bind(
+      ...statements[0].args.slice(0, 2),
+    );
+    const rows = await env.DB.batch([equal, statements[1].raw]);
+    expect(rows[0].meta.changes).toBe(0);
+    return rows;
+  });
+  expect(await acquireFollowDeliveryOwner(db, undefined, cutoff)).toEqual({
+    status: "unavailable",
+  });
+  expect(calls).toBe(1);
+  expect(await owner()).toEqual(before);
+  const legacy = tracedDatabase(async (statements) => {
+    expect(statements[0].sql).toBe(OWNER_UPDATE);
+    expect(statements[0].args).toHaveLength(2);
+    return env.DB.batch(statements.map((s) => s.raw));
+  });
+  expect((await acquireFollowDeliveryOwner(legacy)).status).toBe("acquired");
+});
+
+it("malformed optional cutoff fails before D1", async () => {
+  let calls = 0;
+  const db = {
+    prepare() {
+      calls++;
+      throw Error();
+    },
+    batch() {
+      calls++;
+      throw Error();
+    },
+  };
+  for (const value of [
+    null,
+    false,
+    0,
+    -1,
+    1.5,
+    Infinity,
+    NaN,
+    Number.MAX_SAFE_INTEGER + 1,
+    "1",
+    {},
+    () => 1,
+  ])
+    expect(await acquireFollowDeliveryOwner(db, undefined, value)).toEqual({
+      status: "unavailable",
+    });
+  expect(calls).toBe(0);
+});
+
+it("runtime cutoff is own data, captured after disabled and sending gates", async () => {
+  const f = await fixture();
+  let reads = 0,
+    calls = 0;
+  const options = {
+    ...f.options,
+    db: {
+      prepare() {
+        calls++;
+        throw Error();
+      },
+      batch() {
+        calls++;
+        throw Error();
+      },
+    },
+    loadSnapshot: async () => {
+      throw Error();
+    },
+  };
+  Object.defineProperty(options, "ownerExpiresAtMs", {
+    enumerable: true,
+    get() {
+      reads++;
+      throw Error();
+    },
+  });
+  options.enabled = false;
+  expect(await createOwnedFollowDigestRuntime(options)()).toEqual({ status: "disabled" });
+  options.enabled = true;
+  f.policy.sending = false;
+  expect(await createOwnedFollowDigestRuntime(options)()).toEqual({ status: "disabled" });
+  f.policy.sending = true;
+  expect(await createOwnedFollowDigestRuntime(options)()).toEqual({ status: "unavailable" });
+  const inherited = Object.assign(Object.create({ ownerExpiresAtMs: Date.now() + 10000 }), {
+    ...f.options,
+    db: options.db,
+    loadSnapshot: options.loadSnapshot,
+  });
+  expect(await createOwnedFollowDigestRuntime(inherited)()).toEqual({ status: "unavailable" });
+  expect(reads).toBe(0);
+  expect(calls).toBe(0);
 });
