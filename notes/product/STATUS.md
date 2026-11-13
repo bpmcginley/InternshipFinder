@@ -1,6 +1,6 @@
 # InternScout product status
 
-Updated: 2026-11-12. Owner: product lead. Instructions: [HANDOFF.md](HANDOFF.md) and [refactor coordination](../refactor/HANDOFF.md).
+Updated: 2026-11-13. Owner: product lead. Instructions: [HANDOFF.md](HANDOFF.md) and [refactor coordination](../refactor/HANDOFF.md).
 
 ## Current position
 
@@ -22,6 +22,18 @@ P-4.1 pilot measurement and the hand-off’s 14-day counter reviews are follow-u
 
 Bounded Follow expiry [#596](https://github.com/bpmcginley/InternshipFinder/pull/596) merged as dormant source at `9aea157e`. [Exact main Tests](https://github.com/bpmcginley/InternshipFinder/actions/runs/43346288158) and [Pages](https://github.com/bpmcginley/InternshipFinder/actions/runs/43346287870) passed. All 5,142 archived files matched the preceding publication, including 141 listing pins. Six live responses matched.
 
+
+### Follow cleanup and publication progress
+
+The fourth qualifying automatic listing delivery published data `871d786284ccda6aab27bb773e5b9dc9a1e87762`. [Writer 43363203164](https://github.com/bpmcginley/InternshipFinder/actions/runs/43363203164) and its [automatic Pages follower 43366735692](https://github.com/bpmcginley/InternshipFinder/actions/runs/43366735692) passed. The three source merges below preserved all 5,148 files and 141 exact listing blobs from that delivery. Five live samples matched for each merge. The production Worker and its database were unchanged by these merges.
+
+| Package | Exact main merge | Tests | Pages and artifact |
+| --- | --- | --- | --- |
+| [#612](https://github.com/bpmcginley/InternshipFinder/pull/612), bounded subscriber maintenance | `21e71400950a02fa4378c708d9f8ab4b0d308594` | [43368079289](https://github.com/bpmcginley/InternshipFinder/actions/runs/43368079289) | [43368079245](https://github.com/bpmcginley/InternshipFinder/actions/runs/43368079245), [14011177843](https://github.com/bpmcginley/InternshipFinder/actions/runs/43368079245/artifacts/14011177843) |
+| [#613](https://github.com/bpmcginley/InternshipFinder/pull/613), default-off maintenance scheduler | `efc42c5cb0531e0e19e36ebb17537859681dc06f` | [43368600608](https://github.com/bpmcginley/InternshipFinder/actions/runs/43368600608) | [43368600451](https://github.com/bpmcginley/InternshipFinder/actions/runs/43368600451), [14011053844](https://github.com/bpmcginley/InternshipFinder/actions/runs/43368600451/artifacts/14011053844) |
+| [#615](https://github.com/bpmcginley/InternshipFinder/pull/615), optional archive index digest pin | `5d68cd4a33364b009379a30c929961115f6e9b18` | [43368960277](https://github.com/bpmcginley/InternshipFinder/actions/runs/43368960277) | [43368960232](https://github.com/bpmcginley/InternshipFinder/actions/runs/43368960232), [14011114266](https://github.com/bpmcginley/InternshipFinder/actions/runs/43368960232/artifacts/14011114266) |
+
+#613 needs a separate explicit cron, enable setting and work limits. It sends no email. Production cadence and capacity, including recovery from repeated partial scans, still need qualification. #615 verifies the raw archive index against a trusted digest when configured. Archive publication and production digest configuration remain pending.
 
 ### November 12 Chrome and Follow offline qualification
 
@@ -582,6 +594,10 @@ The golden harness now covers static assets as well as generated pages. Each sit
 | D | P-2.1au native checkpoint test budget | audit_worker_extension | `codex/product-checkpoint-test-budget` | [#485](https://github.com/bpmcginley/InternshipFinder/pull/485) | Merged as `ae151b70` after exact independent review and hosted checks | 58 native cases pass with a dedicated 15-second test budget after a hosted case exceeded the default five-second limit. Real SQLite expiry assertions, single attempts and the 120-second outer wrapper are unchanged. Coverage and stress evidence tracked in the PR; no production changes. |
 
 ## Waiting for Bruce
+
+- **Follow orphan scan.** [#616](https://github.com/bpmcginley/InternshipFinder/pull/616) extends bounded scans. Independent native review verified the row substitution fix and identified a contradictory receipt that can report progress without deleting anything. Final correction, review and capacity qualification are pending.
+
+- **Follow site and archive publication.** Work in draft [#617](https://github.com/bpmcginley/InternshipFinder/pull/617) will connect the offline planner to a staged site build. The isolated rehearsal of the [#598 planner](https://github.com/bpmcginley/InternshipFinder/pull/598) passed 153 focused tests and rendered all 826 employer page models from the fourth delivery's export. Work in draft [#618](https://github.com/bpmcginley/InternshipFinder/pull/618) will prepare a verified archive in private staging. The production writer, archive and catalog activation remain pending.
 
 - **Follow archive recovery.** Draft [#606](https://github.com/bpmcginley/InternshipFinder/pull/606) at `5823a889` recovered the exact archive after a real two-parent Git retry in an isolated candidate checkout. Fifty adapter tests and [independent review](https://github.com/bpmcginley/InternshipFinder/pull/606#pullrequestreview-5885474815) passed. GitGuardian still flags the branch setup commit that restored an existing file byte for byte. The alert needs classification in the signed-in GitGuardian dashboard. Production witness, restore, writer integration and archive publication remain pending.
 
