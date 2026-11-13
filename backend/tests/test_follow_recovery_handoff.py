@@ -320,3 +320,77 @@ def test_deadline_after_final_observation_withholds_receipt_without_reset(sample
 def test_strict_wire_bounds_precede_observation(sample, handoff, bounds):
     result = handoff[0](**bounds)
     assert result.status == 'held' and sample[1].calls == [] and handoff[1] == []
+
+
+def test_prohibited_initial_git_environment_prevents_first_native_observer(
+    sample, handoff, monkeypatch
+):
+    monkeypatch.setenv('GIT_INDEX_FILE', str(sample[0].parent / 'untrusted-index'))
+    result = handoff[0]()
+    assert result.status == 'held' and result.checkpoint_status == 'not_attempted'
+    assert result.receipt is None and handoff[1] == [] and sample[1].calls == []
+
+
+@pytest.mark.parametrize(
+    'key,value',
+    [
+        ('GIT_INDEX_FILE', 'synthetic-invalid-index'),
+        ('GIT_AUTHOR_NAME', 'Changed fixture identity'),
+    ],
+)
+def test_cas_environment_change_holds_unknown_before_final_observer(
+    sample, handoff, monkeypatch, key, value
+):
+    store = sample[1]
+    original = store.compare_and_set
+
+    def changed(change):
+        result = original(change)
+        monkeypatch.setenv(key, value)
+        return result
+
+    store.compare_and_set = changed
+    result = handoff[0]()
+    assert (
+        result.status == 'held' and result.checkpoint_status == 'unknown' and result.receipt is None
+    )
+    assert store.calls == ['load', 'cas'] and store.state.accepted is not None
+    assert len(handoff[1]) == 1
+
+
+@pytest.mark.parametrize('phase', ['first', 'final'])
+def test_observer_environment_change_withholds_receipt_after_native_read(
+    sample, handoff, monkeypatch, phase
+):
+    run, reads, _, observe = handoff
+
+    def changed():
+        result = observe()
+        if len(reads) == (1 if phase == 'first' else 2):
+            monkeypatch.setenv('GIT_AUTHOR_NAME', 'Changed fixture identity')
+        return result
+
+    result = run(observed=changed)
+    assert result.status == 'held' and result.receipt is None
+    if phase == 'first':
+        assert result.checkpoint_status == 'not_attempted' and sample[1].calls == []
+    else:
+        assert result.checkpoint_status == 'promoted' and sample[1].calls == ['load', 'cas']
+
+
+@pytest.mark.parametrize('port', ['clock', '_monotonic'])
+def test_clock_environment_change_stops_before_further_authority_work(
+    sample, handoff, monkeypatch, port
+):
+    def changed():
+        monkeypatch.setenv('GIT_INDEX_FILE', 'synthetic-invalid-index')
+        return NOW if port == 'clock' else 0
+
+    result = handoff[0](**{port: changed})
+    assert (
+        result.status == 'held'
+        and result.checkpoint_status == 'not_attempted'
+        and result.receipt is None
+    )
+    assert sample[1].calls == []
+    assert len(handoff[1]) == (1 if port == 'clock' else 0)

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime
 import json
 from math import isfinite
+import os
 import re
 from time import monotonic
 
@@ -13,6 +14,7 @@ from internscout.follow_snapshot_source import _utc
 from scripts.follow_detached_recovery import (
     DetachedFollowRecovery,
     _authority,
+    _detached_environment,
     recover_detached_follow,
 )
 from scripts.ingest_data_writer import _PublishedFollowProvenance
@@ -160,13 +162,23 @@ def recover_follow_handoff(
             or not callable(observe_ref)
         ):
             raise ValueError('execution ports required')
+        _detached_environment()
+        environment = {k: v for k, v in os.environ.items() if k.upper().startswith('GIT_')}
+
+        def isolated():
+            _detached_environment()
+            if {k: v for k, v in os.environ.items() if k.upper().startswith('GIT_')} != environment:
+                raise ValueError('detached Git environment changed')
+
         last_mono = float('-inf')
         last_utc = None
         last_observed = selected.observation.observed_at
 
         def check():
             nonlocal last_mono
+            isolated()
             value = _monotonic()
+            isolated()
             if (
                 type(value) not in (int, float)
                 or not isfinite(value)
