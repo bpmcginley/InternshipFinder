@@ -1,0 +1,106 @@
+{
+  "baseline": "5d68cd4a33364b009379a30c929961115f6e9b18",
+  "chrome": "157.0.8103.51",
+  "cases": [
+    {
+      "width": 1280,
+      "theme": "light",
+      "openingPosts": 0,
+      "syntheticActivationPosts": 0,
+      "explicitPosts": 1,
+      "bodyExact": true,
+      "ambientCredentialsAbsent": true,
+      "queryCleared": true,
+      "keyboardSkip": true,
+      "keyboard": true,
+      "noOverflow": true,
+      "reloadDisabled": true
+    },
+    {
+      "width": 1280,
+      "theme": "dark",
+      "openingPosts": 0,
+      "syntheticActivationPosts": 0,
+      "explicitPosts": 1,
+      "bodyExact": true,
+      "ambientCredentialsAbsent": true,
+      "queryCleared": true,
+      "keyboardSkip": true,
+      "keyboard": true,
+      "noOverflow": true,
+      "reloadDisabled": true
+    },
+    {
+      "width": 375,
+      "theme": "light",
+      "openingPosts": 0,
+      "syntheticActivationPosts": 0,
+      "explicitPosts": 1,
+      "bodyExact": true,
+      "ambientCredentialsAbsent": true,
+      "queryCleared": true,
+      "keyboardSkip": true,
+      "keyboard": true,
+      "noOverflow": true,
+      "reloadDisabled": true
+    },
+    {
+      "width": 375,
+      "theme": "dark",
+      "openingPosts": 0,
+      "syntheticActivationPosts": 0,
+      "explicitPosts": 1,
+      "bodyExact": true,
+      "ambientCredentialsAbsent": true,
+      "queryCleared": true,
+      "keyboardSkip": true,
+      "keyboard": true,
+      "noOverflow": true,
+      "reloadDisabled": true
+    }
+  ],
+  "images": [
+    {
+      "name": "before-1280-light.png",
+      "sha256": "6eecb6581216d37a4e3dff7cf5acaee9fa9201482f186b07dbd990896442543a"
+    },
+    {
+      "name": "after-1280-light.png",
+      "sha256": "3cef22880a4e24813fa05586a16fec90330c1dbb39e4f2dac0bc5b0de2f87c7a"
+    },
+    {
+      "name": "before-1280-dark.png",
+      "sha256": "2fe8be26fd9a6b653297b3b899b9c5a29922ae16fbb4a8bb7c2a21c25dfbd30b"
+    },
+    {
+      "name": "after-1280-dark.png",
+      "sha256": "b6a3c9937db5e08a6fb48740adda0737d05c1be72d404344df7025bf6aede26e"
+    },
+    {
+      "name": "before-375-light.png",
+      "sha256": "50974c54e3a84f0e00a1e1cea71282946b3210bf416738c13e63dc276e6b2e6a"
+    },
+    {
+      "name": "after-375-light.png",
+      "sha256": "55fe9ff3b9d955289e30bb6c1ad2babf74b9749dedb00ce424e32eb3618b62a5"
+    },
+    {
+      "name": "before-375-dark.png",
+      "sha256": "6e6068e08e0f99e9e03e934a19799916d86c84f1c984d1a67712509cfc38196a"
+    },
+    {
+      "name": "after-375-dark.png",
+      "sha256": "9f902b4d42cb4a880887e3f0a94e5babb33be097d0b60464c933dbc98654b481"
+    }
+  ],
+  "network": "Only loopback document and explicit synthetic POST; external page requests aborted.",
+  "navigation": {
+    "backDisabled": true,
+    "forwardDisabled": true,
+    "posts": 0
+  },
+  "historyFailure": {
+    "disabled": true,
+    "posts": 0
+  }
+}

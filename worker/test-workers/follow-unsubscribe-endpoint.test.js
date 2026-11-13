@@ -95,7 +95,11 @@ it("actual anonymous HTTP route cascades only the bearer subscriber and preserve
       deps,
     );
   };
-  for (const method of ["GET", "HEAD"]) expect((await call(token, method)).status).toBe(404);
+  const preview = await call(token, "GET");
+  expect(preview.status).toBe(200);
+  expect(preview.headers.get("Cache-Control")).toBe("no-store");
+  expect(await preview.text()).not.toContain(token);
+  expect((await call(token, "HEAD")).status).toBe(404);
   for (const value of [wrong, manage]) expect((await call(value)).status).toBe(204);
   expect((await call(requestOnly)).status).toBe(400);
   expect(await counts()).toEqual(before);
