@@ -74,7 +74,7 @@ export const ROUTES = Object.freeze([
     "site-origin",
     "UTF-8 JSON {email, link, scope}. No query or fragment. Scope is a company key or exact field/state arrays. Explicit link=true requires a current non-refreshing session. Up to 16 KiB and five seconds to read.",
     "Empty no-store 202 for accepted or duplicate signup; 400 invalid, 403 Origin, 415 media type, 503 unavailable, 404 without qualified opt-in.",
-    "FOLLOW_SIGNUP_ENABLED and a current trusted catalog release supplier; no default supplier",
+    "FOLLOW_SIGNUP_ENABLED and a current trusted release from FOLLOW_SIGNUP_RELEASE or the injected supplier",
   ),
   route(
     "GET",
