@@ -260,8 +260,18 @@ for (const first of ["signed delivery", "attached recovery"]) {
       const recovered = await w.send("/billing/topup/recover", "POST");
       assert.equal(recovered.response.status, 200);
       assert.deepEqual(recovered.result, { status: "settled" });
+      assert.equal(await w.count("topup_purchases"), 1);
+      assert.deepEqual(await w.balance(), { available: 25, held: 0, consumed: 0, revoked: 0 });
+      assert.equal(await w.count("stripe_events"), 0, "Recovery grants before signed delivery");
     }
     assert.equal((await w.deliver()).response.status, 200);
+    assert.equal(await w.count("topup_purchases"), 1);
+    assert.deepEqual(await w.balance(), { available: 25, held: 0, consumed: 0, revoked: 0 });
+    assert.equal(
+      await w.count("stripe_events"),
+      1,
+      "First delivery commits before duplicate replay",
+    );
     const beforeRepeat = w.calls.length;
     assert.deepEqual((await w.deliver()).result, { ok: true, repeat: true });
     assert.equal(w.calls.length, beforeRepeat);
