@@ -1,6 +1,11 @@
 // Dormant send-free scan. The caller resumes each kind and resets after a complete pass.
 const unavailable = () => ({ status: "unavailable" });
 const definitions = Object.freeze({
+  "digest-days": {
+    table: "follow_digest_days",
+    expired: "expires_at<=strftime('%Y-%m-%dT%H:%M:%fZ','now')",
+    multiplier: 1,
+  },
   confirmation: {
     table: "follow_confirmation_outbox",
     expired: "expires_at<=strftime('%Y-%m-%dT%H:%M:%fZ','now')",
@@ -53,6 +58,9 @@ function receipt(value) {
   if (r.success !== true || !Number.isSafeInteger(meta.changes) || meta.changes < 0) throw Error();
   return { rows: dense(r.results, 128), changes: meta.changes };
 }
+
+// Internal shared validation; descriptors are copied once before any values are used.
+export const expiryReceipts = Object.freeze({ record, rowid, dense, receipt });
 
 export async function expireFollowPage(db, options = {}) {
   try {

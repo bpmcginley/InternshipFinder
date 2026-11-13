@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 export * from "./follow-expiry-page.js";
+export * from "./follow-digest-expiry-page.js";
 import { enqueueFollowSnapshot } from "../src/follow-enqueue.js";
 import { beginFollowSnapshotAttempt, leaseFollowDigest } from "../src/follow-outbox.js";
 import {
