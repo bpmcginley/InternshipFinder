@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+import os
 import re
 from time import monotonic
 
@@ -58,7 +59,6 @@ def _authority(value):
         or len({len(s) for s in ids}) != 1
         or type(value.pending_generation) is not str
         or not re.fullmatch(r"[a-f0-9]{64}", value.pending_generation)
-        or o.observed_at.microsecond % 1000
     ):
         raise ValueError("invalid accepted-operation authority")
     # Copy the complete primitive authority before any injected/private operation.
@@ -69,6 +69,31 @@ def _authority(value):
         value.pending_generation,
         AcceptedFollowObservation(o.commit, o.public_tree, _utc(o.observed_at)),
     )
+
+
+def _detached_environment():
+    # Legacy staged/binding ports inherit the process environment. Require a
+    # dedicated process instead of temporarily changing process-global Git state.
+    env = {k.upper(): v for k, v in os.environ.items() if k.upper().startswith("GIT_")}
+    required = {
+        "GIT_CONFIG_GLOBAL": os.devnull,
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_NO_LAZY_FETCH": "1",
+    }
+    identities = {
+        "GIT_AUTHOR_NAME",
+        "GIT_AUTHOR_EMAIL",
+        "GIT_AUTHOR_DATE",
+        "GIT_COMMITTER_NAME",
+        "GIT_COMMITTER_EMAIL",
+        "GIT_COMMITTER_DATE",
+    }
+    if (
+        any(env.get(k) != v for k, v in required.items())
+        or env.get("GIT_ALLOW_PROTOCOL") not in ("", "file")
+        or set(env) - required.keys() - identities - {"GIT_ALLOW_PROTOCOL"}
+    ):
+        raise ValueError("isolated detached Git process required")
 
 
 def recover_detached_follow(
@@ -86,9 +111,11 @@ def recover_detached_follow(
 ) -> DetachedFollowRecovery:
     """Return a typed receipt only after an acknowledged existing promotion.
 
-    checkout must be private to this caller, with its index still equal to the
-    original pending candidate tree. Never reset it here. The caller separately
-    supplies verified predecessor source, explicit seed if needed, and external
+    checkout must be private to this caller, with HEAD at the original pending
+    candidate and its native index equal to that candidate tree. The dedicated
+    process must satisfy _detached_environment and stay unchanged for this call.
+    Never reset it here. The caller separately supplies verified predecessor source,
+    explicit seed if needed, and external
     accepted-operation authority. This function performs no push or authority lookup.
     A returned receipt can feed plan_follow_archive_from_publication unchanged in
     this new process. Missing/uncertain recovery returns no receipt and is not retried.
@@ -97,6 +124,7 @@ def recover_detached_follow(
         return DetachedFollowRecovery("disabled")
     try:
         selected = _authority(authority)
+        _detached_environment()
         writer = FollowCheckpointWriter(
             checkout, client, bounds=bounds, deadline=deadline, clock=clock, _monotonic=_monotonic
         )
@@ -111,14 +139,37 @@ def recover_detached_follow(
                 or observed != selected.observation
             ):
                 raise ValueError("operation differs from persisted pending identity")
-            raw_git = _candidate_git(checkout)
+            _detached_environment()
+            raw_git = writer._call(_candidate_git, checkout)
+            if (
+                writer._call(raw_git, "rev-parse", "HEAD").strip().decode("ascii")
+                != pending.candidate_commit
+                or writer._call(raw_git, "write-tree").strip().decode("ascii")
+                != pending.candidate_tree
+            ):
+                raise ValueError("original candidate HEAD and native index required")
             # This checks the asserted edge, not the authority of the operation.
-            commit = raw_git("cat-file", "commit", observed.commit)
-            parents = [
-                line[7:].decode("ascii")
-                for line in commit.split(b"\n\n", 1)[0].splitlines()
-                if line.startswith(b"parent ")
-            ]
+            if writer._call(raw_git, "cat-file", "-t", observed.commit).strip() != b"commit":
+                raise ValueError("accepted identity must be a commit")
+            size = int(writer._call(raw_git, "cat-file", "-s", observed.commit))
+            if not 0 < size <= bounds.max_source_bytes:
+                raise ValueError("accepted commit byte bound")
+            commit = writer._call(raw_git, "cat-file", "commit", observed.commit)
+            if len(commit) != size:
+                raise ValueError("accepted commit size changed")
+            headers = commit.split(b"\n\n", 1)[0].split(b"\n")
+            oid = rb"[a-f0-9]{%d}" % len(observed.commit)
+            if not headers or not re.fullmatch(b"tree " + oid, headers[0]):
+                raise ValueError("invalid accepted commit tree header")
+            parents = []
+            position = 1
+            while position < len(headers) and headers[position].startswith(b"parent "):
+                if not re.fullmatch(b"parent " + oid, headers[position]):
+                    raise ValueError("invalid accepted commit parent header")
+                parents.append(headers[position][7:].decode("ascii"))
+                position += 1
+            if any(line.startswith(b"parent ") for line in headers[position:]):
+                raise ValueError("noncontiguous accepted commit parent header")
             if selected.expected_predecessor not in parents:
                 raise ValueError("accepted operation predecessor differs")
             staged = validate_staged_follow_provenance(

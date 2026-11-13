@@ -59,9 +59,13 @@ class Store:
 
 @pytest.fixture
 def sample(tmp_path, monkeypatch):
+    for key in list(os.environ):
+        if key.upper().startswith('GIT_'):
+            monkeypatch.delenv(key)
     for k, v in {
         'GIT_ALLOW_PROTOCOL': 'file',
         'GIT_CONFIG_NOSYSTEM': '1',
+        'GIT_NO_LAZY_FETCH': '1',
         'GIT_CONFIG_GLOBAL': os.devnull,
         'GIT_AUTHOR_NAME': 'Fixture',
         'GIT_COMMITTER_NAME': 'Fixture',
@@ -199,36 +203,38 @@ def test_cold_recovery_reconstructs_exact_receipt_and_archive(sample):
         a.ordinal = 2
 
 
-def test_accepted_unrelated_descendant_uses_original_pending(sample):
-    repo, _, _, a, _, _ = sample
-    # A normal retry can accept a different full tree while preserving all owned data.
+def test_real_merge_retry_requires_fresh_original_candidate_checkout(sample):
+    repo, store, prior, a, _, _ = sample
+    git.git(repo, 'switch', '-c', 'unrelated', prior.commit)
     (repo / 'unrelated.txt').write_text('independent update', encoding='utf8')
-    git.git(repo, 'add', '--all')
-    retry_tree = git.git(repo, 'write-tree').stdout.decode().strip()
-    git.git(repo, 'read-tree', a.pending_candidate)
-    assert retry_tree != git.revision(repo, 'HEAD^{tree}')
-    later = (
-        git.git(
-            repo,
-            'commit-tree',
-            retry_tree,
-            '-p',
-            a.pending_candidate,
-            '-m',
-            'Accepted unrelated retry',
-        )
-        .stdout.decode()
-        .strip()
-    )
-    a = replace(
+    git.git(repo, 'add', 'unrelated.txt')
+    git.git(repo, 'commit', '-m', 'Remote unrelated update')
+    remote = git.revision(repo, 'HEAD')
+    git.git(repo, 'switch', '--detach', a.pending_candidate)
+    git.git(repo, 'merge', '--no-edit', remote)
+    accepted = git.revision(repo, 'HEAD')
+    assert git.git(repo, 'show', '-s', '--format=%P', accepted).stdout.split() == [
+        a.pending_candidate.encode(),
+        remote.encode(),
+    ]
+    authority = replace(
         a,
         ordinal=2,
-        expected_predecessor=a.pending_candidate,
-        observation=replace(a.observation, commit=later),
+        expected_predecessor=remote,
+        observation=replace(a.observation, commit=accepted),
     )
-    result = run(sample, a)
-    assert result.status == 'promoted' and result.receipt.commit == later
-    assert plan(result.receipt) is not None
+    # Even restoring the original index cannot qualify a retry HEAD. No repair
+    # occurs in the adapter; a separate private original-candidate checkout is needed.
+    git.git(repo, 'read-tree', a.pending_candidate)
+    assert run(sample, authority).receipt is None and store.calls == ['load']
+    recovery = repo.parent / 'recovery'
+    git.git(repo, 'worktree', 'add', '--detach', str(recovery), a.pending_candidate)
+    store.calls.clear()
+    result = run((recovery, *sample[1:]), authority)
+    assert result.status == 'promoted' and result.receipt.commit == accepted
+    assert plan(result.receipt) is not None and store.calls == ['load', 'cas']
+    assert git.revision(repo, 'HEAD') == accepted
+    assert git.revision(recovery, 'HEAD') == a.pending_candidate
 
 
 @pytest.mark.parametrize('authority', [False, {}, 'accepted', 1])
@@ -416,3 +422,167 @@ def test_exact_already_promoted_receipt_is_accepted(sample):
     sample[1].reply = 'already_promoted'
     result = run(sample)
     assert result.status == 'already_promoted' and result.receipt is not None
+
+
+def test_oversized_real_accepted_commit_is_rejected_before_body_read(sample, monkeypatch):
+    import scripts.follow_detached_recovery as adapter
+
+    repo, store, _, a, _, _ = sample
+    message = repo.parent / 'oversized-commit-message'
+    message.write_bytes(b'x' * (BOUNDS.max_source_bytes + 100))
+    oversized = (
+        git.git(
+            repo,
+            'commit-tree',
+            git.revision(repo, 'HEAD^{tree}'),
+            '-p',
+            a.pending_candidate,
+            '-F',
+            str(message),
+        )
+        .stdout.decode()
+        .strip()
+    )
+    assert int(git.git(repo, 'cat-file', '-s', oversized).stdout) > BOUNDS.max_source_bytes
+    calls = []
+    real = adapter._candidate_git
+
+    def inspect(checkout):
+        read = real(checkout)
+
+        def command(*args):
+            calls.append(args)
+            return read(*args)
+
+        return command
+
+    monkeypatch.setattr(adapter, '_candidate_git', inspect)
+    changed = replace(
+        a,
+        ordinal=2,
+        expected_predecessor=a.pending_candidate,
+        observation=replace(a.observation, commit=oversized),
+    )
+    result = run(sample, changed)
+    assert result.status == 'held' and result.receipt is None and store.calls == ['load']
+    assert ('cat-file', '-s', oversized) in calls
+    assert ('cat-file', 'commit', oversized) not in calls
+
+
+@pytest.mark.parametrize('cap', [-1, 0, True, 1.5])
+def test_invalid_source_cap_reuses_writer_guard_before_private_io(sample, cap):
+    result = run(sample, bounds=replace(BOUNDS, max_source_bytes=cap))
+    assert result.status == 'held' and result.receipt is None and sample[1].calls == []
+
+
+@pytest.mark.parametrize('command', ['-s', 'commit'])
+def test_late_accepted_inspection_never_reaches_promotion(sample, monkeypatch, command):
+    import scripts.follow_detached_recovery as adapter
+
+    ticks = [0]
+    real = adapter._candidate_git
+
+    def delayed(checkout):
+        read = real(checkout)
+
+        def run_git(*args):
+            result = read(*args)
+            if args[:2] == ('cat-file', command):
+                ticks[0] = 10
+            return result
+
+        return run_git
+
+    monkeypatch.setattr(adapter, '_candidate_git', delayed)
+    result = run(sample, _monotonic=lambda: ticks[0])
+    assert result.status == 'held' and result.receipt is None
+    assert sample[1].calls == ['load']
+
+
+def test_ambient_index_cannot_hide_changed_native_index(sample, monkeypatch):
+    from shutil import copyfile
+
+    repo, store, _, a, _, _ = sample
+    saved = repo.parent / 'saved-index'
+    copyfile(repo / '.git/index', saved)
+    (repo / 'docs/data/first.json').write_text('[{}]')
+    git.git(repo, 'add', '--all')
+    assert git.git(repo, 'write-tree').stdout.decode().strip() != git.revision(
+        repo, a.pending_candidate + '^{tree}'
+    )
+    monkeypatch.setenv('GIT_INDEX_FILE', str(saved))
+    result = run(sample)
+    assert result.status == 'held' and result.receipt is None and store.calls == []
+
+
+def test_process_overrides_and_missing_isolation_hold_before_private_io(sample, monkeypatch):
+    for key in (
+        'git_dir',
+        'GIT_WORK_TREE',
+        'GIT_OBJECT_DIRECTORY',
+        'GIT_ALTERNATE_OBJECT_DIRECTORIES',
+        'GIT_GRAFT_FILE',
+        'GIT_CONFIG_COUNT',
+        'GIT_CONFIG_PARAMETERS',
+        'GIT_REPLACE_REF_BASE',
+    ):
+        with monkeypatch.context() as env:
+            env.setenv(key, 'override')
+            assert run(sample).status == 'held' and sample[1].calls == []
+    for key in (
+        'GIT_CONFIG_GLOBAL',
+        'GIT_CONFIG_NOSYSTEM',
+        'GIT_NO_LAZY_FETCH',
+        'GIT_ALLOW_PROTOCOL',
+    ):
+        with monkeypatch.context() as env:
+            env.delenv(key)
+            assert run(sample).status == 'held' and sample[1].calls == []
+
+
+def test_override_injected_during_load_cannot_reach_binding(sample, monkeypatch):
+    sample[1].after_load = lambda: monkeypatch.setenv('GIT_INDEX_FILE', 'untrusted')
+    assert run(sample).receipt is None and sample[1].calls == ['load']
+
+
+def test_annotated_tag_cannot_stand_in_for_accepted_commit(sample):
+    repo, store, _, a, _, _ = sample
+    git.git(repo, 'tag', '-a', 'accepted-tag', '-m', 'Synthetic tag')
+    tag = git.revision(repo, 'refs/tags/accepted-tag')
+    authority = replace(a, observation=replace(a.observation, commit=tag))
+    result = run(sample, authority)
+    assert result.status == 'held' and result.receipt is None and store.calls == ['load']
+
+
+def test_original_submillisecond_observation_is_preserved(sample):
+    instant = NOW + timedelta(microseconds=500)
+    authority = replace(sample[3], observation=replace(sample[3].observation, observed_at=instant))
+    result = run(sample, authority, clock=lambda: instant)
+    assert result.status == 'promoted' and result.receipt is not None
+    assert json.loads(sample[1].state.accepted)['accepted_at'] == instant.isoformat(
+        timespec='microseconds'
+    ).replace('+00:00', 'Z')
+
+
+def test_out_of_position_parent_header_cannot_attest_expected_edge(sample):
+    repo, store, _, a, _, _ = sample
+    raw = git.git(repo, 'cat-file', 'commit', a.pending_candidate).stdout
+    # Make a genuine child of the candidate, then insert a false predecessor after
+    # the committer header. Git's graph does not recognize that late header.
+    raw = raw.replace(
+        ('parent ' + a.expected_predecessor).encode(), ('parent ' + a.pending_candidate).encode(), 1
+    )
+    raw = raw.replace(b'\n\n', ('\nparent ' + a.expected_predecessor + '\n\n').encode(), 1)
+    path = repo.parent / 'malformed-commit'
+    path.write_bytes(raw)
+    malformed = (
+        git.git(repo, 'hash-object', '-t', 'commit', '-w', '--literally', str(path))
+        .stdout.decode()
+        .strip()
+    )
+    assert git.git(repo, 'show', '-s', '--format=%P', malformed).stdout.split() == [
+        a.pending_candidate.encode()
+    ]
+    authority = replace(a, ordinal=2, observation=replace(a.observation, commit=malformed))
+    result = run(sample, authority)
+    assert result.status == 'held' and result.receipt is None and store.calls == ['load']
