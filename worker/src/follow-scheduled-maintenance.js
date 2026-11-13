@@ -1,3 +1,4 @@
+import { expireFollowDigestCandidate } from "./follow-digest-expiry-candidate.js";
 import { expireFollowDigestPage } from "./follow-digest-expiry-page.js";
 import { expireFollowPage } from "./follow-expiry-page.js";
 import { expireFollowManagementRequests } from "./follow-retention.js";
@@ -13,12 +14,28 @@ export async function runFollowScheduledMaintenance(db, rawPolicy, now = () => p
   try {
     if (typeof rawPolicy !== "string" || rawPolicy.length > 256) return { status: "unavailable" };
     const policy = JSON.parse(rawPolicy);
-    if (!policy || Object.keys(policy).sort().join(",") !== policyKeys)
+    if (
+      !policy ||
+      ![policyKeys, "deadlineMs,digestCandidates,maxD1Calls,maxRows"].includes(
+        Object.keys(policy).sort().join(","),
+      ) ||
+      (Object.hasOwn(policy, "digestCandidates") && typeof policy.digestCandidates !== "boolean")
+    )
       return { status: "unavailable" };
-    const { deadlineMs, maxD1Calls, maxRows } = policy;
+    const { deadlineMs, maxD1Calls, maxRows, digestCandidates = false } = policy;
     // One page per unfinished lane per round. Count D1 calls across rounds.
     if (!bounded(deadlineMs, 30000) || !bounded(maxD1Calls, 48) || !bounded(maxRows, 128))
       return { status: "unavailable" };
+    if (Object.hasOwn(policy, "digestCandidates")) {
+      // Only a flat scalar policy can reach here. Count decoded member names so
+      // an escaped duplicate cannot turn an explicit false into true.
+      const names = new Set();
+      for (const match of rawPolicy.matchAll(/("(?:[^"\\]|\\.)*")\s*:/g)) {
+        const name = JSON.parse(match[1]);
+        if (names.has(name)) return { status: "unavailable" };
+        names.add(name);
+      }
+    }
 
     const start = now();
     if (!Number.isFinite(start) || start < 0) return { status: "unavailable" };
@@ -39,23 +56,37 @@ export async function runFollowScheduledMaintenance(db, rawPolicy, now = () => p
       }
       remainingCalls--;
     };
-    // The digest page reads D1 time before its batch. Fence both calls, including after that await.
+    // Both readers and mutations consume calls. Binding preserves the wrapper,
+    // and each resolved operation fences the next one against elapsed time.
+    const statements = new WeakMap();
+    const execute = async (operation) => {
+      admit();
+      const result = await operation();
+      if (!hasTime()) {
+        exhausted = true;
+        throw new Error("Maintenance deadline exhausted");
+      }
+      return result;
+    };
+    const wrap = (statement) => {
+      const wrapped = {
+        bind: (...values) => wrap(statement.bind(...values)),
+        all: () => execute(() => statement.all()),
+      };
+      statements.set(wrapped, statement);
+      return wrapped;
+    };
     const budgetedDb = {
-      prepare(sql) {
-        const statement = db.prepare(sql);
-        return sql.startsWith("SELECT strftime(")
-          ? {
-              all: () => {
-                admit();
-                return statement.all();
-              },
-            }
-          : statement;
-      },
-      batch(statements) {
-        admit();
-        return db.batch(statements);
-      },
+      prepare: (sql) => wrap(db.prepare(sql)),
+      batch: (batch) =>
+        execute(() =>
+          db.batch(
+            batch.map((statement) => {
+              if (!statements.has(statement)) throw new Error("Unknown maintenance statement");
+              return statements.get(statement);
+            }),
+          ),
+        ),
     };
     const page = { enabled: true, maxRows };
     const lanes = [
@@ -63,7 +94,10 @@ export async function runFollowScheduledMaintenance(db, rawPolicy, now = () => p
       (cursor) => expireFollowPage(budgetedDb, { ...page, kind: "tokens", cursor }),
       (cursor) => expireFollowUnconfirmedPage(budgetedDb, { ...page, cursor }),
       (cursor) => expireFollowOrphanPage(budgetedDb, { ...page, maxChildren: maxRows, cursor }),
-      (cursor) => expireFollowDigestPage(budgetedDb, { ...page, maxRows: 1, cursor }),
+      (cursor) =>
+        digestCandidates
+          ? expireFollowDigestCandidate(budgetedDb, { enabled: true })
+          : expireFollowDigestPage(budgetedDb, { ...page, maxRows: 1, cursor }),
       (cursor) => expireFollowPage(budgetedDb, { ...page, kind: "digest-days", cursor }),
       async () => {
         const result = await expireFollowManagementRequests(budgetedDb, page);
@@ -81,7 +115,7 @@ export async function runFollowScheduledMaintenance(db, rawPolicy, now = () => p
         if (lane.complete) continue;
         if ((lane === scopes && !tokens.complete) || (lane === orphans && !scopes.complete))
           continue;
-        const cost = lane === digests ? 2 : 1;
+        const cost = lane === digests ? (digestCandidates ? 3 : 2) : 1;
         if (remainingCalls < cost || !hasTime()) return { status: "partial" };
         const result = await lane.run(lane.next);
         if (exhausted) return { status: "partial" };
