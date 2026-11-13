@@ -563,14 +563,49 @@ it.each(["malformed", "substituted", "sparse", "changes", "empty"])(
     expect((await f.jobs()).length).toBe(1);
   },
 );
-it("withholds ambiguous no-match progress receipt after an actual advance", async () => {
+it.each(["failed", "over-limit"])(
+  "withholds %s no-match progress receipt after an actual advance",
+  async (kind) => {
+    const f = await fixture(1);
+    await emptySnapshot(f);
+    f.options.db = {
+      prepare: (sql) => env.DB.prepare(sql),
+      batch: async (list) => {
+        const rows = await env.DB.batch(list);
+        if (kind === "failed") rows[1].success = false;
+        else rows[1].meta.changes = f.options.limits.maxFollows + 1;
+        return rows;
+      },
+    };
+    expect(await runFollowArchiveRelease(f.options)).toMatchObject({
+      status: "unavailable",
+      pages: 0,
+      subscribers: 0,
+    });
+    expect(await f.jobs()).toEqual([]);
+    const manifest = JSON.parse(f.files.get(indexUrl));
+    expect(
+      await env.DB.prepare("SELECT watermark FROM follow_scope_progress WHERE subscriber_id=?")
+        .bind(f.ids[0])
+        .first("watermark"),
+    ).toBe(manifest.high_water);
+  },
+);
+it("rejects generic UUID receipt substitution after genuine zero-write scope deletion", async () => {
   const f = await fixture(1);
-  await emptySnapshot(f);
+  let writes = 0;
   f.options.db = {
     prepare: (sql) => env.DB.prepare(sql),
     batch: async (list) => {
+      writes++;
+      await env.DB.prepare("DELETE FROM follow_subscriptions WHERE subscriber_id=?")
+        .bind(f.ids[0])
+        .run();
       const rows = await env.DB.batch(list);
-      rows[1].success = false;
+      expect(rows[1].meta.changes).toBe(0);
+      expect(rows[2].meta.changes).toBe(0);
+      expect(rows[3].results).toEqual([]);
+      rows[3].results = [{ id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" }];
       return rows;
     },
   };
@@ -579,11 +614,75 @@ it("withholds ambiguous no-match progress receipt after an actual advance", asyn
     pages: 0,
     subscribers: 0,
   });
+  expect(writes).toBe(1);
   expect(await f.jobs()).toEqual([]);
-  const manifest = JSON.parse(f.files.get(indexUrl));
-  expect(
-    await env.DB.prepare("SELECT watermark FROM follow_scope_progress WHERE subscriber_id=?")
-      .bind(f.ids[0])
-      .first("watermark"),
-  ).toBe(manifest.high_water);
 });
+it("corroborates an existing idempotent queue receipt without another physical queue write", async () => {
+  const f = await fixture(1);
+  expect((await runFollowArchiveRelease(f.options)).status).toBe("pass-complete");
+  let writes = 0;
+  f.options.db = {
+    prepare: (sql) => env.DB.prepare(sql),
+    batch: async (list) => {
+      const rows = await env.DB.batch(list);
+      writes += rows[1].meta.changes;
+      expect(rows[3].results[0].qualified_subscriber).toBe(f.ids[0]);
+      return rows;
+    },
+  };
+  expect(await runFollowArchiveRelease(f.options)).toMatchObject({
+    status: "pass-complete",
+    counts: { queued: 1 },
+  });
+  expect(writes).toBe(0);
+  expect(await f.jobs()).toEqual(f.ids);
+});
+it.each(["page", "progress", "selected"])(
+  "bounds %s receipt rows before inspecting any row",
+  async (kind) => {
+    const f = await fixture(1);
+    let inspected = 0;
+    const rows = (n) => {
+      const list = new Array(n);
+      Object.defineProperty(list, "0", {
+        get() {
+          inspected++;
+          throw Error("Must not inspect");
+        },
+      });
+      return list;
+    };
+    f.options.db = {
+      prepare(sql) {
+        const raw = env.DB.prepare(sql);
+        const intercept =
+          kind === "page"
+            ? sql.startsWith("WITH RECURSIVE page")
+            : kind === "progress" && sql.startsWith("WITH bounded AS");
+        if (!intercept) return raw;
+        return {
+          bind(...args) {
+            return {
+              async all() {
+                const result = await raw.bind(...args).all();
+                result.results = rows(args[1] + 1);
+                return result;
+              },
+            };
+          },
+        };
+      },
+      batch: async (list) => {
+        const r = await env.DB.batch(list);
+        if (kind === "selected") r[3].results = rows(2);
+        return r;
+      },
+    };
+    expect(await runFollowArchiveRelease(f.options)).toMatchObject({
+      status: "unavailable",
+      pages: 0,
+      subscribers: 0,
+    });
+    expect(inspected).toBe(0);
+  },
+);

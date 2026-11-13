@@ -27,7 +27,7 @@ function sample(read) {
   }
   return value;
 }
-function receipt(value) {
+function receipt(value, maxRows) {
   const r = record(value),
     meta = record(r.meta);
   if (
@@ -37,8 +37,17 @@ function receipt(value) {
     !Array.isArray(r.results)
   )
     fail();
+  const length = Object.getOwnPropertyDescriptor(r.results, "length");
+  if (
+    !length ||
+    !Object.hasOwn(length, "value") ||
+    !Number.isSafeInteger(length.value) ||
+    length.value < 0 ||
+    length.value > maxRows
+  )
+    fail();
   const results = [];
-  for (let i = 0; i < r.results.length; i++) {
+  for (let i = 0; i < length.value; i++) {
     const d = Object.getOwnPropertyDescriptor(r.results, String(i));
     if (!d || !Object.hasOwn(d, "value")) fail();
     results.push(record(d.value));
@@ -171,10 +180,15 @@ export async function runFollowArchiveRelease(options = {}) {
           return statement(raw.bind(...args), sql, args);
         },
         async all() {
+          const maxRows =
+            sql.startsWith("WITH RECURSIVE page") || sql.startsWith("WITH bounded AS")
+              ? parameters[1]
+              : fail();
+          if (!positive(maxRows)) fail();
           charge(1);
           const value = await raw.all();
           check();
-          return receipt(value);
+          return receipt(value, maxRows);
         },
         async first(column) {
           charge(1);
@@ -189,7 +203,15 @@ export async function runFollowArchiveRelease(options = {}) {
     const database = {
       prepare(sql) {
         check();
-        return statement(prepare(sql), sql);
+        // Add actual stored identity columns to this existing read only. Its WHERE,
+        // joins and parameters stay unchanged; the legacy helper receives only id.
+        const qualified = sql.startsWith("SELECT o.id FROM follow_digest_outbox")
+          ? sql.replace(
+              "SELECT o.id FROM",
+              "SELECT o.id,o.subscriber_id AS qualified_subscriber,o.day AS qualified_day,o.payload AS qualified_payload,p.snapshot_digest AS qualified_digest,p.snapshot_at AS qualified_at,p.advances AS qualified_advances FROM",
+            )
+          : sql;
+        return statement(prepare(qualified), sql);
       },
       async batch(list) {
         const owned = list.map((item) => originals.get(item) ?? fail());
@@ -205,12 +227,14 @@ export async function runFollowArchiveRelease(options = {}) {
         ).bind(cutoff);
         const value = await batch([guard, ...raw]);
         check();
-        if (!Array.isArray(value) || value.length !== raw.length + 1) fail();
+        if (!Array.isArray(value)) fail();
+        const length = Object.getOwnPropertyDescriptor(value, "length");
+        if (!length || !Object.hasOwn(length, "value") || length.value !== raw.length + 1) fail();
         const copied = [];
-        for (let i = 0; i < value.length; i++) {
+        for (let i = 0; i < raw.length + 1; i++) {
           const d = Object.getOwnPropertyDescriptor(value, String(i));
           if (!d || !Object.hasOwn(d, "value")) fail();
-          copied.push(receipt(d.value));
+          copied.push(receipt(d.value, raw.length === 3 && i === 3 ? 1 : 0));
         }
         if (copied[0].meta.changes !== 0 || copied[0].results.length !== 0) fail();
         const downstream = copied.slice(1);
@@ -240,12 +264,20 @@ export async function runFollowArchiveRelease(options = {}) {
           if (selected.results.length) {
             const row = selected.results[0];
             if (
-              Object.keys(row).join(",") !== "id" ||
+              Object.keys(row).sort().join(",") !==
+                "id,qualified_advances,qualified_at,qualified_day,qualified_digest,qualified_payload,qualified_subscriber" ||
               typeof row.id !== "string" ||
               !/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/.test(row.id) ||
-              (job.meta.changes === 1 && row.id !== owned[0].parameters[1])
+              (job.meta.changes === 1 && row.id !== owned[0].parameters[1]) ||
+              row.qualified_subscriber !== owned[2].parameters[1] ||
+              row.qualified_day !== owned[2].parameters[2] ||
+              row.qualified_payload !== owned[2].parameters[3] ||
+              row.qualified_digest !== owned[2].parameters[5] ||
+              row.qualified_at !== owned[2].parameters[6] ||
+              row.qualified_advances !== owned[2].parameters[0]
             )
               fail();
+            selected.results = [{ id: row.id }];
           }
         } else fail();
         return downstream;
