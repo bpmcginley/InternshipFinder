@@ -16,12 +16,15 @@ function browser({ query = `?token=${TOKEN}`, hash = "", historyFailure = false,
     calls = [],
     order = [];
   const elements = Object.fromEntries(
-    ["unsubscribe", "status"].map((id) => [
+    ["unsubscribe", "status", "skip", "main"].map((id) => [
       id,
       {
         textContent: "",
         disabled: true,
         handlers: {},
+        focus() {
+          this.focused = true;
+        },
         addEventListener(name, fn) {
           this.handlers[name] = fn;
         },
@@ -76,7 +79,7 @@ function browser({ query = `?token=${TOKEN}`, hash = "", historyFailure = false,
     timers,
     calls,
     order,
-    click: () => elements.unsubscribe.handlers.click(),
+    click: (event = { isTrusted: true }) => elements.unsubscribe.handlers.click(event),
   };
 }
 
@@ -165,6 +168,33 @@ test("explicit click makes one existing one-click POST without ambient credentia
   );
   assert.equal(b.elements.unsubscribe.disabled, true);
   assert.equal(b.timers.size, 0);
+});
+
+test("untrusted synthetic activation cannot consume authority or send", async () => {
+  const b = browser();
+  for (const event of [{}, { isTrusted: false }, { isTrusted: 1 }]) await b.click(event);
+  assert.equal(b.calls.length, 0);
+  assert.equal(b.timers.size, 0);
+  assert.equal(b.elements.unsubscribe.disabled, false);
+  assert.equal(b.elements.status.textContent, "");
+  await b.click();
+  assert.equal(b.calls.length, 1);
+});
+
+test("keyboard skip focuses main without a history change or retiring authority", async () => {
+  const b = browser();
+  let prevented = false;
+  b.elements.skip.handlers.click({
+    preventDefault() {
+      prevented = true;
+    },
+  });
+  assert.equal(prevented, true);
+  assert.equal(b.elements.main.focused, true);
+  assert.equal(b.location.hash, "");
+  assert.deepEqual(b.order, ["clear"]);
+  await b.click();
+  assert.equal(b.calls.length, 1);
 });
 
 test("malformed query, fragment, and failed history replacement cannot send", async () => {

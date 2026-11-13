@@ -25,11 +25,16 @@ const SCRIPT = String.raw`(() => {
   addEventListener("popstate", retire);
   addEventListener("hashchange", () => { if (location.hash !== "#main" || location.search) retire(); });
   document.addEventListener("DOMContentLoaded", () => {
+    document.getElementById("skip").addEventListener("click", event => {
+      event.preventDefault();
+      document.getElementById("main").focus();
+    });
     button = document.getElementById("unsubscribe");
     status = document.getElementById("status");
     button.disabled = !token || retired;
     if (!token || retired) status.textContent = invalid;
-    button.addEventListener("click", async () => {
+    button.addEventListener("click", async event => {
+      if (event.isTrusted !== true) return;
       if (location.search || (location.hash && location.hash !== "#main")) { retire(); return; }
       if (retired || attempted || !token) return;
       attempted = true; button.disabled = true;
@@ -68,7 +73,7 @@ const HTML = `<!doctype html><html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow"><meta name="referrer" content="no-referrer">
 <title>Unsubscribe | InternScout</title><script>${SCRIPT}</script><style>${STYLE}</style>
-</head><body><a class="skip" href="#main">Skip to content</a><header>InternScout</header>
+</head><body><a id="skip" class="skip" href="#main">Skip to content</a><header>InternScout</header>
 <main id="main" tabindex="-1"><p class="eyebrow">Email follows</p><h1>Unsubscribe</h1>
 <p>Select Unsubscribe to stop internship follow emails.</p>
 <button id="unsubscribe" type="button" disabled>Unsubscribe</button>
@@ -84,7 +89,7 @@ const HEADERS = Object.freeze({
   "X-Content-Type-Options": "nosniff",
   "X-Robots-Tag": "noindex, nofollow",
   "Content-Security-Policy":
-    "default-src 'none'; script-src 'sha256-LolS+V2BiVyxlG3SIm9U0knB42bG1qbpQbAtLBrfLpA='; style-src 'sha256-/WZ1fLN1PkTvpxZwxcEPIEdwX4L0md/tvjJ4jtEjtMI='; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+    "default-src 'none'; script-src 'sha256-Qo5oNP+7sJ77q7dSNzojCwQUe/kqr9roRZKIl7sVFik='; style-src 'sha256-/WZ1fLN1PkTvpxZwxcEPIEdwX4L0md/tvjJ4jtEjtMI='; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
 });
 
 export async function followUnsubscribePreview(request) {

@@ -6,10 +6,12 @@
       "width": 1280,
       "theme": "light",
       "openingPosts": 0,
+      "syntheticActivationPosts": 0,
       "explicitPosts": 1,
       "bodyExact": true,
       "ambientCredentialsAbsent": true,
       "queryCleared": true,
+      "keyboardSkip": true,
       "keyboard": true,
       "noOverflow": true,
       "reloadDisabled": true
@@ -18,10 +20,12 @@
       "width": 1280,
       "theme": "dark",
       "openingPosts": 0,
+      "syntheticActivationPosts": 0,
       "explicitPosts": 1,
       "bodyExact": true,
       "ambientCredentialsAbsent": true,
       "queryCleared": true,
+      "keyboardSkip": true,
       "keyboard": true,
       "noOverflow": true,
       "reloadDisabled": true
@@ -30,10 +34,12 @@
       "width": 375,
       "theme": "light",
       "openingPosts": 0,
+      "syntheticActivationPosts": 0,
       "explicitPosts": 1,
       "bodyExact": true,
       "ambientCredentialsAbsent": true,
       "queryCleared": true,
+      "keyboardSkip": true,
       "keyboard": true,
       "noOverflow": true,
       "reloadDisabled": true
@@ -42,10 +48,12 @@
       "width": 375,
       "theme": "dark",
       "openingPosts": 0,
+      "syntheticActivationPosts": 0,
       "explicitPosts": 1,
       "bodyExact": true,
       "ambientCredentialsAbsent": true,
       "queryCleared": true,
+      "keyboardSkip": true,
       "keyboard": true,
       "noOverflow": true,
       "reloadDisabled": true
@@ -86,6 +94,11 @@
     }
   ],
   "network": "Only loopback document and explicit synthetic POST; external page requests aborted.",
+  "navigation": {
+    "backDisabled": true,
+    "forwardDisabled": true,
+    "posts": 0
+  },
   "historyFailure": {
     "disabled": true,
     "posts": 0
