@@ -19,6 +19,7 @@ import { createFollowManagementRequestHttp } from "./follow-management-request-h
 import { loadFollowCatalog, prepareFollowCatalogRelease } from "./follow-catalog-loader.js";
 import { createFollowSignupRoute } from "./follow-signup-route.js";
 import { prepareFollowSignupDeployment } from "./follow-signup-release.js";
+import { runFollowScheduledMaintenance } from "./follow-scheduled-maintenance.js";
 import { followTokenEndpoints } from "./follow-token-endpoint.js";
 import { followUnsubscribeEndpoint } from "./follow-unsubscribe-endpoint.js";
 import { topupCheckoutResponse, topupOfferResponse } from "./topup-checkout-http.js";
@@ -804,6 +805,18 @@ export default {
         if (env.EMPLOYER_REPORTS === "1") await processCampaignReports(env.DB, env, new Date());
       };
       ctx.waitUntil(reportJob());
+      return;
+    }
+    const followCron = env.FOLLOW_MAINTENANCE_CRON;
+    if (
+      typeof followCron === "string" &&
+      followCron.length > 0 &&
+      followCron !== "17 7 * * *" &&
+      event?.cron === followCron
+    ) {
+      if (env.FOLLOW_MAINTENANCE_ENABLED === "1") {
+        ctx.waitUntil(runFollowScheduledMaintenance(env.DB, env.FOLLOW_MAINTENANCE_POLICY));
+      }
       return;
     }
     const now = new Date();
