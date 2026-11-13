@@ -254,3 +254,55 @@ it("accidental async DB port is held without unhandled ordinary rejection", asyn
   );
   await new Promise((r) => setTimeout(r, 0));
 });
+
+it("rejected ordinary Promise DB result is observed before throwing prepare getter", async () => {
+  await seed(1);
+  let reads = 0;
+  const value = Object.defineProperty(Promise.reject(new Error("synthetic")), "prepare", {
+    get() {
+      reads++;
+      throw new Error("must not inspect binding shape");
+    },
+  });
+  assert.deepEqual(await call(config(), { ...context(), getDb: () => value }), unavailable);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(reads, 0);
+  assert.equal(await count(), 1);
+});
+it("native Promise decorated with actual D1 methods cannot submit or delete", async () => {
+  await seed(1);
+  let calls = 0;
+  const value = Object.assign(Promise.resolve(null), {
+    prepare: env.DB.prepare.bind(env.DB),
+    batch(statements) {
+      calls++;
+      return env.DB.batch(statements);
+    },
+  });
+  assert.deepEqual(await call(config(), { ...context(), getDb: () => value }), unavailable);
+  assert.equal(calls, 0);
+  assert.equal(await count(), 1);
+});
+it("exotic Promise binding shapes hold and foreign then getters remain untouched", async () => {
+  let reads = 0;
+  const trap = () => {
+    reads++;
+    throw new Error("must not inspect");
+  };
+  class CustomPromise extends Promise {}
+  for (const value of [
+    Object.defineProperty(Promise.resolve(null), "constructor", { get: trap }),
+    CustomPromise.resolve(null),
+  ]) {
+    Object.defineProperty(value, "prepare", { get: trap });
+    assert.deepEqual(await call(config(), { ...context(), getDb: () => value }), unavailable);
+  }
+  assert.deepEqual(
+    await call(config(), {
+      ...context(),
+      getDb: () => Object.defineProperty({}, "then", { get: trap }),
+    }),
+    unavailable,
+  );
+  assert.equal(reads, 0);
+});

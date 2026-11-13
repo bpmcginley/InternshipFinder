@@ -18,6 +18,19 @@ function discard(value) {
     /* Not an ordinary native promise. */
   }
 }
+function rejectPromiseBinding(value) {
+  let prototype = Object.getPrototypeOf(value);
+  for (let depth = 0; depth < 16; depth++) {
+    if (prototype === null) return;
+    if (prototype === Promise.prototype) {
+      discard(value);
+      throw new Error();
+    }
+    prototype = Object.getPrototypeOf(prototype);
+  }
+  // Unverifiable deep prototype chains hold; no constructor/then/species is consulted.
+  throw new Error();
+}
 function data(value, key) {
   const d = Object.getOwnPropertyDescriptor(value, key);
   if (!d?.enumerable || !Object.hasOwn(d, "value")) throw new Error();
@@ -104,6 +117,7 @@ export async function runTopupHistoryScheduled(eventCron, descriptor = {}, conte
         if (!db) {
           db = getDb();
           if (!db) throw new Error();
+          rejectPromiseBinding(db);
           prepare = db.prepare;
           submit = db.batch;
           if (typeof prepare !== "function" || typeof submit !== "function") {
