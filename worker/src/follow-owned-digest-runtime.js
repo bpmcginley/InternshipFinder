@@ -3,6 +3,7 @@ import { acquireFollowDeliveryOwner, finishFollowDigestOwner } from "./follow-de
 import { runFollowDeliveryTick } from "./follow-delivery-tick.js";
 import { createFollowEmailTransport } from "./follow-email-transport.js";
 import { validFollowSendCap } from "./follow-send-budget.js";
+import { captureFollowDigestRelatedLimits } from "./follow-digest-prepare.js";
 const fail = () => {
   throw new Error("Follow digest runtime unavailable");
 };
@@ -52,7 +53,7 @@ export function createOwnedFollowDigestRuntime(options = {}) {
   } = options;
   return async () => {
     if (enabled !== true) return { status: "disabled" };
-    let selected, transport;
+    let selected, transport, related, beforeAcquire, ownerExpiresAtMs;
     try {
       if (
         typeof policy !== "function" ||
@@ -65,6 +66,29 @@ export function createOwnedFollowDigestRuntime(options = {}) {
         fail();
       selected = snapshot(policy);
       if (!selected.sending) return { status: "disabled" };
+      const descriptor = Object.getOwnPropertyDescriptor(options, "relatedLimits");
+      if (
+        (descriptor && (!descriptor.enumerable || !Object.hasOwn(descriptor, "value"))) ||
+        (!descriptor && "relatedLimits" in options)
+      )
+        fail();
+      related = captureFollowDigestRelatedLimits(descriptor?.value);
+      const admission = Object.getOwnPropertyDescriptor(options, "beforeAcquire");
+      if (
+        (admission && (!admission.enumerable || !Object.hasOwn(admission, "value"))) ||
+        (!admission && "beforeAcquire" in options) ||
+        (admission?.value !== undefined && typeof admission.value !== "function")
+      )
+        fail();
+      beforeAcquire = admission?.value;
+      const cutoff = Object.getOwnPropertyDescriptor(options, "ownerExpiresAtMs");
+      if (
+        (cutoff && (!cutoff.enumerable || !Object.hasOwn(cutoff, "value"))) ||
+        (!cutoff && "ownerExpiresAtMs" in options) ||
+        (cutoff?.value !== undefined && (!Number.isSafeInteger(cutoff.value) || cutoff.value <= 0))
+      )
+        fail();
+      ownerExpiresAtMs = cutoff?.value;
       transport = createFollowEmailTransport({
         enabled: true,
         email,
@@ -73,7 +97,7 @@ export function createOwnedFollowDigestRuntime(options = {}) {
     } catch {
       return { status: "unavailable" };
     }
-    const acquired = await acquireFollowDeliveryOwner(db);
+    const acquired = await acquireFollowDeliveryOwner(db, beforeAcquire, ownerExpiresAtMs);
     if (acquired.status !== "acquired") return acquired;
     let result;
     try {
@@ -93,6 +117,7 @@ export function createOwnedFollowDigestRuntime(options = {}) {
         key,
         catalog,
         limits,
+        relatedLimits: related,
         loadSnapshot,
         cap: selected.cap,
         present: selected.present,
