@@ -247,6 +247,58 @@ it("off inspects no authority or binding", async () => {
   expect(await run(options)).toEqual({ status: "disabled" });
   expect(calls).toBe(0);
 });
+it("only own enabled data admits, never reading accessors or other ports", async () => {
+  const before = await owner();
+  let inspected = 0;
+  for (const [options, status] of [
+    [{}, "disabled"],
+    [{ enabled: false }, "disabled"],
+    [Object.create({ enabled: true }), "disabled"],
+    [
+      Object.defineProperty({}, "enabled", {
+        get() {
+          inspected++;
+          throw Error("enabled getter");
+        },
+      }),
+      "unavailable",
+    ],
+  ]) {
+    for (const name of [
+      "db",
+      "email",
+      "key",
+      "policy",
+      "fetch",
+      "catalog",
+      "archive",
+      "now",
+      "monotonicNow",
+    ])
+      Object.defineProperty(options, name, {
+        get() {
+          inspected++;
+          throw Error("port getter");
+        },
+      });
+    expect(await run(options)).toEqual({ status });
+  }
+  expect(
+    await run(
+      new Proxy(
+        {},
+        {
+          getOwnPropertyDescriptor() {
+            throw Error("descriptor");
+          },
+        },
+      ),
+    ),
+  ).toEqual({ status: "unavailable" });
+  expect(inspected).toBe(0);
+  expect(await owner()).toEqual(before);
+  expect(await env.DB.prepare("SELECT count(*) n FROM follow_send_budget").first("n")).toBe(0);
+});
 it.each([false, true])(
   "uses exact older retained job, never newer latest (genesis=%s)",
   async (genesis) => {

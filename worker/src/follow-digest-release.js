@@ -74,8 +74,11 @@ function targetPath(url) {
 }
 
 export async function runFollowDigestRelease(options = {}) {
-  if (options?.enabled !== true) return { status: "disabled" };
   try {
+    const enabled =
+      options == null ? undefined : Object.getOwnPropertyDescriptor(options, "enabled");
+    if (enabled && !Object.hasOwn(enabled, "value")) fail();
+    if (enabled?.value !== true) return { status: "disabled" };
     const {
       db,
       email,
