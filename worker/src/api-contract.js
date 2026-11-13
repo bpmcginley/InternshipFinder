@@ -33,8 +33,16 @@ export const ROUTES = Object.freeze([
     "/follows/unsubscribe",
     "follow-unsubscribe-token",
     "Exactly one query parameter token=deletion-only UUID.secret; URL-encoded or multipart List-Unsubscribe=One-Click, at most 4,096 bytes with an absolute 5-second body-read deadline; no login, cookies or Origin required",
-    "Empty no-store 204 for deletion/replay/unknown/wrong-purpose; malformed 400; body timeout/capacity/storage 503 with Retry-After: 60; GET/HEAD fall through to 404 without mutation",
+    "Empty no-store 204 for deletion/replay/unknown/wrong-purpose; malformed 400; body timeout/capacity/storage 503 with Retry-After: 60; HEAD falls through to 404 without mutation",
     "none; deletion remains available when signup or sending is off",
+  ),
+  route(
+    "GET",
+    "/follows/unsubscribe",
+    "public",
+    "Exact path. Any query receives identical static HTML without storage access or credential reflection. Browser removes query/fragment before explicit action.",
+    "No-store HTML 200 with hashed CSP, no-referrer, frame-deny and noindex. Explicit button makes existing one-click POST; opening alone never unsubscribes.",
+    "none; existing issued capabilities remain available",
   ),
   route(
     "POST",

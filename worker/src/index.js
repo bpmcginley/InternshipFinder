@@ -22,6 +22,7 @@ import { prepareFollowSignupDeployment } from "./follow-signup-release.js";
 import { runFollowScheduledMaintenance } from "./follow-scheduled-maintenance.js";
 import { followTokenEndpoints } from "./follow-token-endpoint.js";
 import { followUnsubscribeEndpoint } from "./follow-unsubscribe-endpoint.js";
+import { followUnsubscribePreview } from "./follow-unsubscribe-preview.js";
 import { topupCheckoutResponse, topupOfferResponse } from "./topup-checkout-http.js";
 import { canRecoverAttachedTopup } from "./topup-attached-recovery.js";
 import { topupRecoveryResponse } from "./topup-recovery-http.js";
@@ -309,6 +310,7 @@ const withAdmin = (handler) => async (context) => {
 const safeRouteHandlers = {
   // Token deletion stays available independently of future signup/sending switches.
   "POST /follows/unsubscribe": async ({ request, db, now }) => followUnsubscribeEndpoint(request, db, now),
+  "GET /follows/unsubscribe": async ({ request }) => followUnsubscribePreview(request),
   "POST /follows/confirm": async ({ request, db, d }) => followTokenEndpoints.confirm(request, db, d.now),
   "POST /follows/delete-request": async ({ request, db, d }) => followTokenEndpoints.deleteRequest(request, db, d.now),
   "POST /follows/manage/list": manageFollow("list"),
@@ -739,7 +741,7 @@ const exactRoutes = new Map(ROUTES.map(({ method, path }) => {
 async function route(request, env, ctx, d) {
   const url = new URL(request.url);
   const path = url.pathname.replace(/\/+$/, "") || "/";
-  const db = env.DB;
+  const db = request.method === "GET" && path === "/follows/unsubscribe" ? undefined : env.DB;
   const now = d.now();
   // Brand media has no account/session access, analytics, writes, or arbitrary upstream URLs.
   if (path.startsWith("/social-video/")) return socialVideo(request, d.fetch);

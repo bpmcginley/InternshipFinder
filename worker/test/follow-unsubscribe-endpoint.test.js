@@ -72,8 +72,9 @@ test("fixed endpoint accepts anonymous mailbox forms without any signup/sending 
   assert.equal(calls, 3);
 });
 
-test("GET, HEAD, other methods and near routes never mutate; malformed POST never reaches D1", async () => {
-  for (const method of ["GET", "HEAD", "PUT", "DELETE"]) {
+test("GET previews without mutation; HEAD, other methods and near routes stay inert", async () => {
+  assert.equal((await call(new Request(URL))).status, 200);
+  for (const method of ["HEAD", "PUT", "DELETE"]) {
     assert.equal((await call(new Request(URL, { method }))).status, 404);
   }
   assert.equal((await call(new Request(URL, { method: "OPTIONS" }))).status, 204);
