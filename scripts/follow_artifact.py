@@ -22,6 +22,16 @@ from scripts.check_site_contents import audit, read_allowlist, DEFAULT_ALLOWLIST
 from internscout.site import follow_site_publication as site
 from internscout.site.follow_publication import prepare_follow_catalog, _prior
 from internscout.follow_snapshot import FollowSnapshotCatalog
+from scripts.follow_labels import produce_follow_labels
+
+LABEL_PATH = "data/follow-labels.json"
+
+
+@dataclass(frozen=True)
+class FollowArtifactLabels:
+    max_label_bytes: int
+    prior_label_bytes: bytes | None = None
+    prior_label_sha256: str | None = None
 
 
 @dataclass(frozen=True)
@@ -54,6 +64,11 @@ class PrivateFollowArtifact:
     archive_index_sha256: str
     files: int
     references: int
+
+
+@dataclass(frozen=True)
+class PrivateFollowLabelArtifact(PrivateFollowArtifact):
+    labels_sha256: str
 
 
 def _fail():
@@ -246,23 +261,21 @@ def _catalog(value, export, archive):
         "majors.json": export["majors.json"],
     }
     selected.update(value.publication.staged.shards)
-    staged = prepare_follow_catalog(
-        selected,
-        **{
-            key: options.get(key)
-            for key in (
-                "enabled",
-                "source_sha256",
-                "prior_bytes",
-                "prior_sha256",
-                "genesis",
-                "max_source_bytes",
-                "max_source_rows",
-                "max_keys",
-                "max_bytes",
-            )
-        },
-    )
+    stage_options = {
+        key: options.get(key)
+        for key in (
+            "enabled",
+            "source_sha256",
+            "prior_bytes",
+            "prior_sha256",
+            "genesis",
+            "max_source_bytes",
+            "max_source_rows",
+            "max_keys",
+            "max_bytes",
+        )
+    }
+    staged = prepare_follow_catalog(selected, **stage_options)
     if staged is None or staged.catalog_sha256 != options.get("catalog_sha256"):
         _fail()
     valid = _prior(staged.payload, staged.catalog_sha256, options["max_keys"])
@@ -279,7 +292,7 @@ def _catalog(value, export, archive):
                     for key in role[field]
                 ):
                     _fail()
-    return staged.payload
+    return staged.payload, selected, stage_options
 
 
 def _fresh(value, raw, now):
@@ -303,7 +316,7 @@ def _fresh(value, raw, now):
 
 
 def assemble_follow_artifact(
-    source_dir=None, output_dir=None, *, enabled=False, inputs=None, clock=None
+    source_dir=None, output_dir=None, *, enabled=False, inputs=None, clock=None, labels=None
 ):
     """Return a newly assembled private directory, never a production publication.
 
@@ -317,6 +330,7 @@ def assemble_follow_artifact(
         type(inputs) is not FollowArtifactInput
         or type(inputs.site) is not site.FollowSiteInput
         or not callable(clock)
+        or (labels is not None and type(labels) is not FollowArtifactLabels)
     ):
         _fail()
     raw_export = _export(inputs)
@@ -324,7 +338,24 @@ def assemble_follow_artifact(
     prior = archive_stage._capture(inputs.prior, inputs.bounds)
     raw_archive = _archive(inputs)
     _plan(inputs, prior, raw_archive)
-    catalog = _catalog(inputs, raw_export, raw_archive)
+    catalog, selected, stage_options = _catalog(inputs, raw_export, raw_archive)
+    label_plan = None
+    if labels is not None:
+        if (
+            type(inputs.site.catalog_path) is not str
+            or inputs.site.catalog_path.casefold() == LABEL_PATH.casefold()
+        ):
+            _fail()
+        label_plan = produce_follow_labels(
+            selected,
+            catalog,
+            enabled=True,
+            catalog_sha256=_digest(catalog),
+            stage_options=stage_options,
+            prior_label_bytes=labels.prior_label_bytes,
+            prior_label_sha256=labels.prior_label_sha256,
+            max_label_bytes=labels.max_label_bytes,
+        )
     started = clock()
     _fresh(inputs, raw_archive, started)
     source = Path(source_dir)
@@ -332,6 +363,8 @@ def assemble_follow_artifact(
         _fail()
     source = source.resolve(strict=True)
     site._inventory(source, inputs.site.max_site_files, inputs.site.max_site_bytes)
+    if label_plan is not None and site._exact_target(source, LABEL_PATH).exists():
+        _fail()
     data = site._exact_target(source, "data")
     if set(site._inventory(data, inputs.max_export_files, inputs.max_export_bytes)) != set(
         raw_export
@@ -356,6 +389,12 @@ def assemble_follow_artifact(
         staged = Path(temporary) / "site"
         plan = site.publish_follow_site(source, staged, enabled=True, inputs=inputs.site)
         archive_stage._verify(staged / inputs.site.catalog_path, catalog)
+        if label_plan is not None:
+            path = site._exact_target(staged, LABEL_PATH)
+            with path.open("xb") as stream:
+                if stream.write(label_plan.payload) != len(label_plan.payload):
+                    _fail()
+            archive_stage._verify(path, label_plan.payload)
         # A fresh raw source never supplies an existing archive namespace.
         for name in raw_archive:
             if site._exact_target(staged, name).exists():
@@ -371,6 +410,8 @@ def assemble_follow_artifact(
         for name, body in raw_archive.items():
             archive_stage._verify(staged / name, body)
         archive_stage._verify(staged / inputs.site.catalog_path, catalog)
+        if label_plan is not None:
+            archive_stage._verify(site._exact_target(staged, LABEL_PATH), label_plan.payload)
         links = site_links.audit(staged)
         if links["problems"]:
             _fail()
@@ -380,6 +421,7 @@ def assemble_follow_artifact(
             plan.script_url[1:],
             *raw_archive,
             *(entry["path"] for entry in inputs.site.retained_wrappers),
+            *([LABEL_PATH] if label_plan is not None else []),
         }
         patterns = read_allowlist(DEFAULT_ALLOWLIST) + [
             re.compile(re.escape(name)) for name in additions
@@ -392,10 +434,20 @@ def assemble_follow_artifact(
             _fail()
         _fresh(inputs, raw_archive, ended)
         site._absent_rename(staged, output)
-    return PrivateFollowArtifact(
+    receipt = PrivateFollowArtifact(
         output,
         inputs.publication.public_tree,
         inputs.archive.index_sha256,
         len(files),
         links["internal_references"],
+    )
+    if label_plan is None:
+        return receipt
+    return PrivateFollowLabelArtifact(
+        receipt.directory,
+        receipt.public_tree,
+        receipt.archive_index_sha256,
+        receipt.files,
+        receipt.references,
+        label_plan.labels_sha256,
     )
