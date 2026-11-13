@@ -195,3 +195,160 @@ it("does not admit the digest mutation after its database clock read spends the 
   });
   expect(batch).toHaveBeenCalledTimes(4);
 });
+
+async function prefix(db, healthy, orphans = 1) {
+  const at = await clock(db);
+  const writes = [];
+  for (let i = 1; i <= healthy + orphans; i++) {
+    writes.push(
+      db
+        .prepare("INSERT INTO follow_subscribers(rowid,id,email,created) VALUES(?,?,?,?)")
+        .bind(i, `prefix-${i}`, `prefix-${i}@example.test`, at),
+    );
+    if (i <= healthy)
+      writes.push(
+        db
+          .prepare("INSERT INTO follow_subscriptions VALUES(?,'keep',?,?,NULL)")
+          .bind(`prefix-${i}`, at, at),
+      );
+  }
+  await db.batch(writes);
+}
+
+function measured(beforeOrphan = async () => {}) {
+  const pages = [];
+  let calls = 0;
+  const db = {
+    prepare(sql) {
+      const wrap = (statement) => ({
+        sql,
+        statement,
+        bind: (...args) => wrap(statement.bind(...args)),
+        all: () => {
+          calls++;
+          return statement.all();
+        },
+      });
+      return wrap(env.DB.prepare(sql));
+    },
+    async batch(statements) {
+      calls++;
+      const orphan =
+        statements.length === 9 && statements[7].sql.includes("DELETE FROM follow_subscribers");
+      if (orphan) await beforeOrphan();
+      const result = await env.DB.batch(statements.map((s) => s.statement));
+      if (orphan) pages.push(result);
+      return result;
+    },
+  };
+  return { db, pages, calls: () => calls };
+}
+
+it("reaches an orphan after 41 healthy roots within the unchanged 48-call scheduler budget", async () => {
+  await reset(env.DB);
+  await prefix(env.DB, 41);
+  const before = await env.DB.prepare(
+    "SELECT * FROM follow_subscriptions ORDER BY subscriber_id",
+  ).all();
+  const m = measured();
+  const wide = JSON.stringify({ deadlineMs: 30000, maxD1Calls: 48, maxRows: 128 });
+  await expect(
+    Promise.all(run({ ...settings, DB: m.db, FOLLOW_MAINTENANCE_POLICY: wide })),
+  ).resolves.toEqual([{ status: "pass-complete" }]);
+  expect(m.calls()).toBe(8);
+  expect(m.pages).toHaveLength(1);
+  expect(m.pages[0][1].results).toEqual([{ examined: 42, last: "42" }]);
+  expect(m.pages[0][8].results).toEqual([{ changed: 1 }]);
+  expect(await env.DB.prepare("SELECT count(*) AS n FROM follow_subscribers").first("n")).toBe(41);
+  expect(
+    (await env.DB.prepare("SELECT * FROM follow_subscriptions ORDER BY subscriber_id").all())
+      .results,
+  ).toEqual(before.results);
+});
+
+it("retains maxRows one legacy orphan receipts and one call per page", async () => {
+  await reset(env.DB);
+  await prefix(env.DB, 2);
+  const m = measured();
+  const one = JSON.stringify({ deadlineMs: 30000, maxD1Calls: 48, maxRows: 1 });
+  await expect(runFollowScheduledMaintenance(m.db, one)).resolves.toEqual({
+    status: "pass-complete",
+  });
+  expect(m.pages).toHaveLength(3);
+  expect(m.pages.map((r) => r[1].results[0].examined)).toEqual([1, 1, 1]);
+  expect(m.pages.map((r) => r[2].results)).toEqual([
+    [{ eligible: 0 }],
+    [{ eligible: 0 }],
+    [{ eligible: 1 }],
+  ]);
+  expect(m.pages.map((r) => r[8].results[0].changed)).toEqual([0, 0, 1]);
+  expect(m.calls()).toBe(11);
+});
+
+it("bounds both lookahead and child drainage by the existing row policy", async () => {
+  await reset(env.DB);
+  await prefix(env.DB, 2);
+  await env.DB.batch(
+    Array.from({ length: 5 }, (_, i) =>
+      env.DB.prepare(
+        "INSERT INTO follow_tokens VALUES(?,'prefix-3','unsubscribe','','generation',NULL,NULL)",
+      ).bind(`child-${i}`),
+    ),
+  );
+  const m = measured();
+  const small = JSON.stringify({ deadlineMs: 30000, maxD1Calls: 48, maxRows: 2 });
+  await expect(runFollowScheduledMaintenance(m.db, small)).resolves.toEqual({
+    status: "pass-complete",
+  });
+  expect(m.pages).toHaveLength(4);
+  expect(m.pages.map((r) => r[1].results[0].examined)).toEqual([2, 1, 1, 1]);
+  expect(m.pages.map((r) => r[4].results[0].changed)).toEqual([0, 2, 2, 1]);
+  expect(m.pages.map((r) => r[8].results[0].changed)).toEqual([0, 0, 0, 1]);
+  expect(m.calls()).toBeLessThanOrEqual(48);
+  expect(await env.DB.prepare("SELECT count(*) AS n FROM follow_subscribers").first("n")).toBe(2);
+  expect(await env.DB.prepare("SELECT count(*) AS n FROM follow_tokens").first("n")).toBe(0);
+});
+
+it("preserves a scope created before the decisive orphan batch", async () => {
+  await reset(env.DB);
+  await prefix(env.DB, 1);
+  const at = await clock(env.DB);
+  let added = false;
+  const m = measured(async () => {
+    if (!added) {
+      added = true;
+      await env.DB.prepare("INSERT INTO follow_subscriptions VALUES('prefix-2','raced',?,?,NULL)")
+        .bind(at, at)
+        .run();
+    }
+  });
+  await expect(runFollowScheduledMaintenance(m.db, policy)).resolves.toEqual({
+    status: "pass-complete",
+  });
+  expect(m.pages).toHaveLength(1);
+  expect(m.pages[0][2].results[0].eligible).toBe(0);
+  expect(m.pages[0][8].results[0].changed).toBe(0);
+  expect(await env.DB.prepare("SELECT count(*) AS n FROM follow_subscribers").first("n")).toBe(2);
+  expect(await env.DB.prepare("SELECT count(*) AS n FROM follow_subscriptions").first("n")).toBe(2);
+});
+
+it("competing scheduler passes delete the later orphan only once", async () => {
+  await reset(env.DB);
+  await prefix(env.DB, 41);
+  const a = measured(),
+    b = measured();
+  const wide = JSON.stringify({ deadlineMs: 30000, maxD1Calls: 48, maxRows: 128 });
+  await expect(
+    Promise.all([
+      runFollowScheduledMaintenance(a.db, wide),
+      runFollowScheduledMaintenance(b.db, wide),
+    ]),
+  ).resolves.toEqual([{ status: "pass-complete" }, { status: "pass-complete" }]);
+  expect([...a.pages, ...b.pages].reduce((sum, r) => sum + r[8].results[0].changed, 0)).toBe(1);
+  expect(a.calls()).toBeLessThanOrEqual(48);
+  expect(b.calls()).toBeLessThanOrEqual(48);
+  expect(await env.DB.prepare("SELECT count(*) AS n FROM follow_subscribers").first("n")).toBe(41);
+  expect(await env.DB.prepare("SELECT count(*) AS n FROM follow_subscriptions").first("n")).toBe(
+    41,
+  );
+});
