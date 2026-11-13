@@ -26,6 +26,16 @@ export async function runFollowScheduledMaintenance(db, rawPolicy, now = () => p
     // One page per unfinished lane per round. Count D1 calls across rounds.
     if (!bounded(deadlineMs, 30000) || !bounded(maxD1Calls, 48) || !bounded(maxRows, 128))
       return { status: "unavailable" };
+    if (Object.hasOwn(policy, "digestCandidates")) {
+      // Only a flat scalar policy can reach here. Count decoded member names so
+      // an escaped duplicate cannot turn an explicit false into true.
+      const names = new Set();
+      for (const match of rawPolicy.matchAll(/("(?:[^"\\]|\\.)*")\s*:/g)) {
+        const name = JSON.parse(match[1]);
+        if (names.has(name)) return { status: "unavailable" };
+        names.add(name);
+      }
+    }
 
     const start = now();
     if (!Number.isFinite(start) || start < 0) return { status: "unavailable" };

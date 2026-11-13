@@ -663,3 +663,39 @@ it("cannot exceed the exact remaining three-call allowance after a committed can
     await env.DB.prepare("SELECT state FROM follow_digest_outbox WHERE id='due'").first("state"),
   ).toBe("cancelled");
 });
+
+it("rejects duplicate decoded candidate-policy members before any native D1 work", async () => {
+  const access = vi.fn(() => {
+    throw Error("No D1 work permitted");
+  });
+  const common = '"deadlineMs":30000,"maxD1Calls":48,"maxRows":128';
+  for (const raw of [
+    `{${common},"digestCandidates":false,"digestCandidates":true}`,
+    `{${common},"digestCandidates":false,"digest\\u0043andidates":true}`,
+    `{${common},"digest\\u0043andidates":true,"digestCandidates":false}`,
+    `{${common},"max\\u0052ows":1,"digestCandidates":true}`,
+  ]) {
+    expect(await runFollowScheduledMaintenance({ prepare: access, batch: access }, raw)).toEqual({
+      status: "unavailable",
+    });
+  }
+  expect(access).not.toHaveBeenCalled();
+});
+
+it("accepts one escaped selector while preserving omitted legacy duplicate parsing", async () => {
+  await reset(env.DB);
+  for (const enabled of [false, true]) {
+    const tracked = counted(env.DB);
+    const raw = `{"deadlineMs":30000,"maxD1Calls":48,"maxRows":128,"digest\\u0043andidates":${enabled}}`;
+    expect(await runFollowScheduledMaintenance(tracked, raw)).toEqual({ status: "pass-complete" });
+    expect(tracked.calls.includes("candidate")).toBe(enabled);
+  }
+  const legacy = counted(env.DB);
+  expect(
+    await runFollowScheduledMaintenance(
+      legacy,
+      '{"deadlineMs":30000,"maxD1Calls":48,"maxRows":1,"max\\u0052ows":128}',
+    ),
+  ).toEqual({ status: "pass-complete" });
+  expect(legacy.calls.includes("candidate")).toBe(false);
+});
