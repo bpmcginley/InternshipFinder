@@ -6,6 +6,7 @@ import {
   observeFollowSendBudget,
   validFollowSendCap,
 } from "./follow-send-budget.js";
+import { normalizeFollowEmail } from "./follows.js";
 
 const DAY = 86400_000,
   LEASE = 5 * 60_000;
@@ -140,10 +141,12 @@ export async function beginBudgetedFollowSnapshotAttempt(
   lease,
   cap,
   clock = () => new Date(),
+  capabilities = null,
 ) {
   if (!validFollowSendCap(cap)) return "unavailable";
   try {
-    return (await beginAttempt(db, key, id, lease, clock, true, cap)) || "unavailable";
+    const issued = capabilities === null ? null : copyCapabilities(capabilities);
+    return (await beginAttempt(db, key, id, lease, clock, true, cap, issued)) || "unavailable";
   } catch {
     // A lost batch response may have committed. Never authorize transport or retry here.
     return "unavailable";
@@ -156,7 +159,7 @@ function budgetClock(clock) {
   return new Date(stamp);
 }
 
-async function beginAttempt(db, key, id, lease, clock, requirePending, cap = null) {
+async function beginAttempt(db, key, id, lease, clock, requirePending, cap = null, issued = null) {
   if (typeof clock !== "function") invalid();
   const email = await db
     .prepare(
@@ -164,7 +167,7 @@ async function beginAttempt(db, key, id, lease, clock, requirePending, cap = nul
     )
     .bind(id)
     .first("email");
-  if (!email) return false;
+  if (!email || (issued && email !== issued.email)) return false;
   const preparedAt = cap === null ? clock() : budgetClock(clock);
   const marker = await dailyMarker(key, email, preparedAt);
   const now = cap === null ? clock() : budgetClock(clock);
@@ -186,6 +189,10 @@ async function beginAttempt(db, key, id, lease, clock, requirePending, cap = nul
       ")";
   const budgetGuard = cap === null ? "" : " AND " + followSendBudgetAvailable;
   const budgetArgs = cap === null ? [] : [at, cap];
+  const issuanceGuard = issued
+    ? " AND subscriber_id=? AND lease_until>strftime('%Y-%m-%dT%H:%M:%fZ','now') AND expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now') AND ?<=strftime('%Y-%m-%dT%H:%M:%fZ','now') AND substr(?,1,10)=date('now')"
+    : "";
+  const issuanceArgs = issued ? [issued.subscriberId, at, at] : [];
   const markerInsert = db
     .prepare(
       "INSERT INTO follow_digest_days (marker,expires_at) SELECT ?,? FROM follow_digest_outbox WHERE " +
@@ -194,9 +201,10 @@ async function beginAttempt(db, key, id, lease, clock, requirePending, cap = nul
         "(SELECT 1 FROM follow_subscribers WHERE id=follow_digest_outbox.subscriber_id AND email=?) AND " +
         progress +
         budgetGuard +
+        issuanceGuard +
         " ON CONFLICT(marker) DO NOTHING",
     )
-    .bind(marker, midnight, id, lease, at, at, email, at, ...budgetArgs);
+    .bind(marker, midnight, id, lease, at, at, email, at, ...budgetArgs, ...issuanceArgs);
   // changes() is the preceding marker INSERT in this atomic D1 batch. Existing markers cannot
   // authorize a second attempt, even after unsubscribe/resubscribe or across enqueue days.
   const claim = db
@@ -221,10 +229,11 @@ async function beginAttempt(db, key, id, lease, clock, requirePending, cap = nul
     db
       .prepare("SELECT lease_until,expires_at FROM follow_digest_outbox WHERE " + valid)
       .bind(id, lease, at, at),
-    observeFollowSendBudget(db, at),
+    observeFollowSendBudget(db, at, issued !== null),
     markerInsert,
     claim,
     debitFollowSendBudget(db, at, cap, true),
+    ...issueStatements(db, issued, id, lease, at),
     cancel,
     db
       .prepare(
@@ -233,8 +242,10 @@ async function beginAttempt(db, key, id, lease, clock, requirePending, cap = nul
           "WHERE o.id=? AND o.lease_token=?",
       )
       .bind(at, id, lease),
+    ...(issued ? [capabilityReceipt(db, issued, id, lease, at)] : []),
   ]);
   const checked = budgetClock(clock).toISOString();
+  if (issued) return issuedReceipt(results, issued, checked, at, midnight, cap);
   if (checked < at || checked >= midnight || !results.every(({ success }) => success)) return false;
   const [original, , , claimed, debited, , current] = results;
   const row = current.results[0];
@@ -242,6 +253,157 @@ async function beginAttempt(db, key, id, lease, clock, requirePending, cap = nul
   if (claimed.meta.changes === 1 && debited.meta.changes === 1 && row.state === "attempting")
     return "claimed";
   if (row.state === "leased" && row.attempts >= cap) return "paused";
+  return false;
+}
+
+const UUID = /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/;
+const validStamp = (v) => typeof v === "string" && followBudgetStamp(new Date(v)) === v;
+function copyCapabilities(value) {
+  const keys = [
+    "subscriberId",
+    "email",
+    "managementHash",
+    "managementGeneration",
+    "unsubscribeHash",
+    "unsubscribeGeneration",
+  ];
+  const copied = receiptFields(value, keys);
+  if (
+    !copied ||
+    Reflect.ownKeys(value).length !== keys.length ||
+    ![copied.subscriberId, copied.managementGeneration, copied.unsubscribeGeneration].every(
+      (v) => typeof v === "string" && UUID.test(v),
+    ) ||
+    ![copied.managementHash, copied.unsubscribeHash].every(
+      (v) => typeof v === "string" && /^[a-f0-9]{64}$/.test(v),
+    ) ||
+    copied.managementHash === copied.unsubscribeHash ||
+    copied.managementGeneration === copied.unsubscribeGeneration ||
+    typeof copied.email !== "string" ||
+    normalizeFollowEmail(copied.email) !== copied.email
+  )
+    invalid();
+  return Object.freeze(copied);
+}
+
+function issueStatements(db, c, id, lease, at) {
+  if (!c) return [];
+  const exact =
+    "o.id=? AND o.state='attempting' AND o.lease_token=? AND o.attempted_at=? AND o.subscriber_id=?";
+  const args = [id, lease, at, c.subscriberId];
+  // Both hashes are inserted in one statement immediately after the exact debit. The
+  // following deletion requires that statement's two direct changes, never old token existence.
+  return [
+    db
+      .prepare(
+        "INSERT INTO follow_tokens(token_hash,subscriber_id,purpose,scope_key,generation,expires_at) " +
+          "SELECT t.hash,o.subscriber_id,t.purpose,'',t.generation,t.expiry FROM follow_digest_outbox o CROSS JOIN " +
+          "(SELECT ? AS hash,? AS generation,'manage' AS purpose,strftime('%Y-%m-%dT%H:%M:%fZ','now','+30 minutes') AS expiry UNION ALL SELECT ?,?,'unsubscribe',NULL) t WHERE " +
+          exact +
+          " AND changes()=1",
+      )
+      .bind(
+        c.managementHash,
+        c.managementGeneration,
+        c.unsubscribeHash,
+        c.unsubscribeGeneration,
+        ...args,
+      ),
+    db
+      .prepare(
+        "DELETE FROM follow_tokens WHERE purpose='manage' AND scope_key='' AND token_hash!=? AND subscriber_id=? AND changes()=2",
+      )
+      .bind(c.managementHash, c.subscriberId),
+  ];
+}
+
+function capabilityReceipt(db, c, id, lease, at) {
+  return db
+    .prepare(
+      "SELECT m.expires_at AS management_expires_at FROM follow_digest_outbox o JOIN follow_subscribers u ON u.id=o.subscriber_id " +
+        "JOIN follow_tokens m ON m.subscriber_id=u.id AND m.token_hash=? AND m.generation=? AND m.purpose='manage' AND m.scope_key='' AND m.owner_user_hash IS NULL " +
+        "JOIN follow_tokens v ON v.subscriber_id=u.id AND v.token_hash=? AND v.generation=? AND v.purpose='unsubscribe' AND v.scope_key='' AND v.owner_user_hash IS NULL AND v.expires_at IS NULL " +
+        "WHERE o.id=? AND o.lease_token=? AND o.state='attempting' AND o.attempted_at=? AND o.subscriber_id=? AND u.email=? " +
+        "AND m.expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now') AND m.expires_at<=strftime('%Y-%m-%dT%H:%M:%fZ','now','+30 minutes') " +
+        "AND NOT EXISTS(SELECT 1 FROM follow_tokens other WHERE other.subscriber_id=u.id AND other.purpose='manage' AND other.scope_key='' AND other.token_hash!=m.token_hash)",
+    )
+    .bind(
+      c.managementHash,
+      c.managementGeneration,
+      c.unsubscribeHash,
+      c.unsubscribeGeneration,
+      id,
+      lease,
+      at,
+      c.subscriberId,
+      c.email,
+    );
+}
+
+function strictReceipts(value, count) {
+  if (!receiptArray(value) || value.length !== count) invalid();
+  const copied = [];
+  for (let i = 0; i < count; i++) {
+    const r = receiptFields(receiptEntry(value, i), ["success", "results", "meta"]);
+    const meta = receiptFields(r?.meta, ["changes"]);
+    if (
+      !r ||
+      r.success !== true ||
+      !meta ||
+      !Number.isSafeInteger(meta.changes) ||
+      meta.changes < 0 ||
+      !receiptArray(r.results)
+    )
+      invalid();
+    copied.push({ changes: meta.changes, results: r.results });
+  }
+  return copied;
+}
+function readFields(receipt, keys) {
+  if (receipt.changes !== 0 || receipt.results.length > 1) invalid();
+  if (!receipt.results.length) return null;
+  const row = receiptEntry(receipt.results, 0),
+    copied = receiptFields(row, keys);
+  if (!copied || Reflect.ownKeys(row).length !== keys.length) invalid();
+  return copied;
+}
+function issuedReceipt(results, credentials, checked, at, midnight, cap) {
+  const r = strictReceipts(results, 10);
+  const original = readFields(r[0], ["lease_until", "expires_at"]);
+  const current = readFields(r[8], ["state", "lease_until", "expires_at", "attempts"]);
+  const issued = readFields(r[9], ["management_expires_at"]);
+  for (const i of [1, 2, 3, 4, 5, 6, 7]) if (r[i].results.length) invalid();
+  if (
+    checked < at ||
+    checked >= midnight ||
+    !liveDeadlines(original, checked) ||
+    !liveDeadlines(current, checked) ||
+    !Number.isSafeInteger(current.attempts) ||
+    current.attempts < 0 ||
+    ![0, 1].includes(r[1].changes)
+  )
+    return false;
+  if (
+    [1, 2, 3, 4].every((i) => r[i].changes === 1) &&
+    current.attempts >= 1 &&
+    current.attempts <= cap &&
+    r[5].changes === 2 &&
+    r[7].changes === 0 &&
+    current.state === "attempting" &&
+    issued &&
+    validStamp(issued.management_expires_at) &&
+    checked < issued.management_expires_at
+  ) {
+    return { status: "claimed", credentials, expiresAt: issued.management_expires_at };
+  }
+  // Only a complete no-write claim may pause. All other uncertainty stays closed.
+  if (
+    [2, 3, 4, 5, 6, 7].every((i) => r[i].changes === 0) &&
+    !issued &&
+    current.state === "leased" &&
+    current.attempts >= cap
+  )
+    return "paused";
   return false;
 }
 
@@ -358,25 +520,105 @@ export async function expireFollowOutbox(db, now = new Date()) {
 
 // Dormant final transport fence. No caller may await other work after true before handoff.
 // Snapshot consent is the same exact generation/progress check used by the budgeted claim.
-export async function authorizeFollowSnapshotTransport(db, id, lease, subscriberId, email, clock) {
+export async function authorizeFollowSnapshotTransport(
+  db,
+  id,
+  lease,
+  subscriberId,
+  email,
+  clock,
+  capabilities = null,
+) {
   try {
+    const proof =
+      capabilities === null ? null : receiptFields(capabilities, ["credentials", "expiresAt"]);
+    if (capabilities !== null && !proof) return false;
+    const issued = proof ? copyCapabilities(proof.credentials) : null;
+    const expiry = proof ? proof.expiresAt : null;
+    if (
+      issued &&
+      (issued.subscriberId !== subscriberId || issued.email !== email || !validStamp(expiry))
+    )
+      return false;
     const at = budgetClock(clock).toISOString();
     const results = await db.batch([
       db
         .prepare(
-          "SELECT follow_digest_outbox.lease_until,follow_digest_outbox.expires_at FROM follow_digest_outbox " +
+          "SELECT follow_digest_outbox.lease_until,follow_digest_outbox.expires_at" +
+            (issued
+              ? ",follow_digest_outbox.id AS job_id,follow_digest_outbox.lease_token,follow_digest_outbox.subscriber_id,u.email,checked_m.token_hash AS management_hash,checked_m.generation AS management_generation,checked_m.expires_at AS management_expires_at,checked_v.token_hash AS unsubscribe_hash,checked_v.generation AS unsubscribe_generation"
+              : "") +
+            " FROM follow_digest_outbox " +
             "JOIN follow_subscribers u ON u.id=follow_digest_outbox.subscriber_id " +
+            (issued
+              ? "JOIN follow_tokens checked_m ON checked_m.subscriber_id=u.id AND checked_m.purpose='manage' AND checked_m.scope_key='' AND checked_m.owner_user_hash IS NULL JOIN follow_tokens checked_v ON checked_v.subscriber_id=u.id AND checked_v.token_hash=? "
+              : "") +
             "WHERE follow_digest_outbox.id=? AND state='attempting' AND lease_token=? " +
-            "AND subscriber_id=? AND u.email=? AND attempted_at<=? AND substr(attempted_at,1,10)=? " +
+            (issued ? "AND follow_digest_outbox.subscriber_id=?" : "AND subscriber_id=?") +
+            " AND u.email=? AND attempted_at<=? AND substr(attempted_at,1,10)=? " +
             "AND attempted_at<=strftime('%Y-%m-%dT%H:%M:%fZ','now') " +
             "AND substr(attempted_at,1,10)=date('now') " +
             "AND lease_until>strftime('%Y-%m-%dT%H:%M:%fZ','now') " +
-            "AND expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now') " +
-            `AND ${consent("payload", "follow_digest_outbox.subscriber_id")} AND ${snapshotConsent}`,
+            (issued ? "AND follow_digest_outbox.expires_at" : "AND expires_at") +
+            ">strftime('%Y-%m-%dT%H:%M:%fZ','now') " +
+            `AND ${consent("payload", "follow_digest_outbox.subscriber_id")} AND ${snapshotConsent}` +
+            (issued
+              ? ` AND EXISTS(SELECT 1 FROM follow_tokens m WHERE m.subscriber_id=u.id AND m.token_hash=? AND m.generation=? AND m.purpose='manage' AND m.scope_key='' AND m.owner_user_hash IS NULL AND m.expires_at=? AND m.expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now') AND NOT EXISTS(SELECT 1 FROM follow_tokens other WHERE other.subscriber_id=u.id AND other.purpose='manage' AND other.scope_key='' AND other.token_hash!=m.token_hash)) AND EXISTS(SELECT 1 FROM follow_tokens v WHERE v.subscriber_id=u.id AND v.token_hash=? AND v.generation=? AND v.purpose='unsubscribe' AND v.scope_key='' AND v.owner_user_hash IS NULL AND v.expires_at IS NULL)`
+              : ""),
         )
-        .bind(id, lease, subscriberId, email, at, at.slice(0, 10), at),
+        .bind(
+          ...(issued ? [issued.unsubscribeHash] : []),
+          id,
+          lease,
+          subscriberId,
+          email,
+          at,
+          at.slice(0, 10),
+          at,
+          ...(issued
+            ? [
+                issued.managementHash,
+                issued.managementGeneration,
+                expiry,
+                issued.unsubscribeHash,
+                issued.unsubscribeGeneration,
+              ]
+            : []),
+        ),
     ]);
     const checked = budgetClock(clock).toISOString();
+    if (issued) {
+      const receipts = strictReceipts(results, 1);
+      const row = readFields(receipts[0], [
+        "lease_until",
+        "expires_at",
+        "job_id",
+        "lease_token",
+        "subscriber_id",
+        "email",
+        "management_hash",
+        "management_generation",
+        "management_expires_at",
+        "unsubscribe_hash",
+        "unsubscribe_generation",
+      ]);
+      return (
+        row !== null &&
+        row.job_id === id &&
+        row.lease_token === lease &&
+        row.subscriber_id === subscriberId &&
+        row.email === email &&
+        row.management_hash === issued.managementHash &&
+        row.management_generation === issued.managementGeneration &&
+        row.management_expires_at === expiry &&
+        row.unsubscribe_hash === issued.unsubscribeHash &&
+        row.unsubscribe_generation === issued.unsubscribeGeneration &&
+        checked >= at &&
+        checked.slice(0, 10) === at.slice(0, 10) &&
+        checked < expiry &&
+        liveDeadlines(row, checked)
+      );
+    }
     return (
       checked >= at &&
       checked.slice(0, 10) === at.slice(0, 10) &&

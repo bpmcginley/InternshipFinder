@@ -25,10 +25,16 @@ function snapshot(supply) {
   if (
     d.sending?.value !== true ||
     !validFollowSendCap(d.cap?.value) ||
-    typeof d.present?.value !== "function"
+    typeof d.present?.value !== "function" ||
+    (d.buildLinks && d.buildLinks.value !== null && typeof d.buildLinks.value !== "function")
   )
     fail();
-  return { sending: true, cap: d.cap.value, present: d.present.value };
+  return {
+    sending: true,
+    cap: d.cap.value,
+    present: d.present.value,
+    buildLinks: d.buildLinks?.value ?? null,
+  };
 }
 export function createOwnedFollowDigestRuntime(options = {}) {
   // Capture each option once, especially DB identity across ownership and dispatch.
@@ -73,7 +79,13 @@ export function createOwnedFollowDigestRuntime(options = {}) {
     try {
       const current = () => {
         const p = snapshot(policy);
-        if (p.sending !== true || p.cap !== selected.cap || p.present !== selected.present) fail();
+        if (
+          p.sending !== true ||
+          p.cap !== selected.cap ||
+          p.present !== selected.present ||
+          p.buildLinks !== selected.buildLinks
+        )
+          fail();
       };
       current();
       result = await runFollowDeliveryTick({
@@ -84,6 +96,7 @@ export function createOwnedFollowDigestRuntime(options = {}) {
         loadSnapshot,
         cap: selected.cap,
         present: selected.present,
+        buildLinks: selected.buildLinks,
         maxCandidates: 1,
         clock: () => {
           current();

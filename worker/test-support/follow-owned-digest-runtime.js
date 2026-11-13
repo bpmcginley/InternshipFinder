@@ -127,6 +127,54 @@ async function fixture(db, n = 3) {
 }
 const owner = (db) => db.prepare("SELECT * FROM follow_delivery_owner").first();
 const reset = (db) => db.prepare("UPDATE follow_delivery_owner SET phase='ready'").run(); // Test fixture only.
+
+function enableDigestCapabilities(f) {
+  const present = f.policy.present;
+  f.policy.present = async (input) => ({
+    ...(await present(input)),
+    origins: ["https://example.test", "https://internscout.org"],
+  });
+  f.policy.buildLinks = ({ management, unsubscribe }) => ({
+    management: `https://internscout.org/follows/manage.html#token=${management}`,
+    unsubscribe: `https://example.test/follows/unsubscribe?token=${unsubscribe}`,
+  });
+}
+export async function ownedCapabilityIssuanceUsesSameOwnerAndBudget(db) {
+  const f = await fixture(db, 1);
+  enableDigestCapabilities(f);
+  assert.deepEqual(await f.run(), { status: "processed", counts: { accepted: 1 } });
+  assert.equal(f.calls(), 1);
+  assert.equal((await owner(db)).phase, "ready");
+  assert.equal(
+    await db
+      .prepare("SELECT count(*) n FROM follow_tokens WHERE purpose IN ('manage','unsubscribe')")
+      .first("n"),
+    2,
+  );
+  assert.equal(await db.prepare("SELECT attempts FROM follow_send_budget").first("attempts"), 1);
+}
+export async function ownedCapabilityBuilderRotationHoldsBeforeHandoff(db) {
+  const f = await fixture(db, 1);
+  enableDigestCapabilities(f);
+  const database = wrap(db, async (sql, result) => {
+    if (sql.length === 10 && sql[5].startsWith("INSERT INTO follow_tokens"))
+      f.policy.buildLinks = () => {
+        throw Error("replacement must not run");
+      };
+    return result;
+  });
+  assert.deepEqual(await f.run({ db: database }), { status: "held" });
+  assert.equal(f.calls(), 0);
+  assert.equal((await owner(db)).phase, "held");
+  assert.equal(await db.prepare("SELECT attempts FROM follow_send_budget").first("attempts"), 1);
+  assert.equal(
+    await db
+      .prepare("SELECT state FROM follow_digest_outbox WHERE id=?")
+      .bind(f.ids[0])
+      .first("state"),
+    "attempting",
+  );
+}
 function wrap(db, batch = async (_sql, result) => result, run = async (_sql, result) => result) {
   const bound = (s, sql) => ({
     raw: s,
