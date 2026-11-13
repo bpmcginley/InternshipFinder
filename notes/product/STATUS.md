@@ -4,6 +4,25 @@ Updated: 2026-11-12. Owner: product lead. Instructions: [HANDOFF.md](HANDOFF.md)
 
 ## Current position
 
+### Remaining work across both refactors
+
+The count below covers the 25 numbered packages in the original Product hand-off. Sixteen are live or dispositioned as specified, including P-1.6, which the hand-off says to skip without a direct per-listing check timestamp. Nine still need implementation, activation or release. Four of the nine ship together in Chrome 0.6.0.
+
+| Remaining outcome | What must pass before it is complete |
+| --- | --- |
+| Engineering listing cutover | [#329](https://github.com/bpmcginley/InternshipFinder/pull/329) is the last required package. Complete seven clean days of automatic listing delivery, refresh the exact head on current main, review and merge, then verify Tests, Pages, all listing pins and rollback readiness. Earliest observation completion is November 19 at 7:43:05 a.m. Eastern, subject to a continuously clean window. |
+| P-2.1 Follow email | Publish and verify the same-export catalog and archive, wire the site and Worker against trusted pins, and qualify sender policy, preview settings, shared capacity, maintenance cadence, restore and uncertain delivery recovery. Then verify signup, confirmation, digest and unsubscribe on the released path. |
+| P-2.2 One-time top-up | Qualify the actual Stripe account, mode, schema and approved live Price and funded-run configuration. Verify checkout, balance and recovery before enabling sales. Historical coverage and automatic erasure require separate proof under the approved policy. |
+| P-2.3 Employer click reporting | After the listing observation, publish annotations only and match the exact export. Verify catalog delivery and current UTC-day maintenance, then qualify Worker intake before browser capture and verify the private aggregate. |
+| P-2.4 Cross-device My List | Implement the approved design after November 24 at 7:26:35 p.m. Eastern. Verify two-device behavior, stale writes, deletion and restore, then coordinate privacy and Worker release. |
+| P-3.1 through P-3.4 Chrome extension | Limit card, review prompt, resume-first setup and practice form source are merged. Bruce reported 0.6.0 submitted with manual publishing selected. Verify Store approval, coordinate manual publication after both refactors, verify the signed version and then publish the install instructions. |
+| P-4.4 Advisor signup | Weekly advisor pages are live. Refresh and verify the default-off source stack. Confirm Tags and the absence of advisor-tag automation in the signed-in provider account, then publish the form and disclosure together and verify fresh rollback after the listing observation. |
+
+P-4.1 pilot measurement and the hand-off’s 14-day counter reviews are follow-up on shipped work. The owner’s campaign and subscription choices, distribution announcement, demo clip and private cost inputs remain tracked separately.
+
+Bounded Follow expiry [#596](https://github.com/bpmcginley/InternshipFinder/pull/596) merged as dormant source at `9aea157e`. [Exact main Tests](https://github.com/bpmcginley/InternshipFinder/actions/runs/43346288158) and [Pages](https://github.com/bpmcginley/InternshipFinder/actions/runs/43346287870) passed. All 5,142 archived files matched the preceding publication, including 141 listing pins. Six live responses matched.
+
+
 ### November 12 Chrome and Follow offline qualification
 
 - **Recommended Chrome ZIP rehearsal recorded.** Evidence-only [#590](https://github.com/bpmcginley/InternshipFinder/pull/590) merged as `f540310001d07e5bcd3f9a31b5d65809c2289f78`. Eight isolated Chrome-to-local-funded-handler cases passed using the recommended 0.6.0 ZIP, synthetic sessions and provider replies. This identifies the recommended artifact, not the owner's actual dashboard upload or a signed Store installation. [Exact Tests 43337019663](https://github.com/bpmcginley/InternshipFinder/actions/runs/43337019663) and [Pages 43337019786](https://github.com/bpmcginley/InternshipFinder/actions/runs/43337019786) passed. Product release verification matched all 5,142 prior files, 141 exact listing blobs and six live responses in [artifact 13997766994](https://github.com/bpmcginley/InternshipFinder/actions/runs/43337019786/artifacts/13997766994). The rehearsal preserves the existing retry behavior and does not prove duplicate-generation prevention or qualify deployed legacy streaming.
