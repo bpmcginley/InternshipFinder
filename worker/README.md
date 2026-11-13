@@ -341,3 +341,5 @@ binding, the `REVIEW_TO` secret, the Stripe webhook events) are in [ORDERS.md](O
 - Extra school domains that don't end in `.edu`: `EDU_EXTRA_DOMAINS`.
 - New allowed site origin (for example a custom domain): add it to `ALLOWED_ORIGINS`, and to both
   sign-in providers' redirect URIs.
+
+<!-- P-2.2bg owns the deployment and top-up operator guidance in this draft. -->
