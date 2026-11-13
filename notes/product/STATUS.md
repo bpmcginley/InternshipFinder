@@ -42,6 +42,8 @@ These exact main Tests and Pages runs passed. Each artifact preserved all 5,148 
 
 The annotations-only rehearsal used source `ad2810c4` and data `871d7862`. Current main `e93d26c3` differs from that source only in the two status trackers. All 141 default listing files matched raw Git. The annotation build added the 2,860-key catalog and changed only employer metadata in 69 JSON files and 2,207 HTML files. Removing the keys restored all 35,495 listing occurrences and exact HTML bytes. All 50,218 annotated anchors matched organic postings in the same export. The exact catalog passed local Worker membership, expiry and refresh tests. The browser capture attribute was absent. The build used an isolated clock, synthetic placements and no live prior page metadata. [Employer rehearsal](https://github.com/bpmcginley/InternshipFinder/pull/465#issuecomment-6846730343)
 
+A second offline rehearsal composed the held #329 head with main deebe26d before building both modes. All 141 raw pins, 35,495 rows, 50,218 organic anchors and 2,860 catalog keys matched the expected export. Browser capture was absent. [Post-cutover rehearsal](https://github.com/bpmcginley/InternshipFinder/pull/465#issuecomment-6848348562)
+
 After #329 publishes and passes exact raw listing verification, use a separate annotations-only Pages slot. The existing manual Pages trigger can build directly. It selects main and data at execution, so verify both actual pins and the published artifact. Existing Pages notification, the downstream every-major workflow and conditional placement accounting still apply. Recheck the served catalog and current-day maintenance before enabling Worker intake. Keep browser capture off until that qualification passes. Rollback through the off mode rebuilds the selected export.
 
 Exact [Engineering #645](https://github.com/bpmcginley/InternshipFinder/pull/645) merged as `e93d26c3`. [Tests](https://github.com/bpmcginley/InternshipFinder/actions/runs/43385048649) and [Pages](https://github.com/bpmcginley/InternshipFinder/actions/runs/43385048634) passed. All 5,148 public files and 141 listing pins matched the preceding artifact. The listing cutover remains held.
@@ -83,12 +85,12 @@ Exact [Engineering #645](https://github.com/bpmcginley/InternshipFinder/pull/645
   native tests passed. The exact combined signup-to-unsubscribe rehearsal also passed.
   [Independent review](https://github.com/bpmcginley/InternshipFinder/pull/653#pullrequestreview-5887959008) ·
   [Lifecycle rehearsal](https://github.com/bpmcginley/InternshipFinder/pull/653#issuecomment-6847642984)
-- [Scheduled digest #654](https://github.com/bpmcginley/InternshipFinder/pull/654) at `fef97235` passed all nine
-  hosted checks, 84 independent native cases and an additional disabled-archive collision case. The scheduled
-  handler dispatches one digest when supplied with trusted inputs. The default Worker has no supplier. An isolated
-  merge rehearsal with #636 resolved the adjacent helper insertion and preserved both maintenance jobs in 13
-  native cases. Production scheduling, key provisioning and digest presentation remain open.
-  [Independent review](https://github.com/bpmcginley/InternshipFinder/pull/654#pullrequestreview-5888128344)
+- Corrected [scheduled digest #654](https://github.com/bpmcginley/InternshipFinder/pull/654) at
+  `da68a169` passed all nine hosted checks, 141 independent native cases and seven entry probes. The
+  isolated #647 lifecycle sent through the actual shared scheduled handler. The default Worker has no
+  digest supplier. Composition with #636 preserved the maintenance jobs and passed 14 native cases.
+  [Exact review](https://github.com/bpmcginley/InternshipFinder/pull/654#issuecomment-6848273711) ·
+  [Scheduled lifecycle](https://github.com/bpmcginley/InternshipFinder/pull/654#issuecomment-6848472301)
 - Six local Git tests verified that the [journal #651](https://github.com/bpmcginley/InternshipFinder/pull/651)
   feeds the [detached recovery #640](https://github.com/bpmcginley/InternshipFinder/pull/640) unchanged after an
   actual two-parent retry. Recovery held when the journal write failed, the direct push acknowledgement was lost,
@@ -101,6 +103,23 @@ Exact [Engineering #645](https://github.com/bpmcginley/InternshipFinder/pull/645
   on the initial hosted Worker job. The exact rerun passed all nine checks. Live Stripe qualification remains open.
   [Independent review](https://github.com/bpmcginley/InternshipFinder/pull/655#pullrequestreview-5888078455) ·
   [Hosted rerun](https://github.com/bpmcginley/InternshipFinder/actions/runs/43392335054/attempts/2)
+
+- [Logical checkpoint retirement #657](https://github.com/bpmcginley/InternshipFinder/pull/657) at
+  `e1cce927` passed all nine hosted checks and 107 independent native cases plus two live-slot probes.
+  Rejection and expiry preserve the other slot under the existing witness. Physical cleanup and
+  production storage remain separately gated.
+  [Exact review](https://github.com/bpmcginley/InternshipFinder/pull/657#pullrequestreview-5888359334)
+- Corrected [top-up epoch candidacy #658](https://github.com/bpmcginley/InternshipFinder/pull/658) at
+  `1d9012c7` passed 86 independent native cases and an additional native empty-result accessor probe.
+  An isolated composition with #657 passed 42 affected D1 cases. Existing settlement still grants
+  normally when coverage is stale or missing. Candidacy supplies no erasure authority.
+  [Exact review](https://github.com/bpmcginley/InternshipFinder/pull/658#issuecomment-6848507353) ·
+  [Combined test](https://github.com/bpmcginley/InternshipFinder/pull/658#issuecomment-6848493027)
+- [Detached recovery source successor #660](https://github.com/bpmcginley/InternshipFinder/pull/660)
+  at `d4adae17` preserves the corrected #606 helper and fixture on exact #501. All 50 local recovery
+  cases and the fresh GitGuardian check passed. The original #606 finding remains open for separate
+  disposition. The prerequisite and owner release gates still apply.
+  [Exact review](https://github.com/bpmcginley/InternshipFinder/pull/660#issuecomment-6848457020)
 
 ### Follow delivery source progress
 
