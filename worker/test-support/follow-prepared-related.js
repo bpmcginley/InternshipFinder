@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { deliverFollowSnapshotDigest } from "../src/follow-digest-delivery.js";
+import { prepareLeasedFollowDigest } from "../src/follow-digest-prepare.js";
 import { matchFollowSnapshot, matchFollowSnapshotWithRelated } from "../src/follow-matching.js";
 import { enqueueFollowSnapshot } from "../src/follow-enqueue.js";
 import { requestFollow, mintFollowToken, confirmFollow } from "../src/follows.js";
@@ -132,6 +133,14 @@ async function fixture(db, empty = false) {
 export async function verifiedSelectionAndOwnedCapabilityBranch(db) {
   const f = await fixture(db);
   const chosen = { ...related };
+  const originalPresent = f.options.present;
+  f.options.present = async () =>
+    Object.defineProperty(await originalPresent(), "similar", {
+      enumerable: true,
+      get() {
+        assert.fail("must not inspect caller similar");
+      },
+    });
   const originalLoad = f.options.loadSnapshot;
   f.options.loadSnapshot = async (pin) => {
     chosen.maxRoles = 0;
@@ -167,6 +176,14 @@ export async function verifiedSelectionAndOwnedCapabilityBranch(db) {
 
 export async function verifiedSelectionOrdinaryBranch(db) {
   const f = await fixture(db);
+  const originalPresent = f.options.present;
+  f.options.present = async () =>
+    Object.defineProperty(await originalPresent(), "similar", {
+      enumerable: true,
+      get() {
+        assert.fail("must not inspect caller similar");
+      },
+    });
   assert.deepEqual(await deliverFollowSnapshotDigest({ ...f.options, relatedLimits: related }), {
     status: "accepted",
   });
@@ -226,6 +243,33 @@ export async function undersizedSelectionFailsBeforeClaim(db) {
     { status: "unavailable" },
   );
   assert.equal(f.sent.length, 0);
+  assert.equal(await f.attempts(), null);
+}
+
+export async function accessorBoundsFailClosedWithoutIO(db) {
+  const f = await fixture(db);
+  const bounds = Object.defineProperty({ ...related }, "maxDirect", {
+    get() {
+      assert.fail("must not invoke bound accessor");
+    },
+  });
+  const noDB = {
+    prepare() {
+      assert.fail("must reject before DB");
+    },
+  };
+  assert.deepEqual(
+    await deliverFollowSnapshotDigest({ ...f.options, db: noDB, relatedLimits: bounds }),
+    { status: "unavailable" },
+  );
+  assert.deepEqual(
+    await prepareLeasedFollowDigest(noDB, f.options.jobId, f.options.jobId, {
+      ...f.options,
+      relatedLimits: bounds,
+    }),
+    { status: "unavailable" },
+  );
+  assert.equal(f.reads(), 0);
   assert.equal(await f.attempts(), null);
 }
 

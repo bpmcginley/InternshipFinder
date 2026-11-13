@@ -9,6 +9,24 @@ import { payloadOf } from "./follow-outbox.js";
 
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 const unavailable = () => ({ status: "unavailable" });
+export function captureFollowDigestRelatedLimits(value) {
+  if (value === undefined) return undefined;
+  if (!value || ![Object.prototype, null].includes(Object.getPrototypeOf(value)))
+    throw new Error("Invalid related limits");
+  const result = {};
+  for (const key of ["maxRoles", "maxDirect", "maxPairs", "maxInputBytes", "maxResultBytes"]) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (
+      !descriptor?.enumerable ||
+      !Object.hasOwn(descriptor, "value") ||
+      !Number.isSafeInteger(descriptor.value) ||
+      descriptor.value < 1
+    )
+      throw new Error("Invalid related limits");
+    result[key] = descriptor.value;
+  }
+  return Object.freeze(result);
+}
 function stamp(clock) {
   const time = clock();
   if (!(time instanceof Date) || !Number.isFinite(+time)) return null;
@@ -50,7 +68,12 @@ export async function prepareLeasedFollowDigest(
   { catalog, limits, loadSnapshot, clock = () => new Date(), relatedLimits } = {},
 ) {
   const bounds = { ...limits };
-  const related = relatedLimits === undefined ? undefined : { ...relatedLimits };
+  let related;
+  try {
+    related = captureFollowDigestRelatedLimits(relatedLimits);
+  } catch {
+    return unavailable();
+  }
   if (
     typeof jobId !== "string" ||
     !uuid.test(jobId) ||
