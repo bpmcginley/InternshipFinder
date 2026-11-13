@@ -9,6 +9,10 @@ import {
 
 const DAY = 86400_000,
   LEASE = 5 * 60_000;
+// Migrations 0010/0012 bound pending JSON to 32768 bytes and unique advances.
+// Each advance occupies at least one byte. Add one outbox update and one pending
+// deletion for a conservative aggregate bound without reading retained scopes.
+const MAX_TERMINAL_CHANGES = 32768 + 2;
 const encoder = new TextEncoder();
 const iso = (now) => now.toISOString();
 const dayOf = (now) => iso(now).slice(0, 10);
@@ -253,6 +257,29 @@ function liveDeadlines(row, checked) {
   );
 }
 
+// Read only expected own data fields. Native metadata may contain additional
+// fields, which are deliberately neither inspected nor invoked.
+function receiptFields(value, keys) {
+  if (
+    !value ||
+    typeof value !== "object" ||
+    ![Object.prototype, null].includes(Object.getPrototypeOf(value))
+  )
+    return null;
+  const copy = Object.create(null);
+  for (const key of keys) {
+    const d = Object.getOwnPropertyDescriptor(value, key);
+    if (!d?.enumerable || !Object.hasOwn(d, "value")) return null;
+    copy[key] = d.value;
+  }
+  return copy;
+}
+const receiptArray = (value) =>
+  Array.isArray(value) && Object.getPrototypeOf(value) === Array.prototype;
+function receiptEntry(value, index) {
+  const d = Object.getOwnPropertyDescriptor(value, index);
+  return d?.enumerable && Object.hasOwn(d, "value") ? d.value : null;
+}
 // Caller reports a known acceptance or uncertainty; there is deliberately no retry transition.
 // After lease expiry/cleanup or deletion, late completion is inert. No provider is called here.
 export async function finishFollowDigestAttempt(db, id, lease, outcome, now = new Date()) {
@@ -268,11 +295,41 @@ export async function finishFollowDigestAttempt(db, id, lease, outcome, now = ne
     db
       .prepare(
         "UPDATE follow_digest_outbox SET state=?,accepted_at=?,payload=NULL,lease_token=NULL,lease_until=NULL " +
-          "WHERE id=? AND state='attempting' AND lease_token=? AND lease_until>?",
+          "WHERE id=? AND state='attempting' AND lease_token=? AND lease_until>? RETURNING 1 AS changed",
       )
       .bind(outcome, outcome === "accepted" ? at : null, id, lease, at),
   ]);
-  return result[1].meta.changes > 0;
+  if (!receiptArray(result) || result.length !== 2) return false;
+  const receipts = [];
+  for (const index of [0, 1]) {
+    const r = receiptFields(receiptEntry(result, index), ["success", "results", "meta"]);
+    const meta = receiptFields(r?.meta, ["changes"]);
+    if (
+      !r ||
+      r.success !== true ||
+      !receiptArray(r.results) ||
+      !meta ||
+      !Number.isSafeInteger(meta.changes) ||
+      meta.changes < 0
+    )
+      return false;
+    receipts.push({ results: r.results, changes: meta.changes });
+  }
+  const [subscriber, terminal] = receipts;
+  if (subscriber.results.length !== 0 || subscriber.changes !== (outcome === "accepted" ? 1 : 0))
+    return false;
+  const rows = terminal.results;
+  if (rows.length !== 1) return false;
+  const row = receiptEntry(rows, 0),
+    changed = receiptFields(row, ["changed"]);
+  // RETURNING counts the direct update independently of watermark triggers.
+  return (
+    changed !== null &&
+    Reflect.ownKeys(row).length === 1 &&
+    changed.changed === 1 &&
+    terminal.changes >= 1 &&
+    terminal.changes <= MAX_TERMINAL_CHANGES
+  );
 }
 
 export function followOutboxExpiryStatements(db, now) {
