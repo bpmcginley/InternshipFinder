@@ -79,6 +79,16 @@ Exact [Engineering #645](https://github.com/bpmcginley/InternshipFinder/pull/645
 
 ### Current Follow and top-up qualification
 
+- **Stripe sandbox checkout and settlement verified.** An isolated Worker and database verified the
+  approved one-time test Price. The first real Stripe Checkout request rejected an Adaptive Pricing
+  override under Managed Payments. [#668](https://github.com/bpmcginley/InternshipFinder/pull/668)
+  fixes that request and passed independent review and nine hosted checks. An owner-completed
+  sandbox Checkout then returned a signed webhook with HTTP 200 and credited exactly 25 runs.
+  Stripe resent the same event and again received 200. The test balance and single purchase
+  were unchanged. No production funds or balances were used. The live catalog Price is set up,
+  and the live top-up offer remains disabled.
+
+
 Four source packages merged after exact review. All four exact Pages checks below preserved all 5,148 public
 files and 141 pinned listing blobs. No Worker deployment or production migration accompanied these merges.
 
@@ -766,7 +776,12 @@ The golden harness now covers static assets as well as generated pages. Each sit
 
 - **Chrome 0.6.0 Store submission and install instructions.** On November 12, 2026 (America/New_York), Bruce reported submitting 0.6.0 for Chrome Web Store review with automatic publication unchecked. This is an owner-reported submission, not an independently verified submission or Store acceptance. Review and publication remain pending. After review, manual publication is available for up to 30 days. The Chrome Developer Dashboard shows the expiration date. [Chrome publishing instructions](https://developer.chrome.com/docs/webstore/publish/#deferred-publishing-option). [Staged install instructions #494](https://github.com/bpmcginley/InternshipFinder/pull/494) remain held until the signed Chrome 0.6.0 extension is publicly verifiable in the Store.
 - **Initial private payment-history observation design** in [#530](https://github.com/bpmcginley/InternshipFinder/pull/530), exact `48be283b08ae1658199b76d4b544501725bd6964`, was approved by Bruce on November 12. This satisfies the initial observation-design gate; implementation, authoritative historical coverage, provider qualification and activation remain separate.
-- **Top-up activation** requires the approved live Stripe Price and release configuration. On November 12 the active Worker binding inventory was missing `STRIPE_PRICE_TOPUP`, and its public configuration showed sales off. The [recovery route #472](https://github.com/bpmcginley/InternshipFinder/pull/472) and [dashboard recovery controls #475](https://github.com/bpmcginley/InternshipFinder/pull/475) are published. Sales and attached recovery remain disabled.
+- **Top-up activation.** Stripe sandbox settlement and replay passed. Keep public sales off pending
+  review of [#669](https://github.com/bpmcginley/InternshipFinder/pull/669), which handles formal
+  disputes larger than the charge after currency conversion, and the live Price and funded-run
+  release checks. The published [privacy wording](https://internscout.org/privacy.html#topups)
+  links availability to payment-history cleanup readiness. Trusted history coverage, cleanup
+  qualification and coordinated terms and privacy publication are still open.
 - **Advisor signup** is held after the owner confirmed Tags is disabled on the current Buttondown plan. If the tagged scope is retained, verify Tags and any advisor-tag automation before coordinated form and privacy publication after G3. [Approved design](P-4.4-advisor-signup.md) · [Publication draft #491](https://github.com/bpmcginley/InternshipFinder/pull/491).
 - **P-2.4 cross-device My List design** at exact `63b29089691b41b3bfc548d760e0d308694dc6de` was approved by Bruce on November 12, including its copy, storage, retention and deletion. Implementation remains held until November 24, 2026 at 7:26:35 p.m. Eastern (November 25 at 00:26:35 UTC). [Design draft #500](https://github.com/bpmcginley/InternshipFinder/pull/500).
 - **P-2.1cn filtered dashboard follows** in [#557](https://github.com/bpmcginley/InternshipFinder/pull/557) is source-merged and independently UI-reviewed. It remains off. Qualified trusted catalog/sender/G3 release is required before enabling the absent static switch.
