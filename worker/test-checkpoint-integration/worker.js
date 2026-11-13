@@ -354,25 +354,8 @@ export class CheckpointIntegration extends DurableObject {
   retireExpired(phase) {
     return this.runtime.retireExpired(phase);
   }
-  async cleanupRetired() {
-    const before = await this.admitted(),
-      retired = before?.retired;
-    if (!retired) return "held";
-    return this.change(
-      (state) => {
-        if (!equal(state, before)) return false;
-        state.retired = null;
-        return true;
-      },
-      async () => {
-        const result = await this.slots.write(
-          retired.slot,
-          retired.etag,
-          await this.slots.tombstone(),
-        );
-        return result.status === "stored";
-      },
-    );
+  cleanupRetired() {
+    return this.runtime.cleanupRetired();
   }
 }
 
