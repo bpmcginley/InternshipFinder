@@ -44,6 +44,7 @@ const migrationNames = [
   "0031_follow_delivery_owner.sql",
   "0032_follow_finalize_attempt_cost.sql",
   "0033_follow_digest_expiry_candidates.sql",
+  "0034_topup_purchase_coverage_epoch.sql",
 ];
 const legacySql = [...env.TEST_SCHEMA_SQL, ...env.TEST_EXTRA_SCHEMA_SQL];
 const databases = [env.LEGACY_DB, env.MIGRATION_DB];
@@ -366,6 +367,7 @@ it("0020 preserves old retention timestamps but cannot infer historical eligibil
     resolved_zero_since: "2020-01-01T00:00:00.000Z",
     history_proven: 0,
     evidence_digest: null,
+    coverage_epoch: null,
   });
   expect(
     await env.MIGRATION_DB.prepare("SELECT consumed FROM topup_purchases WHERE payment_hash=?")

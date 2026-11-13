@@ -227,3 +227,6 @@ export function createFollowCheckpointSnapshotReader({
     }
   };
 }
+
+// Shared pure metadata validation; no slot reads or witness authority.
+export { record as validateFollowCheckpointRecord };

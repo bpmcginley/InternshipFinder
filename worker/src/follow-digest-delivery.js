@@ -1,5 +1,8 @@
 // Dormant one-attempt composition; capability issuance requires an explicit trusted builder.
-import { prepareLeasedFollowDigest } from "./follow-digest-prepare.js";
+import {
+  prepareLeasedFollowDigest,
+  captureFollowDigestRelatedLimits,
+} from "./follow-digest-prepare.js";
 import { renderFollowMail } from "./follow-mail.js";
 import { createFollowCapability } from "./follows.js";
 import { validFollowSendCap } from "./follow-send-budget.js";
@@ -12,7 +15,7 @@ import {
 
 // Capture only rendered public facts before exposing fresh capabilities to the builder.
 // Reuse the caller's already-required result/role bounds; no separate volume policy.
-function snapshotPresentation(input, matches, limits) {
+function snapshotPresentation(input, matches, limits, similar) {
   let remaining = limits.maxResultBytes;
   const maxRoles = limits.maxRoles;
   if (
@@ -89,7 +92,7 @@ function snapshotPresentation(input, matches, limits) {
       publicShare: publicUrl(field(links, "publicShare")),
     }),
     matches: list(matches, maxRoles, role),
-    similar: list(field(input, "similar", true) ?? [], maxRoles, role),
+    similar: list(similar ?? field(input, "similar", true) ?? [], maxRoles, role),
   });
 }
 
@@ -133,6 +136,7 @@ export async function deliverFollowSnapshotDigest({
   present,
   transport,
   buildLinks = null,
+  relatedLimits,
 }) {
   const unavailable = () => ({ status: "unavailable" });
   if (
@@ -154,6 +158,7 @@ export async function deliverFollowSnapshotDigest({
     return new Date(latest);
   };
   try {
+    const related = captureFollowDigestRelatedLimits(relatedLimits);
     lease = await leaseFollowDigest(db, jobId, fresh());
     if (!lease) return unavailable();
     const prepared = await prepareLeasedFollowDigest(db, jobId, lease, {
@@ -161,6 +166,7 @@ export async function deliverFollowSnapshotDigest({
       limits,
       loadSnapshot,
       clock: fresh,
+      relatedLimits: related,
     });
     if (prepared.status !== "ready") return unavailable();
     const recipient = await db
@@ -170,14 +176,20 @@ export async function deliverFollowSnapshotDigest({
     if (typeof recipient !== "string") return unavailable();
     // Snapshot public roles before calling trusted presentation code. It receives no email.
     const matches = prepared.roles.map((role) => ({ ...role }));
+    const similar =
+      related === undefined ? undefined : prepared.similar.map((role) => ({ ...role }));
     const presentation = await present({
       subscriberId: prepared.subscriberId,
       roles: prepared.roles.map((role) => ({ ...role })),
     });
     let credentials = null,
       bound = presentation;
+    if (similar !== undefined && buildLinks === null) {
+      const { from, postalAddress, origins, links } = presentation;
+      bound = { from, postalAddress, origins, links };
+    }
     if (buildLinks !== null) {
-      const snapshot = snapshotPresentation(presentation, matches, limits);
+      const snapshot = snapshotPresentation(presentation, matches, limits, similar);
       const [management, unsubscribe] = await Promise.all([
         createFollowCapability(),
         createFollowCapability(),
@@ -201,6 +213,7 @@ export async function deliverFollowSnapshotDigest({
     const envelope = renderFollowMail("digest", {
       ...bound,
       matches: credentials ? bound.matches : matches,
+      ...(similar === undefined ? {} : { similar: credentials ? bound.similar : similar }),
       to: recipient,
     });
     if (!envelope) return unavailable();
