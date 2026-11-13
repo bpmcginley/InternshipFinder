@@ -21,6 +21,7 @@ import { createFollowSignupRoute } from "./follow-signup-route.js";
 import { prepareFollowSignupDeployment } from "./follow-signup-release.js";
 import { runFollowScheduledMaintenance } from "./follow-scheduled-maintenance.js";
 import { runFollowScheduledLinks } from "./follow-scheduled-links.js";
+import { runFollowArchiveDeployment } from "./follow-archive-deployment.js";
 import { followTokenEndpoints } from "./follow-token-endpoint.js";
 import { followUnsubscribeEndpoint } from "./follow-unsubscribe-endpoint.js";
 import { followUnsubscribePreview } from "./follow-unsubscribe-preview.js";
@@ -827,6 +828,31 @@ export default {
         ![CLOCK_CRON, STUDENT_BILLING_CRON, CAMPAIGN_REPORT_CRON, "17 7 * * *", followCron].includes(linksCron) &&
         event?.cron === linksCron) {
       if (env.FOLLOW_LINKS_ENABLED === "1") ctx.waitUntil(runFollowScheduledLinks(env));
+      return;
+    }
+    const archiveCron = env.FOLLOW_ARCHIVE_CRON;
+    if (
+      typeof archiveCron === "string" &&
+      archiveCron.length > 0 &&
+      event?.cron === archiveCron &&
+      ![
+        CLOCK_CRON, STUDENT_BILLING_CRON, CAMPAIGN_REPORT_CRON, "17 7 * * *", followCron, linksCron,
+      ].includes(archiveCron)
+    ) {
+      if (env.FOLLOW_ARCHIVE_ENABLED === "1") {
+        ctx.waitUntil(
+          runFollowArchiveDeployment({
+            enabled: true,
+            get descriptor() {
+              return env.FOLLOW_ARCHIVE_RELEASE;
+            },
+            get db() {
+              return env.DB;
+            },
+            fetch,
+          }),
+        );
+      }
       return;
     }
     if (event?.cron !== "17 7 * * *") return;

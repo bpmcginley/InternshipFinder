@@ -1,6 +1,7 @@
 import { applyD1Migrations } from "cloudflare:test";
 import { env } from "cloudflare:workers";
-import { beforeEach, expect, it } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import worker from "../src/index.js";
 import { runFollowArchiveDeployment } from "../src/follow-archive-deployment.js";
 import { runFollowArchiveRelease } from "../src/follow-archive-release.js";
 import { prepareFollowCatalogDeployment } from "../src/follow-signup-release.js";
@@ -17,7 +18,9 @@ beforeEach(async () => {
   await env.DB.prepare("DELETE FROM follow_subscribers").run();
   await env.DB.prepare("DELETE FROM follow_digest_days").run();
 });
-async function fixture(genesis = false) {
+afterEach(() => vi.unstubAllGlobals());
+
+async function fixture(genesis = false, subscribers = 1) {
   const time = Date.now(),
     generated = time - hour,
     confirmed = generated - hour;
@@ -26,24 +29,26 @@ async function fixture(genesis = false) {
     fields: new Set(["swe"]),
     states: new Set(["MA"]),
   };
-  const scope = await requestFollow(
-    env.DB,
-    "synthetic@example.test",
-    { kind: "company", company: "fixture" },
-    sets,
-    new Date(confirmed),
-  );
-  await confirmFollow(
-    env.DB,
-    await mintFollowToken(
+  for (let index = 0; index < subscribers; index++) {
+    const scope = await requestFollow(
       env.DB,
-      scope.subscriberId,
-      "confirm",
-      { scopeKey: scope.scopeKey },
+      `synthetic${index}@example.test`,
+      { kind: "company", company: "fixture" },
+      sets,
       new Date(confirmed),
-    ),
-    new Date(confirmed),
-  );
+    );
+    await confirmFollow(
+      env.DB,
+      await mintFollowToken(
+        env.DB,
+        scope.subscriberId,
+        "confirm",
+        { scopeKey: scope.scopeKey },
+        new Date(confirmed),
+      ),
+      new Date(confirmed),
+    );
+  }
   const snapshot = JSON.stringify({
     version: 1,
     complete: true,
@@ -186,6 +191,126 @@ async function fixture(genesis = false) {
     jobs: () => env.DB.prepare("SELECT count(*) AS n FROM follow_digest_outbox").first("n"),
   };
 }
+
+const archiveCron = "19 3 * * *";
+
+function scheduledArchive(bindings, cron = archiveCron) {
+  const pending = [];
+  worker.scheduled({ cron }, bindings, { waitUntil: (job) => pending.push(job) });
+  return Promise.all(pending);
+}
+
+it("scheduled archive requires an exact configured cron and literal opt-in", async () => {
+  const read = vi.fn(() => {
+    throw Error("unexpected archive binding read");
+  });
+  const bindings = (selection) =>
+    Object.defineProperties(
+      { FOLLOW_ARCHIVE_CRON: archiveCron, ...selection },
+      { FOLLOW_ARCHIVE_RELEASE: { get: read }, DB: { get: read }, EMAIL: { get: read } },
+    );
+  for (const enabled of [undefined, "0", true])
+    expect(await scheduledArchive(bindings({ FOLLOW_ARCHIVE_ENABLED: enabled }))).toEqual([]);
+  expect(await scheduledArchive(bindings({ FOLLOW_ARCHIVE_ENABLED: "1" }), "21 3 * * *")).toEqual(
+    [],
+  );
+  for (const setting of ["FOLLOW_LINKS_CRON", "FOLLOW_MAINTENANCE_CRON"]) {
+    expect(
+      await scheduledArchive(bindings({ FOLLOW_ARCHIVE_ENABLED: "1", [setting]: archiveCron })),
+    ).toEqual([]);
+  }
+  expect(read).not.toHaveBeenCalled();
+});
+
+it("scheduled archive returns unavailable for a missing or inaccessible release", async () => {
+  const fetch = vi.fn();
+  vi.stubGlobal("fetch", fetch);
+  const bindings = { FOLLOW_ARCHIVE_CRON: archiveCron, FOLLOW_ARCHIVE_ENABLED: "1", DB: env.DB };
+  const unavailable = [{ status: "unavailable", fetchCalls: 0 }];
+  expect(await scheduledArchive(bindings)).toEqual(unavailable);
+  Object.defineProperty(bindings, "FOLLOW_ARCHIVE_RELEASE", {
+    get() {
+      throw Error("unavailable binding");
+    },
+  });
+  expect(await scheduledArchive(bindings)).toEqual(unavailable);
+  expect(fetch).not.toHaveBeenCalled();
+});
+
+it("existing clock, billing, reports and daily work retain priority", async () => {
+  const descriptor = vi.fn(() => {
+    throw Error("unexpected archive descriptor read");
+  });
+  const fetch = vi.fn(async () => {
+    throw Error("unexpected network");
+  });
+  vi.stubGlobal("fetch", fetch);
+  const db = {
+    prepare: () => ({
+      bind() {
+        return this;
+      },
+      all: async () => ({ success: true, results: [] }),
+      run: async () => ({ success: true, meta: { changes: 0 } }),
+      first: async () => null,
+    }),
+    batch: async () => [],
+  };
+  const invoke = (cron, extra) => {
+    const jobs = [];
+    const bindings = Object.defineProperty({ DB: db, ...extra }, "FOLLOW_ARCHIVE_RELEASE", {
+      get: descriptor,
+    });
+    worker.scheduled({ cron }, bindings, {
+      waitUntil: (job) => jobs.push(Promise.resolve(job).catch(() => {})),
+    });
+    return jobs;
+  };
+  for (const cron of ["4,34 * * * *", "27 7 * * *", "47 7 * * *", "17 7 * * *"]) {
+    const previous = invoke(cron, {});
+    const selected = invoke(cron, { FOLLOW_ARCHIVE_CRON: cron, FOLLOW_ARCHIVE_ENABLED: "1" });
+    expect(selected).toHaveLength(previous.length);
+    await Promise.all([...previous, ...selected]);
+  }
+  expect(descriptor).not.toHaveBeenCalled();
+  expect(fetch).not.toHaveBeenCalled();
+});
+
+it("scheduled archive enqueues one bounded pass and leaves email and delivery ownership untouched", async () => {
+  const f = await fixture(false, 2);
+  f.input.budget.maxPages = 1;
+  vi.stubGlobal("fetch", f.options.fetch);
+  const email = vi.fn(() => {
+    throw Error("unexpected email binding read");
+  });
+  const bindings = Object.defineProperty(
+    {
+      FOLLOW_ARCHIVE_CRON: archiveCron,
+      FOLLOW_ARCHIVE_ENABLED: "1",
+      FOLLOW_ARCHIVE_RELEASE: JSON.stringify(f.input),
+      DB: env.DB,
+    },
+    "EMAIL",
+    { get: email },
+  );
+  const owner = () => env.DB.prepare("SELECT * FROM follow_delivery_owner").first();
+  const before = await owner();
+  expect(await scheduledArchive(bindings)).toMatchObject([
+    { status: "partial", pages: 1, subscribers: 1, fetchCalls: 4, counts: { queued: 1 } },
+  ]);
+  expect(await f.jobs()).toBe(1);
+  expect(await owner()).toEqual(before);
+  expect(email).not.toHaveBeenCalled();
+  expect(f.gets).toEqual([f.priorUrl, f.currentUrl, f.indexUrl, [...f.files.keys()].at(-1)]);
+  f.input.budget.maxPages = 2;
+  bindings.FOLLOW_ARCHIVE_RELEASE = JSON.stringify(f.input);
+  expect(await scheduledArchive(bindings)).toMatchObject([
+    { status: "pass-complete", pages: 2, subscribers: 2, counts: { queued: 2 } },
+  ]);
+  expect(await f.jobs()).toBe(2);
+  expect(await owner()).toEqual(before);
+  expect(email).not.toHaveBeenCalled();
+});
 
 it("default off does not inspect deployment inputs", async () => {
   expect(
