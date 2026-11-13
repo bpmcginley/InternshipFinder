@@ -567,6 +567,10 @@ test("verified final review skips only the redundant Worker call", async (t) => 
   const digestWarning = "This field is required.";
   const cases = [
     ["qualified review", 1, "ready_to_submit"],
+    ["two verified fills", 1, "ready_to_submit"],
+    ["second fill has a validation error", 2, "ready_to_submit"],
+    ["same field filled twice", 2, "ready_to_submit"],
+    ["extra tool before Next", 2, "ready_to_submit"],
     ["ambiguous document evidence", 2, "ready_to_submit"],
     ["alternate control", 2, "ready_to_submit"],
     ["consent control", 2, "needs_you"],
@@ -584,12 +588,17 @@ test("verified final review skips only the redundant Worker call", async (t) => 
       const id = await newJob();
       let phase = "fill", proofReads = 0, highlighted = 0;
       const requests = [];
+      const batched = ["two verified fills", "second fill has a validation error", "same field filled twice", "extra tool before Next"].includes(name);
+      const extraFillRef = name === "same field filled twice" ? "e1" : "e2";
       window.ISDom.snapshot = () => {
         const review = phase !== "fill", late = phase === "late";
         return {
           url, title: "Synthetic internship", headings: [review ? "Review Your Application" : "Application"],
           step: review ? "2" : "1", errors: [], captcha: false, reviewStep: review,
-          elements: review && !late ? [] : [{ ref: "e1", kind: "text", label: late ? "New required answer" : "Name", required: true, value: "" }],
+          elements: review && !late ? [] : [
+            { ref: "e1", kind: "text", label: late ? "New required answer" : "Name", required: true, value: "" },
+            ...(batched && !late ? [{ ref: "e2", kind: "text", label: "Email", required: true, value: "" }] : []),
+          ],
           buttons: !review ? [{ ref: "b1", text: "Next" }] : name === "consent control"
             ? [{ ref: "b2", text: "I agree", blocked: true, consent: true }]
             : [{ ref: "b2", text: "Submit Application", blocked: true },
@@ -602,7 +611,10 @@ test("verified final review skips only the redundant Worker call", async (t) => 
       window.ISDom.act = async (ref, kind) => {
         actions.push(kind + ":" + ref);
         if (kind === "click" && ref === "b1") phase = "review";
-        if (kind === "fill" && name === "field error on the preceding fill") return { ok: true, field_error: "Invalid" };
+        if (kind === "fill" && (name === "field error on the preceding fill" ||
+            (name === "second fill has a validation error" && ref === "e2"))) {
+          return { ok: true, field_error: "Invalid" };
+        }
         return { ok: true };
       };
       window.ISDom.highlight = () => {
@@ -645,7 +657,12 @@ test("verified final review skips only the redundant Worker call", async (t) => 
           assert.ok(JSON.stringify(body).includes(warnings[name] || digestWarning));
         }
         const parts = requests.length === 1
-          ? [tool("fill", { ref: "0:e1", text: "Sample" }), tool("click", { ref: "0:b1" })]
+          ? [
+            tool("fill", { ref: "0:e1", text: "Sample" }),
+            ...(batched ? [tool("fill", { ref: "0:" + extraFillRef, text: "sample@example.test" })] : []),
+            ...(name === "extra tool before Next" ? [tool("wait", { seconds: 1 })] : []),
+            tool("click", { ref: "0:b1" }),
+          ]
           : warnings[name] || ["late editable field", "consent control", "warning during final digest"].includes(name)
             ? [tool("pause_for_user", { reason: "Check the new prompt." })]
             : [tool("ready_to_submit", { summary: "Human review" })];
@@ -657,12 +674,12 @@ test("verified final review skips only the redundant Worker call", async (t) => 
       assert.equal(job.status, status);
       assert.equal(requests.length, expectedCalls);
       assert.equal(new Set(requests.map((body) => body.run_id)).size, 1);
-      assert.deepEqual(actions, ["fill:e1", "click:b1"]);
-      if (name === "qualified review") {
+      assert.deepEqual(actions, ["fill:e1", ...(batched ? ["fill:" + extraFillRef] : []), "click:b1"]);
+      if (name === "qualified review" || name === "two verified fills") {
         assert.equal(proofReads, 2);
         assert.equal(highlighted, 1);
         assert.equal(job.summary, "Check every answer before you submit.");
-        assert.equal(job.pending.results.length, 2);
+        assert.equal(job.pending.results.length, batched ? 3 : 2);
         assert.equal((await loadMsgs(id)).length, 2);
       }
       if (name === "warning during final digest") {
