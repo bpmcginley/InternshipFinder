@@ -324,3 +324,69 @@ def test_full_upstream_shard_cardinality_plus_first_is_accepted(captured):
     files['unexpected.json'] = b'[]'
     with pytest.raises(ValueError):
         prepare(captured[1]['listings'], updated, enabled=True, max_rows=100, max_bytes=200000)
+
+
+@pytest.mark.parametrize('change', ['mutated', 'other_loader'])
+def test_loader_membership_must_match_captured_shards(captured, change):
+    root, loaded, _ = captured
+    if change == 'mutated':
+        loaded['listings'][0]['keys'].discard('MA')
+        loaded['listings'][0]['keys'].add('CA')
+    else:
+        index_path = root / 'data/listings/index.json'
+        index = json.loads(index_path.read_bytes())
+        index['files']['CA'] = index['files'].pop('MA')
+        index['files']['CA']['file'] = 'listings/CA.json'
+        (root / 'data/listings/CA.json').write_bytes((root / 'data/listings/MA.json').read_bytes())
+        index_path.write_bytes(raw(index))
+        other = source.load(str(root))
+        assert {k: v for k, v in other['listings'][0].items() if k != 'keys'} == {
+            k: v for k, v in loaded['listings'][0].items() if k != 'keys'
+        }
+        loaded['listings'][0] = other['listings'][0]
+    with pytest.raises(ValueError):
+        selection(captured)
+
+
+def test_first_preview_cannot_supply_missing_shard_membership(captured):
+    stage = captured[2]
+    updated = replace(
+        stage, follow=replace(stage.follow, files={'first.json': stage.follow.files['first.json']})
+    )
+    with pytest.raises(ValueError):
+        prepare(captured[1]['listings'][:1], updated, enabled=True, max_rows=100, max_bytes=200000)
+
+
+@pytest.mark.parametrize('name', ['Acme Café', 'Acme ' + 'é' * 110])
+def test_canada_metro_membership_and_inherited_multibyte_label_bound(captured, name):
+    root = captured[0]
+    _, _, options = sample()
+    selected = {
+        path: (root / 'data' / path).read_bytes()
+        for path in ('listings/index.json', 'majors.json', 'listings/MA.json', 'listings/ON.json')
+    }
+    metro = next(iter(source.CA_METRO_PAGES))
+    for path in ('listings/MA.json', 'listings/ON.json'):
+        rows = json.loads(selected[path])
+        for row in rows:
+            row['company_name'] = name
+            row['regions'] = [
+                {'loc': 'Toronto, ON', 'state': 'ON', 'kind': 'canada', 'metro': metro}
+            ]
+        selected[path] = raw(rows)
+    first = raw([json.loads(selected['listings/MA.json'])[0]])
+    stage = stage_paired_annotations(selected, first, **repin(selected, first, options))
+    assert name in dict(json.loads(stage.follow.catalog.payload)['aliases'])
+    for path, data in selected.items():
+        (root / 'data' / path).write_bytes(data)
+    loaded = source.load(str(root))
+    current = (root, loaded, stage)
+    ctx = selection(current)
+    assert loaded['listings'][0]['keys'] == {'MA', 'ON', 'Canada', metro}
+    value = replace(page(current), name=name, spellings=[name])
+    if len(name.encode('utf-8')) > 200:
+        # Existing #575 renderer is stricter than the catalog's UTF-16 display bound.
+        with pytest.raises(ValueError):
+            ctx.select(value, enabled=True)
+    else:
+        assert ctx.select(value, enabled=True).follow_company.key == source.employer_key(name)

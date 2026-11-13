@@ -202,8 +202,17 @@ def prepare_follow_employer_selection(
     catalog = codec._read(payload)
     aliases = MappingProxyType(dict(catalog['aliases']))
     companies = frozenset(catalog['signup']['companies'])
-    identities, occurrences = {}, 0
-    for raw in raw_files:
+    identities, membership, occurrences = {}, {}, 0
+    for path, raw in stage.follow.files.items():
+        if path == 'first.json':
+            continue  # Preview never supplies source.load membership.
+        if (
+            type(path) is not str
+            or not path.startswith('listings/')
+            or not path.endswith('.json')
+            or not codec._SHARD.fullmatch(path[9:-5])
+        ):
+            _fail()
         rows = codec._read(raw)
         if type(rows) is not list:
             _fail()
@@ -222,6 +231,18 @@ def prepare_follow_employer_selection(
             identity = (_facts(original, limit=max_bytes, public=True, derive=True), key)
             if identities.setdefault(row['id'], identity) != identity:
                 _fail()
+            if not source.well_formed(original) or not source.safe_url(original.get('apply_url')):
+                continue
+            keys = membership.setdefault(row['id'], set())
+            keys.add(path[9:-5])
+            for region in original.get('regions') or []:
+                if region.get('kind') == 'canada':
+                    keys.add('Canada')
+                if region.get('metro') in source.CA_METRO_PAGES:
+                    keys.add(region['metro'])
+                metro = source.us_metro(region) if region.get('kind') != 'canada' else None
+                if metro:
+                    keys.add(metro)
     captured, used = {}, 0
     for position, row in enumerate(organic_rows):
         if type(row) is not dict or type(row.get('id')) is not str:
@@ -230,6 +251,8 @@ def prepare_follow_employer_selection(
         if (
             row['id'] in captured
             or identity is None
+            or type(row.get('keys')) is not set
+            or row['keys'] != membership.get(row['id'])
             or any(k in row for k in ('follow_company_key', 'employer_key'))
             or _facts(row, limit=max_bytes, public=True) != identity[0]
         ):
