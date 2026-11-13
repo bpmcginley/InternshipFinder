@@ -56,7 +56,9 @@ Exact [Engineering #645](https://github.com/bpmcginley/InternshipFinder/pull/645
   `34719813` stops before submitting the owner update when the ready lookup finishes after the deadline. It checks
   the same deadline again immediately before handing off to EMAIL. A spent claim retains its budget and existing held
   outcome. The author passed 94 native and 1,268 Node tests. Independent native tests verified both fixes. An owner
-  update submitted on time may still arrive at SQLite after the deadline.
+  update submitted on time may still arrive at SQLite after the deadline. Engineering reproduced that case with no
+  email, budget use or queue change. A follow-up will apply the cutoff at the database update. All nine hosted checks
+  passed for `34719813`.
   [Exact deadline review](https://github.com/bpmcginley/InternshipFinder/pull/649#issuecomment-6847406822)
 - The [default-entry test draft #647](https://github.com/bpmcginley/InternshipFinder/pull/647) at
   `1e01b559` passed 36 native cases and all nine hosted checks. It covers HTTP signup and confirmation, scheduled
@@ -66,6 +68,12 @@ Exact [Engineering #645](https://github.com/bpmcginley/InternshipFinder/pull/645
   snapshot, and synthetic EMAIL recorded one confirmation and one digest. The owner returned ready and the watermark
   and action assertions passed. Production scheduling, sender and restore qualification remain open.
   [Independent corrected composition](https://github.com/bpmcginley/InternshipFinder/pull/649#issuecomment-6847431772)
+
+- The [push intent journal draft #651](https://github.com/bpmcginley/InternshipFinder/pull/651) at `3b51a5a9`
+  records each exact candidate before its push through a trusted caller-supplied sink. Independent review passed 45
+  tests and verified the existing recovery parser accepts the canonical bytes. A stale sink acknowledgement withholds
+  private evidence while the ordinary listing retry still succeeds. Production storage and trusted accepted-operation
+  evidence remain open. [Independent exact review](https://github.com/bpmcginley/InternshipFinder/pull/651#pullrequestreview-5887873831)
 
 ### Follow delivery source progress
 
