@@ -89,7 +89,7 @@ def _parent(value):
     return path
 
 
-def _write(path, raw):
+def _write(path, raw, created=None):
     flags = os.O_CREAT | os.O_EXCL | os.O_RDWR
     flags |= getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0)
     descriptor = os.open(path, flags, 0o600)
@@ -97,6 +97,8 @@ def _write(path, raw):
         info = os.fstat(stream.fileno())
         if not _regular(info) or not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
             raise ValueError("exclusive regular output required")
+        if created is not None:
+            created[path] = (info.st_dev, info.st_ino)
         if stream.write(raw) != len(raw):
             raise OSError("incomplete archive write")
         stream.flush()
@@ -166,6 +168,7 @@ def stage_follow_archive(
         raise ValueError("completed archive manifest required")
     private = _parent(parent)
     identities = {private: _directory(private)}
+    created_files = {}
     root = Path(tempfile.mkdtemp(prefix="follow-archive-", dir=private))
     # mkdtemp is exclusive; the generation is never reused, renamed or made public.
     paths = tuple(root / name for name in sorted(proposed.files))
@@ -180,7 +183,7 @@ def stage_follow_archive(
         for path in paths:
             if any(_directory(p) != identity for p, identity in identities.items()):
                 raise ValueError("private directory changed")
-            _write(path, proposed.files[path.relative_to(root).as_posix()])
+            _write(path, proposed.files[path.relative_to(root).as_posix()], created_files)
         if any(_directory(p) != identity for p, identity in identities.items()):
             raise ValueError("private directory changed")
         for path in paths:
@@ -213,23 +216,41 @@ def stage_follow_archive(
             root, proposed.base_index_sha256, sha256(proposed.files[INDEX]).hexdigest(), receipts
         )
     except BaseException:
-        # No recursive deletion, traversal or touching prior/current output. On a
-        # violated ownership precondition leave an unusable private orphan instead.
-        if root in identities and all(
-            _unchanged(p, identity) for p, identity in identities.items()
-        ):
-            for path in paths:
+        # Only successful creations carry ownership. Check captured ancestors from
+        # parent to child before traversing; unknown/replaced output stays orphaned.
+        for path, identity in created_files.items():
+            if _owned_ancestors(path, private, identities):
                 try:
-                    if not stat.S_ISDIR(path.lstat().st_mode):
+                    info = path.lstat()
+                    if (
+                        _regular(info)
+                        and stat.S_ISREG(info.st_mode)
+                        and info.st_nlink == 1
+                        and (info.st_dev, info.st_ino) == identity
+                    ):
                         path.unlink()
                 except OSError:
                     pass
-            for directory in reversed(directories):
+        for directory in reversed(tuple(identities)):
+            if (
+                directory != private
+                and _owned_ancestors(directory, private, identities)
+                and _unchanged(directory, identities[directory])
+            ):
                 try:
                     directory.rmdir()
                 except OSError:
                     pass
         raise
+
+
+def _owned_ancestors(path, private, identities):
+    if not path.is_relative_to(private) or path == private:
+        return False
+    chain = [path.parent]
+    while chain[-1] != private:
+        chain.append(chain[-1].parent)
+    return all(p in identities and _unchanged(p, identities[p]) for p in reversed(chain))
 
 
 def _unchanged(path, identity):

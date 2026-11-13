@@ -143,10 +143,10 @@ def test_partial_failure_no_receipt_no_prior_mutation(stage, monkeypatch, tmp_pa
     real_write = stage._write
     calls = 0
 
-    def broken(path, raw):
+    def broken(path, raw, created):
         nonlocal calls
         calls += 1
-        real_write(path, raw)
+        real_write(path, raw, created)
         if calls == 2:
             raise OSError("synthetic partial write")
 
@@ -237,8 +237,8 @@ def test_final_readback_rejects_change_to_previously_written_blob(stage, monkeyp
     original = stage._write
     previous = []
 
-    def changed(path, raw):
-        original(path, raw)
+    def changed(path, raw, created):
+        original(path, raw, created)
         if previous:
             previous[0].write_bytes(b"changed after its own readback")
         previous.append(path)
@@ -252,8 +252,8 @@ def test_final_readback_rejects_change_to_previously_written_blob(stage, monkeyp
 def test_extra_output_prevents_receipt(stage, monkeypatch, tmp_path):
     original = stage._write
 
-    def extra(path, raw):
-        original(path, raw)
+    def extra(path, raw, created):
+        original(path, raw, created)
         (path.parent / "unexpected").write_bytes(b"unapproved")
 
     monkeypatch.setattr(stage, "_write", extra)
@@ -291,8 +291,8 @@ def test_hardlinked_output_rejected_without_touching_target(stage, monkeypatch, 
     external.write_bytes(b"outside")
     original = stage._write
 
-    def hardlink(path, raw):
-        original(path, raw)
+    def hardlink(path, raw, created):
+        original(path, raw, created)
         if path.name == "index.json":
             path.unlink()
             os.link(external, path)
@@ -301,7 +301,10 @@ def test_hardlinked_output_rejected_without_touching_target(stage, monkeypatch, 
     with pytest.raises(ValueError, match="regular archive readback"):
         call(stage, tmp_path)
     assert external.read_bytes() == b"outside"
-    assert list(tmp_path.iterdir()) == [external]
+    # The replacement inode/hardlink is not ours to remove.
+    orphans = [p for p in tmp_path.iterdir() if p != external]
+    assert len(orphans) == 1
+    assert (orphans[0] / INDEX).read_bytes() == b"outside"
 
 
 def test_parent_directory_file_rejected(stage, tmp_path):
@@ -310,3 +313,47 @@ def test_parent_directory_file_rejected(stage, tmp_path):
     with pytest.raises(ValueError, match="must be real"):
         call(stage, parent)
     assert parent.read_bytes() == b"keep"
+
+
+def test_failed_exclusive_open_preserves_competing_file(stage, monkeypatch, tmp_path):
+    original = stage.os.open
+    competitor = []
+
+    def competing_open(path, flags, *args, **kwargs):
+        if flags & os.O_EXCL and Path(path).name == "index.json":
+            Path(path).write_bytes(b"competing owner")
+            competitor.append(Path(path))
+        return original(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(stage.os, "open", competing_open)
+    with pytest.raises(FileExistsError):
+        call(stage, tmp_path)
+    assert len(competitor) == 1
+    assert competitor[0].read_bytes() == b"competing owner"
+    assert [p for p in tmp_path.rglob("*.json")] == competitor
+
+
+def test_failed_mkdir_never_traverses_or_removes_uncaptured_directory(stage, monkeypatch, tmp_path):
+    original_mkdir, original_lstat = Path.mkdir, Path.lstat
+    unknown = []
+
+    def competing_mkdir(path, *args, **kwargs):
+        if path.name == "data":
+            original_mkdir(path)
+            original_mkdir(path / "follows")
+            (path / "follows" / "index.json").write_bytes(b"competing tree")
+            unknown.append(path)
+            raise FileExistsError("synthetic competing mkdir")
+        return original_mkdir(path, *args, **kwargs)
+
+    def no_traversal(path, *args, **kwargs):
+        if unknown and path.is_relative_to(unknown[0]):
+            pytest.fail("cleanup traversed an uncaptured directory")
+        return original_lstat(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "mkdir", competing_mkdir)
+    monkeypatch.setattr(Path, "lstat", no_traversal)
+    with pytest.raises(FileExistsError):
+        call(stage, tmp_path)
+    assert len(unknown) == 1
+    assert (unknown[0] / "follows" / "index.json").read_bytes() == b"competing tree"
