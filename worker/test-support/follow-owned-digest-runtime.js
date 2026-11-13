@@ -22,7 +22,7 @@ const limits = {
   maxTextBytes: 200,
   maxWindowMs: 4 * 86400000,
 };
-async function fixture(db, n = 3) {
+async function fixture(db, n = 3, includeRelated = false) {
   const at = new Date(
     await db.prepare("SELECT strftime('%Y-%m-%dT%H:%M:%fZ','now') AS at").first("at"),
   );
@@ -46,7 +46,20 @@ async function fixture(db, n = 3) {
       complete: true,
       generated_at: at.toISOString(),
       covers_after: new Date(+confirmed - 3600000).toISOString(),
-      roles: [role],
+      roles: [
+        role,
+        ...(includeRelated
+          ? [
+              {
+                ...role,
+                id: "2".repeat(16),
+                first_seen: new Date(+confirmed - 1000).toISOString(),
+                title: "Selected related",
+                apply_url: "https://example.test/related",
+              },
+            ]
+          : []),
+      ],
     }),
   );
   for (let i = 0; i < n; i++) {
@@ -101,6 +114,7 @@ async function fixture(db, n = 3) {
   });
   const p = { sending: true, cap: 20, present };
   let calls = 0;
+  const messages = [];
   const options = {
     enabled: true,
     db,
@@ -111,19 +125,100 @@ async function fixture(db, n = 3) {
     clock: () => new Date(+at),
     policy: () => p,
     email: {
-      send: async () => {
+      send: async (message) => {
         calls++;
+        messages.push(message);
         return { messageId: "synthetic" };
       },
     },
   };
   return {
     ids,
+    messages,
     options,
     policy: p,
     calls: () => calls,
     run: (changes) => create({ ...options, ...changes })(),
   };
+}
+const relatedBounds = () => ({
+  maxRoles: 10,
+  maxDirect: 10,
+  maxPairs: 100,
+  maxInputBytes: 20000,
+  maxResultBytes: 20000,
+});
+
+export async function relatedOptionOmittedPreservesDirectOnly(db) {
+  const f = await fixture(db, 1, true);
+  assert.deepEqual(await f.run(), { status: "processed", counts: { accepted: 1 } });
+  assert.match(f.messages[0].text, /Fixture: Role/);
+  assert.doesNotMatch(f.messages[0].text, /Selected related|similar role/);
+  assert.equal((await owner(db)).phase, "ready");
+}
+
+export async function relatedCaptureSurvivesOwnerAwaitMutation(db) {
+  const f = await fixture(db, 1, true);
+  enableDigestCapabilities(f);
+  const bounds = relatedBounds();
+  let changed = false;
+  const database = wrap(db, async (sql, rows) => {
+    if (!changed) {
+      assert.ok(sql[0].startsWith("UPDATE follow_delivery_owner SET phase='running'"));
+      bounds.maxRoles = 0;
+      changed = true;
+    }
+    return rows;
+  });
+  assert.deepEqual(await f.run({ db: database, relatedLimits: bounds }), {
+    status: "processed",
+    counts: { accepted: 1 },
+  });
+  assert.equal(changed, true);
+  assert.equal(f.calls(), 1);
+  assert.match(f.messages[0].text, /One similar role:\nFixture: Selected related/);
+  assert.equal((await owner(db)).phase, "ready");
+  assert.equal(await db.prepare("SELECT attempts FROM follow_send_budget").first("attempts"), 1);
+}
+
+export async function malformedRelatedBeforeOwnerOrProvider(db) {
+  const f = await fixture(db, 1);
+  const before = await owner(db);
+  let inspected = 0;
+  const accessor = Object.defineProperty(relatedBounds(), "maxDirect", {
+    get() {
+      inspected++;
+      assert.fail("must not read bound getter");
+    },
+  });
+  const noDB = {
+    prepare() {
+      inspected++;
+      assert.fail("must not acquire owner");
+    },
+  };
+  const email = {
+    get send() {
+      inspected++;
+      assert.fail("must not inspect provider");
+    },
+  };
+  for (const relatedLimits of [null, {}, accessor, { ...relatedBounds(), maxPairs: 0 }]) {
+    assert.deepEqual(await f.run({ db: noDB, email, relatedLimits }), { status: "unavailable" });
+    assert.deepEqual(await f.run({ enabled: false, db: noDB, email, relatedLimits }), {
+      status: "disabled",
+    });
+    assert.deepEqual(
+      await f.run({ db: noDB, email, relatedLimits, policy: () => ({ sending: false }) }),
+      {
+        status: "disabled",
+      },
+    );
+  }
+  assert.deepEqual(await owner(db), before);
+  assert.equal(inspected, 0);
+  assert.equal(f.calls(), 0);
+  assert.equal(await db.prepare("SELECT count(*) n FROM follow_send_budget").first("n"), 0);
 }
 const owner = (db) => db.prepare("SELECT * FROM follow_delivery_owner").first();
 const reset = (db) => db.prepare("UPDATE follow_delivery_owner SET phase='ready'").run(); // Test fixture only.

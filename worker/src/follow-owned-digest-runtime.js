@@ -3,6 +3,7 @@ import { acquireFollowDeliveryOwner, finishFollowDigestOwner } from "./follow-de
 import { runFollowDeliveryTick } from "./follow-delivery-tick.js";
 import { createFollowEmailTransport } from "./follow-email-transport.js";
 import { validFollowSendCap } from "./follow-send-budget.js";
+import { captureFollowDigestRelatedLimits } from "./follow-digest-prepare.js";
 const fail = () => {
   throw new Error("Follow digest runtime unavailable");
 };
@@ -46,13 +47,14 @@ export function createOwnedFollowDigestRuntime(options = {}) {
     key,
     catalog,
     limits,
+    relatedLimits,
     loadSnapshot,
     clock = () => new Date(),
     transportTimeoutMs = 10000,
   } = options;
   return async () => {
     if (enabled !== true) return { status: "disabled" };
-    let selected, transport;
+    let selected, transport, related;
     try {
       if (
         typeof policy !== "function" ||
@@ -65,6 +67,7 @@ export function createOwnedFollowDigestRuntime(options = {}) {
         fail();
       selected = snapshot(policy);
       if (!selected.sending) return { status: "disabled" };
+      related = captureFollowDigestRelatedLimits(relatedLimits);
       transport = createFollowEmailTransport({
         enabled: true,
         email,
@@ -93,6 +96,7 @@ export function createOwnedFollowDigestRuntime(options = {}) {
         key,
         catalog,
         limits,
+        relatedLimits: related,
         loadSnapshot,
         cap: selected.cap,
         present: selected.present,
