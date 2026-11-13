@@ -46,7 +46,7 @@ def declarations(data: dict) -> dict[str, dict[str, str]]:
     field_object = "{ " + ", ".join(entries(data["field_display_overrides"])) + " };"
     baseline = "[" + ", ".join(map(quote, data["baseline_states"])) + "]"
     return {
-        "core.js": {
+        "core/profile.mjs": {
             "US_STATES": object_block("US_STATES", data["us_places"], (7, 7, 7, 6, 6, 6, 6, 6, 1)),
             "CA_PROVINCES": object_block("CA_PROVINCES", data["canadian_provinces"], (6, 4, 3)),
             "BASELINE": "  const BASELINE = (C.baselineStates && C.baselineStates.length) ? "

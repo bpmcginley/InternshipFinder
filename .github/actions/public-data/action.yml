@@ -1,5 +1,12 @@
 name: Select public listing data
 description: Check out the data branch snapshot or use the primary checkout when it is absent
+inputs:
+  expected-commit:
+    description: Verified catch-up data commit, or empty for ordinary selection
+  expected-tree:
+    description: Verified catch-up public data tree, or empty for ordinary selection
+  upstream-run:
+    description: Verified catch-up writer run, or empty for ordinary selection
 outputs:
   directory:
     description: Absolute path to the selected public listing export
@@ -10,6 +17,10 @@ runs:
     - name: Resolve the data branch
       id: resolve
       shell: bash
+      env:
+        CATCHUP_COMMIT: ${{ inputs.expected-commit }}
+        CATCHUP_TREE: ${{ inputs.expected-tree }}
+        CATCHUP_UPSTREAM_RUN: ${{ inputs.upstream-run }}
       run: python "$GITHUB_ACTION_PATH/listing_data.py" resolve
 
     - name: Check out the public listing snapshot
@@ -27,4 +38,7 @@ runs:
       shell: bash
       env:
         DATA_SHA: ${{ steps.resolve.outputs.sha }}
+        CATCHUP_COMMIT: ${{ inputs.expected-commit }}
+        CATCHUP_TREE: ${{ inputs.expected-tree }}
+        CATCHUP_UPSTREAM_RUN: ${{ inputs.upstream-run }}
       run: python "$GITHUB_ACTION_PATH/listing_data.py" select

@@ -4,8 +4,8 @@ import { EMAIL, isBot } from "../leads.js";
 import { dayOf } from "../placements.js";
 import { siteUrl, stripe } from "../billing.js";
 import { sendMail } from "../mail.js";
-import { TERMS_BOX, TERMS_VERSION } from "../orders.js";
-import { CHECKOUT_HOLD_MS, DAYS, LISTING_ID, PRICES, bad, conflict, fieldsOf, rolesWord, text } from "./shared.js";
+import { CHECKOUT_HOLD_MS, DAYS, LISTING_ID, PRICES, TERMS_BOX, TERMS_VERSION,
+  bad, conflict, fieldsOf, rolesWord, text } from "./shared.js";
 import { readShard } from "./roles.js";
 import { firstFit, fitAll, heldRoles, reserveCapacity, startDay } from "./capacity.js";
 import { verifyMail } from "./templates.js";

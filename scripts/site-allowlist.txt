@@ -10,21 +10,33 @@ widget/builder\.html
 widget/builder\.js
 widget/share\.css
 share-feeds\.html
+follows/action\.html
+follows/manage\.html
 widget/README\.md
 icon(48|128|180|192|512|-maskable512)\.png
 og-preview\.png
 manifest\.webmanifest
 internscout-org-indexnow\.txt
-js/(app|buy|core|count|offer|placements)\.js
+js/(app|buy|core|count|offer|placements|share)\.js
+js/follow-form\.mjs
+js/follow-management\.mjs
+js/core/[a-z][a-z0-9-]*\.mjs
+js/modules/[0-9a-f]{64}/[a-z][a-z0-9-]*\.mjs
+js/app/[a-z][a-z0-9-]*\.mjs
+js/app-modules/[0-9a-f]{64}/[a-z][a-z0-9-]*\.mjs
+js/buy/(entry|landing|order-form)\.mjs
+js/buy-modules/[0-9a-f]{64}/(entry|landing|order-form)\.mjs
 fonts/(ibm-plex-sans-latin|source-serif-4-latin)\.woff2
 fonts/OFL-(IBM-Plex-Sans|Source-Serif-4)\.txt
 # Exported listing data and generated build data.
 data/(first|majors|seo-posting-details|stats|placements|widget|page-content-dates)\.json
 data/listings/index\.json
+data/employer-posting-keys\.json
 data/listings/(AB|AK|AL|AR|AZ|BC|CA|CO|CT|Canada|DC|DE|FL|GA|HI|IA|ID|IL|IN|KS|KY|LA|MA|MB|MD|ME|MI|MN|MO|MS|MT|NB|NC|ND|NE|NH|NJ|NL|NM|NS|NT|NU|NV|NY|OH|OK|ON|OR|PA|PE|PR|QC|RI|SC|SD|SK|TN|TX|US|UT|VA|VT|WA|WI|WV|WY|YT|remote)(\.desc)?\.json
 data/roles/(index|[a-z0-9_])\.json
 # Generated pages and feeds: slug directories never admit notes or arbitrary files.
 404\.html
 (sitemap\.xml|robots\.txt|llms(-full)?\.txt|noindex-pages\.txt)
 internships/([a-z0-9-]+/)*(index\.html|feed\.xml)
+internships/[a-z0-9-]+/([a-z0-9-]+/)?share\.png
 (about|compare|digest|numbers|pricing)/index\.html

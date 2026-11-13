@@ -688,3 +688,558 @@ CREATE TABLE IF NOT EXISTS employer_campaign_reports (
 CREATE INDEX IF NOT EXISTS employer_campaign_reports_order ON employer_campaign_reports (order_id);
 CREATE INDEX IF NOT EXISTS employer_campaign_reports_due
   ON employer_campaign_reports (state, next_attempt_at, sending_until);
+
+-- Dormant P-2.1a storage: no route, cron or sending path uses these tables yet.
+CREATE TABLE IF NOT EXISTS follow_subscribers (
+  id TEXT PRIMARY KEY,
+  email TEXT NOT NULL UNIQUE,
+  created TEXT NOT NULL,
+  confirmed_at TEXT,
+  last_sent_at TEXT
+);
+CREATE TABLE IF NOT EXISTS follow_subscriptions (
+  subscriber_id TEXT NOT NULL REFERENCES follow_subscribers(id) ON DELETE CASCADE,
+  scope_key TEXT NOT NULL,
+  created TEXT NOT NULL,
+  confirmed_at TEXT,
+  owner_user_hash TEXT,
+  PRIMARY KEY (subscriber_id, scope_key)
+);
+CREATE INDEX IF NOT EXISTS follow_subscriptions_owner ON follow_subscriptions (owner_user_hash);
+CREATE TABLE IF NOT EXISTS follow_tokens (
+  token_hash TEXT PRIMARY KEY,
+  subscriber_id TEXT NOT NULL REFERENCES follow_subscribers(id) ON DELETE CASCADE,
+  -- Management is reserved for the approved next slice; no management helper exists yet.
+  purpose TEXT NOT NULL CHECK (purpose IN ('confirm', 'manage', 'unsubscribe')),
+  scope_key TEXT NOT NULL,
+  generation TEXT NOT NULL,
+  expires_at TEXT,
+  owner_user_hash TEXT,
+  CHECK ((purpose = 'confirm' AND scope_key != '') OR (purpose != 'confirm' AND scope_key = '')),
+  CHECK ((purpose = 'unsubscribe' AND expires_at IS NULL) OR (purpose != 'unsubscribe' AND expires_at IS NOT NULL)),
+  CHECK (purpose = 'confirm' OR owner_user_hash IS NULL)
+);
+CREATE INDEX IF NOT EXISTS follow_tokens_subscriber ON follow_tokens (subscriber_id, purpose, scope_key);
+
+-- Dormant digest-only queue; no transport, router or cron consumes it yet.
+CREATE TABLE IF NOT EXISTS follow_digest_days (
+  marker TEXT PRIMARY KEY CHECK (length(marker) = 64),
+  expires_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS follow_digest_outbox (
+  id TEXT PRIMARY KEY,
+  subscriber_id TEXT NOT NULL REFERENCES follow_subscribers(id) ON DELETE CASCADE,
+  day TEXT NOT NULL,
+  payload TEXT,
+  created TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  state TEXT NOT NULL CHECK (state IN ('queued','leased','attempting','accepted','uncertain','cancelled')),
+  lease_token TEXT,
+  lease_until TEXT,
+  attempted_at TEXT,
+  accepted_at TEXT,
+  UNIQUE (subscriber_id, day),
+  CHECK ((state IN ('queued','leased','attempting') AND payload IS NOT NULL) OR
+    (state IN ('accepted','uncertain','cancelled') AND payload IS NULL)),
+  CHECK ((state IN ('leased','attempting') AND lease_token IS NOT NULL AND lease_until IS NOT NULL) OR
+    (state NOT IN ('leased','attempting') AND lease_token IS NULL AND lease_until IS NULL))
+);
+CREATE INDEX IF NOT EXISTS follow_digest_outbox_due ON follow_digest_outbox (state, lease_until);
+-- Cancelling every outstanding aggregate is conservative: no removed-scope roles can be sent.
+-- Already accepted mail cannot be recalled. The independent daily marker has no subscriber FK.
+CREATE TRIGGER IF NOT EXISTS follow_scope_cancel_digest AFTER DELETE ON follow_subscriptions
+BEGIN
+  UPDATE follow_digest_outbox SET state='cancelled', payload=NULL, lease_token=NULL, lease_until=NULL
+    WHERE subscriber_id=OLD.subscriber_id AND state IN ('queued','leased','attempting');
+END;
+
+-- Dormant P-2.2a: immutable purchase identity and isolated grant, not payment authorization.
+-- Claims retain only opaque provider-reference fingerprints and state after future deletion.
+CREATE TABLE IF NOT EXISTS topup_claims (
+  payment_hash TEXT PRIMARY KEY NOT NULL CHECK(length(payment_hash) = 64),
+  checkout_hash TEXT NOT NULL UNIQUE CHECK(length(checkout_hash) = 64),
+  state TEXT NOT NULL CHECK(state IN ('granted', 'deleted', 'retired'))
+);
+CREATE TABLE IF NOT EXISTS topup_purchases (
+  payment_hash TEXT PRIMARY KEY NOT NULL REFERENCES topup_claims(payment_hash),
+  payment_id TEXT NOT NULL,
+  checkout_id TEXT NOT NULL,
+  user_hash TEXT NOT NULL CHECK(length(user_hash) = 64),
+  offer_version TEXT NOT NULL,
+  amount INTEGER NOT NULL CHECK(typeof(amount) = 'integer' AND amount > 0),
+  currency TEXT NOT NULL CHECK(length(currency) = 3),
+  granted INTEGER NOT NULL CHECK(typeof(granted) = 'integer' AND granted > 0),
+  available INTEGER NOT NULL CHECK(typeof(available) = 'integer' AND available >= 0),
+  held INTEGER NOT NULL DEFAULT 0 CHECK(typeof(held) = 'integer' AND held >= 0),
+  consumed INTEGER NOT NULL DEFAULT 0 CHECK(typeof(consumed) = 'integer' AND consumed >= 0),
+  revoked INTEGER NOT NULL DEFAULT 0 CHECK(typeof(revoked) = 'integer' AND revoked >= 0),
+  created TEXT NOT NULL,
+  CHECK(available + held + consumed + revoked = granted)
+);
+CREATE INDEX IF NOT EXISTS topup_purchases_user ON topup_purchases(user_hash, created, payment_hash);
+
+-- Dormant existing-purchase reconciliation; no new identity or provider snapshot fields.
+CREATE TABLE IF NOT EXISTS topup_reconciliations (
+  payment_hash TEXT PRIMARY KEY NOT NULL REFERENCES topup_purchases(payment_hash) ON DELETE CASCADE,
+  revision INTEGER NOT NULL CHECK(typeof(revision) = 'integer' AND revision > 0 AND revision <= 9007199254740991),
+  loss INTEGER NOT NULL CHECK(loss IN (0, 1)),
+  full_refund INTEGER NOT NULL CHECK(full_refund IN (0, 1)),
+  hold_ids TEXT NOT NULL CHECK(json_valid(hold_ids) AND json_type(hold_ids) = 'array')
+);
+
+-- One purchased unit per existing run identity; retain receipts independently of runs cleanup.
+CREATE TABLE IF NOT EXISTS topup_allocations (
+  user_hash TEXT NOT NULL CHECK(length(user_hash)=64),
+  month TEXT NOT NULL CHECK(length(month)=7),
+  task TEXT NOT NULL CHECK(task='autofill'),
+  run_id TEXT NOT NULL CHECK(length(run_id) BETWEEN 1 AND 64),
+  payment_hash TEXT NOT NULL REFERENCES topup_purchases(payment_hash) ON DELETE CASCADE,
+  state TEXT NOT NULL CHECK(state IN ('allocated','restored','revoked')),
+  PRIMARY KEY(user_hash,month,task,run_id)
+);
+CREATE INDEX IF NOT EXISTS topup_allocations_purchase ON topup_allocations(payment_hash);
+
+-- Dormant capability for deleting one pending confirmation request.
+CREATE TABLE IF NOT EXISTS follow_request_deletions (
+  token_hash TEXT PRIMARY KEY NOT NULL CHECK (length(token_hash) = 64),
+  confirm_hash TEXT NOT NULL UNIQUE REFERENCES follow_tokens(token_hash) ON DELETE CASCADE
+);
+
+-- Only confirmed scopes can be referenced by an outstanding digest.
+DROP TRIGGER IF EXISTS follow_scope_cancel_digest;
+CREATE TRIGGER IF NOT EXISTS follow_scope_cancel_digest AFTER DELETE ON follow_subscriptions
+WHEN OLD.confirmed_at IS NOT NULL
+BEGIN
+  UPDATE follow_digest_outbox SET state='cancelled', payload=NULL, lease_token=NULL, lease_until=NULL
+    WHERE subscriber_id=OLD.subscriber_id AND state IN ('queued','leased','attempting');
+END;
+
+-- Dormant top-up checkout reservation; unresolved attempts never expire by local timer.
+CREATE TABLE IF NOT EXISTS topup_checkout_attempts (
+  id TEXT PRIMARY KEY NOT NULL CHECK(length(id)=36),
+  user_hash TEXT NOT NULL CHECK(length(user_hash)=64),
+  offer_version TEXT NOT NULL,
+  amount INTEGER NOT NULL CHECK(typeof(amount)='integer' AND amount>0),
+  currency TEXT NOT NULL CHECK(length(currency)=3),
+  units INTEGER NOT NULL CHECK(typeof(units)='integer' AND units>0),
+  created TEXT NOT NULL,
+  checkout_id TEXT UNIQUE,
+  state TEXT NOT NULL CHECK(state IN ('creating','open','expired','settled')),
+  CHECK(state!='open' OR checkout_id IS NOT NULL)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS topup_checkout_one_active ON topup_checkout_attempts(user_hash)
+  WHERE state IN ('creating','open');
+
+-- Dormant matching prerequisites. Progress belongs to exactly one confirmed scope lifetime.
+CREATE TABLE IF NOT EXISTS follow_scope_progress (
+  subscriber_id TEXT NOT NULL,
+  scope_key TEXT NOT NULL,
+  scope_generation TEXT NOT NULL UNIQUE,
+  watermark TEXT NOT NULL,
+  PRIMARY KEY (subscriber_id, scope_key),
+  FOREIGN KEY (subscriber_id, scope_key)
+    REFERENCES follow_subscriptions(subscriber_id, scope_key) ON DELETE CASCADE
+);
+
+-- Legacy confirmed scopes have no surviving first-confirmation token. Give each a new opaque
+-- server identity once; preserve the original confirmation instant, including invalid legacy
+-- values that the bounded reader must reject rather than silently repairing or advancing.
+INSERT INTO follow_scope_progress (subscriber_id,scope_key,scope_generation,watermark)
+SELECT s.subscriber_id,s.scope_key,
+  lower(hex(randomblob(4))) || '-' || lower(hex(randomblob(2))) || '-' ||
+  lower(hex(randomblob(2))) || '-' || lower(hex(randomblob(2))) || '-' || lower(hex(randomblob(6))),
+  s.confirmed_at
+FROM follow_subscriptions s
+WHERE s.confirmed_at IS NOT NULL AND NOT EXISTS (
+  SELECT 1 FROM follow_scope_progress p
+  WHERE p.subscriber_id=s.subscriber_id AND p.scope_key=s.scope_key
+);
+
+-- Dormant enqueue metadata; no email, rendered facts or permanent watermark advancement.
+CREATE INDEX IF NOT EXISTS follow_confirmed_scopes
+  ON follow_subscriptions (subscriber_id, scope_key) WHERE confirmed_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS follow_active_expiry
+  ON follow_digest_outbox (subscriber_id, expires_at)
+  WHERE state IN ('queued','leased','attempting');
+CREATE TABLE IF NOT EXISTS follow_pending_progress (
+  job_id TEXT PRIMARY KEY NOT NULL REFERENCES follow_digest_outbox(id) ON DELETE CASCADE,
+  snapshot_digest TEXT NOT NULL CHECK (length(snapshot_digest)=64 AND snapshot_digest NOT GLOB '*[^0-9a-f]*'),
+  snapshot_at TEXT NOT NULL CHECK (length(snapshot_at)=24),
+  advances TEXT NOT NULL CHECK (json_valid(advances) AND json_type(advances)='array'
+    AND json_array_length(advances)>0 AND length(CAST(advances AS BLOB))<=32768)
+);
+CREATE TRIGGER IF NOT EXISTS follow_pending_immutable BEFORE UPDATE ON follow_pending_progress
+BEGIN
+  SELECT RAISE(ABORT, 'follow_pending_immutable');
+END;
+-- Existing cancellation, uncertainty, acceptance and expiry paths already erase the payload.
+-- Erase its pending metadata in the same statement; scope watermarks remain recoverable.
+CREATE TRIGGER IF NOT EXISTS follow_pending_terminal AFTER UPDATE OF state ON follow_digest_outbox
+WHEN NEW.state IN ('accepted','uncertain','cancelled')
+BEGIN
+  DELETE FROM follow_pending_progress WHERE job_id=NEW.id;
+END;
+
+-- Aggregate organic posting activations. No migration backfill or identity columns.
+CREATE TABLE IF NOT EXISTS employer_posting_counts (
+  day TEXT NOT NULL CHECK (length(day) = 10 AND date(day, '+0 days') IS day),
+  company TEXT NOT NULL CHECK (typeof(company) = 'text' AND length(CAST(company AS BLOB)) BETWEEN 1 AND 200),
+  n INTEGER NOT NULL CHECK (typeof(n) = 'integer' AND n BETWEEN 1 AND 1000),
+  PRIMARY KEY (day, company)
+);
+
+-- The active UTC-day limit survives process restarts and removal of company totals.
+CREATE TABLE IF NOT EXISTS employer_posting_day_caps (
+  day TEXT PRIMARY KEY NOT NULL CHECK (length(day) = 10 AND date(day, '+0 days') IS day),
+  n INTEGER NOT NULL CHECK (typeof(n) = 'integer' AND n BETWEEN 0 AND 50000)
+);
+
+-- A bounded validation view, not new retained data. Invalid pending data is never guessed.
+CREATE VIEW IF NOT EXISTS follow_valid_pending AS
+SELECT p.job_id,p.snapshot_at,p.advances
+FROM follow_pending_progress p JOIN follow_digest_outbox o ON o.id=p.job_id
+WHERE length(p.snapshot_digest)=64 AND p.snapshot_digest NOT GLOB '*[^0-9a-f]*'
+  AND length(p.snapshot_at)=24
+  AND strftime('%Y-%m-%dT%H:%M:%fZ',p.snapshot_at,'+0 days')=p.snapshot_at
+  AND length(o.created)=24 AND strftime('%Y-%m-%dT%H:%M:%fZ',o.created,'+0 days')=o.created
+  AND p.snapshot_at<=o.created AND length(CAST(p.advances AS BLOB))<=32768
+  AND json_type(p.advances)='array' AND json_array_length(p.advances)>0
+  AND NOT EXISTS (
+    SELECT 1 FROM json_each(p.advances) a
+    WHERE CASE WHEN a.type!='object' THEN 1 ELSE NOT COALESCE(
+      (SELECT COUNT(*) FROM json_each(a.value))=5
+      AND NOT EXISTS (SELECT 1 FROM json_each(a.value) k
+        WHERE k.key NOT IN ('scopeKey','generation','confirmedAt','from','to'))
+      AND json_type(a.value,'$.scopeKey')='text' AND length(json_extract(a.value,'$.scopeKey'))>0
+      AND json_type(a.value,'$.generation')='text'
+      AND length(json_extract(a.value,'$.generation'))=36
+      AND substr(json_extract(a.value,'$.generation'),9,1)='-'
+      AND substr(json_extract(a.value,'$.generation'),14,1)='-'
+      AND substr(json_extract(a.value,'$.generation'),19,1)='-'
+      AND substr(json_extract(a.value,'$.generation'),24,1)='-'
+      AND length(replace(json_extract(a.value,'$.generation'),'-',''))=32
+      AND replace(json_extract(a.value,'$.generation'),'-','') NOT GLOB '*[^0-9a-f]*'
+      AND json_type(a.value,'$.confirmedAt')='text' AND length(json_extract(a.value,'$.confirmedAt'))=24
+      AND strftime('%Y-%m-%dT%H:%M:%fZ',json_extract(a.value,'$.confirmedAt'),'+0 days')=json_extract(a.value,'$.confirmedAt')
+      AND json_type(a.value,'$.from')='text' AND length(json_extract(a.value,'$.from'))=24
+      AND strftime('%Y-%m-%dT%H:%M:%fZ',json_extract(a.value,'$.from'),'+0 days')=json_extract(a.value,'$.from')
+      AND json_type(a.value,'$.to')='text' AND json_extract(a.value,'$.to')=p.snapshot_at
+      AND json_extract(a.value,'$.confirmedAt')<=json_extract(a.value,'$.from')
+      AND json_extract(a.value,'$.from')<=json_extract(a.value,'$.to'),0) END
+  )
+  AND (SELECT COUNT(DISTINCT json_extract(CASE WHEN a.type='object' THEN a.value ELSE '{}' END,'$.scopeKey'))
+    FROM json_each(p.advances) a)=json_array_length(p.advances);
+
+-- Runs before the existing AFTER-state trigger erases pending data. Only durable attempts
+-- can consume a window. Removed/recreated or independently changed lifetimes are untouched.
+CREATE TRIGGER IF NOT EXISTS follow_finalize_attempt BEFORE UPDATE OF state ON follow_digest_outbox
+WHEN OLD.state='attempting' AND NEW.state IN ('accepted','uncertain')
+  AND length(OLD.attempted_at)=24
+  AND strftime('%Y-%m-%dT%H:%M:%fZ',OLD.attempted_at,'+0 days')=OLD.attempted_at
+BEGIN
+  -- Validate the pinned pending row once. Drive indexed lookups from its advances.
+  UPDATE follow_scope_progress SET watermark=approved.to_watermark
+  FROM (
+    WITH verified AS MATERIALIZED (
+      SELECT advances FROM follow_valid_pending
+      WHERE job_id=OLD.id AND snapshot_at<=OLD.attempted_at
+    ), approved_advances AS MATERIALIZED (
+      SELECT json_extract(a.value,'$.scopeKey') AS scope,
+        json_extract(a.value,'$.generation') AS generation,
+        json_extract(a.value,'$.confirmedAt') AS confirmed,
+        json_extract(a.value,'$.from') AS from_watermark,
+        json_extract(a.value,'$.to') AS to_watermark
+      FROM verified CROSS JOIN json_each(verified.advances) a
+    )
+    SELECT * FROM approved_advances
+  ) AS approved
+  CROSS JOIN follow_subscriptions s ON s.subscriber_id=OLD.subscriber_id
+    AND s.scope_key=approved.scope AND s.confirmed_at=approved.confirmed
+  WHERE follow_scope_progress.subscriber_id=OLD.subscriber_id
+    AND follow_scope_progress.scope_key=approved.scope
+    AND follow_scope_progress.scope_generation=approved.generation
+    AND follow_scope_progress.watermark=approved.from_watermark;
+END;
+
+-- No advancement before an attempt. Once claimed, cancellation is uncertain for survivors:
+-- a late provider response cannot be recalled and must not make their window eligible again.
+DROP TRIGGER IF EXISTS follow_scope_cancel_digest;
+CREATE TRIGGER IF NOT EXISTS follow_scope_cancel_digest AFTER DELETE ON follow_subscriptions
+WHEN OLD.confirmed_at IS NOT NULL
+BEGIN
+  UPDATE follow_digest_outbox SET state=CASE WHEN state='attempting' AND EXISTS (SELECT 1 FROM follow_pending_progress WHERE job_id=follow_digest_outbox.id) THEN 'uncertain' ELSE 'cancelled' END,
+    payload=NULL,lease_token=NULL,lease_until=NULL
+    WHERE subscriber_id=OLD.subscriber_id AND state IN ('queued','leased','attempting');
+END;
+
+-- Dormant pre-provider fence. Consumed on settlement; removed with an erased attempt.
+CREATE TABLE IF NOT EXISTS topup_attempt_revisions (
+  attempt_id TEXT PRIMARY KEY NOT NULL REFERENCES topup_checkout_attempts(id) ON DELETE CASCADE,
+  revision INTEGER NOT NULL CHECK(typeof(revision) = 'integer' AND revision > 0 AND revision <= 9007199254740991)
+);
+
+-- Check one subscriber's unresolved attempts without walking global attempt history.
+CREATE INDEX IF NOT EXISTS follow_attempting_subscriber
+  ON follow_digest_outbox (subscriber_id) WHERE state='attempting';
+
+-- Account deletion is the sole INSERT/UPSERT writer of forget. Monthly cleanup only DELETEs.
+-- RAISE aborts deleteUser's whole D1 batch; no new identity or retention is introduced.
+CREATE INDEX IF NOT EXISTS topup_checkout_resolved_user ON topup_checkout_attempts(user_hash)
+  WHERE state IN ('expired', 'settled');
+CREATE TRIGGER IF NOT EXISTS topup_account_deletion BEFORE INSERT ON forget
+BEGIN
+  SELECT RAISE(ABORT, 'topup_payment_pending') WHERE EXISTS (
+    SELECT 1 FROM topup_checkout_attempts
+    WHERE user_hash = NEW.user_hash AND state IN ('creating', 'open')
+  );
+  UPDATE topup_claims SET state = 'deleted'
+    WHERE state = 'granted' AND payment_hash IN (
+      SELECT payment_hash FROM topup_purchases WHERE user_hash = NEW.user_hash
+    );
+  DELETE FROM topup_purchases WHERE user_hash = NEW.user_hash;
+  DELETE FROM topup_checkout_attempts
+    WHERE user_hash = NEW.user_hash AND state IN ('expired', 'settled');
+END;
+
+-- One global follow-send attempt count for the UTC day of the latest observed time.
+CREATE TABLE IF NOT EXISTS follow_send_budget (
+  slot INTEGER PRIMARY KEY CHECK(slot=1),
+  observed_at TEXT NOT NULL CHECK(length(observed_at)=24
+    AND strftime('%Y-%m-%dT%H:%M:%fZ',observed_at,'+0 days') IS observed_at),
+  attempts INTEGER NOT NULL CHECK(typeof(attempts)='integer'
+    AND attempts BETWEEN 0 AND 9007199254740991)
+);
+
+-- Approved #294 lifecycle metadata; old runs remain committed without inferred funding.
+CREATE TABLE IF NOT EXISTS "funded_runs" (
+  user_hash TEXT NOT NULL,
+  month TEXT NOT NULL,
+  task TEXT NOT NULL,
+  run_id TEXT NOT NULL,
+  generation TEXT NOT NULL UNIQUE CHECK(length(generation)=36),
+  funding TEXT NOT NULL CHECK(funding IN ('monthly','invite','purchase')),
+  accepted INTEGER NOT NULL DEFAULT 0 CHECK(accepted IN (0,1)),
+  first_autofill_day TEXT,
+  first_autofill_due INTEGER NOT NULL DEFAULT 0 CHECK(first_autofill_due IN (0,1)),
+  PRIMARY KEY(user_hash,month,task,run_id),
+  FOREIGN KEY(user_hash,month,task,run_id) REFERENCES runs(user_hash,month,task,run_id) ON DELETE CASCADE,
+  CHECK(first_autofill_due=0 OR first_autofill_day IS NOT NULL)
+);
+CREATE TABLE IF NOT EXISTS "funded_run_calls" (
+  call_id TEXT PRIMARY KEY CHECK(length(call_id)=36),
+  generation TEXT NOT NULL REFERENCES "funded_runs"(generation) ON DELETE CASCADE,
+  state TEXT NOT NULL CHECK(state IN ('reserved','accepted')),
+  estimate REAL NOT NULL CHECK(estimate>=0),
+  account_metered INTEGER NOT NULL CHECK(account_metered IN (0,1)),
+  free_day TEXT,
+  free_month INTEGER NOT NULL CHECK(free_month IN (0,1)),
+  CHECK((free_day IS NULL AND free_month=0) OR (free_day IS NOT NULL AND length(free_day)=10 AND free_month=1))
+);
+CREATE INDEX IF NOT EXISTS funded_run_calls_generation ON funded_run_calls(generation);
+-- Generation receipts survive run cleanup and follow the original purchase retention.
+CREATE TABLE IF NOT EXISTS topup_generation_allocations (
+  generation TEXT PRIMARY KEY CHECK(length(generation)=36),
+  user_hash TEXT NOT NULL CHECK(length(user_hash)=64),
+  month TEXT NOT NULL CHECK(length(month)=7),
+  task TEXT NOT NULL CHECK(task='autofill'),
+  run_id TEXT NOT NULL CHECK(length(run_id) BETWEEN 1 AND 64),
+  payment_hash TEXT NOT NULL REFERENCES topup_purchases(payment_hash) ON DELETE CASCADE,
+  state TEXT NOT NULL CHECK(state IN ('allocated','restored','revoked'))
+);
+CREATE INDEX IF NOT EXISTS topup_generation_allocations_purchase ON topup_generation_allocations(payment_hash);
+
+-- Dormant resolution evidence prerequisite. No backfill, sweep or financial-policy changes.
+CREATE TABLE IF NOT EXISTS topup_retention (
+  payment_hash TEXT PRIMARY KEY NOT NULL REFERENCES topup_purchases(payment_hash) ON DELETE CASCADE,
+  resolved_at TEXT CHECK(resolved_at IS NULL OR strftime('%Y-%m-%dT%H:%M:%fZ',resolved_at) IS resolved_at),
+  resolved_zero_since TEXT CHECK(resolved_zero_since IS NULL OR
+    (resolved_at IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',resolved_zero_since) IS resolved_zero_since
+      AND resolved_zero_since >= resolved_at))
+, history_proven INTEGER NOT NULL DEFAULT 0 CHECK(history_proven IN (0,1)), evidence_digest TEXT CHECK(evidence_digest IS NULL OR (length(evidence_digest)=64 AND evidence_digest NOT GLOB '*[^0-9a-f]*')));
+
+-- Pending confirmation queue. Credentials and rendered mail are created only at dispatch.
+CREATE TABLE IF NOT EXISTS follow_confirmation_outbox (
+  id TEXT PRIMARY KEY NOT NULL,
+  subscriber_id TEXT NOT NULL,
+  scope_key TEXT NOT NULL,
+  queued_at TEXT NOT NULL,
+  expires_at TEXT NOT NULL CHECK (expires_at > queued_at), claim_id TEXT, owner_user_hash TEXT
+  CHECK(owner_user_hash IS NULL OR (length(owner_user_hash)=64 AND owner_user_hash NOT GLOB '*[^0-9a-f]*')),
+  UNIQUE (subscriber_id, scope_key),
+  FOREIGN KEY (subscriber_id, scope_key)
+    REFERENCES follow_subscriptions(subscriber_id, scope_key) ON DELETE CASCADE
+);
+
+CREATE TRIGGER IF NOT EXISTS follow_confirmation_scope_changed
+AFTER UPDATE OF created, confirmed_at ON follow_subscriptions
+WHEN NEW.created != OLD.created OR NEW.confirmed_at IS NOT OLD.confirmed_at
+BEGIN
+  DELETE FROM follow_confirmation_outbox
+    WHERE subscriber_id = OLD.subscriber_id AND scope_key = OLD.scope_key;
+END;
+
+CREATE INDEX IF NOT EXISTS follow_confirmation_owner ON follow_confirmation_outbox(owner_user_hash)
+  WHERE owner_user_hash IS NOT NULL;
+
+-- Consuming a claimed link token also retires its exact pending consent, including a
+-- confirmed scope whose confirmed_at does not change. Different/unclaimed jobs survive.
+CREATE TRIGGER IF NOT EXISTS follow_link_consumed AFTER DELETE ON follow_tokens
+WHEN OLD.purpose='confirm' AND OLD.owner_user_hash IS NOT NULL
+BEGIN
+  DELETE FROM follow_confirmation_outbox WHERE subscriber_id=OLD.subscriber_id
+    AND scope_key=OLD.scope_key AND owner_user_hash=OLD.owner_user_hash
+    AND expires_at=OLD.expires_at AND claim_id IS NOT NULL;
+END;
+
+-- Transient input only: this view has no rows or backing table. One INSERT executes
+-- the entire request at one SQLite step's UTC instant. Session proof is never retained.
+CREATE VIEW IF NOT EXISTS follow_link_requests AS
+  SELECT NULL AS subscriber_id,NULL AS email,NULL AS scope_key,NULL AS job_id,
+    NULL AS session_id,NULL AS owner_user_hash WHERE 0;
+CREATE TRIGGER IF NOT EXISTS follow_link_request INSTEAD OF INSERT ON follow_link_requests
+WHEN EXISTS(SELECT 1 FROM sessions WHERE id=NEW.session_id AND user_hash=NEW.owner_user_hash
+       AND julianday(expires)>julianday('now'))
+  AND NOT EXISTS(SELECT 1 FROM follow_subscriptions s JOIN follow_subscribers u ON u.id=s.subscriber_id
+    WHERE u.email=NEW.email AND s.scope_key=NEW.scope_key AND s.owner_user_hash IS NOT NULL)
+  AND NOT EXISTS(SELECT 1 FROM follow_confirmation_outbox q JOIN follow_subscribers u ON u.id=q.subscriber_id
+    WHERE u.email=NEW.email AND q.scope_key=NEW.scope_key
+      AND q.expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now') AND q.owner_user_hash IS NOT NEW.owner_user_hash)
+  AND NOT EXISTS(SELECT 1 FROM follow_tokens t JOIN follow_subscribers u ON u.id=t.subscriber_id
+    WHERE u.email=NEW.email AND t.scope_key=NEW.scope_key AND t.purpose='confirm'
+      AND t.expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now') AND t.owner_user_hash IS NOT NEW.owner_user_hash)
+BEGIN
+  INSERT INTO follow_subscribers(id,email,created)
+    VALUES(NEW.subscriber_id,NEW.email,strftime('%Y-%m-%dT%H:%M:%fZ','now')) ON CONFLICT(email) DO NOTHING;
+  DELETE FROM follow_tokens WHERE purpose='confirm' AND scope_key=NEW.scope_key
+    AND expires_at<=strftime('%Y-%m-%dT%H:%M:%fZ','now')
+    AND subscriber_id IN(SELECT id FROM follow_subscribers WHERE email=NEW.email);
+  DELETE FROM follow_confirmation_outbox WHERE scope_key=NEW.scope_key
+    AND expires_at<=strftime('%Y-%m-%dT%H:%M:%fZ','now')
+    AND subscriber_id IN(SELECT id FROM follow_subscribers WHERE email=NEW.email);
+  INSERT INTO follow_subscriptions(subscriber_id,scope_key,created)
+    SELECT id,NEW.scope_key,strftime('%Y-%m-%dT%H:%M:%fZ','now') FROM follow_subscribers WHERE email=NEW.email
+    ON CONFLICT(subscriber_id,scope_key) DO UPDATE SET created=excluded.created
+    WHERE confirmed_at IS NULL AND created<=strftime('%Y-%m-%dT%H:%M:%fZ','now','-7 days');
+  INSERT INTO follow_confirmation_outbox(id,subscriber_id,scope_key,queued_at,expires_at,owner_user_hash)
+    SELECT NEW.job_id,s.subscriber_id,s.scope_key,strftime('%Y-%m-%dT%H:%M:%fZ','now'),
+      CASE WHEN s.confirmed_at IS NULL THEN strftime('%Y-%m-%dT%H:%M:%fZ',s.created,'+7 days')
+        ELSE strftime('%Y-%m-%dT%H:%M:%fZ','now','+7 days') END,NEW.owner_user_hash
+    FROM follow_subscriptions s JOIN follow_subscribers u ON u.id=s.subscriber_id
+    WHERE u.email=NEW.email AND s.scope_key=NEW.scope_key ON CONFLICT(subscriber_id,scope_key) DO NOTHING;
+END;
+
+-- Dormant management removal admits once at SQLite UTC; the view retains no request data.
+CREATE VIEW IF NOT EXISTS follow_management_removals AS
+SELECT CAST(NULL AS TEXT) AS token_hash, CAST(NULL AS TEXT) AS scope_key, CAST(NULL AS TEXT) AS admitted_at WHERE 0;
+CREATE TRIGGER IF NOT EXISTS follow_management_remove
+INSTEAD OF INSERT ON follow_management_removals
+WHEN EXISTS (
+  SELECT 1 FROM follow_tokens t JOIN follow_subscriptions s
+    ON s.subscriber_id=t.subscriber_id AND s.scope_key=NEW.scope_key
+  WHERE t.token_hash=NEW.token_hash AND t.purpose='manage'
+    AND t.expires_at>NEW.admitted_at
+    AND t.expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now')
+)
+BEGIN
+  DELETE FROM follow_tokens WHERE purpose='confirm' AND scope_key=NEW.scope_key
+    AND subscriber_id IN (SELECT subscriber_id FROM follow_tokens WHERE token_hash=NEW.token_hash);
+  DELETE FROM follow_subscriptions WHERE scope_key=NEW.scope_key
+    AND subscriber_id IN (SELECT subscriber_id FROM follow_tokens WHERE token_hash=NEW.token_hash);
+  DELETE FROM follow_subscribers
+    WHERE id IN (SELECT subscriber_id FROM follow_tokens WHERE token_hash=NEW.token_hash)
+      AND NOT EXISTS (SELECT 1 FROM follow_subscriptions WHERE subscriber_id=follow_subscribers.id);
+END;
+
+-- Dormant trusted catalog precondition. This empty view retains no request or release data.
+CREATE VIEW IF NOT EXISTS follow_catalog_admissions AS SELECT NULL AS expires_at_ms WHERE 0;
+CREATE TRIGGER IF NOT EXISTS follow_catalog_admit
+INSTEAD OF INSERT ON follow_catalog_admissions
+BEGIN
+  SELECT CASE WHEN typeof(NEW.expires_at_ms) IN ('integer','real')
+    AND NEW.expires_at_ms>0 AND NEW.expires_at_ms<=9007199254740991
+    AND NEW.expires_at_ms=CAST(NEW.expires_at_ms AS INTEGER)
+    AND NEW.expires_at_ms>CAST(round((julianday('now')-2440587.5)*86400000) AS INTEGER)
+    THEN 1 ELSE RAISE(ABORT,'Follow catalog unavailable') END;
+END;
+
+-- Dormant existing-subscriber management requests; only an irreversible attempt claim, no raw credentials.
+CREATE TABLE IF NOT EXISTS follow_management_outbox (
+  id TEXT PRIMARY KEY NOT NULL,
+  subscriber_id TEXT NOT NULL UNIQUE REFERENCES follow_subscribers(id) ON DELETE CASCADE,
+  queued_at TEXT NOT NULL CHECK(length(queued_at)=24 AND strftime('%Y-%m-%dT%H:%M:%fZ',queued_at,'+0 days') IS queued_at),
+  expires_at TEXT NOT NULL CHECK(length(expires_at)=24 AND strftime('%Y-%m-%dT%H:%M:%fZ',expires_at,'+0 days') IS expires_at
+    AND expires_at>queued_at AND expires_at<=strftime('%Y-%m-%dT%H:%M:%fZ',queued_at,'+7 days'))
+, claim_id TEXT);
+CREATE INDEX IF NOT EXISTS follow_management_outbox_expiry ON follow_management_outbox(expires_at);
+
+-- Bounded live, unclaimed candidate pages. No retained scheduling state.
+CREATE INDEX IF NOT EXISTS follow_confirmation_outbox_dispatch
+  ON follow_confirmation_outbox(expires_at,id) WHERE claim_id IS NULL;
+CREATE INDEX IF NOT EXISTS follow_management_outbox_dispatch
+  ON follow_management_outbox(expires_at,id) WHERE claim_id IS NULL;
+
+-- Approved private unlinked observation receipt. No raw event/payment/account association.
+CREATE TABLE IF NOT EXISTS topup_history_receipts (
+  event_digest TEXT PRIMARY KEY NOT NULL CHECK(length(event_digest)=64 AND event_digest NOT GLOB '*[^0-9a-f]*'),
+  observed_at TEXT NOT NULL CHECK(length(observed_at)=24 AND strftime('%Y-%m-%dT%H:%M:%fZ',observed_at,'+0 days') IS observed_at)
+);
+CREATE INDEX IF NOT EXISTS topup_history_receipts_expiry ON topup_history_receipts(observed_at,event_digest);
+
+-- Private current coverage metadata only. No purchase enrollment or replay authority.
+CREATE TABLE IF NOT EXISTS topup_history_coverage (
+  mode TEXT PRIMARY KEY NOT NULL CHECK(mode IN ('test','live')),
+  epoch TEXT NOT NULL CHECK(length(epoch)=32 AND epoch NOT GLOB '*[^0-9a-f]*'),
+  schema_key TEXT NOT NULL CHECK(length(schema_key) BETWEEN 1 AND 64 AND schema_key NOT GLOB '*[^A-Za-z0-9_.-]*'),
+  starts_at TEXT NOT NULL CHECK(length(starts_at)=24 AND strftime('%Y-%m-%dT%H:%M:%fZ',starts_at,'+0 days') IS starts_at),
+  covered_through TEXT CHECK(covered_through IS NULL OR (length(covered_through)=24 AND strftime('%Y-%m-%dT%H:%M:%fZ',covered_through,'+0 days') IS covered_through AND covered_through>=starts_at)),
+  revision INTEGER NOT NULL CHECK(typeof(revision)='integer' AND revision BETWEEN 1 AND 9007199254740991),
+  health TEXT NOT NULL CHECK(health IN ('unproven','closed','qualified')),
+  CHECK(health!='unproven' OR covered_through IS NULL),
+  CHECK(health!='qualified' OR covered_through IS NOT NULL)
+);
+
+-- One private current owner. No automatic reset, lease expiry or takeover.
+CREATE TABLE IF NOT EXISTS follow_delivery_owner (
+  singleton INTEGER PRIMARY KEY CHECK(singleton=1),
+  version INTEGER NOT NULL CHECK(version=1),
+  generation TEXT NOT NULL CHECK(length(generation)=32 AND generation NOT GLOB '*[^0-9a-f]*'),
+  phase TEXT NOT NULL CHECK(phase IN ('ready','running','held')),
+  next_kind TEXT NOT NULL CHECK(next_kind IN ('confirmation','management')),
+  confirmation_id TEXT,
+  confirmation_expires_at TEXT,
+  management_id TEXT,
+  management_expires_at TEXT,
+  CHECK((confirmation_id IS NULL)=(confirmation_expires_at IS NULL)),
+  CHECK((management_id IS NULL)=(management_expires_at IS NULL)),
+  CHECK(confirmation_id IS NULL OR length(confirmation_id)=36),
+  CHECK(management_id IS NULL OR length(management_id)=36),
+  CHECK(confirmation_expires_at IS NULL OR (length(confirmation_expires_at)=24 AND strftime('%Y-%m-%dT%H:%M:%fZ',confirmation_expires_at,'+0 days') IS confirmation_expires_at)),
+  CHECK(management_expires_at IS NULL OR (length(management_expires_at)=24 AND strftime('%Y-%m-%dT%H:%M:%fZ',management_expires_at,'+0 days') IS management_expires_at))
+);
+-- Adoption is operator-gated. Runtime never inserts or recreates this row.
+INSERT INTO follow_delivery_owner(singleton,version,generation,phase,next_kind)
+VALUES(1,1,lower(hex(randomblob(16))),'ready','confirmation')
+ON CONFLICT(singleton) DO NOTHING;
+
+CREATE TRIGGER IF NOT EXISTS follow_owner_confirmation_delete AFTER DELETE ON follow_confirmation_outbox
+BEGIN
+  UPDATE follow_delivery_owner SET confirmation_id=NULL,confirmation_expires_at=NULL
+  WHERE confirmation_id=OLD.id AND confirmation_expires_at=OLD.expires_at;
+END;
+CREATE TRIGGER IF NOT EXISTS follow_owner_confirmation_replace AFTER UPDATE OF id,expires_at ON follow_confirmation_outbox
+WHEN OLD.id IS NOT NEW.id OR OLD.expires_at IS NOT NEW.expires_at
+BEGIN
+  UPDATE follow_delivery_owner SET confirmation_id=NULL,confirmation_expires_at=NULL
+  WHERE confirmation_id=OLD.id AND confirmation_expires_at=OLD.expires_at;
+END;
+CREATE TRIGGER IF NOT EXISTS follow_owner_management_delete AFTER DELETE ON follow_management_outbox
+BEGIN
+  UPDATE follow_delivery_owner SET management_id=NULL,management_expires_at=NULL
+  WHERE management_id=OLD.id AND management_expires_at=OLD.expires_at;
+END;
+CREATE TRIGGER IF NOT EXISTS follow_owner_management_replace AFTER UPDATE OF id,expires_at ON follow_management_outbox
+WHEN OLD.id IS NOT NEW.id OR OLD.expires_at IS NOT NEW.expires_at
+BEGIN
+  UPDATE follow_delivery_owner SET management_id=NULL,management_expires_at=NULL
+  WHERE management_id=OLD.id AND management_expires_at=OLD.expires_at;
+END;

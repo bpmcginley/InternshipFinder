@@ -1,0 +1,13 @@
+# P-2.2an session freshness evidence
+
+Eight paired Edge PNGs cover 1280 and 375 pixels in light/dark themes. All records, sessions and Worker responses are synthetic. Playwright fulfills local repository files and Worker mocks and aborts external requests; no provider or real account is contacted. No page errors or horizontal overflow were observed, and the allowance heading remains within the viewport.
+
+The before phase serves exact #461 `daf27b524670566ebaf3ee4126d5bd9b46660ead` native Core account and App allowance modules; after serves this package. For both phases the intercepted local dashboard response exposes its existing `setAuth` callback through a test-only hook. Synthetic verified sign-in results drive A to B to reused A. Actual setter generation, effects, Core and loader code run; this does not simulate a provider login. The first A response is held, the newer A response succeeds, then the old A response returns 401. Before, persisted A is erased; after, it remains. Navigating to a fresh dashboard from that resulting storage shows the changed sign-in outcome. The hook is only in the local capture response, never in production source. No actual BFCache, screen-reader or payment operation is claimed.
+
+`results.json` records the eight results and zero external requests. Before has three authenticated `/me` reads; after has a fourth on reload because the valid stored session survives. The UI strings are existing strings; this package adds no public copy.
+
+The 10 new real Core-plus-loader tests cover generation, same-token supersession, timeout (late 200 and 401), cleanup, current-authority rejection/refresh, original one-argument callers and late bodies. Running the six stale-operation cases against an isolated exact parent archive reproduces all six failures; all 10 pass after the fix. The additional existing auth/balance focused cases pass (43 total), as does the full 384-test site suite.
+
+To reproduce the paired capture, extract the parent's `docs/js/core/` and `docs/js/app/allowance.mjs` into an isolated temporary directory and run `node notes/product/screenshots/P-2.2an/capture.cjs <baseline-directory>` using the existing isolated Playwright/Edge tooling.
+
+`build-delta.json` comes from a temporary build through the actual offline golden harness, with socket activity denied. Its 836 outputs differ only in the two changed native modules, the dashboard's graph references and the 11 App plus seven Core generation paths. Every other output is byte-identical. The shared golden manifest/archive remain untouched by instruction; this diagnostic is not a golden approval or a release qualification.

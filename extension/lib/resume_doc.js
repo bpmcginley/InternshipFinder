@@ -8,6 +8,7 @@
 // rows are never editable. Anything that fails a check falls back to the original text.
 // This file is ASCII only; every other character is written as a \u escape.
 import { hasNewNumbers } from "./tailoring.js";
+import { hasUnsupportedAnchors } from "./tailor_claims.js";
 // was: import { plain } from "./pdf_layout.js";
 import { lossless, parseRich, plain } from "./pdf_layout.js";
 
@@ -304,7 +305,12 @@ export function applyDocTailoring(doc, out) {
       if (kind === "skills") next = reorderSkills(orig, next);
       else {
         next = marks(next, orig);
-        if (!fits(next, orig) || hasNewNumbers(plain(next), all)) return orig;
+        if (
+          !fits(next, orig) ||
+          hasNewNumbers(plain(next), all) ||
+          hasUnsupportedAnchors(plain(next), all)
+        )
+          return orig;
       }
       if (plain(next) !== plain(orig))
         diff.push({ where: sec.title, before: plain(orig), after: plain(next) });
@@ -321,7 +327,8 @@ export function applyDocTailoring(doc, out) {
         nt &&
         plain(nt) !== plain(e.text) &&
         fits(nt, e.text) &&
-        !hasNewNumbers(plain(nt), plain(e.text))
+        !hasNewNumbers(plain(nt), plain(e.text)) &&
+        !hasUnsupportedAnchors(plain(nt), plain(e.text))
       ) {
         diff.push({ where, before: plain(e.text), after: plain(nt) });
         text = nt;
@@ -339,6 +346,7 @@ export function applyDocTailoring(doc, out) {
           !next ||
           !fits(next, orig) ||
           hasNewNumbers(plain(next), plain(orig)) ||
+          hasUnsupportedAnchors(plain(next), plain(orig)) ||
           plain(next) === plain(orig)
         )
           next = orig;

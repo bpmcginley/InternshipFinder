@@ -1,7 +1,8 @@
+import { finishQuickProfileAction, saveQuickProfileAction } from "../../docs/js/app/setup.mjs";
+import { createTestApp } from "./app-fixture.mjs";
+import { installCore } from "./core-fixture.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import vm from "node:vm";
 
 function harness() {
   const storage = new Map();
@@ -31,17 +32,9 @@ function harness() {
     document: { documentElement: { dataset: {} } },
   };
   ctx.window = ctx;
-  vm.createContext(ctx);
-  vm.runInContext(readFileSync(new URL("../../docs/js/core.js", import.meta.url), "utf8"), ctx);
-  const app = readFileSync(new URL("../../docs/js/app.js", import.meta.url), "utf8");
-  vm.runInContext(
-    app.replace(
-      'ReactDOM.createRoot(document.getElementById("root")).render(h(App));',
-      "window.components = { quickProfile, QuickProfile, MultiSelect, Sel, matchControl, Why };",
-    ),
-    ctx,
-  );
-  return { ...ctx.components, IS: ctx.IS, storage };
+  installCore(ctx);
+  const components = createTestApp(ctx);
+  return { ...components, IS: ctx.IS, storage };
 }
 const plain = (x) => JSON.parse(JSON.stringify(x));
 const nodes = (n, predicate) =>
@@ -172,7 +165,6 @@ test("quick save preserves filters and defers the existing first-profile invitat
   const H = harness(),
     offers = [],
     counted = [];
-  const source = readFileSync(new URL("../../docs/js/app.js", import.meta.url), "utf8");
   let filters = { q: "Engineer", states: ["NY"], fields: ["swe"], sort: "new" };
   const ctx = {
     IS: { ...H.IS, count: (event) => counted.push(event) },
@@ -192,14 +184,8 @@ test("quick save preserves filters and defers the existing first-profile invitat
     offerNudge: () => false,
     offerDigestNudge: (action) => offers.push(action),
   };
-  vm.createContext(ctx);
-  vm.runInContext(
-    source.slice(
-      source.indexOf("    function saveQuickProfile(patch) {"),
-      source.indexOf("    // Focus goes back"),
-    ),
-    ctx,
-  );
+  ctx.saveQuickProfile = patch => saveQuickProfileAction(ctx, patch);
+  ctx.finishQuickProfile = () => finishQuickProfileAction({ ...ctx, browser: ctx });
   ctx.saveQuickProfile({ majors: ["Psychology"] });
   ctx.saveQuickProfile({ class_year: "junior" });
   assert.deepEqual(plain(filters), {

@@ -134,8 +134,10 @@ export async function callGemini({
 }) {
   if (!apiKey) throw new Error("No Gemini API key. Open Auto-Apply setup → Setup.");
   const body = buildGeminiBody({ system, messages, tools, max_tokens, thinking });
+  const maxAttempts = 5;
   let lastErr = "";
-  for (let attempt = 0; attempt < 5; attempt++) {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const hasNextAttempt = attempt + 1 < maxAttempts;
     throwIfAborted(signal);
     let res;
     try {
@@ -148,13 +150,13 @@ export async function callGemini({
     } catch (e) {
       if (signal?.aborted || e.name === "AbortError") throw e;
       lastErr = e.message;
-      await sleep(1500 * 2 ** attempt, signal);
+      if (hasNextAttempt) await sleep(1500 * 2 ** attempt, signal);
       continue;
     }
     throwIfAborted(signal);
     if (res.status === 429 || res.status >= 500) {
       lastErr = `${res.status}`;
-      await sleep(2000 * 2 ** attempt, signal);
+      if (hasNextAttempt) await sleep(2000 * 2 ** attempt, signal);
       continue;
     }
     const data = await res.json().catch((e) => {
@@ -215,6 +217,12 @@ export function workerError(status, data = {}) {
             : "bad_request");
   let msg,
     offer = null;
+  // The cap code/reset/offer are shared by monthly, per-run and spend limits. Only this
+  // exact Worker response identifies the allowance (including a disabled zero limit).
+  const allowanceLimited =
+    code === "cap" &&
+    data.task === "autofill" &&
+    data.message === "Monthly autofill allowance is used up";
   if (code === "auth") msg = `${SIGN_IN_HINT} to use AI features, then try again.`;
   else if (code === "cap") {
     const label =
@@ -254,6 +262,13 @@ export function workerError(status, data = {}) {
     msg = data.resets
       ? `You've used this month's free ${label} allowance.${resets}${edu}${more}${OWN_KEY_HINT.replace(/^or /, "")}.`
       : `This run hit its AI call limit${data.message ? ` (${data.message})` : ""}. Finish it by hand, ${OWN_KEY_HINT}.`;
+    if (allowanceLimited)
+      msg =
+        "Auto-Apply cannot start another run with this account's current allowance. Open the dashboard to check your allowance and available options, or finish this application by hand.";
+    else if (data.message === "This run reached its call limit")
+      msg = `This run reached its AI call limit. Finish it by hand, ${OWN_KEY_HINT}.`;
+    else if (data.message === "This account reached its monthly AI ceiling")
+      msg = `This account reached its monthly AI spending limit. Finish this application by hand, ${OWN_KEY_HINT}.`;
   } else if (code === "rate")
     msg = `Too many AI calls in a short time. Wait ${data.retry_after ? `${data.retry_after} seconds` : "a minute"}, then try again.`;
   // Not this student's own limit: everyone's calls together hit the server's per-minute ceiling. Say so,
@@ -268,6 +283,7 @@ export function workerError(status, data = {}) {
   const e = new Error(msg);
   e.code = code;
   e.status = status;
+  e.allowanceLimited = allowanceLimited;
   if (offer) e.offer = offer;
   if (data.retry_after) e.retry_after = +data.retry_after;
   return e;
@@ -281,6 +297,38 @@ export const NEEDS_YOU_CODES = new Set(["auth", "cap", "rate", "paused", "busy"]
 // Puts a streamed Gemini reply back together as one generateContent reply, so fromResponse reads it
 // like any other. Each chunk carries a few parts; text that was split across chunks is joined again.
 // A part with a thoughtSignature closes the text before it, because the signature belongs to that part.
+const TERMINAL_REASONS = new Set([
+  "STOP",
+  "MAX_TOKENS",
+  "SAFETY",
+  "RECITATION",
+  "LANGUAGE",
+  "OTHER",
+  "BLOCKLIST",
+  "PROHIBITED_CONTENT",
+  "SPII",
+  "MALFORMED_FUNCTION_CALL",
+  "IMAGE_SAFETY",
+  "IMAGE_PROHIBITED_CONTENT",
+  "IMAGE_OTHER",
+  "NO_IMAGE",
+  "IMAGE_RECITATION",
+  "UNEXPECTED_TOOL_CALL",
+  "TOO_MANY_TOOL_CALLS",
+  "MISSING_THOUGHT_SIGNATURE",
+  "MALFORMED_RESPONSE",
+  "ESCALATION",
+  "PUP_LIMITED_DISABLED",
+]);
+const BLOCK_REASONS = new Set([
+  "SAFETY",
+  "OTHER",
+  "BLOCKLIST",
+  "PROHIBITED_CONTENT",
+  "IMAGE_SAFETY",
+]);
+const object = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+
 export function stitchChunks(chunks) {
   const parts = [];
   let finishReason,
@@ -288,14 +336,56 @@ export function stitchChunks(chunks) {
     promptFeedback,
     seen = false;
   for (const c of chunks) {
-    if (!c || typeof c !== "object") continue;
+    if (!c || typeof c !== "object" || Array.isArray(c))
+      throw new Error("Invalid Gemini stream chunk");
+    if (c.error) throw new Error("Gemini stream error");
+    if (c.candidates !== undefined && !Array.isArray(c.candidates))
+      throw new Error("Invalid Gemini candidates");
     if (c.usageMetadata) usageMetadata = c.usageMetadata;
     if (c.promptFeedback) promptFeedback = c.promptFeedback;
     const cand = (c.candidates || [])[0];
-    if (!cand) continue;
+    if (!c.candidates?.length) continue;
+    if (
+      !cand ||
+      typeof cand !== "object" ||
+      Array.isArray(cand) ||
+      (cand.finishReason !== undefined &&
+        (typeof cand.finishReason !== "string" ||
+          (cand.finishReason !== "" &&
+            cand.finishReason !== "CONTINUATION" &&
+            cand.finishReason !== "FINISH_REASON_UNSPECIFIED" &&
+            !TERMINAL_REASONS.has(cand.finishReason))))
+    )
+      throw new Error("Invalid Gemini candidate");
+    if (
+      cand.content !== undefined &&
+      (!cand.content || typeof cand.content !== "object" || Array.isArray(cand.content))
+    )
+      throw new Error("Invalid Gemini content");
+    const candidateParts = cand.content?.parts;
+    if (candidateParts !== undefined && !Array.isArray(candidateParts))
+      throw new Error("Invalid Gemini parts");
     seen = true;
-    if (cand.finishReason) finishReason = cand.finishReason;
-    for (const p of (cand.content && cand.content.parts) || []) {
+    // Later candidate content cannot inherit an earlier terminal marker. Usage-only trailers can.
+    finishReason = cand.finishReason;
+    for (const p of candidateParts || []) {
+      if (
+        !p ||
+        typeof p !== "object" ||
+        Array.isArray(p) ||
+        (p.text != null && typeof p.text !== "string")
+      )
+        throw new Error("Invalid Gemini part");
+      if (p.functionCall !== undefined) {
+        const call = p.functionCall;
+        if (
+          !object(call) ||
+          typeof call.name !== "string" ||
+          !call.name.trim() ||
+          (call.args !== undefined && !object(call.args))
+        )
+          throw new Error("Invalid Gemini function call");
+      }
       if (p.thought) continue;
       const last = parts[parts.length - 1];
       const plain = (x) => x && x.text != null && !x.functionCall;
@@ -311,39 +401,153 @@ export function stitchChunks(chunks) {
       : [],
     ...(usageMetadata ? { usageMetadata } : {}),
     ...(promptFeedback ? { promptFeedback } : {}),
-    complete: !!finishReason,
+    complete: TERMINAL_REASONS.has(finishReason),
   };
 }
 
-// Reads a text/event-stream body to the end and returns the JSON of every "data:" line.
-export async function readSSE(res) {
+// Technical client ceilings, not claims about operator-configured Worker limits.
+export const SSE_LIMITS = Object.freeze({ maxBytes: 4 * 1024 * 1024, maxEventBytes: 1024 * 1024 });
+
+// Decode complete SSE events, never individual data lines or a truncated last event.
+export async function readSSE(
+  res,
+  { signal, maxBytes = SSE_LIMITS.maxBytes, maxEventBytes = SSE_LIMITS.maxEventBytes } = {},
+) {
+  throwIfAborted(signal);
+  if (
+    !Number.isSafeInteger(maxBytes) ||
+    maxBytes < 1 ||
+    maxBytes > SSE_LIMITS.maxBytes ||
+    !Number.isSafeInteger(maxEventBytes) ||
+    maxEventBytes < 1 ||
+    maxEventBytes > Math.min(maxBytes, SSE_LIMITS.maxEventBytes)
+  )
+    throw new Error("Invalid SSE limits");
+  if (!res.body?.getReader) throw new Error("Missing SSE reader");
+  const reader = res.body.getReader(),
+    decoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
   const chunks = [];
-  const take = (line) => {
-    if (!line.startsWith("data:")) return;
-    const t = line.slice(5).trim();
-    if (!t || t === "[DONE]") return;
-    try {
-      chunks.push(JSON.parse(t));
-    } catch (e) {
-      /* a cut-off last line: stitchChunks reports it as incomplete */
+  let lineParts = [],
+    lineBytes = 0,
+    pendingCR = false,
+    firstLine = true,
+    lines = [],
+    eventBytes = 0,
+    total = 0,
+    ended = false;
+  const dispatch = () => {
+    const data = lines.join("\n");
+    lines = [];
+    eventBytes = 0;
+    if (!data.trim()) return;
+    if (data.trim() === "[DONE]") {
+      ended = true;
+      return;
+    }
+    if (ended) throw new Error("Data after SSE completion");
+    const value = JSON.parse(data);
+    if (!value || typeof value !== "object" || Array.isArray(value))
+      throw new Error("Invalid SSE data");
+    chunks.push(value);
+  };
+  const append = (part) => {
+    if (part.length) {
+      lineParts.push(part);
+      lineBytes += part.length;
     }
   };
-  if (res.body && res.body.getReader) {
-    const reader = res.body.getReader(),
-      dec = new TextDecoder();
-    let buf = "";
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buf += dec.decode(value, { stream: true });
-      const lines = buf.split(/\r?\n/);
-      buf = lines.pop();
-      lines.forEach(take);
+  const finishLine = (terminated = true) => {
+    const bytes = new Uint8Array(lineBytes);
+    let offset = 0;
+    for (const part of lineParts) {
+      bytes.set(part, offset);
+      offset += part.length;
     }
-    buf += dec.decode();
-    if (buf) take(buf);
-  } else (await res.text()).split(/\r?\n/).forEach(take);
-  return chunks;
+    let line = decoder.decode(bytes);
+    if (firstLine && line[0] === "\ufeff") line = line.slice(1);
+    firstLine = false;
+    lineParts = [];
+    lineBytes = 0;
+    if (!line && terminated) dispatch();
+    else if (line === "data" || line.startsWith("data:"))
+      lines.push(line.slice(5).replace(/^ /, ""));
+  };
+  const countByte = () => {
+    if (++eventBytes > maxEventBytes) throw new Error("SSE event too large");
+  };
+  // Each raw byte is visited once. Decode each complete line once, rather than rescanning or
+  // re-encoding its growing prefix on every transport read. CR/LF cannot be UTF-8 continuation bytes.
+  const scan = (bytes) => {
+    let start = 0;
+    for (let i = 0; i < bytes.length; i++) {
+      const byte = bytes[i];
+      if (pendingCR) {
+        pendingCR = false;
+        if (byte === 10) {
+          countByte();
+          finishLine();
+          start = i + 1;
+          continue;
+        }
+        finishLine();
+      }
+      countByte();
+      if (byte === 13 || byte === 10) {
+        append(bytes.subarray(start, i));
+        start = i + 1;
+        if (byte === 13) pendingCR = true;
+        else finishLine();
+      }
+    }
+    append(bytes.subarray(start));
+  };
+  const finish = () => {
+    if (pendingCR) finishLine();
+    else if (lineBytes) finishLine(false);
+    // Preserve a harmless final DONE trailer; it never supplies Gemini's finish reason.
+    if (lines.length && lines.join("\n").trim() !== "[DONE]")
+      throw new Error("Incomplete SSE event");
+  };
+  let rejectAbort;
+  const aborted = new Promise((_, reject) => {
+    rejectAbort = reject;
+  });
+  const cancelReader = (reason) => {
+    try {
+      void Promise.resolve(reader.cancel(reason)).catch(() => {});
+    } catch {}
+  };
+  const abort = () => {
+    const reason = signal.reason || new DOMException("The request was canceled.", "AbortError");
+    rejectAbort(reason);
+    cancelReader(reason);
+  };
+  signal?.addEventListener("abort", abort, { once: true });
+  try {
+    throwIfAborted(signal);
+    const read = async () => {
+      for (;;) {
+        const { done, value } = await reader.read();
+        throwIfAborted(signal);
+        if (done) break;
+        if (!(value instanceof Uint8Array)) throw new Error("Invalid SSE bytes");
+        total += value.byteLength;
+        if (total > maxBytes) throw new Error("SSE body too large");
+        scan(value);
+      }
+      finish();
+      throwIfAborted(signal);
+      return chunks;
+    };
+    // One abort race for the operation, not one retained reaction per incoming chunk.
+    return await Promise.race([read(), aborted]);
+  } finally {
+    signal?.removeEventListener("abort", abort);
+    cancelReader();
+    try {
+      reader.releaseLock();
+    } catch {}
+  }
 }
 
 const isSSE = (res) =>
@@ -363,16 +567,23 @@ export async function callWorker({
   task,
   run_id,
   signal,
+  verifySession,
   fetchImpl = fetch,
   sleepImpl = sleep,
   ...opts
 }) {
   if (!token) throw workerError(401, { error: "auth" });
   const body = JSON.stringify(buildWorkerRequest({ task, run_id, ...opts }));
+  const maxAttempts = 4;
   let refreshed = false,
     lastErr = null;
-  for (let attempt = 0; attempt < 4; attempt++) {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const hasNextAttempt = attempt + 1 < maxAttempts;
     throwIfAborted(signal);
+    if (verifySession) {
+      await verifySession();
+      throwIfAborted(signal);
+    }
     let res;
     try {
       res = await fetchImpl(`${url}/ai?stream=1`, {
@@ -384,26 +595,30 @@ export async function callWorker({
     } catch (e) {
       if (signal?.aborted || e.name === "AbortError") throw e;
       lastErr = workerError(502, { error: "upstream" });
-      await sleepImpl(1500 * 2 ** attempt, signal);
+      if (hasNextAttempt) await sleepImpl(1500 * 2 ** attempt, signal);
       continue;
     }
     throwIfAborted(signal);
     if (res.ok && isSSE(res)) {
       let whole;
       try {
-        whole = stitchChunks(await readSSE(res));
+        whole = stitchChunks(await readSSE(res, { signal }));
       } catch (e) {
         if (signal?.aborted || e.name === "AbortError") throw e;
         whole = null;
       }
+      throwIfAborted(signal);
       // A stream that stopped before Gemini said it was finished is a dropped connection, not an
       // answer: half a tool call or half a resume must not be acted on. Try again like any 502.
-      if (!whole || (!whole.complete && !whole.promptFeedback)) {
+      if (
+        !whole ||
+        (!whole.complete &&
+          (whole.candidates.length || !BLOCK_REASONS.has(whole.promptFeedback?.blockReason)))
+      ) {
         lastErr = workerError(502, { error: "upstream" });
-        await sleepImpl(1500 * 2 ** attempt, signal);
+        if (hasNextAttempt) await sleepImpl(1500 * 2 ** attempt, signal);
         continue;
       }
-      throwIfAborted(signal);
       return fromResponse(whole);
     }
     const data = await res.json().catch((e) => {
@@ -428,7 +643,8 @@ export async function callWorker({
       err.code === "upstream"
     ) {
       lastErr = err;
-      await sleepImpl(err.retry_after ? err.retry_after * 1000 : 2000 * 2 ** attempt, signal);
+      if (hasNextAttempt)
+        await sleepImpl(err.retry_after ? err.retry_after * 1000 : 2000 * 2 ** attempt, signal);
       continue;
     }
     throw err;

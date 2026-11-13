@@ -22,8 +22,19 @@ export function fakeD1() {
     },
     all: async () => ({ success: true, meta: {}, results: sql.prepare(query).all(...params).map((r) => ({ ...r })) }),
     run: async () => {
+      // D1 batch() returns SELECT rows from the same transaction as preceding writes.
+      // Keep the existing write path/changes semantics below unchanged.
+      if (/^\s*SELECT\b/i.test(query)) {
+        return { success: true, meta: { changes: 0 }, results: sql.prepare(query).all(...params).map((r) => ({ ...r })) };
+      }
+      // DML RETURNING has rows in real D1, unlike an ordinary write receipt.
+      if (/^\s*(?:INSERT|UPDATE|DELETE)\b[\s\S]*\bRETURNING\b/i.test(query)) {
+        const results = sql.prepare(query).all(...params).map((r) => ({ ...r }));
+        const changes = Number(sql.prepare("SELECT changes() AS n").get().n);
+        return { success: true, meta: { changes }, results };
+      }
       const r = sql.prepare(query).run(...params);
-      return { success: true, meta: { changes: Number(r.changes) } };
+      return { success: true, meta: { changes: Number(r.changes) }, results: [] };
     },
   });
   async function runBatch(list) {

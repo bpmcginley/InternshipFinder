@@ -1,0 +1,78 @@
+main {
+  max-width: 720px;
+  margin-inline: auto;
+  padding: clamp(24px, 6vw, 64px) var(--s4);
+  font-size: var(--fs-4);
+}
+
+header {
+  border-bottom: 1px solid var(--rule);
+  margin-bottom: var(--s5);
+  padding-bottom: var(--s4);
+}
+
+h1 {
+  margin: 0 0 var(--s2);
+  font: 600 clamp(var(--fs-7), 4vw, var(--fs-8))/var(--lh-head) var(--serif);
+}
+
+header p {
+  max-width: 48ch;
+  margin: 0;
+  color: var(--ink2);
+}
+
+form {
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-lg);
+  padding: clamp(var(--s4), 3vw, var(--s6));
+}
+
+h2 {
+  margin: 0 0 var(--s4);
+  font: 600 var(--fs-6)/var(--lh-head) var(--serif);
+}
+
+.btn {
+  min-height: 44px;
+}
+
+.fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s3) var(--s4);
+  margin-block: var(--s5);
+}
+
+label {
+  display: grid;
+  gap: var(--s1);
+  color: var(--ink2);
+  font-size: var(--fs-3);
+}
+
+input {
+  width: 100%;
+  min-height: 44px;
+  padding: var(--s2) var(--s3);
+  font: inherit;
+  color: var(--ink);
+  background: var(--panel);
+}
+
+#result {
+  margin: 0 0 var(--s3);
+  color: var(--ink2);
+  font-size: var(--fs-3);
+}
+
+#result:empty {
+  margin: 0;
+}
+
+@media (max-width: 480px) {
+  .fields {
+    grid-template-columns: 1fr;
+  }
+}

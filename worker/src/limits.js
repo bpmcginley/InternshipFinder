@@ -2,6 +2,7 @@
 import { HttpError } from "./http.js";
 import { canUpgrade, paymentsInfo } from "./billing.js";
 import { forgetStatements } from "./referral.js";
+import { forgetLinkedFollowStatements } from "./follow-account-deletion.js";
 import { forgetCopies, forgetSessions } from "./session.js";
 import { forgetProfile } from "./profile.js";
 import { countEvent } from "./visits.js";
@@ -213,7 +214,7 @@ export async function bumpUnder(db, user, bucket, limit) {
 // slip past a limit between a read and a write. `estimate` (cents) is charged up front and corrected
 // by settle() once Gemini says what the call really cost; release() undoes it all if Gemini fails.
 // A Worker that dies in between leaves the unit and the estimate counted, which errs on the safe side.
-export async function admit(db, env, config, user, task, runId, now, tier = "general", plan = "free", estimate = 0) {
+export async function aiPreflight(db, env, config, user, now, plan = "free") {
   const rate = (config.PLANS[plan] || config.PLANS.free).rate || config.RATE;
   const month = monthOf(now);
   const today = dayOf(now);
@@ -264,6 +265,12 @@ export async function admit(db, env, config, user, task, runId, now, tier = "gen
                         { retry_after: untilNextMinute });
   }
 
+}
+
+export async function admit(db, env, config, user, task, runId, now, tier = "general", plan = "free", estimate = 0, boundary = {}) {
+  const month = monthOf(now), today = dayOf(now);
+  const minute = "m:" + now.toISOString().slice(0, 16), dayBucket = "d:" + today;
+  if (!boundary.preflightDone) await aiPreflight(db, env, config, user, now, plan);
   const limit = allowanceFor(config, env, task, tier, plan, now);
   // The client uses `upgrade` to decide whether to mention a paid plan; it never guesses.
   // `upgrade` tells the client whether a bigger plan exists for this student, so it never offers one
@@ -275,7 +282,7 @@ export async function admit(db, env, config, user, task, runId, now, tier = "gen
     offer: upgradeOffer(env, config, tier, plan, now) });
 
   const runKey = [user, month, task, runId];
-  const ins = await db.prepare("INSERT OR IGNORE INTO runs (user_hash, month, task, run_id, calls) VALUES (?, ?, ?, ?, 0)")
+  const ins = boundary.existingLegacyOnly ? { meta: { changes: 0 } } : await db.prepare("INSERT OR IGNORE INTO runs (user_hash, month, task, run_id, calls) VALUES (?, ?, ?, ?, 0)")
     .bind(...runKey).run();
   const isNew = ins.meta.changes > 0;
   let used;
@@ -316,9 +323,13 @@ export async function admit(db, env, config, user, task, runId, now, tier = "gen
     used = row ? row.units : 0;
   }
   const call = await db.prepare(
-    "UPDATE runs SET calls = calls + 1 WHERE user_hash = ? AND month = ? AND task = ? AND run_id = ? AND calls < ?",
-  ).bind(...runKey, config.MAX_CALLS_PER_RUN).run();
-  if (call.meta.changes === 0) throw cap("This run reached its call limit");
+    "UPDATE runs SET calls = calls + 1 WHERE user_hash = ? AND month = ? AND task = ? AND run_id = ? AND calls < ?" +
+      (boundary.existingLegacyOnly ? " AND calls>0 AND date('now')=? AND NOT EXISTS(SELECT 1 FROM funded_runs f WHERE f.user_hash=runs.user_hash AND f.month=runs.month AND f.task=runs.task AND f.run_id=runs.run_id) AND NOT EXISTS(SELECT 1 FROM forget WHERE user_hash=runs.user_hash)" : ""),
+  ).bind(...runKey, config.MAX_CALLS_PER_RUN, ...(boundary.existingLegacyOnly ? [today] : [])).run();
+  if (call.meta.changes === 0) {
+    if (boundary.existingLegacyOnly) throw new HttpError(503, "busy", "AI admission is temporarily unavailable");
+    throw cap("This run reached its call limit");
+  }
 
   // was: const admitted = { month, used, limit, isNew, estimate: estimate > 0 ? estimate : 0, metered: false };
   // was: const admitted = { month, day: today, used, limit, isNew, estimate: estimate > 0 ? estimate : 0, metered: false };
@@ -524,7 +535,7 @@ export async function settle(db, user, admitted, cents, usage, meta) {
 // too, in the same batch, so the account is signed out on every device.
 export async function deleteUser(db, user, now = new Date()) {
   const month = monthOf(now);
-  await db.batch([
+  const statements = [
     db.prepare("DELETE FROM demand WHERE user_hash = ?").bind(user),
     db.prepare("DELETE FROM usage WHERE user_hash = ? AND month < ?").bind(user, month),
     db.prepare("DELETE FROM runs WHERE user_hash = ? AND month < ?").bind(user, month),
@@ -532,10 +543,23 @@ export async function deleteUser(db, user, now = new Date()) {
     db.prepare("INSERT INTO forget (user_hash, month) VALUES (?, ?) ON CONFLICT(user_hash) DO UPDATE SET month = excluded.month")
       .bind(user, month),
     ...forgetStatements(db, user),
+    ...forgetLinkedFollowStatements(db, user),
     forgetProfile(db, user),
     forgetSessions(db, user),
     forgetCopies(db, user),
-  ]);
+  ];
+  try {
+    await db.batch(statements);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    const trigger = /^D1_ERROR: topup_payment_pending: SQLITE_CONSTRAINT(?: \(extended: SQLITE_CONSTRAINT_TRIGGER\))?$/;
+    if (message !== "topup_payment_pending" && !trigger.test(message)) throw error;
+    throw new HttpError(
+      409,
+      "topup_payment_pending",
+      "Finish or let your pending checkout expire before deleting your data. Contact support if a billing confirmation is pending.",
+    );
+  }
 }
 
 // was: // Daily cron: old rate buckets, last month's runs and per-account spend, usage older than a year.

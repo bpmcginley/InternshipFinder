@@ -3,16 +3,21 @@
 from urllib.parse import parse_qs, urlsplit
 import re
 
-from internscout import seo_pages
-from test_seo_pages import _row, _site
+import pytest
+
+from internscout.site import runtime
+from internscout.site.runtime import employer_key, employer_offer
+from tests.seo_fixture_data import _row, _site
+
+pytestmark = pytest.mark.without_seo_facade
 
 
 def test_public_company_key_prefill_is_escaped_and_never_places_an_order():
     name = 'North & South <Research> "Hiring"'
-    out = seo_pages.employer_offer(name)
+    out = employer_offer(name)
     link = re.search(r'href="([^"]+)" data-employer-entry="employer"', out).group(1)
     assert urlsplit(link).path == '/employers/buy/'
-    assert parse_qs(urlsplit(link).query) == {'company': [seo_pages.employer_key(name)]}
+    assert parse_qs(urlsplit(link).query) == {'company': [employer_key(name)]}
     assert '<Research>' not in out and '&lt;Research&gt;' in out
     assert 'Payment never changes organic search rankings.' in out
     assert 'Board additions and corrections are free' in out
@@ -21,7 +26,9 @@ def test_public_company_key_prefill_is_escaped_and_never_places_an_order():
 
 def test_employer_cta_does_not_add_application_links_or_change_indexing(tmp_path):
     rows = [_row(i, company_name='Example Co') for i in range(10)]
-    pages = seo_pages.build(_site(tmp_path, {'all': rows}), earning=frozenset())
+    site = _site(tmp_path, {'all': rows})
+    state = runtime.BuildState(near_on=False)
+    pages = runtime.invoke(state, runtime.BuildHooks(), runtime.build, site, earning=frozenset())
     page = next(p for p in pages if p['path'] == '/internships/at/example-co/')
     h = page['html']
     assert h.count('data-employer-entry="employer"') == 1

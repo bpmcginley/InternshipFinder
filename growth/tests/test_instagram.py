@@ -149,7 +149,14 @@ def test_no_secret_means_nothing_is_sent_and_result_does_not_claim_a_post(
     assert json.loads(status.read_text())["outcome"] == "not_configured"
 
 
-def test_a_failure_prints_meta_message_but_never_the_token(monkeypatch, capsys, tmp_path):
+@pytest.mark.parametrize("json_mode", [False, True])
+def test_a_failure_preserves_safe_advice_without_meta_message(
+    monkeypatch, capsys, tmp_path, json_mode
+):
+    if json_mode:
+        monkeypatch.setenv("INTERNSCOUT_LOG_FORMAT", "json")
+    else:
+        monkeypatch.delenv("INTERNSCOUT_LOG_FORMAT", raising=False)
     monkeypatch.setenv("INSTAGRAM_TOKEN", "SECRET-TOKEN-VALUE")
     monkeypatch.delenv("CLOUDFLARE_API_TOKEN", raising=False)
     refresher(monkeypatch, error="OAuthException 190: Error validating access token")
@@ -163,7 +170,7 @@ def test_a_failure_prints_meta_message_but_never_the_token(monkeypatch, capsys, 
         ig,
         "publish",
         lambda *a, **k: (_ for _ in ()).throw(
-            ig.InstagramError("OAuthException 190: Error validating access token")
+            ig.InstagramError("OAuthException 190: synthetic publish detail")
         ),
     )
     status = tmp_path / "result.json"
@@ -171,6 +178,16 @@ def test_a_failure_prints_meta_message_but_never_the_token(monkeypatch, capsys, 
     out = capsys.readouterr().out
     assert "SECRET-TOKEN-VALUE" not in out
     assert "replace the INSTAGRAM_TOKEN secret" in out
+    assert "synthetic publish detail" not in out
+    warning = next(line for line in out.splitlines() if "[instagram] failed:" in line)
+    if json_mode:
+        assert json.loads(warning) == {
+            "level": "WARNING",
+            "message": "[instagram] failed: InstagramError",
+            "exception_type": "InstagramError",
+        }
+    else:
+        assert warning == "[instagram] failed: InstagramError"
     result = json.loads(status.read_text())
     assert result["outcome"] == "failed" and result["reason"] == "publishing_error"
     assert "SECRET-TOKEN-VALUE" not in status.read_text()

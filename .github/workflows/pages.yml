@@ -1,7 +1,7 @@
 name: Deploy site
 
 # Publishes docs/ to GitHub Pages together with the crawlable landing pages under /internships/,
-# which backend/internscout/seo_pages.py builds from docs/data on every deploy. They are built here
+# which backend/internscout/site/publish.py builds from docs/data on every deploy. They are built here
 # rather than committed: 1,000+ pages rewritten four times a day would bloat the repo, and a page
 # built at deploy time is always exactly as fresh as the data it is deployed with.
 #
@@ -18,6 +18,8 @@ on:
     workflows: ["Ingest internships"]
     types: [completed]
   workflow_dispatch:
+  repository_dispatch:
+    types: [internscout-catchup-publication]
 
 permissions:
   contents: read
@@ -30,12 +32,26 @@ concurrency:
   # cancelling a run that is inside deploy-pages can leave the Pages deployment half-made, and
   # GitHub's own Pages starter workflow sets false for that reason. A queued run waits a few minutes.
   cancel-in-progress: false
+  queue: max  # Keep pending direct and supplementary publications serialized.
 
 # Pinned to ubuntu-24.04 (was: ubuntu-latest): that label moves to Ubuntu 26 on 2026-10-19, and the move should be a deliberate change.
 jobs:
   build:
+    if: >-
+      github.event_name != 'repository_dispatch' ||
+      (github.ref == 'refs/heads/main' && github.actor == 'github-actions[bot]' &&
+      github.triggering_actor == 'github-actions[bot]' &&
+      github.event.sender.login == 'github-actions[bot]' &&
+      github.event.repository.full_name == github.repository)
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read
+      pages: write
+      id-token: write
+    outputs:
+      catchup-commit: ${{ steps.catchup.outputs.commit }}
     steps:
       - name: Check that Pages deploys from this workflow
         env:
@@ -50,18 +66,49 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: main             # after an ingest run: the commit that run just pushed
+          fetch-depth: 0
+          filter: blob:none
 
       - uses: ./.github/actions/python
+
+      - name: Verify automatic catch-up writer
+        if: github.event_name == 'repository_dispatch'
+        id: catchup-writer
+        timeout-minutes: 2
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/catchup_pages.py verify-run
+
+      - name: Download the exact automatic catch-up receipt
+        if: github.event_name == 'repository_dispatch'
+        uses: actions/download-artifact@v8
+        timeout-minutes: 1
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.catchup-writer.outputs.run_id }}
+          artifact-ids: ${{ steps.catchup-writer.outputs.artifact_id }}
+          merge-multiple: true
+          path: ${{ runner.temp }}/catchup-publication
+
+      - name: Verify automatic catch-up receipt
+        if: github.event_name == 'repository_dispatch'
+        id: catchup
+        run: python scripts/catchup_pages.py verify-receipt
 
       - name: Select public listing data
         id: public-data
         uses: ./.github/actions/public-data
+        with:
+          expected-commit: ${{ steps.catchup.outputs.commit }}
+          expected-tree: ${{ steps.catchup.outputs.tree }}
+          upstream-run: ${{ steps.catchup.outputs.run_id }}
 
       - name: Save the sitemap that is live now
-        # seo_pages keeps a page that is already live until its listings fall well below the bar for
+        # the publisher keeps a page that is already live until its listings fall well below the bar for
         # a new one (keep_at), so pages near the line do not vanish and return between deploys. On
         # the first deploy there is none, and every page is judged as new.
-        # The noindex pages live now (seo_pages HELD_FILE, 2026-10-13) are not in the sitemap, and count as
+        # The noindex pages live now (publisher HELD_FILE, 2026-10-13) are not in the sitemap, and count as
         # live for keep_at too. Missing before the first deploy that writes it, which is fine.
         run: |
           curl -sfL --max-time 20 https://internscout.org/sitemap.xml -o live-sitemap.xml || rm -f live-sitemap.xml
@@ -85,9 +132,12 @@ jobs:
             echo '{"placements":[]}' > placements.json
           fi
 
+      - name: Install the link preview renderer
+        run: python -m pip install -r scripts/share-card-requirements.txt
+
       - name: Build the site and its landing pages
         id: pages
-        # seo_pages uses only the standard library, so nothing is installed.
+        # The share-card entry point builds pages and their local link previews together.
         # A malformed listing is skipped and counted inside the build, so bad data no longer stops a
         # deploy. Anything else that breaks here fails the run and deploys nothing, which leaves the
         # last good site live, landing pages and all.
@@ -96,10 +146,19 @@ jobs:
         # 404 until the next good build. A few hours of older listings costs far less than that.
         env:
           INTERNSCOUT_PUBLIC_DATA: ${{ steps.public-data.outputs.directory }}
-          # A backstop: seo_pages breaks every tie itself so two builds of the same data are the same
+          EMPLOYER_POSTING_MODE: ${{ vars.INTERNSCOUT_EMPLOYER_POSTING_MODE }}
+          # A backstop: the publisher breaks every tie itself so two builds of the same data are the same
           # bytes, and a fixed hash seed keeps any tie it missed from moving between deploys.
           PYTHONHASHSEED: "0"
         run: |
+          # Off until explicitly staged: annotations first, capture only after Worker qualification.
+          employer_args=()
+          case "${EMPLOYER_POSTING_MODE:-}" in
+            ""|off) ;;
+            annotations) employer_args=(--employer-postings) ;;
+            capture) employer_args=(--employer-postings --employer-posting-capture) ;;
+            *) echo "::error::Invalid employer posting mode."; exit 1 ;;
+          esac
           cp -r docs _site
           if [ "$INTERNSCOUT_PUBLIC_DATA" != "$GITHUB_WORKSPACE/docs/data" ]; then
             rm -rf -- _site/data
@@ -110,7 +169,7 @@ jobs:
           rm -f _site/CNAME        # the custom domain lives in the Pages settings for an Actions deploy
           # --placements-report (2026-10-14): what this build kept and dropped, for the next step. Written
           # outside _site, so it is never published.
-          (cd backend && INTERNSCOUT_PUBLIC_DATA="$GITHUB_WORKSPACE/_site/data" python -m internscout.seo_pages ../_site ../live-sitemap.xml ../live-noindex.txt --placements ../placements.json --placements-report ../placements-report.json)
+          (cd backend && INTERNSCOUT_PUBLIC_DATA="$GITHUB_WORKSPACE/_site/data" PYTHONPATH="..:." python -m scripts.make_og_image --site ../_site ../live-sitemap.xml ../live-noindex.txt --placements ../placements.json --placements-report ../placements-report.json "${employer_args[@]}")
           # 2026-10-23: fail before publishing missing links/canonicals or directory redirects.
           (cd backend && python -m internscout.site_links ../_site)
           # For the notify job: what was live before this deploy, and what this deploy publishes.
@@ -135,7 +194,7 @@ jobs:
 
       - name: Stamp local script and stylesheet content versions
         working-directory: backend
-        run: python -m internscout.asset_versions ../_site
+        run: python -m internscout.asset_versions ../_site --retain-core-git ..
 
       - name: Check public site contents before publishing
         run: |
@@ -156,12 +215,31 @@ jobs:
 
   deploy:
     needs: build
+    # A partial rerun can reuse a successful build from the original actor.
+    if: >-
+      github.event_name != 'repository_dispatch' ||
+      (github.ref == 'refs/heads/main' && github.actor == 'github-actions[bot]' &&
+      github.triggering_actor == 'github-actions[bot]' &&
+      github.event.sender.login == 'github-actions[bot]' &&
+      github.event.repository.full_name == github.repository)
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - name: Recheck the automatic catch-up data tip
+        if: github.event_name == 'repository_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_DATA_COMMIT: ${{ needs.build.outputs.catchup-commit }}
+        run: |
+          current=$(timeout 15s gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/data" \
+            --header "Cache-Control: no-cache" --jq 'select(.ref == "refs/heads/data" and .object.type == "commit") | .object.sha')
+          if ! [[ "$EXPECTED_DATA_COMMIT" =~ ^[a-f0-9]{40}$ ]] || [ "$current" != "$EXPECTED_DATA_COMMIT" ]; then
+            echo "::error::Automatic catch-up data tip changed before deployment."
+            exit 1
+          fi
       - id: deployment
         uses: actions/deploy-pages@v5
 
@@ -169,6 +247,13 @@ jobs:
   # this deploy added, removed or changed within hours (growth/indexnow.py). Google reads the sitemap.
   notify:
     needs: deploy
+    # A notify-only rerun can reuse a successful deployment.
+    if: >-
+      github.event_name != 'repository_dispatch' ||
+      (github.ref == 'refs/heads/main' && github.actor == 'github-actions[bot]' &&
+      github.triggering_actor == 'github-actions[bot]' &&
+      github.event.sender.login == 'github-actions[bot]' &&
+      github.event.repository.full_name == github.repository)
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:

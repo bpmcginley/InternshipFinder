@@ -10,6 +10,7 @@ import { canTailor } from "../lib/tailoring.js";
 import { getJob, updateJob, appendLog, saveMsgs, loadMsgs, getTailoredFile, tailorChoice } from "./queue.js";
 import { spend, money } from "../lib/usage.js";
 import { recordStep } from "./evalrec.js";
+import { confirmFinalReview } from "./review-handoff.js";
 // Side-effect import: guard.js is an IIFE that hangs ISGuard off globalThis. We want detectGate
 // here (in the worker) as well as in the page, and this keeps one copy with one set of tests.
 import "../agent/guard.js";
@@ -24,6 +25,7 @@ export { formatSnapshot, preFilledLine, SAME_SNAPSHOTS_MAX, TURNS_PER_PAGE_MAX, 
 
 const MAX_STEPS = 40;
 const PAGE_FILES = ["agent/guard.js", "agent/actions.js", "agent/dom.js"];
+const TOOL_INPUT_SCHEMAS = new Map(TOOLS.map(({ name, input_schema }) => [name, input_schema]));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ---------- tab + page plumbing ----------
@@ -138,7 +140,7 @@ async function pageMark(tabId) {
 }
 export const noChange = (before, after) => !!before && !!after && before === after;
 
-async function act(tabId, fullRef, action, payload) {
+async function act(tabId, fullRef, action, payload, observeDocument) {
   const [fid, local] = String(fullRef).split(":");
   try {
     const [r] = await toPage(chrome.scripting.executeScript({
@@ -146,6 +148,7 @@ async function act(tabId, fullRef, action, payload) {
       func: (ref, a, p) => (window.ISDom ? window.ISDom.act(ref, a, p) : { ok: false, error: "Page changed. Use the new snapshot." }),
       args: [local, action, payload],
     }));
+    if (r?.result) observeDocument?.(r.documentId);
     return (r && r.result) || { ok: false, error: "No result (frame navigated?)" };
   } catch (e) {
     return { ok: false, error: "Could not reach the page: " + e.message };
@@ -200,10 +203,10 @@ async function confirmAccounts(store, frames, active) {
 
 // ---------- tailored resume ----------
 // own: loop()'s status writer, so a Pause pressed while the resume is tailored is not overwritten.
-async function tailorStep(id, job, store, own = (patch) => updateJob(id, patch)) {
+async function tailorStep(id, job, store, own, signal) {
   await updateJob(id, { activity: "Tailoring your resume to this posting…" });
   try {
-    const { cost_usd, reused, ...t } = await tailorResume(store, job);
+    const { cost_usd, reused, ...t } = await tailorResume(store, job, { signal });
     // Nothing worth changing for this posting: the student's own file is the better thing to send than
     // a re-saved or redrawn copy of it, and there is nothing to ask them to review.
     if (!Array.isArray(t.diff) || !t.diff.length) {
@@ -234,6 +237,7 @@ async function tailorStep(id, job, store, own = (patch) => updateJob(id, patch))
     await appendLog(id, { kind: "tailor", text: `Tailored resume: ${t.diff.length} change(s)${reused ? ", reused from an earlier run at no cost" : ""}${auto ? ", used automatically" : ""}.` });
     if (!auto) job = await own({ status: "needs_you", reason: "Review the tailored resume: use it, or keep your original.", question: "", activity: "" });
   } catch (e) {
+    if (signal.aborted && e === signal.reason) return getJob(id);
     const msg = String((e && e.message) || e);
     // was: job = await updateJob(id, { tailored: { status: "failed", error: msg } });
     // A failure can still have cost something (the layout of a PDF was read before it was refused).
@@ -357,17 +361,17 @@ async function loop(id, run) {
   // resumed, can run after the resume was replaced. Nothing is filled with a profile that isn't ready.
   // was: checked only when jobs were added.
   if (!autoApplyReady(store)) {
-    await own({ status: "needs_you", activity: "", question: "", reason: notReadyHelp(store) });
+    await own({ status: "needs_you", activity: "", question: "", allowanceLimited: false, reason: notReadyHelp(store) });
     return;
   }
   if (!hasKey(store)) {
-    await own({ status: "needs_you", reason: `Add your ${isGemini(store.ai) ? "Gemini" : "Anthropic"} API key (Auto-Apply setup → Setup), then Resume.` });
+    await own({ status: "needs_you", allowanceLimited: false, reason: `Add your ${isGemini(store.ai) ? "Gemini" : "Anthropic"} API key (Auto-Apply setup → Setup), then Resume.` });
     return;
   }
   if (isWorker(store.ai) && !(await ensureToken())) {
     // needs_auth gives the card a "Sign in & resume" button. A plain Resume only re-ran this check, and an
     // expired sign-in (they last an hour) that could not refresh silently stayed stuck here.
-    await own({ status: "needs_you", needs_auth: true, needs_host: "", reason: "Your InternScout sign-in has expired (they last an hour). Sign in again to keep going.", activity: "" });
+    await own({ status: "needs_you", allowanceLimited: false, needs_auth: true, needs_host: "", reason: "Your InternScout sign-in has expired (they last an hour). Sign in again to keep going.", activity: "" });
     return;
   }
   // The manifest only covers the big applicant-tracking systems. An employer that runs its own careers
@@ -377,7 +381,7 @@ async function loop(id, run) {
   if (!(await hasHostAccess(job.apply_url))) {
     // Flags outlive the pause that set them, and the side panel checks needs_auth before needs_host,
     // so clear the other one here or a sign-in that expired earlier hides the Allow button.
-    await own({ status: "needs_you", needs_host: job.apply_url, needs_auth: false, activity: "",
+    await own({ status: "needs_you", allowanceLimited: false, needs_host: job.apply_url, needs_auth: false, activity: "",
       reason: `InternScout needs your permission to work on ${hostOf(job.apply_url)}. Allow it below, then Resume.` });
     return;
   }
@@ -389,14 +393,14 @@ async function loop(id, run) {
   // batch_tailor "skipped": "Use my original for all" on another job of this batch (U5), so nothing is
   // tailored, and none of the allowance is spent on it.
   if (!job.tailored && (store.settings.tailor_resume || "off") !== "off" && job.batch_tailor !== "skipped" && canTailor(store, job) && (isWorker(store.ai) || !(await spend()).over)) {
-    job = await tailorStep(id, job, store, own);
+    job = await tailorStep(id, job, store, own, run.signal);
     if (!owns(job, gen)) return; // waiting for the human to approve it, or stopped meanwhile
   }
   if (!(await active())) return;
   let tabId = await ensureTab(job);
   // was: { tabId, status: "working", ... } written whatever had happened meanwhile, which undid a
   // Pause pressed while the resume was being tailored or the tab was opening.
-  const fresh = { status: "working", reason: "", question: "", needs_host: "", needs_auth: false, upgrade: null };
+  const fresh = { status: "working", reason: "", question: "", needs_host: "", needs_auth: false, upgrade: null, allowanceLimited: false };
   job = await updateJob(id, (j) => (owns(j, gen) ? { tabId, ...fresh } : { tabId }));
   if (!owns(job, gen)) return;
   const msgs = await loadMsgs(id);
@@ -412,7 +416,9 @@ async function loop(id, run) {
   // with a password box) do not count: the posting's own Apply button often comes after them.
   let runFilled = !!job.run_filled;
   const noteFilled = async () => { if (!runFilled) { runFilled = true; await updateJob(id, { run_filled: true }); } };
-  const shot = () => inFrames(tabId, (o) => window.ISDom && window.ISDom.snapshot(o), [{ runFilled }]);
+  const shot = async () => (await inFrames(tabId, (o) => window.ISDom && window.ISDom.snapshot(o), [{ runFilled }]))
+    .map((r) => ({ ...r.result, frameId: r.frameId, documentId: r.documentId }));
+  let reviewAfter = null;
 
   while (true) {
     job = await getJob(id);
@@ -463,7 +469,7 @@ async function loop(id, run) {
     let pre = (await inFrames(tabId, (f, file, g) => window.ISDom && window.ISDom.fastFill(f, file, { gen: g }), [facts, resume, gen]))
       .flatMap((r) => r.result || []);
 
-    let frames = (await shot()).map((r) => ({ frameId: r.frameId, ...r.result }));
+    let frames = await shot();
     // Single-page apps (Workday, Oracle, SuccessFactors) show a spinner for several seconds after the tab
     // reports "complete". A model turn spent on an empty loading page is wasted, so wait it out here.
     //
@@ -487,7 +493,7 @@ async function loop(id, run) {
       if (i >= 3 && still >= 2) break;
       await sleep(i ? 2000 : 2500);
       await inject(tabId);
-      frames = (await shot()).map((r) => ({ frameId: r.frameId, ...r.result }));
+      frames = await shot();
     }
     // fastFill ran before that wait, so on a page that had not drawn itself yet it was handed an empty
     // form and filled nothing. Now that the fields exist, give the rules their turn: every field the
@@ -497,7 +503,7 @@ async function loop(id, run) {
       if (!(await active())) return;
       pre = (await inFrames(tabId, (f, file, g) => window.ISDom && window.ISDom.fastFill(f, file, { gen: g }), [facts, resume, gen]))
         .flatMap((r) => r.result || []);
-      if (pre.length) frames = (await shot()).map((r) => ({ frameId: r.frameId, ...r.result }));
+      if (pre.length) frames = await shot();
     }
     // A page Chrome has put to sleep answers every snapshot with whatever was on screen when the
     // student left, so acting on it would be acting on a photograph. Say so instead of guessing.
@@ -507,7 +513,7 @@ async function loop(id, run) {
     if (asleep) {
       await sleep(2500);
       await inject(tabId);
-      frames = (await shot()).map((r) => ({ frameId: r.frameId, ...r.result }));
+      frames = await shot();
       asleep = frames.some((f) => f.frozen);
     }
 
@@ -529,6 +535,7 @@ async function loop(id, run) {
     // stopping progress: the page has come back unchanged three snapshots running while asleep.
     if (asleep) { sleepy = snap.text === sleepText ? sleepy + 1 : 0; sleepText = snap.text; }
     else { sleepy = 0; sleepText = null; }
+    const priorProgress = progress;
     const check = progressCheck(progress, snap.text, pageKey(url, frames), asleep);
     progress = check.state;
     const stuckAsleep = asleep && sleepy >= 2;
@@ -590,6 +597,29 @@ async function loop(id, run) {
       return;
     }
 
+    const previousReview = reviewAfter;
+    reviewAfter = null;
+    const review = frames[0];
+    if (previousReview && runFilled && !accountPage && frames.length === 1 && review?.frameId === 0 &&
+        review.documentId === previousReview.documentId && tabId === previousReview.tabId &&
+        review.url === previousReview.url && review.reviewStep && !review.frozen && !review.busy &&
+        !review.captcha && !review.captchaFrame && !review.errors.length && !review.elements.length &&
+        review.buttons.length === 1 && review.buttons[0].blocked && !review.buttons[0].consent &&
+        /^submit application$/i.test(review.buttons[0].text)) {
+      const execute = (func, world, args) => toPage(chrome.scripting.executeScript({
+        target: { tabId, documentIds: [review.documentId] }, func, world, args,
+      }), world === "ISOLATED" ? 1000 : undefined);
+      if (await confirmFinalReview({ execute, documentId: review.documentId, gen, active })) {
+        await own({ status: "ready_to_submit", activity: "", pending, double_check: [],
+          summary: "Check every answer before you submit." });
+        return;
+      }
+      if (!(await active())) return;
+      // A changed page must go through the existing gates on fresh evidence before another call.
+      progress = priorProgress;
+      continue;
+    }
+
     // The account the password box belongs to, which is an ATS iframe's own when the form is embedded.
     const pwFrame = frames.find((f) => (f.elements || []).some((e) => e.kind === "password"));
     const content = [];
@@ -617,7 +647,8 @@ async function loop(id, run) {
       // was: await updateJob(id, { status: "needs_you", reason: e.message, pending: prevPending, activity: "", needs_auth: e.code === "auth" });
       // `upgrade` (a used-up allowance with a bigger plan on offer) puts an Upgrade button on the job card.
       await own({ status: "needs_you", reason: e.message, pending: prevPending, activity: "", needs_auth: e.code === "auth",
-        upgrade: e.code === "cap" && e.offer ? e.offer : null });
+        upgrade: e.code === "cap" && e.offer ? e.offer : null,
+        allowanceLimited: e.code === "cap" && e.allowanceLimited === true });
       await saveMsgs(id, msgs);
       return;
     }
@@ -649,6 +680,16 @@ async function loop(id, run) {
 
     const results = [];
     let stop = null, stopped = false;
+    // Only an actual, immediately preceding fill and Next on this document can qualify.
+    const [fill, next] = uses;
+    const initial = frames[0];
+    let reviewTransition = uses.length === 2 && !accountPage && frames.length === 1 &&
+      initial?.frameId === 0 && typeof initial.documentId === "string" && initial.documentId &&
+      fill.name === "fill" && typeof fill.input?.ref === "string" &&
+      snap.index[fill.input.ref]?.kind === "text" && typeof fill.input.text === "string" &&
+      fill.input.text.trim() &&
+      next.name === "click" && initial.buttons.some((button) =>
+        next.input?.ref === "0:" + button.ref && !button.blocked && /^next$/i.test(button.text));
     for (const u of uses) {
       if (stop) { results.push(toolResult(u.id, "Not run: the job paused.")); continue; }
       // Checked before every action, not once per turn: the student can press Pause or Take over while
@@ -656,7 +697,11 @@ async function loop(id, run) {
       if (!stopped && !owns(await getJob(id), gen)) stopped = true;
       if (stopped) { results.push(toolResult(u.id, "Not run: the student paused the job or took over the tab.")); continue; }
       if (tabId !== snap.tabId) { results.push(toolResult(u.id, "Not run: the application opened in a new tab. Continue from the new snapshot.")); continue; }
-      const r = await execTool(u, { tabId, index: snap.index, hasFinal: snap.hasFinal, reviewStep: snap.reviewStep, consentOnly: snap.consentOnly, runFilled, store, job, fails, url, active, gen });
+      let actionDocument;
+      const observeDocument = reviewTransition ? (documentId) => { actionDocument = documentId; } : undefined;
+      const r = await execTool(u, { tabId, index: snap.index, hasFinal: snap.hasFinal, reviewStep: snap.reviewStep, consentOnly: snap.consentOnly, runFilled, store, job, fails, url, active, gen, observeDocument });
+      if (reviewTransition && (actionDocument !== initial.documentId || r.isError || r.newTab ||
+          r.content?.ok !== true || r.content.note || r.content.field_error)) reviewTransition = false;
       if (["fill", "select", "check", "upload"].includes(u.name) && !r.isError && !accountPage) await noteFilled();
       if (r.newTab) {
         tabId = r.newTab;
@@ -673,6 +718,7 @@ async function loop(id, run) {
     }
 
     if (!stop) {
+      if (reviewTransition && !stopped) reviewAfter = { documentId: initial.documentId, tabId, url: initial.url };
       pending = { results };
       await updateJob(id, { pending });
       await saveMsgs(id, msgs);
@@ -703,31 +749,53 @@ async function loop(id, run) {
 // Names no button that could be the final one: only the ways to a next page.
 export const EARLY_READY_PUSHBACK = "No blocked final button is visible yet, so there may be more pages. If there is a Next, Continue or Save and Continue button, use it and keep filling. If this page only shows your answers for review, or nothing is left but the final button, call ready_to_submit again.";
 
+function matchesToolArgument(value, { type, enum: choices, items }) {
+  if (choices && !choices.includes(value)) return false;
+  if (type === "number") return Number.isFinite(value);
+  if (type === "array")
+    return Array.isArray(value) && value.every((item) => matchesToolArgument(item, items));
+  return typeof value === type;
+}
+
+function acceptsToolInput(schema, input) {
+  return (
+    input !== null && typeof input === "object" && !Array.isArray(input) &&
+    schema.required.every((key) => Object.hasOwn(input, key)) &&
+    Object.entries(schema.properties).every(
+      ([key, property]) => !Object.hasOwn(input, key) || matchesToolArgument(input[key], property),
+    )
+  );
+}
+
 async function execTool(u, ctx) {
-  const { name, input = {} } = u;
+  const { name, input } = u;
+  const schema = TOOL_INPUT_SCHEMAS.get(name);
+  if (!schema) return { content: `Unknown tool ${name}`, isError: true };
+  if (!acceptsToolInput(schema, input))
+    return { content: `Invalid arguments for ${name}. Use the tool's required fields and declared types.`, isError: true };
   const { tabId, index, store, job, fails } = ctx;
   // gen goes with every action, so the page refuses one from a run the student has stopped (dom.js halt).
   const checkedAct = async (tab, ref, action, payload = {}) => {
     if (ctx.active && !(await ctx.active())) return { ok: false, cancelled: true, error: "The student stopped this run." };
-    return act(tab, ref, action, ctx.gen == null ? payload : { ...payload, gen: ctx.gen });
+    return act(tab, ref, action, ctx.gen == null ? payload : { ...payload, gen: ctx.gen }, ctx.observeDocument);
   };
-  const needsRef = ["fill", "select", "check", "upload", "click", "fill_secret"].includes(name);
-  const t = needsRef ? index[input.ref] : null;
+  const needsRef = schema.required.includes("ref");
+  const t = needsRef && Object.hasOwn(index, input.ref) ? index[input.ref] : null;
   if (needsRef && !t) return { content: `Unknown ref ${input.ref}. Use refs from the latest snapshot.`, isError: true };
   if (needsRef && (fails[input.ref] || 0) >= MAX_FIELD_FAILS) return { content: "This field already failed 3 times. Skip it, or pause_for_user if it is required.", isError: true };
 
   let r;
   switch (name) {
     case "fill":
-      r = await checkedAct(tabId, input.ref, "fill", { text: String(input.text ?? "") });
+      r = await checkedAct(tabId, input.ref, "fill", { text: input.text });
       if (r.ok) await logAnswer(job, t.label, input.text, t.kind);
       break;
     case "select":
-      r = await checkedAct(tabId, input.ref, "select", { option: String(input.option ?? "") });
+      r = await checkedAct(tabId, input.ref, "select", { option: input.option });
       if (r.ok) await logAnswer(job, t.label, r.chosen || input.option, t.kind);
       break;
     case "check":
-      r = await checkedAct(tabId, input.ref, "check", { checked: !!input.checked });
+      r = await checkedAct(tabId, input.ref, "check", { checked: input.checked });
       break;
     case "upload": {
       // Was: ... && job.tailored.file; the bytes now live off the job (see queue.js).
@@ -784,7 +852,7 @@ async function execTool(u, ctx) {
       break;
     }
     case "wait":
-      await sleep(Math.min(10, Math.max(1, Number(input.seconds) || 2)) * 1000);
+      await sleep(Math.min(10, Math.max(1, input.seconds || 2)) * 1000);
       return { content: "Waited." };
     case "ask_user":
       return { stop: true, kind: "ask", question: input.question, why: input.why };
