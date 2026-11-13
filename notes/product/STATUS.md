@@ -79,6 +79,23 @@ Exact [Engineering #645](https://github.com/bpmcginley/InternshipFinder/pull/645
 
 ### Current Follow and top-up qualification
 
+Four source packages merged after exact review. All four exact Pages checks below preserved all 5,148 public
+files and 141 pinned listing blobs. No Worker deployment or production migration accompanied these merges.
+
+| Package | Main merge | Tests | Pages and artifact |
+| --- | --- | --- | --- |
+| [#655 purchased streaming retry](https://github.com/bpmcginley/InternshipFinder/pull/655) | `cd3c38b8` | [43399103340](https://github.com/bpmcginley/InternshipFinder/actions/runs/43399103340) | [43399102819](https://github.com/bpmcginley/InternshipFinder/actions/runs/43399102819), [14023728127](https://github.com/bpmcginley/InternshipFinder/actions/runs/43399102819/artifacts/14023728127) |
+| [#663 payment history receipt cleanup](https://github.com/bpmcginley/InternshipFinder/pull/663) | `dcd26dff` | [43399594966](https://github.com/bpmcginley/InternshipFinder/actions/runs/43399594966) | [43399595009](https://github.com/bpmcginley/InternshipFinder/actions/runs/43399595009), [14024048363](https://github.com/bpmcginley/InternshipFinder/actions/runs/43399595009/artifacts/14024048363) |
+| [#657 logical Follow checkpoint retirement](https://github.com/bpmcginley/InternshipFinder/pull/657) | `72584d81` | [43400061127](https://github.com/bpmcginley/InternshipFinder/actions/runs/43400061127) | [43400061044](https://github.com/bpmcginley/InternshipFinder/actions/runs/43400061044), [14024472717](https://github.com/bpmcginley/InternshipFinder/actions/runs/43400061044/artifacts/14024472717) |
+| [#658 payment history epoch candidacy](https://github.com/bpmcginley/InternshipFinder/pull/658) | `20b9d41a` | [43400559734](https://github.com/bpmcginley/InternshipFinder/actions/runs/43400559734) | [43400559767](https://github.com/bpmcginley/InternshipFinder/actions/runs/43400559767), [14024833877](https://github.com/bpmcginley/InternshipFinder/actions/runs/43400559767/artifacts/14024833877) |
+
+The corrected #663 cleanup preserves counts from acknowledged pages and stops if the deadline, clock or acknowledgement
+becomes uncertain. The existing indexed 30-day cutoff is unchanged. The [independent review](https://github.com/bpmcginley/InternshipFinder/pull/663#pullrequestreview-5888579278)
+verified the strict async clock failure and 35 focused native cases. The exact #658 merge tree passed 77 native D1
+cases spanning migrations, receipt cleanup, coverage, enrollment and sales. The [daily adapter #664](https://github.com/bpmcginley/InternshipFinder/pull/664)
+passed its initial local cases. Independent review found an async database binding edge and the author is correcting
+it. Scheduling, historical coverage, erasure and live sales remain off.
+
 - [Follow database deadline #653](https://github.com/bpmcginley/InternshipFinder/pull/653) at `bc647e01`
   checks the same fixed cutoff in the SQLite owner update. A late batch changes zero rows. A committed update
   with lost acknowledgement preserves the existing running state. All nine hosted checks and 101 independent
@@ -713,7 +730,7 @@ The golden harness now covers static assets as well as generated pages. Each sit
 
 ## Waiting for Bruce
 
-- **Reviewed Follow and top-up drafts.** [#653 database deadline](https://github.com/bpmcginley/InternshipFinder/pull/653), [#654 scheduled digest](https://github.com/bpmcginley/InternshipFinder/pull/654) and [#655 purchased streaming test](https://github.com/bpmcginley/InternshipFinder/pull/655) are staged with exact review and hosted checks. Follow and top-up sales remain off.
+- **Reviewed Follow drafts.** [#653 database deadline](https://github.com/bpmcginley/InternshipFinder/pull/653) and [#654 scheduled digest](https://github.com/bpmcginley/InternshipFinder/pull/654) are staged with exact review and hosted checks. Follow and top-up sales remain off.
 
 - **Daily Follow sweep capacity.** At the current statement ceiling, the actual local Workers/D1 queue completed 19 matching subscribers. With 20, two fresh passes each left the same subscriber unprocessed. [Capacity evidence](https://github.com/bpmcginley/InternshipFinder/pull/630#issuecomment-6846262939). [Design #641](https://github.com/bpmcginley/InternshipFinder/pull/641) proposes one expiring private resume record with a single subscriber reference, atomic erasure and a pinned daily snapshot. [Independent design review](https://github.com/bpmcginley/InternshipFinder/pull/641#pullrequestreview-5887334844) passed. Owner approval is required for the new reference, deletion and expiry before implementation.
 
