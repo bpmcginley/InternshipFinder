@@ -21,7 +21,7 @@ function record(value, keys) {
   }
   return copy;
 }
-function version(value) {
+export function validTopupHistoryRequestVersion(value) {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}(?:\.[a-z][a-z0-9-]{0,31})?$/.test(value))
     return false;
   const date = value.slice(0, 10),
@@ -62,7 +62,10 @@ function discard(response) {
   }
 }
 export function createTopupHistoryPageReader({ enabled = false, requestVersion, request } = {}) {
-  const ready = enabled === true && version(requestVersion) && typeof request === "function";
+  const ready =
+    enabled === true &&
+    validTopupHistoryRequestVersion(requestVersion) &&
+    typeof request === "function";
   return (query, signal) => {
     let url;
     try {

@@ -937,22 +937,28 @@ WHEN OLD.state='attempting' AND NEW.state IN ('accepted','uncertain')
   AND length(OLD.attempted_at)=24
   AND strftime('%Y-%m-%dT%H:%M:%fZ',OLD.attempted_at,'+0 days')=OLD.attempted_at
 BEGIN
-  UPDATE follow_scope_progress SET watermark=(
-    SELECT json_extract(a.value,'$.to') FROM follow_valid_pending v,json_each(v.advances) a
-    WHERE v.job_id=OLD.id AND json_extract(a.value,'$.scopeKey')=follow_scope_progress.scope_key
-  ) WHERE (subscriber_id,scope_key) IN (
-    SELECT OLD.subscriber_id,json_extract(a.value,'$.scopeKey')
-    FROM follow_valid_pending v,json_each(v.advances) a WHERE v.job_id=OLD.id
-  ) AND EXISTS (
-    SELECT 1 FROM follow_valid_pending v,json_each(v.advances) a
-    JOIN follow_subscriptions s ON s.subscriber_id=OLD.subscriber_id
-      AND s.scope_key=json_extract(a.value,'$.scopeKey')
-    WHERE v.job_id=OLD.id AND v.snapshot_at<=OLD.attempted_at
-      AND s.scope_key=follow_scope_progress.scope_key
-      AND s.confirmed_at=json_extract(a.value,'$.confirmedAt')
-      AND follow_scope_progress.scope_generation=json_extract(a.value,'$.generation')
-      AND follow_scope_progress.watermark=json_extract(a.value,'$.from')
-  );
+  -- Validate the pinned pending row once. Drive indexed lookups from its advances.
+  UPDATE follow_scope_progress SET watermark=approved.to_watermark
+  FROM (
+    WITH verified AS MATERIALIZED (
+      SELECT advances FROM follow_valid_pending
+      WHERE job_id=OLD.id AND snapshot_at<=OLD.attempted_at
+    ), approved_advances AS MATERIALIZED (
+      SELECT json_extract(a.value,'$.scopeKey') AS scope,
+        json_extract(a.value,'$.generation') AS generation,
+        json_extract(a.value,'$.confirmedAt') AS confirmed,
+        json_extract(a.value,'$.from') AS from_watermark,
+        json_extract(a.value,'$.to') AS to_watermark
+      FROM verified CROSS JOIN json_each(verified.advances) a
+    )
+    SELECT * FROM approved_advances
+  ) AS approved
+  CROSS JOIN follow_subscriptions s ON s.subscriber_id=OLD.subscriber_id
+    AND s.scope_key=approved.scope AND s.confirmed_at=approved.confirmed
+  WHERE follow_scope_progress.subscriber_id=OLD.subscriber_id
+    AND follow_scope_progress.scope_key=approved.scope
+    AND follow_scope_progress.scope_generation=approved.generation
+    AND follow_scope_progress.watermark=approved.from_watermark;
 END;
 
 -- No advancement before an attempt. Once claimed, cancellation is uncertain for survivors:
@@ -1191,3 +1197,49 @@ CREATE TABLE IF NOT EXISTS topup_history_coverage (
   CHECK(health!='unproven' OR covered_through IS NULL),
   CHECK(health!='qualified' OR covered_through IS NOT NULL)
 );
+
+-- One private current owner. No automatic reset, lease expiry or takeover.
+CREATE TABLE IF NOT EXISTS follow_delivery_owner (
+  singleton INTEGER PRIMARY KEY CHECK(singleton=1),
+  version INTEGER NOT NULL CHECK(version=1),
+  generation TEXT NOT NULL CHECK(length(generation)=32 AND generation NOT GLOB '*[^0-9a-f]*'),
+  phase TEXT NOT NULL CHECK(phase IN ('ready','running','held')),
+  next_kind TEXT NOT NULL CHECK(next_kind IN ('confirmation','management')),
+  confirmation_id TEXT,
+  confirmation_expires_at TEXT,
+  management_id TEXT,
+  management_expires_at TEXT,
+  CHECK((confirmation_id IS NULL)=(confirmation_expires_at IS NULL)),
+  CHECK((management_id IS NULL)=(management_expires_at IS NULL)),
+  CHECK(confirmation_id IS NULL OR length(confirmation_id)=36),
+  CHECK(management_id IS NULL OR length(management_id)=36),
+  CHECK(confirmation_expires_at IS NULL OR (length(confirmation_expires_at)=24 AND strftime('%Y-%m-%dT%H:%M:%fZ',confirmation_expires_at,'+0 days') IS confirmation_expires_at)),
+  CHECK(management_expires_at IS NULL OR (length(management_expires_at)=24 AND strftime('%Y-%m-%dT%H:%M:%fZ',management_expires_at,'+0 days') IS management_expires_at))
+);
+-- Adoption is operator-gated. Runtime never inserts or recreates this row.
+INSERT INTO follow_delivery_owner(singleton,version,generation,phase,next_kind)
+VALUES(1,1,lower(hex(randomblob(16))),'ready','confirmation')
+ON CONFLICT(singleton) DO NOTHING;
+
+CREATE TRIGGER IF NOT EXISTS follow_owner_confirmation_delete AFTER DELETE ON follow_confirmation_outbox
+BEGIN
+  UPDATE follow_delivery_owner SET confirmation_id=NULL,confirmation_expires_at=NULL
+  WHERE confirmation_id=OLD.id AND confirmation_expires_at=OLD.expires_at;
+END;
+CREATE TRIGGER IF NOT EXISTS follow_owner_confirmation_replace AFTER UPDATE OF id,expires_at ON follow_confirmation_outbox
+WHEN OLD.id IS NOT NEW.id OR OLD.expires_at IS NOT NEW.expires_at
+BEGIN
+  UPDATE follow_delivery_owner SET confirmation_id=NULL,confirmation_expires_at=NULL
+  WHERE confirmation_id=OLD.id AND confirmation_expires_at=OLD.expires_at;
+END;
+CREATE TRIGGER IF NOT EXISTS follow_owner_management_delete AFTER DELETE ON follow_management_outbox
+BEGIN
+  UPDATE follow_delivery_owner SET management_id=NULL,management_expires_at=NULL
+  WHERE management_id=OLD.id AND management_expires_at=OLD.expires_at;
+END;
+CREATE TRIGGER IF NOT EXISTS follow_owner_management_replace AFTER UPDATE OF id,expires_at ON follow_management_outbox
+WHEN OLD.id IS NOT NEW.id OR OLD.expires_at IS NOT NEW.expires_at
+BEGIN
+  UPDATE follow_delivery_owner SET management_id=NULL,management_expires_at=NULL
+  WHERE management_id=OLD.id AND management_expires_at=OLD.expires_at;
+END;

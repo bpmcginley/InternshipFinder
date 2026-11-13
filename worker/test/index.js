@@ -120,7 +120,11 @@ import "./topup-history-observation.test.js";
 import "./topup-history-coverage.test.js";
 import "./topup-history-traversal.test.js";
 import "./topup-history-page.test.js";
+import "./topup-history-replay.test.js";
 import "./topup-history-events.test.js";
 
 import "./topup-webhook.test.js";
 import "./purchased-allowance.test.js";
+
+import "./follow-delivery-owner.test.js";
+import "./follow-owned-digest-runtime.test.js";

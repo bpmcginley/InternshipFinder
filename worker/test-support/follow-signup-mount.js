@@ -298,3 +298,5 @@ export async function oneIsolateLimitSpansRequestOwnedCatalogLoads(db) {
   assert.equal(supplied, 5);
   assert.equal(loads, 5);
 }
+
+export * from "./follow-signup-release.js";

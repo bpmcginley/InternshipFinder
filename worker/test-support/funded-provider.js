@@ -45,6 +45,210 @@ async function setup(db) {
 const used = async (db) => (await db.prepare("SELECT units FROM usage").first()).units;
 const budget = async (db) =>
   (await db.prepare("SELECT spend_cents FROM budget").first()).spend_cents;
+const wireResponse = (bytes, step, cancelled) => {
+  let offset = 0;
+  return new Response(
+    new ReadableStream(
+      {
+        pull(controller) {
+          if (offset === bytes.length) return controller.close();
+          controller.enqueue(bytes.slice(offset, offset + step));
+          offset = Math.min(bytes.length, offset + step);
+        },
+        cancel: cancelled,
+      },
+      { highWaterMark: 0 },
+    ),
+  );
+};
+export async function fundedWireLimitsCountFramingAcrossChunks(db) {
+  for (const raw of [
+    frame(answer("å🙂")),
+    `: ignored\ndata: ${JSON.stringify(answer())}\n\n`,
+    `\ufeffdata: ${JSON.stringify(answer())}\r\n\r\n`,
+    `event: response\ndata: ${JSON.stringify(answer())}\n\n`,
+  ]) {
+    const bytes = encoder.encode(raw);
+    for (const step of [1, bytes.length - 1, bytes.length]) {
+      for (const delta of [-1, 0, 1]) {
+        const options = await setup(db);
+        let cancelled = 0;
+        const invoke = () =>
+          boundary({
+            ...options,
+            stream: true,
+            limits: { ...limits, maxEventBytes: bytes.length + delta },
+            send: async () => wireResponse(bytes, step, () => cancelled++),
+          });
+        if (delta < 0) {
+          await assert.rejects(invoke, (e) => e.code === "upstream");
+          assert.equal((await stored(db)).state, "reserved");
+          assert.equal(await budget(db), 6);
+          assert.equal(cancelled, 1);
+        } else {
+          const result = await invoke();
+          assert.deepEqual(new Uint8Array(await result.response.arrayBuffer()), bytes);
+          await result.completion;
+          assert.equal(await budget(db), 2);
+        }
+      }
+    }
+  }
+}
+export async function fundedWireBlankBoundariesAndLargeComments(db) {
+  const content = frame(answer()),
+    cap = encoder.encode(content).length;
+  for (const prefix of ["\ufeff\r\n", ": a\r\r\n", ": a\n\n"]) {
+    for (const step of [1, 65536]) {
+      const options = await setup(db),
+        bytes = encoder.encode(prefix + content + content);
+      const result = await boundary({
+        ...options,
+        stream: true,
+        limits: { ...limits, maxEventBytes: cap },
+        send: async () => wireResponse(bytes, step),
+      });
+      assert.deepEqual(new Uint8Array(await result.response.arrayBuffer()), bytes);
+      await result.completion;
+      assert.equal(await budget(db), 2);
+    }
+  }
+  for (const step of [4096, 2 * 1024 * 1024]) {
+    const options = await setup(db),
+      bytes = encoder.encode(":".repeat(1024 * 1024 + 1) + "\n\n" + content);
+    let cancelled = 0;
+    await assert.rejects(
+      () =>
+        boundary({
+          ...options,
+          stream: true,
+          limits: { ...limits, maxBytes: 2 * 1024 * 1024, maxEventBytes: 1024 * 1024 },
+          send: async () => wireResponse(bytes, step, () => cancelled++),
+        }),
+      (e) => e.code === "upstream",
+    );
+    assert.equal((await stored(db)).state, "reserved");
+    assert.equal(await budget(db), 6);
+    assert.equal(cancelled, 1);
+  }
+}
+export async function fundedWireFailureAfterAcceptanceCannotMeter(db) {
+  const before = await setup(db),
+    combined = frame(answer()) + ":".repeat(5000) + "\n\n";
+  await assert.rejects(
+    () =>
+      boundary({
+        ...before,
+        stream: true,
+        send: async () => wireResponse(encoder.encode(combined), 10000),
+      }),
+    (e) => e.code === "upstream",
+  );
+  assert.equal((await stored(db)).state, "reserved");
+  assert.equal(await budget(db), 6);
+  const options = await setup(db),
+    first = encoder.encode(frame(answer()));
+  const cap = first.length,
+    bad = encoder.encode(":".repeat(cap + 1) + "\n\n");
+  let index = 0,
+    cancelled = 0;
+  const result = await boundary({
+    ...options,
+    stream: true,
+    limits: { ...limits, maxEventBytes: cap },
+    send: async () =>
+      new Response(
+        new ReadableStream(
+          {
+            pull(controller) {
+              controller.enqueue(index++ === 0 ? first : bad);
+            },
+            cancel() {
+              cancelled++;
+            },
+          },
+          { highWaterMark: 0 },
+        ),
+      ),
+  });
+  const reader = result.response.body.getReader();
+  assert.deepEqual((await reader.read()).value, first);
+  await assert.rejects(
+    () => reader.read(),
+    (e) => e.code === "upstream",
+  );
+  await result.completion;
+  assert.equal(cancelled, 1);
+  assert.equal((await stored(db)).state, "accepted");
+  assert.equal(await budget(db), 6);
+}
+export async function fundedWireEventLimitDoesNotApplyToJson(db) {
+  const options = await setup(db),
+    raw = JSON.stringify(answer("x".repeat(500)));
+  const result = await boundary({
+    ...options,
+    limits: { ...limits, maxEventBytes: 1 },
+    send: async () => new Response(raw),
+  });
+  assert.equal(await result.response.text(), raw);
+  await result.completion;
+  assert.equal(await budget(db), 2);
+}
+export async function fundedMixedCrFramesRetainSemanticLimit(db) {
+  const partA = "data: {" + " ".repeat(185) + "\n\r";
+  const body = JSON.stringify({
+    candidates: [{ content: { parts: [{ text: "x".repeat(75) }] }, finishReason: "STOP" }],
+    usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1 },
+  });
+  const partB = ": bridge\ndata: " + body.slice(1) + "\n\n";
+  assert.deepEqual([encoder.encode(partA).length, encoder.encode(partB).length], [194, 229]);
+  assert.equal(encoder.encode(partA.slice(6, -1) + body.slice(1)).length, 399);
+  for (const step of [1, 194, 1024]) {
+    const options = await setup(db);
+    let cancelled = 0;
+    await assert.rejects(
+      () =>
+        boundary({
+          ...options,
+          stream: true,
+          limits: { ...limits, maxEventBytes: 256 },
+          send: async () => wireResponse(encoder.encode(partA + partB), step, () => cancelled++),
+        }),
+      (e) => e.code === "upstream",
+    );
+    assert.equal(cancelled, 1);
+    assert.equal((await stored(db)).state, "reserved");
+    assert.equal(await budget(db), 6);
+  }
+  const options = await setup(db),
+    first = encoder.encode(frame(answer()));
+  let index = 0;
+  const result = await boundary({
+    ...options,
+    stream: true,
+    limits: { ...limits, maxEventBytes: 256 },
+    send: async () =>
+      new Response(
+        new ReadableStream(
+          {
+            pull(c) {
+              c.enqueue(index++ === 0 ? first : encoder.encode(partA + partB));
+            },
+          },
+          { highWaterMark: 0 },
+        ),
+      ),
+  });
+  const reader = result.response.body.getReader();
+  assert.deepEqual((await reader.read()).value, first);
+  await assert.rejects(
+    () => reader.read(),
+    (e) => e.code === "upstream",
+  );
+  await result.completion;
+  assert.equal((await stored(db)).state, "accepted");
+  assert.equal(await budget(db), 6);
+}
 export async function fundedJsonCommitsBeforeExactExposure(db) {
   const options = await setup(db),
     raw = " \n" + JSON.stringify(answer("fixture å")) + "\n";
