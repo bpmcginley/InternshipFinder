@@ -19,7 +19,8 @@ import { createFollowManagementRequestHttp } from "./follow-management-request-h
 import { loadFollowCatalog, prepareFollowCatalogRelease } from "./follow-catalog-loader.js";
 import { createFollowSignupRoute } from "./follow-signup-route.js";
 import { prepareFollowSignupDeployment } from "./follow-signup-release.js";
-import { runFollowScheduledMaintenance } from "./follow-scheduled-maintenance.js";
+import { runFollowScheduledMaintenance, measureFollowScheduledMaintenance } from "./follow-scheduled-maintenance.js";
+import { createFollowMaintenanceObservation } from "./follow-maintenance-observation.js";
 import { runFollowScheduledLinks } from "./follow-scheduled-links.js";
 import { runFollowArchiveDeployment } from "./follow-archive-deployment.js";
 import { followTokenEndpoints } from "./follow-token-endpoint.js";
@@ -785,6 +786,28 @@ export async function handle(request, env, ctx, deps = {}) {
   return res;
 }
 
+// Optional trusted port only; no production binding or timeout is selected here.
+function maintenanceRecorder(env) {
+  try {
+    const binding = env.FOLLOW_MAINTENANCE_OBSERVATION;
+    if (!binding) return null;
+    const raw = env.FOLLOW_MAINTENANCE_OBSERVATION_TIMEOUT_MS;
+    if (typeof raw !== "string" || !/^[1-9][0-9]{0,4}$/.test(raw) || Number(raw) > 30000) return null;
+    const record = binding.record;
+    if (typeof record !== "function") return null;
+    const observe = createFollowMaintenanceObservation(value => Reflect.apply(record, binding, [value]));
+    return async (observation) => {
+      if (!observation) return;
+      let timer;
+      try {
+        // Bound only observation after work settles. A late recorder is not retried or recalled.
+        const timeout = new Promise(resolve => { timer = setTimeout(resolve, Number(raw)); });
+        await Promise.race([observe(observation), timeout]);
+      } finally { clearTimeout(timer); }
+    };
+  } catch { return null; }
+}
+
 export default {
   fetch: (request, env, ctx) => handle(request, env, ctx),
   scheduled(event, env, ctx) {
@@ -819,7 +842,14 @@ export default {
       event?.cron === followCron
     ) {
       if (env.FOLLOW_MAINTENANCE_ENABLED === "1") {
-        ctx.waitUntil(runFollowScheduledMaintenance(env.DB, env.FOLLOW_MAINTENANCE_POLICY));
+        const record = maintenanceRecorder(env);
+        if (record) {
+          const measured = measureFollowScheduledMaintenance(env.DB, env.FOLLOW_MAINTENANCE_POLICY);
+          ctx.waitUntil(measured.then(({result}) => result));
+          ctx.waitUntil(measured.then(({observation}) => record(observation)));
+        } else {
+          ctx.waitUntil(runFollowScheduledMaintenance(env.DB, env.FOLLOW_MAINTENANCE_POLICY));
+        }
       }
       return;
     }
