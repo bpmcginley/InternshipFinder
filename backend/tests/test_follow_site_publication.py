@@ -58,7 +58,7 @@ def fixture(captured):
         ),
         'data/follow-catalog.json',
         (),
-        1000,
+        5000,
         20000000,
     )
     return site, inputs
@@ -276,3 +276,58 @@ def test_complete_model_rejection_precedes_artifact_write(fixture, tmp_path, mon
         run(fixture, tmp_path / "invalid-model")
     assert writes == [] and tree(fixture[0]) == before
     assert not (tmp_path / "invalid-model").exists()
+
+
+@pytest.mark.parametrize(
+    "relative",
+    [
+        "data/FOLLOW-CATALOG.JSON",
+        "js/FOLLOW-COMPANY-MODULES/unknown.mjs",
+        "js/APP-MODULES/unknown/entry.mjs",
+    ],
+)
+def test_case_alias_owned_namespace_is_rejected(fixture, tmp_path, relative):
+    site, _ = fixture
+    sentinel = site / relative
+    sentinel.parent.mkdir(parents=True, exist_ok=True)
+    sentinel.write_bytes(b"sentinel")
+    before = tree(site)
+    with pytest.raises(ValueError):
+        run(fixture, tmp_path / "case-alias")
+    assert tree(site) == before and sentinel.read_bytes() == b"sentinel"
+    assert not (tmp_path / "case-alias").exists()
+
+
+def test_directory_entries_are_bounded_before_copy(fixture, tmp_path, monkeypatch):
+    site, inputs = fixture
+    for i in range(15):
+        (site / f"empty-{i}").mkdir()
+    monkeypatch.setattr(adapter.shutil, "copytree", lambda *_: pytest.fail("copied unbounded tree"))
+    with pytest.raises(ValueError):
+        run((site, replace(inputs, max_site_files=10)), tmp_path / "too-many-directories")
+    assert not (tmp_path / "too-many-directories").exists()
+
+
+@pytest.mark.parametrize("name", ["--placements", "--placements-report"])
+def test_option_looking_reference_is_only_an_absolute_read(fixture, tmp_path, monkeypatch, name):
+    monkeypatch.chdir(tmp_path)
+    reference = tmp_path / name
+    reference.write_text("<urlset/>")
+    sentinel = tmp_path / "sentinel"
+    sentinel.write_text("unchanged")
+    site, inputs = fixture
+    original = publish.main
+    seen = []
+
+    def invoke(argv, **kwargs):
+        seen.append(argv[2:])
+        assert argv[2:] == [str(reference.resolve()), str(sentinel.resolve())]
+        return original(argv, **kwargs)
+
+    monkeypatch.setattr(publish, "main", invoke)
+    output = tmp_path / "safe-reference"
+    adapter.publish_follow_site(
+        site, output, enabled=True, inputs=inputs, live_sitemap=name, live_noindex=sentinel
+    )
+    assert seen and sentinel.read_text() == "unchanged"
+    assert not (output / "data/placements.json").exists()

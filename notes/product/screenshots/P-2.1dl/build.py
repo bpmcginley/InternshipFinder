@@ -6,11 +6,12 @@ import shutil
 import sys
 
 from golden_build import frozen_runtime
+
+frozen_runtime()
 from test_follow_employer_selection import captured
 from test_follow_site_publication import fixture
 from internscout.site import follow_site_publication, publish
 
-frozen_runtime()
 root = Path(sys.argv[1]).resolve()
 root.mkdir()  # absent output required
 site, inputs = fixture.__wrapped__(captured.__wrapped__(root))
