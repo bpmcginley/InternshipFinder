@@ -45,27 +45,36 @@ export function boundLegacySSE(stream) {
     {
       async pull(controller) {
         try {
-          const result = await reader.read();
-          if (ended) return;
-          if (result.done) {
-            finish("complete");
-            controller.close();
-            release();
+          for (;;) {
+            const result = await reader.read();
+            if (ended) return;
+            if (result.done) {
+              finish("complete");
+              controller.close();
+              release();
+              return;
+            }
+            if (!(result.value instanceof Uint8Array)) throw failure();
+            if (result.value.byteLength === 0) continue;
+            total += result.value.byteLength;
+            if (total > LEGACY_SSE_LIMITS.maxBytes) {
+              limited = true;
+              throw failure();
+            }
+            try {
+              scan(result.value);
+            } catch {
+              limited = true;
+              throw failure();
+            }
+            const value = result.value;
+            controller.enqueue(
+              value.byteOffset !== 0 || value.buffer.byteLength !== value.byteLength
+                ? new Uint8Array(value)
+                : value,
+            );
             return;
           }
-          if (!(result.value instanceof Uint8Array)) throw failure();
-          total += result.value.byteLength;
-          if (total > LEGACY_SSE_LIMITS.maxBytes) {
-            limited = true;
-            throw failure();
-          }
-          try {
-            scan(result.value);
-          } catch {
-            limited = true;
-            throw failure();
-          }
-          controller.enqueue(result.value);
         } catch {
           if (ended) {
             release();

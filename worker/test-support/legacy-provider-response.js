@@ -304,7 +304,8 @@ export async function legacyCancelPendingReadDoesNotAwaitUpstream() {
   let rejectRead,
     started,
     cancelled = 0,
-    released = 0;
+    released = 0,
+    emptyReads = 0;
   const pending = new Promise((_, reject) => {
     rejectRead = reject;
   });
@@ -314,6 +315,7 @@ export async function legacyCancelPendingReadDoesNotAwaitUpstream() {
   const guarded = boundLegacySSE({
     getReader: () => ({
       read() {
+        if (emptyReads++ < 16) return Promise.resolve({ done: false, value: new Uint8Array() });
         started();
         return pending;
       },
@@ -333,8 +335,50 @@ export async function legacyCancelPendingReadDoesNotAwaitUpstream() {
   assert.equal(await guarded.completed, "interrupted");
   assert.equal(cancelled, 1);
   assert.equal(released, 1);
+  assert.equal(emptyReads, 17);
   rejectRead(new Error("synthetic late read rejection"));
   assert.equal((await read).done, true);
   await new Promise((resolve) => setTimeout(resolve, 0));
   assert.equal(released, 2);
+}
+
+export async function legacyEmptyChunksAndBackingBuffersAreBounded() {
+  const bytes = encoder.encode(frame),
+    buffer = new ArrayBuffer(2 * 1024 * 1024);
+  class AliasedView extends Uint8Array {
+    slice() {
+      throw new Error("must not invoke overridable slice");
+    }
+  }
+  const view = new AliasedView(buffer, 10, bytes.length);
+  view.set(bytes);
+  const exact = bytes.slice();
+  let reads = 0;
+  const guarded = boundLegacySSE(
+    new ReadableStream(
+      {
+        pull(c) {
+          reads++;
+          if (reads <= 1000) c.enqueue(new Uint8Array(buffer, 0, 0));
+          else if (reads === 1001) c.enqueue(view);
+          else if (reads === 1002) c.enqueue(exact);
+          else c.close();
+        },
+      },
+      { highWaterMark: 0 },
+    ),
+  );
+  const reader = guarded.body.getReader();
+  const first = await reader.read();
+  assert.deepEqual(first.value, bytes);
+  assert.equal(reads, 1001);
+  assert.equal(Object.getPrototypeOf(first.value), Uint8Array.prototype);
+  assert.equal(first.value.byteOffset, 0);
+  assert.equal(first.value.buffer.byteLength, bytes.length);
+  assert.notEqual(first.value.buffer, buffer);
+  const second = await reader.read();
+  assert.equal(second.value, exact);
+  assert.equal((await reader.read()).done, true);
+  assert.equal(reads, 1003);
+  assert.equal(await guarded.completed, "complete");
 }
