@@ -1,9 +1,32 @@
 // Dormant preparation only. A sender must still claim an attempt under fresh consent.
-import { followInstant, followSnapshotDigest, matchFollowSnapshot } from "./follow-matching.js";
+import {
+  followInstant,
+  followSnapshotDigest,
+  matchFollowSnapshot,
+  matchFollowSnapshotWithRelated,
+} from "./follow-matching.js";
 import { payloadOf } from "./follow-outbox.js";
 
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 const unavailable = () => ({ status: "unavailable" });
+export function captureFollowDigestRelatedLimits(value) {
+  if (value === undefined) return undefined;
+  if (!value || ![Object.prototype, null].includes(Object.getPrototypeOf(value)))
+    throw new Error("Invalid related limits");
+  const result = {};
+  for (const key of ["maxRoles", "maxDirect", "maxPairs", "maxInputBytes", "maxResultBytes"]) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (
+      !descriptor?.enumerable ||
+      !Object.hasOwn(descriptor, "value") ||
+      !Number.isSafeInteger(descriptor.value) ||
+      descriptor.value < 1
+    )
+      throw new Error("Invalid related limits");
+    result[key] = descriptor.value;
+  }
+  return Object.freeze(result);
+}
 function stamp(clock) {
   const time = clock();
   if (!(time instanceof Date) || !Number.isFinite(+time)) return null;
@@ -42,9 +65,15 @@ export async function prepareLeasedFollowDigest(
   db,
   jobId,
   lease,
-  { catalog, limits, loadSnapshot, clock = () => new Date() } = {},
+  { catalog, limits, loadSnapshot, clock = () => new Date(), relatedLimits } = {},
 ) {
   const bounds = { ...limits };
+  let related;
+  try {
+    related = captureFollowDigestRelatedLimits(relatedLimits);
+  } catch {
+    return unavailable();
+  }
   if (
     typeof jobId !== "string" ||
     !uuid.test(jobId) ||
@@ -78,11 +107,15 @@ export async function prepareLeasedFollowDigest(
       confirmed_at: confirmedAt,
       watermark: from,
     }));
-    matched = matchFollowSnapshot(bytes, scopes, {
+    const options = {
       catalog,
       limits: bounds,
       upperBound: pinned.snapshot_at,
-    });
+    };
+    matched =
+      related === undefined
+        ? matchFollowSnapshot(bytes, scopes, options)
+        : matchFollowSnapshotWithRelated(bytes, scopes, options, related);
     if (
       matched.status !== "matched" ||
       !matched.refs.length ||
@@ -101,5 +134,6 @@ export async function prepareLeasedFollowDigest(
     Object.keys(pinned).some((key) => current[key] !== pinned[key])
   )
     return unavailable();
-  return { status: "ready", subscriberId: pinned.subscriber_id, roles: matched.roles };
+  const result = { status: "ready", subscriberId: pinned.subscriber_id, roles: matched.roles };
+  return related === undefined ? result : { ...result, similar: matched.similar };
 }
