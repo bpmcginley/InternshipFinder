@@ -5,6 +5,10 @@ import { createOwnedFollowLinkRuntime } from "./follow-owned-runtime.js";
 import { validFollowSendCap } from "./follow-send-budget.js";
 
 const kinds = ["companies", "fields", "states"];
+const typedArray = Object.getPrototypeOf(Uint8Array.prototype);
+const byteLength = Object.getOwnPropertyDescriptor(typedArray, "byteLength").get;
+const arrayType = Object.getOwnPropertyDescriptor(typedArray, Symbol.toStringTag).get;
+const setSize = Object.getOwnPropertyDescriptor(Set.prototype, "size").get;
 const encoder = new TextEncoder();
 const digest = /^[a-f0-9]{64}$/;
 const fail = () => {
@@ -32,8 +36,18 @@ function exact(value, keys) {
 }
 
 function bytes(value, max) {
-  if (!(value instanceof Uint8Array) || !bounded(value.byteLength, max)) fail();
+  if (arrayType.call(value) !== "Uint8Array" || !bounded(byteLength.call(value), max)) fail();
   return new Uint8Array(value);
+}
+
+function copyPredecessor(value, maxKeys) {
+  const previous = exact(value, kinds);
+  for (const kind of kinds) {
+    const set = previous[kind];
+    if (setSize.call(set) > maxKeys) fail();
+    previous[kind] = new Set(Set.prototype.values.call(set));
+  }
+  return previous;
 }
 
 async function readLabels(raw, { catalogSha256, sourceSha256, labelsSha256 }, valid) {
@@ -77,8 +91,22 @@ async function readLabels(raw, { catalogSha256, sourceSha256, labelsSha256 }, va
 // No network acquisition, sender defaults, cron or deployment configuration is selected.
 export async function runFollowLinkRelease(options = {}) {
   try {
-    if (options.enabled !== true) return { status: "disabled" };
-    const { db, email, policy, clock, catalogBytes, labelBytes, previousValid, release } = options;
+    const enabled = Object.getOwnPropertyDescriptor(options, "enabled");
+    if (enabled?.value !== true) return { status: "disabled" };
+    const { db, email, policy, clock, catalogBytes, labelBytes, previousValid, release } = exact(
+      options,
+      [
+        "enabled",
+        "db",
+        "email",
+        "policy",
+        "clock",
+        "catalogBytes",
+        "labelBytes",
+        "previousValid",
+        "release",
+      ],
+    );
     const send = email?.send;
     const settings = exact(policy, [
       "from",
@@ -139,7 +167,7 @@ export async function runFollowLinkRelease(options = {}) {
       sourceSha256: pins.sourceSha256,
       maxBytes: pins.maxCatalogBytes,
       maxKeys: pins.maxKeys,
-      previousValid: exact(previousValid, kinds),
+      previousValid: copyPredecessor(previousValid, pins.maxKeys),
     });
     fresh();
     const labels = await readLabels(rawLabels, pins, catalog.valid);

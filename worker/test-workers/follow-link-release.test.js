@@ -151,3 +151,54 @@ it("delivers the existing exact email through the native owner and synthetic bin
   expect(after.phase).toBe("ready");
   expect(after.generation).not.toBe(previous.generation);
 });
+
+it("enforces intrinsic byte and predecessor bounds before taking the owner", async () => {
+  class MisleadingBytes extends Uint8Array {
+    get byteLength() {
+      return 1;
+    }
+  }
+  class MisleadingSet extends Set {
+    get size() {
+      return 0;
+    }
+    *[Symbol.iterator]() {
+      throw Error("must not invoke caller iterator");
+    }
+  }
+  const input = await fixture();
+  const denied = vi.fn(() => {
+    throw Error("unexpected D1");
+  });
+  const db = { prepare: denied, batch: denied };
+  for (const changes of [
+    {
+      labelBytes: new MisleadingBytes(input.labelBytes),
+      release: { ...input.release, maxLabelBytes: 1 },
+    },
+    {
+      catalogBytes: new MisleadingBytes(input.catalogBytes),
+      release: { ...input.release, maxCatalogBytes: 1 },
+    },
+    {
+      previousValid: {
+        ...input.previousValid,
+        companies: new MisleadingSet(Array.from({ length: 21 }, (_, i) => `key-${i}`)),
+      },
+    },
+  ]) {
+    expect(await runFollowLinkRelease({ ...input, db, ...changes })).toEqual({
+      status: "unavailable",
+    });
+  }
+  expect(await runFollowLinkRelease(Object.create({ ...input, db }))).toEqual({
+    status: "disabled",
+  });
+  const getter = vi.fn(() => db);
+  const accessor = { ...input };
+  Object.defineProperty(accessor, "db", { enumerable: true, get: getter });
+  expect(await runFollowLinkRelease(accessor)).toEqual({ status: "unavailable" });
+  expect(getter).not.toHaveBeenCalled();
+  expect(denied).not.toHaveBeenCalled();
+  expect(input.email.send).not.toHaveBeenCalled();
+});
