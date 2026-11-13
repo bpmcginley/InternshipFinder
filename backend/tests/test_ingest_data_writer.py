@@ -371,6 +371,27 @@ class IngestWriterTests(unittest.TestCase):
         self.assertEqual(observed[-1][0].public_tree, raw)
         self.assertNotEqual(writer.revision(self.data, f"{commit}:{writer.PUBLIC}"), raw)
 
+    def test_direct_push_rejects_invalid_raw_tree_despite_valid_replacement(self):
+        writer.prepare(self.data, self.primary, self.state)
+        before = writer.revision(self.remote, writer.BRANCH)
+        valid_tree = writer.revision(self.data, "HEAD^{tree}")
+        write(self.data, "docs/data/stats.json", {"generated_at": "invalid"})
+        writer.stage_snapshot(self.data, self.state)
+        staged_tree = self.git(self.data, "write-tree").decode("ascii").strip()
+        self.git(self.data, "replace", staged_tree, valid_tree)
+        writer.validate_tree(self.data, staged_tree)
+        observed = []
+
+        with self.assertRaisesRegex(ValueError, "different generation dates"):
+            writer.publish(
+                self.data,
+                self.state,
+                "Publish",
+                observe_push=lambda intent, acknowledged: observed.append((intent, acknowledged)),
+            )
+        self.assertEqual(observed, [])
+        self.assertEqual(writer.revision(self.remote, writer.BRANCH), before)
+
     def test_direct_push_acknowledgement_requires_one_stable_common_endpoint(self):
         other = self.root / "alternate.git"
         self.git(self.root, "clone", "--bare", str(self.remote), str(other))
@@ -493,6 +514,69 @@ class IngestWriterTests(unittest.TestCase):
                 self.assertEqual(message, "Published validated data snapshot.")
                 self.assertEqual(writer.revision(self.remote, writer.BRANCH), commit)
                 self.assertEqual(seen, [False, True] if fail_after_push else [False])
+
+    def test_observer_error_cannot_substitute_another_head(self):
+        writer.prepare(self.data, self.primary, self.state)
+        write(self.state, Path(writer.STATE[0]).name, {"changed": True})
+        observed = []
+
+        def observe(intent, acknowledged):
+            observed.append((intent, acknowledged))
+            self.assertFalse(acknowledged)
+            write(self.data, "docs/data/stats.json", {"generated_at": "invalid"})
+            self.commit(self.data, "docs/data/stats.json")
+            raise OSError("synthetic evidence recorder failure")
+
+        _, commit = writer.publish(self.data, self.state, "Publish", observe_push=observe)
+        self.assertEqual(len(observed), 1)
+        self.assertEqual(commit, observed[0][0].candidate_commit)
+        self.assertNotEqual(writer.revision(self.data, "HEAD"), commit)
+        self.assertEqual(writer.revision(self.remote, writer.BRANCH), commit)
+        writer.validate_tree(self.remote, writer.BRANCH)
+
+    def test_observer_error_preserves_pinned_retry_without_acknowledgement(self):
+        writer.prepare(self.data, self.primary, self.state)
+        write(self.state, Path(writer.STATE[0]).name, {"changed": True})
+        other = self.other()
+        write(other, "other.json", {"unrelated": "concurrent"})
+        competing = self.commit(other, "other.json")
+        self.git(other, "push", "origin", f"HEAD:{writer.BRANCH}")
+        observed = []
+
+        def observe(intent, acknowledged):
+            observed.append((intent, acknowledged))
+            raise OSError("synthetic evidence recorder failure")
+
+        with patch.object(writer, "_push_existing", wraps=writer._push_existing) as push:
+            _, commit = writer.publish(self.data, self.state, "Publish", observe_push=observe)
+        self.assertEqual(len(observed), 1)
+        intent, acknowledged = observed[0]
+        self.assertFalse(acknowledged)
+        self.assertEqual(
+            [call.args for call in push.call_args_list],
+            [
+                (self.data, intent.expected_predecessor, intent.candidate_commit),
+                (self.data, competing, commit),
+            ],
+        )
+        self.assertEqual(writer.revision(self.remote, writer.BRANCH), commit)
+
+    def test_observer_error_with_changed_head_cannot_resume_at_retry(self):
+        writer.prepare(self.data, self.primary, self.state)
+        write(self.state, Path(writer.STATE[0]).name, {"changed": True})
+        other = self.other()
+        write(other, "other.json", {"unrelated": "concurrent"})
+        competing = self.commit(other, "other.json")
+        self.git(other, "push", "origin", f"HEAD:{writer.BRANCH}")
+
+        def observe(_intent, _acknowledged):
+            write(self.data, "unrelated.json", {"unrelated": "observer"})
+            self.commit(self.data, "unrelated.json")
+            raise OSError("synthetic evidence recorder failure")
+
+        with self.assertRaisesRegex(ValueError, "candidate changed before retry"):
+            writer.publish(self.data, self.state, "Publish", observe_push=observe)
+        self.assertEqual(writer.revision(self.remote, writer.BRANCH), competing)
 
     def test_safe_reader_and_writer_markers(self):
         writer.prepare(self.data, self.primary, self.state)

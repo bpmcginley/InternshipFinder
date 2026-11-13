@@ -73,11 +73,12 @@ def check_counts(declared, actual):
         raise ValueError("Declared ingest snapshot count does not match the referenced file")
 
 
-def validate_tree(checkout, tree):
+def validate_tree(checkout, tree, *, raw=False):
+    options = ("--no-replace-objects",) if raw else ()
     paths = [PUBLIC]
-    if git(checkout, "ls-tree", tree, "--", "backend/data").stdout:
+    if git(checkout, *options, "ls-tree", tree, "--", "backend/data").stdout:
         paths.append("backend/data")
-    archive = git(checkout, "archive", "--format=tar", tree, "--", *paths).stdout
+    archive = git(checkout, *options, "archive", "--format=tar", tree, "--", *paths).stdout
     files = {}
     names = set()
     with tarfile.open(fileobj=io.BytesIO(archive)) as snapshot:
@@ -230,6 +231,10 @@ def same_snapshot(checkout, earlier, later):
     )
 
 
+def _raw_owned_entries(checkout, tree):
+    return git(checkout, "--no-replace-objects", "ls-tree", "-z", tree, "--", *OWNED).stdout
+
+
 @dataclass(frozen=True)
 class PushIntent:
     ordinal: int
@@ -325,7 +330,12 @@ def publish(checkout, state, message, *, observe_push=None):
         raise ValueError("Isolated ingest state is missing")
     stage_snapshot(checkout, state)
     tree = git(checkout, "write-tree").stdout.decode("ascii").strip()
-    validate_tree(checkout, tree)
+    endpoint = _shared_push_endpoint(checkout) if observe_push is not None else None
+    if endpoint is None:
+        validate_tree(checkout, tree)
+    else:
+        validate_tree(checkout, tree, raw=True)
+        staged_entries = _raw_owned_entries(checkout, tree)
     if tree == revision(checkout, "HEAD^{tree}"):
         remote = remote_tip(checkout)
         if not same_snapshot(checkout, base, remote):
@@ -335,13 +345,10 @@ def publish(checkout, state, message, *, observe_push=None):
     if revision(checkout, "HEAD^{tree}") != tree:
         raise ValueError("Committed tree differs from the validated snapshot")
     candidate = revision(checkout, "HEAD")
-    endpoint = _shared_push_endpoint(checkout) if observe_push is not None else None
-    if endpoint is None:
-        observe_push = None
     expected = base
     for attempt in range(3):
         pushed_commit = None
-        if observe_push is None:
+        if endpoint is None:
             pushed = push_existing(checkout, expected)
         else:
             current = revision(checkout, "HEAD")
@@ -352,41 +359,37 @@ def publish(checkout, state, message, *, observe_push=None):
                 .stdout.decode("ascii")
                 .strip()
             )
-            raw_public = (
-                git(checkout, "--no-replace-objects", "rev-parse", "--verify", f"{tree}:{PUBLIC}")
-                .stdout.decode("ascii")
-                .strip()
-            )
             if (
                 not all(
                     re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", oid) and len(oid) == len(current)
                     for oid in (expected, current, public_tree)
                 )
-                or public_tree != raw_public
+                or _raw_owned_entries(checkout, current) != staged_entries
             ):
                 raise ValueError("Invalid Follow push identity")
             intent = PushIntent(attempt + 1, expected, current, public_tree)
-            try:
-                observe_push(intent, False)
-            except Exception:
-                observe_push = None
+            if observe_push is not None:
+                try:
+                    observe_push(intent, False)
+                except Exception:
+                    observe_push = None
             if _shared_push_endpoint(checkout) != endpoint:
                 raise ValueError("Follow push endpoint changed before publication")
-            if observe_push is None:
-                pushed = push_existing(checkout, expected)
-            else:
-                result = _push_existing(checkout, expected, current)
-                pushed = result.returncode == 0
-                pushed_commit = current
-                if (
-                    _acknowledges_push(result, intent)
-                    and _shared_push_endpoint(checkout) == endpoint
-                ):
-                    try:
-                        observe_push(intent, True)
-                    except Exception:
-                        # The listing was pushed. Optional evidence cannot revoke that result.
-                        pass
+            result = _push_existing(checkout, expected, current)
+            pushed = result.returncode == 0
+            pushed_commit = current
+            if (
+                observe_push is not None
+                and _acknowledges_push(result, intent)
+                and _shared_push_endpoint(checkout) == endpoint
+            ):
+                try:
+                    observe_push(intent, True)
+                except Exception:
+                    # The listing was pushed. Optional evidence cannot revoke that result.
+                    pass
+            if not pushed and revision(checkout, "HEAD") != current:
+                raise ValueError("Follow push candidate changed before retry")
         if pushed:
             return "Published validated data snapshot.", pushed_commit or revision(checkout, "HEAD")
         remote = remote_tip(checkout)
