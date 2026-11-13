@@ -7,6 +7,7 @@ import { authenticateUser, bearerOf, providers, userHash, verifyIdToken } from "
 import { copySession, createSession, dropExpiredSessions, endSession, isSessionToken, sessionInfo } from "./session.js";
 import { MAX_PROFILE_BYTES, deleteProfile, getProfile, putProfile, requireSync, syncOn } from "./profile.js";
 import { callGemini, costCents, estimateCents, readUsageFromSSE, sanitizeRequest } from "./gemini.js";
+import { boundLegacySSE } from "./legacy-provider-response.js";
 import { allowanceFor, cleanup, upgradeOffer, deleteUser, globalRpm, isPaused, monthOf, release, remainingOf, settle, shownLimit, usageFor } from "./limits.js";
 import { admitAiLifecycle, fundedPurchaseCreationReady, respondFundedAi } from "./ai-lifecycle.js";
 import { purchasedRunsFor } from "./funded-purchase.js";
@@ -571,8 +572,14 @@ const safeRouteHandlers = {
     const price = (usage) => (usage ? costCents(model, usage, d.config, now) : estimate);
 
     if (stream) {
-      const [client, meter] = upstream.body.tee();
-      later(ctx, readUsageFromSSE(meter).then((u) => settle(db, user, admitted, price(u), u, { task, model })));
+      const bounded = boundLegacySSE(upstream.body);
+      const [client, meter] = bounded.body.tee();
+      later(ctx, readUsageFromSSE(meter).then(async (u) => {
+        // Retain first-autofill and ordinary error settlement. Only a byte cutoff
+        // discards provisional usage and keeps the already charged estimate.
+        const usage = await bounded.completed === "limited" ? null : u;
+        await settle(db, user, admitted, price(usage), usage, { task, model });
+      }));
       return new Response(client, {
         status: 200,
         headers: { ...headers, "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },
