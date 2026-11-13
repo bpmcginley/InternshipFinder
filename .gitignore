@@ -27,6 +27,7 @@ worker/.dev.vars
 # Model comparison (scripts/eval): recorded Auto-Apply steps hold a real profile - never commit
 scripts/eval/*.json
 scripts/eval/eval-report.md
+scripts/eval/hydrogen-run-*/
 # Offline form benchmark (scripts/eval/form_bench.mjs): run logs and the headless-Chrome dependency
 scripts/eval/*.log
 scripts/eval/bench-*.md
