@@ -5,6 +5,9 @@ import json
 from pathlib import Path
 import shutil
 import socket
+import sys
+import os
+import subprocess
 
 import pytest
 
@@ -12,10 +15,7 @@ from internscout import asset_versions, core_graph
 from internscout.follow_catalog import build_follow_catalog
 from internscout.follow_snapshot import build_follow_snapshot
 from internscout.follow_snapshot_archive import INDEX, plan_follow_snapshot_archive
-from internscout.site import follow_artifact as module
 from internscout.site.follow_site_publication import FollowSiteInput, publish_follow_site
-from scripts.check_site_contents import audit, read_allowlist, DEFAULT_ALLOWLIST
-from scripts.follow_archive_stage import stage_follow_archive
 from test_follow_archive_from_publication import accepted, BOUNDS, NOW, CATALOG, plan
 from test_follow_writer_provenance import (
     BASELINE,
@@ -29,6 +29,13 @@ from test_follow_writer_provenance import (
 from test_ingest_data_writer import writer
 
 ROOT = Path(__file__).resolve().parents[2]
+# The assembler is deliberately a repository-only script, like its two parents.
+sys.path.insert(0, str(ROOT))
+from scripts import follow_artifact as module
+from scripts.check_site_contents import audit, read_allowlist, DEFAULT_ALLOWLIST
+from scripts.follow_archive_stage import stage_follow_archive
+from scripts.follow_archive_from_publication import plan_follow_archive_from_publication
+from internscout.follow_snapshot import FollowSnapshotCatalog
 
 
 def sha(body):
@@ -143,8 +150,21 @@ def candidate(accepted, tmp_path, monkeypatch):
         20000,
         100000000,
     )
+    snapshot_catalog = FollowSnapshotCatalog(
+        **{kind: frozenset(keys) for kind, keys in json.loads(catalog)['valid'].items()}
+    )
     inputs = module.FollowArtifactInput(
-        site, receipt, tuple(entries), archive, prior, NOW, BASELINE, bounds, CATALOG, 100, 500000
+        site,
+        receipt,
+        tuple(entries),
+        archive,
+        prior,
+        NOW,
+        BASELINE,
+        bounds,
+        snapshot_catalog,
+        100,
+        500000,
     )
     return source, inputs, tmp_path / 'assembled'
 
@@ -438,3 +458,211 @@ def test_final_archive_bytes_and_link_validation_are_not_optional(candidate, mon
     with pytest.raises(ValueError):
         run(candidate)
     assert not output.exists()
+
+
+def rebuild_archive(inputs, catalog, prior=None):
+    prior = inputs.prior if prior is None else prior
+    planned = plan_follow_archive_from_publication(
+        inputs.publication,
+        prior,
+        effective_lower=inputs.effective_lower,
+        now=inputs.archive_at,
+        bounds=inputs.bounds,
+        catalog=catalog,
+        max_source_bytes=inputs.max_export_bytes,
+        max_source_rows=inputs.site.stage_options['max_source_rows'],
+    )
+    assert planned is not None
+    receipt = stage_follow_archive(
+        prior,
+        planned,
+        parent=inputs.archive.directory.parent,
+        now=inputs.archive_at,
+        bounds=inputs.bounds,
+    )
+    return replace(inputs, catalog=catalog, prior=prior, archive=receipt)
+
+
+def test_catalog_must_match_all_site_valid_sets_before_render(candidate, monkeypatch):
+    source, inputs, output = candidate
+    monkeypatch.setattr(
+        module.site,
+        'publish_follow_site',
+        lambda *_a, **_k: pytest.fail('rendered mismatched catalog'),
+    )
+    for catalog in (
+        replace(inputs.catalog, fields=inputs.catalog.fields - {'swe'}),
+        replace(inputs.catalog, states=frozenset()),
+        replace(inputs.catalog, companies=inputs.catalog.companies | {'unpublished company'}),
+    ):
+        narrowed = rebuild_archive(inputs, catalog)
+        # The archive planner alone permits these projections from the same raw pins.
+        with pytest.raises(ValueError):
+            run((source, narrowed, output))
+    assert not output.exists()
+
+
+def test_retained_snapshot_keys_require_current_valid_catalog(candidate, monkeypatch):
+    source, inputs, output = candidate
+    monkeypatch.setattr(
+        module.site, 'publish_follow_site', lambda *_a, **_k: pytest.fail('rendered retired scope')
+    )
+    for field in ('company', 'field', 'state'):
+        row = dict(
+            id='a' * 16,
+            first_seen=NOW - timedelta(days=1),
+            status='open',
+            company_name='Fixture MA',
+            title='Synthetic older internship',
+            location='Boston, MA',
+            apply_url='https://jobs.example.test/old',
+            field_tags=['swe'],
+            states=['MA'],
+        )
+        catalog = inputs.catalog
+        if field == 'company':
+            row['company_name'] = 'Retired Synthetic'
+            catalog = replace(catalog, companies=catalog.companies | {'retired synthetic'})
+        elif field == 'field':
+            row['field_tags'] = ['retired_field']
+            catalog = replace(catalog, fields=catalog.fields | {'retired_field'})
+        else:
+            row['states'] = ['ZZ']
+            catalog = replace(catalog, states=catalog.states | {'ZZ'})
+        older = build_follow_snapshot(
+            [row],
+            generated_at=NOW - timedelta(days=1),
+            covers_after=NOW - timedelta(days=1, hours=1),
+            complete=True,
+            catalog=catalog,
+            bounds=inputs.bounds.snapshot,
+        )
+        prior = plan_follow_snapshot_archive(
+            {}, older, now=NOW - timedelta(days=1), bounds=inputs.bounds
+        ).files
+        changed = rebuild_archive(inputs, inputs.catalog, prior)
+        with pytest.raises(ValueError):
+            run((source, changed, output))
+    assert not output.exists()
+
+
+def test_archive_inventory_rejects_nested_link_before_any_open(candidate, monkeypatch):
+    _, inputs, output = candidate
+    nested = inputs.archive.directory / 'data/follows'
+    outside = output.parent / 'outside-archive'
+    nested.rename(outside)
+    if os.name == 'nt':
+        subprocess.run(
+            ['cmd', '/c', 'mklink', '/J', str(nested), str(outside)],
+            check=True,
+            capture_output=True,
+        )
+    else:
+        nested.symlink_to(outside, target_is_directory=True)
+    opened = []
+
+    def denied(path, *_args, **_kwargs):
+        opened.append(path)
+        pytest.fail('opened before real ancestor qualification')
+
+    monkeypatch.setattr(Path, 'open', denied)
+    try:
+        with pytest.raises(ValueError):
+            module._archive(inputs)
+        assert opened == [] and not output.exists()
+    finally:
+        if os.name == 'nt':
+            nested.rmdir()
+        else:
+            nested.unlink()
+        outside.rename(nested)
+
+
+def test_archive_entry_bound_precedes_any_open(candidate, monkeypatch):
+    _, inputs, _ = candidate
+    for index in range(inputs.bounds.max_entries + 4):
+        (inputs.archive.directory / f'empty{index}').mkdir()
+    monkeypatch.setattr(Path, 'open', lambda *_a, **_k: pytest.fail('opened unbounded archive'))
+    with pytest.raises(ValueError):
+        module._archive(inputs)
+
+
+def test_archive_directory_replacement_during_read_fails(candidate, monkeypatch):
+    _, inputs, _ = candidate
+    original = module.archive_stage._verify
+    nested = inputs.archive.directory / 'data/follows'
+    replaced = nested.with_name('old-follows')
+
+    def changed(path, raw):
+        original(path, raw)
+        if not replaced.exists():
+            nested.rename(replaced)
+            shutil.copytree(replaced, nested)
+
+    monkeypatch.setattr(module.archive_stage, '_verify', changed)
+    with pytest.raises(ValueError):
+        module._archive(inputs)
+
+
+def test_explicit_retained_valid_company_is_preserved(candidate):
+    source, inputs, output = candidate
+    files = {item.path: item.body for item in inputs.export_files}
+    retained = {kind: frozenset() for kind in ('companies', 'fields', 'states')}
+    retained['companies'] = frozenset({'retired synthetic'})
+    options = inputs.site.stage_options
+    catalog = build_follow_catalog(
+        inputs.publication.staged.index_bytes,
+        dict(inputs.publication.staged.shards),
+        files['majors.json'],
+        retained=retained,
+        complete=True,
+        **{
+            name: options[name]
+            for name in ('max_source_bytes', 'max_source_rows', 'max_keys', 'max_bytes')
+        },
+    )
+    valid = FollowSnapshotCatalog(
+        **{kind: frozenset(keys) for kind, keys in json.loads(catalog)['valid'].items()}
+    )
+    changed = replace(
+        inputs,
+        site=replace(
+            inputs.site,
+            stage_options=options
+            | dict(
+                genesis=False,
+                prior_bytes=catalog,
+                prior_sha256=sha(catalog),
+                catalog_sha256=sha(catalog),
+            ),
+        ),
+        catalog=valid,
+    )
+    row = dict(
+        id='a' * 16,
+        first_seen=NOW - timedelta(days=1),
+        status='open',
+        company_name='Retired Synthetic',
+        title='Synthetic retained internship',
+        location='Boston, MA',
+        apply_url='https://jobs.example.test/old',
+        field_tags=['swe'],
+        states=['MA'],
+    )
+    snapshot = build_follow_snapshot(
+        [row],
+        generated_at=NOW - timedelta(days=1),
+        covers_after=NOW - timedelta(days=1, hours=1),
+        complete=True,
+        catalog=valid,
+        bounds=inputs.bounds.snapshot,
+    )
+    prior = plan_follow_snapshot_archive(
+        {}, snapshot, now=NOW - timedelta(days=1), bounds=inputs.bounds
+    ).files
+    changed = rebuild_archive(changed, valid, prior)
+    run((source, changed, output))
+    assert (output / f'data/follows/{sha(snapshot)}.json').read_bytes() == snapshot
+    emitted = json.loads((output / changed.site.catalog_path).read_bytes())
+    assert 'retired synthetic' in emitted['valid']['companies']
+    assert 'retired synthetic' not in emitted['signup']['companies']

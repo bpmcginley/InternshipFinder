@@ -3,12 +3,13 @@
 from dataclasses import dataclass
 from datetime import datetime
 import hashlib
+import json
 from pathlib import Path
 import re
 from tempfile import TemporaryDirectory
 
-from .. import asset_versions, site_links
-from ..follow_snapshot_archive import (
+from internscout import asset_versions, site_links
+from internscout.follow_snapshot_archive import (
     INDEX,
     FollowArchiveBounds,
     plan_follow_snapshot_archive,
@@ -18,7 +19,9 @@ from scripts import follow_archive_stage as archive_stage
 from scripts.follow_archive_from_publication import plan_follow_archive_from_publication
 from scripts.ingest_data_writer import _PublishedFollowProvenance
 from scripts.check_site_contents import audit, read_allowlist, DEFAULT_ALLOWLIST
-from . import follow_site_publication as site
+from internscout.site import follow_site_publication as site
+from internscout.site.follow_publication import prepare_follow_catalog, _prior
+from internscout.follow_snapshot import FollowSnapshotCatalog
 
 
 @dataclass(frozen=True)
@@ -160,6 +163,20 @@ def _archive(value):
     ):
         _fail()
     root = archive_stage._parent(receipt.directory)
+    identities = {
+        path: archive_stage._directory(path)
+        for path in (root, root / "data", root / "data/follows")
+    }
+    inventory = site._inventory(root, bounds.max_entries + 3, bounds.max_archive_bytes)
+    if set(inventory) != {
+        item.path for item in receipt.files if type(item) is archive_stage.ArchiveFileReceipt
+    }:
+        _fail()
+
+    def unchanged():
+        if any(archive_stage._directory(path) != identity for path, identity in identities.items()):
+            _fail()
+
     files, used = {}, 0
     for item in receipt.files:
         if (
@@ -183,11 +200,13 @@ def _archive(value):
             or info.st_size != item.size
         ):
             _fail()
+        unchanged()
         with path.open("rb") as stream:
             raw = stream.read(item.size + 1)
         if len(raw) != item.size or _digest(raw) != item.sha256:
             _fail()
         archive_stage._verify(path, raw)
+        unchanged()
         files[item.path] = raw
     if (
         set(site._inventory(root, bounds.max_entries + 3, bounds.max_archive_bytes)) != set(files)
@@ -195,6 +214,7 @@ def _archive(value):
         or _digest(files[INDEX]) != receipt.index_sha256
     ):
         _fail()
+    unchanged()
     return files
 
 
@@ -215,6 +235,51 @@ def _plan(value, prior, raw):
         or expected.files != raw
     ):
         _fail()
+
+
+def _catalog(value, export, archive):
+    options = value.site.stage_options
+    if type(options) is not dict or type(value.catalog) is not FollowSnapshotCatalog:
+        _fail()
+    selected = {
+        "listings/index.json": export["listings/index.json"],
+        "majors.json": export["majors.json"],
+    }
+    selected.update(value.publication.staged.shards)
+    staged = prepare_follow_catalog(
+        selected,
+        **{
+            key: options.get(key)
+            for key in (
+                "enabled",
+                "source_sha256",
+                "prior_bytes",
+                "prior_sha256",
+                "genesis",
+                "max_source_bytes",
+                "max_source_rows",
+                "max_keys",
+                "max_bytes",
+            )
+        },
+    )
+    if staged is None or staged.catalog_sha256 != options.get("catalog_sha256"):
+        _fail()
+    valid = _prior(staged.payload, staged.catalog_sha256, options["max_keys"])
+    if any(getattr(value.catalog, kind) != keys for kind, keys in valid.items()):
+        _fail()
+    # Prior retained snapshots are structurally validated by the archive planner;
+    # all of their scopes must also remain valid in this exact public catalog.
+    for path, raw in archive.items():
+        if path != INDEX:
+            for role in json.loads(raw)["roles"]:
+                if role["company_key"] not in valid["companies"] or any(
+                    key not in valid[kind]
+                    for kind, field in (("fields", "field_tags"), ("states", "states"))
+                    for key in role[field]
+                ):
+                    _fail()
+    return staged.payload
 
 
 def _fresh(value, raw, now):
@@ -259,6 +324,7 @@ def assemble_follow_artifact(
     prior = archive_stage._capture(inputs.prior, inputs.bounds)
     raw_archive = _archive(inputs)
     _plan(inputs, prior, raw_archive)
+    catalog = _catalog(inputs, raw_export, raw_archive)
     started = clock()
     _fresh(inputs, raw_archive, started)
     source = Path(source_dir)
@@ -289,6 +355,7 @@ def assemble_follow_artifact(
     with TemporaryDirectory(prefix=".fa-", dir=parent) as temporary:
         staged = Path(temporary) / "site"
         plan = site.publish_follow_site(source, staged, enabled=True, inputs=inputs.site)
+        archive_stage._verify(staged / inputs.site.catalog_path, catalog)
         # A fresh raw source never supplies an existing archive namespace.
         for name in raw_archive:
             if site._exact_target(staged, name).exists():
@@ -303,6 +370,7 @@ def assemble_follow_artifact(
         site._inventory(staged, inputs.site.max_site_files, inputs.site.max_site_bytes)
         for name, body in raw_archive.items():
             archive_stage._verify(staged / name, body)
+        archive_stage._verify(staged / inputs.site.catalog_path, catalog)
         links = site_links.audit(staged)
         if links["problems"]:
             _fail()
