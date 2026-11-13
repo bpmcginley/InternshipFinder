@@ -8400,6 +8400,12 @@
    "added": "2026-09-18",
    "sector": "health"
   },
+  "careers.merrick.com": {
+   "name": "Merrick",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-13"
+  },
   "careers.msasafety.com": {
    "name": "MSA Safety",
    "quant": false,
@@ -11506,6 +11512,12 @@
    "fails": 0,
    "added": "2026-09-14"
   },
+  "hdow.fa.us6.oraclecloud.com|CX_1003": {
+   "name": "Cantor Fitzgerald",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-13"
+  },
   "hdsn.fa.us6.oraclecloud.com|CX_1": {
    "name": "American Tower",
    "quant": false,
@@ -12628,6 +12640,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-16"
+  },
+  "reasonable": {
+   "name": "Reasonable AI",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-13"
   },
   "red-rabbit-robotics": {
    "name": "Red Rabbit Robotics",
@@ -15685,6 +15703,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "fondsftq|wd10|sitecarriere_externe": {
+   "name": "Fonds de solidarité FTQ",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-13"
   },
   "fordfoundation|wd1|FordFoundationCareerPage": {
    "name": "Ford Foundation",
