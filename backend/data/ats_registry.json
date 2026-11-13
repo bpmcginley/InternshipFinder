@@ -16831,6 +16831,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "jsx|wd503|JSX_Careers": {
+   "name": "JSX",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-13"
+  },
   "juliusbaer|wd3|External": {
    "name": "Julius Baer",
    "quant": false,
@@ -19129,6 +19135,12 @@
    "fails": 0,
    "added": "2026-09-18"
   },
+  "sjindustries|wd1|SJI": {
+   "name": "SJI",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-13"
+  },
   "skechers|wd5|One-career-site": {
    "name": "Skechers",
    "quant": false,
@@ -19729,6 +19741,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-15"
+  },
+  "thgrp|wd12|envita": {
+   "name": "Envita Solutions",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-13"
   },
   "thinkbrg|wd5|BRG_External_Career_Site": {
    "name": "BRG",
