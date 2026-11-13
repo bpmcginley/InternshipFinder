@@ -238,6 +238,9 @@ it("scheduled archive returns unavailable for a missing or inaccessible release"
 });
 
 it("existing clock, billing, reports and daily work retain priority", async () => {
+  const archiveSelector = vi.fn(() => {
+    throw Error("unexpected archive cron read");
+  });
   const descriptor = vi.fn(() => {
     throw Error("unexpected archive descriptor read");
   });
@@ -256,11 +259,12 @@ it("existing clock, billing, reports and daily work retain priority", async () =
     }),
     batch: async () => [],
   };
-  const invoke = (cron, extra) => {
+  const invoke = (cron, extra, selector) => {
     const jobs = [];
     const bindings = Object.defineProperty({ DB: db, ...extra }, "FOLLOW_ARCHIVE_RELEASE", {
       get: descriptor,
     });
+    if (selector) Object.defineProperty(bindings, "FOLLOW_ARCHIVE_CRON", { get: selector });
     worker.scheduled({ cron }, bindings, {
       waitUntil: (job) => jobs.push(Promise.resolve(job).catch(() => {})),
     });
@@ -272,6 +276,10 @@ it("existing clock, billing, reports and daily work retain priority", async () =
     expect(selected).toHaveLength(previous.length);
     await Promise.all([...previous, ...selected]);
   }
+  const daily = invoke("17 7 * * *", { FOLLOW_ARCHIVE_ENABLED: "1" }, archiveSelector);
+  expect(daily).toHaveLength(1);
+  await Promise.all(daily);
+  expect(archiveSelector).not.toHaveBeenCalled();
   expect(descriptor).not.toHaveBeenCalled();
   expect(fetch).not.toHaveBeenCalled();
 });

@@ -830,16 +830,14 @@ export default {
       if (env.FOLLOW_LINKS_ENABLED === "1") ctx.waitUntil(runFollowScheduledLinks(env));
       return;
     }
-    const archiveCron = env.FOLLOW_ARCHIVE_CRON;
-    if (
-      typeof archiveCron === "string" &&
-      archiveCron.length > 0 &&
-      event?.cron === archiveCron &&
-      ![
-        CLOCK_CRON, STUDENT_BILLING_CRON, CAMPAIGN_REPORT_CRON, "17 7 * * *", followCron, linksCron,
-      ].includes(archiveCron)
-    ) {
-      if (env.FOLLOW_ARCHIVE_ENABLED === "1") {
+    if (event?.cron !== "17 7 * * *") {
+      const archiveCron = env.FOLLOW_ARCHIVE_CRON;
+      if (
+        typeof archiveCron === "string" &&
+        archiveCron.length > 0 &&
+        event?.cron === archiveCron &&
+        env.FOLLOW_ARCHIVE_ENABLED === "1"
+      ) {
         ctx.waitUntil(
           runFollowArchiveDeployment({
             enabled: true,
@@ -855,7 +853,6 @@ export default {
       }
       return;
     }
-    if (event?.cron !== "17 7 * * *") return;
     const now = new Date();
     // was: ctx.waitUntil(Promise.all([cleanup(env.DB, now), dropStale(env.DB, CONFIG, now)]));
     // was: ctx.waitUntil(Promise.all([cleanup(env.DB, now), dropStale(env.DB, CONFIG, now), dropExpiredSessions(env.DB, now)]));
