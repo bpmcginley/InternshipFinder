@@ -88,12 +88,13 @@ export async function callModel(variant, body, key, fetcher = fetch) {
   const candidate = reply.candidates[0];
   const usage = tokenCounts(reply.usageMetadata);
   const ms = performance.now() - start;
-  const calls = (candidate?.content.parts ?? []).flatMap((part) =>
-    part.functionCall ? [part.functionCall] : [],
-  );
+  const parts = candidate?.content.parts ?? [];
+  const calls = parts.flatMap((part) => (part.functionCall ? [part.functionCall] : []));
   return {
     ms,
     calls,
+    parts,
+    text: parts.map((part) => part.text ?? "").join(""),
     usage,
     modelVersion: chunks.findLast((chunk) => typeof chunk.modelVersion === "string")?.modelVersion,
     finish: candidate?.finishReason ?? reply.promptFeedback?.blockReason ?? "missing",

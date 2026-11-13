@@ -184,3 +184,5 @@ multi-turn cache behavior, or the effect on resume tailoring and Deep Dive. Foll
 served multi-page forms using the existing form benchmark, and use separate task-specific evaluations
 for resume claims and Deep Dive question quality. The experiment customizes prompts and tools. The
 [Gemini Developer API](https://ai.google.dev/gemini-api/docs/model-tuning) does not offer fine-tuning.
+
+The expanded experiment compared multi-step forms and task-specific writing. See the [follow-up results](hydrogen-followup.md).
