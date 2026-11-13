@@ -111,13 +111,28 @@ export async function readEmployerHistoryObject(env, kind, id, fetchImpl) {
   );
 }
 
+function topupSalesSettings(env) {
+  if (env?.TOPUPS_ENABLED !== "1" || !paymentsOn(env)) return null;
+  const {
+    STRIPE_SECRET_KEY: key,
+    STRIPE_WEBHOOK_SECRET: signingKey,
+    STRIPE_PRICE_TOPUP: priceId,
+    STRIPE_TOPUP_MODE: mode,
+  } = env;
+  if (
+    typeof key !== "string" ||
+    !key ||
+    typeof signingKey !== "string" ||
+    !/^[!-~]+$/.test(signingKey) ||
+    typeof priceId !== "string" ||
+    !/^price_[A-Za-z0-9_]{1,250}$/.test(priceId) ||
+    (mode !== "test" && mode !== "live")
+  )
+    return null;
+  return { key, signingKey, priceId, mode };
+}
 export function topupConfigured(env) {
-  return (
-    env?.TOPUPS_ENABLED === "1" &&
-    paymentsOn(env) &&
-    typeof env.STRIPE_PRICE_TOPUP === "string" &&
-    /^price_[A-Za-z0-9_]{1,250}$/.test(env.STRIPE_PRICE_TOPUP)
-  );
+  return topupSalesSettings(env) !== null;
 }
 
 export function topupDisplayOffer(adapter) {
@@ -278,8 +293,9 @@ export async function prepareTopupStripe(
   fetchImpl,
   timeoutMs = TOPUP_CHECKOUT_BOUNDS.timeoutMs,
 ) {
+  const sales = topupSalesSettings(env);
   if (
-    !topupConfigured(env) ||
+    !sales ||
     typeof fetchImpl !== "function" ||
     !Number.isInteger(timeoutMs) ||
     timeoutMs < 1 ||
@@ -287,14 +303,27 @@ export async function prepareTopupStripe(
   )
     return { enabled: false };
   // Snapshot private configuration. Price/session paths and raw errors must never reach logs.
-  const config = { STRIPE_SECRET_KEY: env.STRIPE_SECRET_KEY },
-    priceId = env.STRIPE_PRICE_TOPUP,
-    managed = managedPayments(env);
+  const { key, signingKey, priceId, mode } = sales;
+  const config = { STRIPE_SECRET_KEY: key },
+    livemode = mode === "live";
+  let managed, root, success, cancel, price;
+  const current = () => {
+    const latest = topupSalesSettings(env);
+    return (
+      latest?.key === key &&
+      latest.signingKey === signingKey &&
+      latest.priceId === priceId &&
+      latest.mode === mode &&
+      managedPayments(env) === managed &&
+      env.SITE_URL === root
+    );
+  };
   const request = (path, form = {}, key = null, method = "GET") =>
     boundedRequest(config, path, form, fetchImpl, key, method, timeoutMs);
-  let success, cancel, price;
   try {
-    const site = new URL(siteUrl(env));
+    managed = managedPayments(env);
+    root = env.SITE_URL;
+    const site = new URL(siteUrl({ SITE_URL: root }));
     if (
       site.protocol !== "https:" ||
       site.username ||
@@ -321,7 +350,8 @@ export async function prepareTopupStripe(
       price.unit_amount !== 300 ||
       Number(price.unit_amount_decimal) !== 300 ||
       price.tax_behavior !== "exclusive" ||
-      typeof price.livemode !== "boolean" ||
+      price.livemode !== livemode ||
+      !current() ||
       price.product?.object !== "product" ||
       price.product.active !== true ||
       price.product.deleted
@@ -357,7 +387,7 @@ export async function prepareTopupStripe(
       session.mode !== "payment" ||
       session.status !== "open" ||
       session.payment_status !== "unpaid" ||
-      session.livemode !== price.livemode ||
+      session.livemode !== livemode ||
       session.client_reference_id !== a.user_hash ||
       session.currency !== "usd" ||
       session.amount_subtotal !== 300 ||
@@ -397,10 +427,13 @@ export async function prepareTopupStripe(
     };
   }
   return {
-    enabled: true,
+    get enabled() {
+      return current();
+    },
     offer: OFFER,
     async create(a) {
       if (
+        !current() ||
         !attemptOk(a) ||
         a.state !== "creating" ||
         a.checkout_id !== null ||
@@ -424,15 +457,17 @@ export async function prepareTopupStripe(
         form[`payment_intent_data[metadata][${k}]`] = v;
       }
       if (managed) form["managed_payments[enabled]"] = "true";
+      // A POST already sent under the captured settings may have created a session.
+      // Preserve verified durable attachment. A stale adapter cannot subsequently open it.
       return verified(await request("checkout/sessions", form, a.idempotencyKey, "POST"), a);
     },
     async readOpen(a) {
-      if (!attemptOk(a) || a.state !== "open" || !validTopupCheckoutId(a.checkout_id))
+      if (!current() || !attemptOk(a) || a.state !== "open" || !validTopupCheckoutId(a.checkout_id))
         throw unavailable();
       const session = await request(
         "checkout/sessions/" + encodeURIComponent(a.checkout_id) + "?expand[]=line_items",
       );
-      if (session?.id !== a.checkout_id) throw unavailable();
+      if (!current() || session?.id !== a.checkout_id) throw unavailable();
       return verified(session, a);
     },
   };
