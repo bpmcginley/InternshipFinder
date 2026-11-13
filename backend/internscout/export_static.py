@@ -342,7 +342,7 @@ COLLAPSE_FLOOR = 3
 CARRY_DAYS = 2
 
 
-def previous_export(out_dir: str) -> list[dict]:
+def previous_export(out_dir: str, *, fixed_shards=None) -> list[dict]:
     """Every listing in the export this run is about to replace.
 
     CI commits the exported JSON and checks it back out, so the last run is still on disk here
@@ -368,14 +368,17 @@ def previous_export(out_dir: str) -> list[dict]:
                 continue
             if isinstance(got, dict):
                 descs.update(got)
-    for name in names:
+    for name in names if fixed_shards is None else sorted(fixed_shards):
         if not name.endswith(".json") or name == "index.json" or name.endswith(".desc.json"):
             continue
-        try:
-            with open(os.path.join(shard_dir, name), encoding="utf-8") as f:
-                items = json.load(f)
-        except (OSError, ValueError):  # a half-written shard is not worth failing a run over
-            continue
+        if fixed_shards is None:
+            try:
+                with open(os.path.join(shard_dir, name), encoding="utf-8") as f:
+                    items = json.load(f)
+            except (OSError, ValueError):  # a half-written shard is not worth failing a run over
+                continue
+        else:
+            items = json.loads(fixed_shards[name])
         if not isinstance(items, list):
             continue
         for it in items:
@@ -399,7 +402,9 @@ def _seen_within(stamp: str | None, today, days: int) -> bool:
     return (today - seen).days < days
 
 
-def carry_first_seen(listings: list[dict], out_dir: str, today=None, prev=None) -> int:
+def carry_first_seen(
+    listings: list[dict], out_dir: str, today=None, prev=None, *, follow_capture=None
+) -> int:
     """Give each listing the first-seen date it had in the export this one replaces.
 
     CI keeps no database between runs, so first_seen was set to the moment of the run every
@@ -416,22 +421,24 @@ def carry_first_seen(listings: list[dict], out_dir: str, today=None, prev=None) 
     old row-order ids, and a posting whose title the employer edited afterwards, which changes
     the dedupe key the id is built from but is plainly the same posting.
     """
-    by_id: dict[str, str] = {}
-    by_url: dict[str, str] = {}
+    by_id: dict[str, dict] = {}
+    by_url: dict[str, dict] = {}
     for it in previous_export(out_dir) if prev is None else prev:
         seen = it.get("first_seen")
         if not seen:
             continue
-        by_id.setdefault(str(it.get("id")), seen)
+        by_id.setdefault(str(it.get("id")), it)
         if it.get("apply_url"):
-            by_url.setdefault(it["apply_url"], seen)
+            by_url.setdefault(it["apply_url"], it)
 
     today = today or datetime.now(timezone.utc).date()
     carried = 0
     for x in listings:
-        seen = by_id.get(str(x.get("id"))) or by_url.get(x.get("apply_url") or "")
-        if seen:
-            x["first_seen"] = seen
+        previous = by_id.get(str(x.get("id"))) or by_url.get(x.get("apply_url") or "")
+        if previous is not None:
+            x["first_seen"] = previous["first_seen"]
+            if follow_capture is not None:
+                follow_capture.carried(x, previous)
             carried += 1
     mark_new(listings, today)
     return carried
@@ -543,6 +550,8 @@ def carry_open_boards(
     prev=None,
     completed_boards=None,
     observed_urls=None,
+    *,
+    follow_capture=None,
 ) -> int:
     """Hold the listings of a board whose fetch collapsed this run, rather than deleting them.
 
@@ -625,6 +634,8 @@ def carry_open_boards(
             kept = dict(it)
             kept["carried"] = True
             listings.append(kept)
+            if follow_capture is not None:
+                follow_capture.carried(kept, it)
             have.add(url)
             identity = _requisition_key(it, icims_hosts, gh_tenants)
             if identity:
@@ -642,6 +653,8 @@ def carry_search_finds(
     prev=None,
     completed_boards=None,
     observed_urls=None,
+    *,
+    follow_capture=None,
 ) -> int:
     """Keep what the Google Jobs searches found until they have had a chance to find it again.
 
@@ -687,7 +700,10 @@ def carry_search_finds(
         stage = merged_stages(it.get("stage"), it.get("title") or "")
         if not stage:
             continue
-        listings.append({**it, "stage": stage, "carried": True})
+        kept = {**it, "stage": stage, "carried": True}
+        listings.append(kept)
+        if follow_capture is not None:
+            follow_capture.carried(kept, it)
         have.add(url)
         identity = _requisition_key(it, icims_hosts, gh_tenants)
         if identity:
@@ -770,7 +786,7 @@ def discard_placeholder_paid_claims(listings: list[dict]) -> None:
             listing["insights"] = {key: value for key, value in ins.items() if key != "pay"}
 
 
-def export(out_dir: str, completed_boards=None, observed_urls=None) -> dict:
+def export(out_dir: str, completed_boards=None, observed_urls=None, *, follow_capture=None) -> dict:
     """Write the static site data.
 
     completed_boards is the (ats, token) evidence run_ingest.scan_boards collected this run. CI
@@ -789,20 +805,30 @@ def export(out_dir: str, completed_boards=None, observed_urls=None) -> dict:
             .options(selectinload(Listing.source_links))
             .order_by(Listing.relevance_score.desc(), Listing.first_seen.desc())
         ).all()
-        listings = still_student_opportunities([_listing_dict(r) for r in rows])
+        fixed = follow_capture.predecessor(out_dir) if follow_capture is not None else None
+        if fixed is None:
+            follow_capture = None
+        listings = []
+        for row in rows:
+            item = _listing_dict(row)
+            listings.append(item)
+            if follow_capture is not None:
+                follow_capture.from_database(item, row.dedupe_key)
+        listings = still_student_opportunities(listings)
         generated_at = datetime.now(timezone.utc).isoformat()
         for x in listings:
             x["last_seen"] = generated_at  # this run really did read these off the board
         # Before write_shards overwrites it: the export on disk is the only record of when we
         # first saw any of this and of what the boards held, because the db does not outlive a run.
-        prev = previous_export(out_dir)
-        carried = carry_first_seen(listings, out_dir, prev=prev)
+        prev = previous_export(out_dir, fixed_shards=fixed)
+        carried = carry_first_seen(listings, out_dir, prev=prev, follow_capture=follow_capture)
         held = carry_open_boards(
             listings,
             out_dir,
             prev=prev,
             completed_boards=completed_boards,
             observed_urls=observed_urls,
+            follow_capture=follow_capture,
         )
         held += carry_search_finds(
             listings,
@@ -810,6 +836,7 @@ def export(out_dir: str, completed_boards=None, observed_urls=None) -> dict:
             prev=prev,
             completed_boards=completed_boards,
             observed_urls=observed_urls,
+            follow_capture=follow_capture,
         )
         closed = closed_by_scan(listings, prev, completed_boards, observed_urls=observed_urls)
         correct_non_cyber_security_tags(listings)
@@ -880,6 +907,8 @@ def export(out_dir: str, completed_boards=None, observed_urls=None) -> dict:
         f"({len(canonical(completed_boards))} boards read to the end)"
     )
     index = write_shards(listings, out_dir, generated_at)
+    if follow_capture is not None:
+        follow_capture.seal(out_dir, generated_at)
     unplaced = [x for x in listings if not shard_keys(x)]
     json_log = os.environ.get("INTERNSCOUT_LOG_FORMAT") == "json"
     written = (

@@ -69,7 +69,9 @@ def _in_scan_scope(row, boards) -> bool:
     return all(ats not in SEARCH_SCOPED or ats in sources for ats, _ in boards)
 
 
-def run(raw_items: list[dict], *, verbose=True, completed_boards=None, metrics=None) -> dict:
+def run(
+    raw_items: list[dict], *, verbose=True, completed_boards=None, metrics=None, follow_capture=None
+) -> dict:
     """Persist items; only explicitly completed employer boards authorize absence closure.
 
     completed_boards contains (ats, token) pairs, including successfully empty
@@ -128,6 +130,7 @@ def run(raw_items: list[dict], *, verbose=True, completed_boards=None, metrics=N
     }
 
     now = datetime.now(timezone.utc)
+    origins = {}
     with SessionLocal() as db:
         seen_keys = set()
         for key, it in merged.items():
@@ -138,6 +141,8 @@ def run(raw_items: list[dict], *, verbose=True, completed_boards=None, metrics=N
                 row = Listing(dedupe_key=key, first_seen=now, is_new=True)
                 db.add(row)
                 stats["new"] += 1
+                if follow_capture is not None:
+                    origins[key] = now
             else:
                 row.is_new = False
                 stats["updated"] += 1
@@ -214,6 +219,8 @@ def run(raw_items: list[dict], *, verbose=True, completed_boards=None, metrics=N
                     row.status = "closed"
                     stats["closed"] += 1
         db.commit()
+    if follow_capture is not None:
+        follow_capture.committed(origins)
     if metrics is not None:
         metrics.count("persisted", len(merged))
 

@@ -1,7 +1,10 @@
 """Prepare and publish one complete ingest snapshot on the existing data branch."""
 
 import argparse
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass
 from datetime import datetime
+from hashlib import sha256
 import io
 import json
 import os
@@ -10,6 +13,7 @@ import shutil
 import subprocess
 import tarfile
 import tempfile
+from types import MappingProxyType
 
 BRANCH = "refs/heads/data"
 TRACKING = "refs/remotes/origin/data"
@@ -29,15 +33,22 @@ REQUIRED = {
 }
 
 
-def git(checkout, *args, check=True, env=None):
-    result = subprocess.run(["git", *args], cwd=checkout, capture_output=True, check=False, env=env)
+def git(checkout, *args, check=True, env=None, no_replace=False):
+    command = ["git", "--no-replace-objects"] if no_replace else ["git"]
+    result = subprocess.run(
+        [*command, *args], cwd=checkout, capture_output=True, check=False, env=env
+    )
     if check and result.returncode:
         raise ValueError(f"Git {args[0]} failed in the data checkout")
     return result
 
 
-def revision(checkout, ref):
-    return git(checkout, "rev-parse", "--verify", ref).stdout.decode("ascii").strip()
+def revision(checkout, ref, *, no_replace=False):
+    return (
+        git(checkout, "rev-parse", "--verify", ref, no_replace=no_replace)
+        .stdout.decode("ascii")
+        .strip()
+    )
 
 
 def owned(path):
@@ -71,11 +82,14 @@ def check_counts(declared, actual):
         raise ValueError("Declared ingest snapshot count does not match the referenced file")
 
 
-def validate_tree(checkout, tree):
+def validate_tree(checkout, tree, *, _listing_bytes=None):
+    no_replace = _listing_bytes is not None
     paths = [PUBLIC]
-    if git(checkout, "ls-tree", tree, "--", "backend/data").stdout:
+    if git(checkout, "ls-tree", tree, "--", "backend/data", no_replace=no_replace).stdout:
         paths.append("backend/data")
-    archive = git(checkout, "archive", "--format=tar", tree, "--", *paths).stdout
+    archive = git(
+        checkout, "archive", "--format=tar", tree, "--", *paths, no_replace=no_replace
+    ).stdout
     files = {}
     names = set()
     with tarfile.open(fileobj=io.BytesIO(archive)) as snapshot:
@@ -88,11 +102,25 @@ def validate_tree(checkout, tree):
             if not member.isfile() or name in names or not member.name.endswith(".json"):
                 raise ValueError("Aliased or unexpected file in ingest snapshot")
             names.add(name)
-            with snapshot.extractfile(member) as payload:
-                value = parse_json(payload.read())
-                if member.name in STATE and not isinstance(value, dict):
-                    raise ValueError("Expected an ingest state object")
-                files[member.name.removeprefix(PUBLIC + "/")] = value
+            path = member.name.removeprefix(PUBLIC + "/")
+            if (
+                _listing_bytes is not None
+                and member.name.startswith(f"{PUBLIC}/listings/")
+                and not member.name.endswith(".desc.json")
+            ):
+                # Git archive may apply working-tree conversion to text files.
+                # Validate and retain the exact object bytes for the proof.
+                raw = git(
+                    checkout, "cat-file", "blob", f"{tree}:{member.name}", no_replace=True
+                ).stdout
+                _listing_bytes[path] = raw
+                value = parse_json(raw)
+            else:
+                with snapshot.extractfile(member) as payload:
+                    value = parse_json(payload.read())
+            if member.name in STATE and not isinstance(value, dict):
+                raise ValueError("Expected an ingest state object")
+            files[path] = value
 
     if not REQUIRED <= files.keys():
         raise ValueError("Required public file missing from ingest snapshot")
@@ -196,8 +224,18 @@ def prepare(checkout, primary, state):
         copy_state(checkout / path, state / Path(path).name)
 
 
-def ensure_owned_stage(checkout):
-    staged = git(checkout, "diff", "--cached", "--no-renames", "--name-only", "-z").stdout
+def ensure_owned_stage(checkout, *, no_replace=False):
+    options = ("--ignore-submodules=none", "--no-ext-diff", "--no-textconv") if no_replace else ()
+    staged = git(
+        checkout,
+        "diff",
+        "--cached",
+        "--no-renames",
+        "--name-only",
+        "-z",
+        *options,
+        no_replace=no_replace,
+    ).stdout
     if any(not owned(name.decode("utf8")) for name in staged.split(b"\0") if name):
         raise ValueError("Refusing unrelated staged files in the data checkout")
 
@@ -218,8 +256,114 @@ def stage_snapshot(checkout, state):
     ensure_owned_stage(checkout)
 
 
-def ancestor(checkout, earlier, later):
-    return git(checkout, "merge-base", "--is-ancestor", earlier, later, check=False).returncode == 0
+@dataclass(frozen=True)
+class _StagedFollowProvenance:
+    candidate_tree: str
+    generated_at: datetime
+    covers_after: datetime
+    index_bytes: bytes
+    shards: Mapping[str, bytes]
+    index_sha256: str
+    shard_sha256: Mapping[str, str]
+    _rows: Mapping
+
+    def for_adapter(self, provenance_type, evidence_type):
+        """Construct #334 evidence from the exact validated staged candidate."""
+        return provenance_type(
+            self.index_sha256,
+            self.shard_sha256,
+            {
+                role_id: evidence_type(proof.raw_first_seen, proof.verified_utc, proof.observed_by)
+                for role_id, proof in self._rows.items()
+            },
+        )
+
+
+def validate_staged_follow_provenance(checkout, candidate_tree, provenance):
+    """Verify an opted-in proof against the current, exact writer candidate without publishing."""
+    ensure_owned_stage(checkout, no_replace=True)
+    if (
+        provenance is None
+        or git(checkout, "write-tree", no_replace=True).stdout.decode("ascii").strip()
+        != candidate_tree
+    ):
+        raise ValueError("Expected follow proof and exact staged candidate")
+
+    listing_bytes = {}
+    validate_tree(checkout, candidate_tree, _listing_bytes=listing_bytes)
+    staged_listing_paths = (
+        git(
+            checkout,
+            "ls-tree",
+            "-r",
+            "--name-only",
+            "-z",
+            candidate_tree,
+            "--",
+            f"{PUBLIC}/listings",
+            no_replace=True,
+        )
+        .stdout.decode("utf-8")
+        .split("\0")
+    )
+    if {
+        path.removeprefix(PUBLIC + "/")
+        for path in staged_listing_paths
+        if path and not path.endswith(".desc.json")
+    } != listing_bytes.keys():
+        raise ValueError("Staged follow listing paths differ from the validated archive")
+    index_bytes = listing_bytes.pop("listings/index.json")
+    index = parse_json(index_bytes)
+    identity = provenance.identity
+    if (
+        sha256(index_bytes).hexdigest() != identity.index_sha256
+        or datetime.fromisoformat(index["generated_at"]) != provenance.generated_at
+        or not index["files"]
+        or index["files"].keys() != identity.shard_sha256.keys()
+    ):
+        raise ValueError("Follow proof does not match the staged listing index")
+
+    digests = {}
+    for key, entry in index["files"].items():
+        path = entry["file"]
+        digests[key] = sha256(listing_bytes[path]).hexdigest()
+    if digests != identity.shard_sha256:
+        raise ValueError("Follow proof does not match the staged listing shards")
+
+    if (
+        git(checkout, "write-tree", no_replace=True).stdout.decode("ascii").strip()
+        != candidate_tree
+    ):
+        raise ValueError("Staged candidate changed during follow verification")
+
+    return _StagedFollowProvenance(
+        candidate_tree,
+        provenance.generated_at,
+        provenance.covers_after,
+        index_bytes,
+        MappingProxyType(listing_bytes),
+        identity.index_sha256,
+        MappingProxyType(digests),
+        MappingProxyType(dict(provenance.rows)),
+    )
+
+
+def ancestor(checkout, earlier, later, *, no_replace=False):
+    # Legacy grafts affect merge-base even when replacement objects are disabled.
+    env = {**os.environ, "GIT_GRAFT_FILE": os.devnull} if no_replace else None
+    return (
+        git(
+            checkout,
+            "merge-base",
+            "--is-ancestor",
+            earlier,
+            later,
+            check=False,
+            no_replace=no_replace,
+            env=env,
+        ).returncode
+        == 0
+    )
 
 
 def same_snapshot(checkout, earlier, later):
@@ -264,7 +408,57 @@ def publication_marker(checkout, commit):
     return f"[ingest-data] commit={commit} tree={tree}"
 
 
+@dataclass(frozen=True)
+class _PublishedFollowProvenance:
+    commit: str
+    public_tree: str
+    staged: _StagedFollowProvenance
+
+
+def _bind_published_follow(checkout, candidate, accepted, staged):
+    if staged is None:
+        return None
+    try:
+        if not ancestor(checkout, candidate, accepted, no_replace=True):
+            return None
+        staged_owned = git(
+            checkout, "ls-tree", "-z", staged.candidate_tree, "--", *OWNED, no_replace=True
+        ).stdout
+        accepted_owned = git(
+            checkout, "ls-tree", "-z", accepted, "--", *OWNED, no_replace=True
+        ).stdout
+        if staged_owned != accepted_owned:
+            return None
+        public_tree = revision(checkout, f"{accepted}:{PUBLIC}", no_replace=True)
+        if public_tree != revision(checkout, f"{staged.candidate_tree}:{PUBLIC}", no_replace=True):
+            return None
+        return _PublishedFollowProvenance(accepted, public_tree, staged)
+    except (ValueError, OSError, tarfile.TarError):
+        return None
+
+
 def publish(checkout, state, message):
+    result, _ = _publish(checkout, state, message, follow_provenance=None)
+    return result
+
+
+def publish_with_follow_provenance(
+    checkout, state, message, follow_provenance, *, before_first_push=None
+):
+    """Return the ordinary publication result and an optional immutable follow receipt."""
+    return _publish(
+        checkout, state, message, follow_provenance, before_first_push=before_first_push
+    )
+
+
+def _publish(
+    checkout,
+    state,
+    message,
+    follow_provenance,
+    *,
+    before_first_push: Callable[[str, _StagedFollowProvenance], None] | None = None,
+):
     base = data_base(checkout)
     git(checkout, "ls-remote", "--exit-code", "--heads", "origin", BRANCH)
     if not state.is_dir() or state.is_symlink():
@@ -276,19 +470,40 @@ def publish(checkout, state, message):
         remote = remote_tip(checkout)
         if not same_snapshot(checkout, base, remote):
             raise ValueError("Concurrent update changed ingest-owned data; refusing no-op")
-        return "No changes.", remote
+        return ("No changes.", remote), None
+
+    staged = None
+    if follow_provenance is not None:
+        try:
+            staged = validate_staged_follow_provenance(checkout, tree, follow_provenance)
+        except (ValueError, OSError, tarfile.TarError):
+            # The independently validated public snapshot can still publish.
+            pass
     git(checkout, "commit", "-m", message)
     if revision(checkout, "HEAD^{tree}") != tree:
         raise ValueError("Committed tree differs from the validated snapshot")
     candidate = revision(checkout, "HEAD")
+    if before_first_push is not None and staged is not None:
+        before_first_push(candidate, staged)
     expected = base
     for attempt in range(3):
+        attempted = None
+        if staged is not None:
+            try:
+                attempted = revision(checkout, "HEAD", no_replace=True)
+            except (ValueError, OSError):
+                staged = None
         if push_existing(checkout, expected):
-            return "Published validated data snapshot.", revision(checkout, "HEAD")
+            accepted = revision(checkout, "HEAD")
+            receipt = _bind_published_follow(
+                checkout, candidate, accepted, staged if accepted == attempted else None
+            )
+            return ("Published validated data snapshot.", accepted), receipt
         remote = remote_tip(checkout)
         if ancestor(checkout, candidate, remote):
             if same_snapshot(checkout, candidate, remote):
-                return "Validated data snapshot already published.", remote
+                receipt = _bind_published_follow(checkout, candidate, remote, staged)
+                return ("Validated data snapshot already published.", remote), receipt
             raise ValueError("Data snapshot changed after publication")
         if (
             not ancestor(checkout, base, remote)
