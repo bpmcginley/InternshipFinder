@@ -251,3 +251,76 @@ def test_real_build_only_adds_existing_employer_control(captured, monkeypatch):
     assert all(result[p]['html'] == baseline[p]['html'] for p in baseline if p != path)
     assert all('follow_company_key' not in row for row in loaded['listings'])
     assert all(value.follow_company is None for value in selected_models)
+
+
+@pytest.mark.parametrize(
+    'value',
+    [
+        '',
+        '"\\\b\f\n\r\t\x00\x1f',
+        'é🙂',
+        [[], {}, '', None, True, False],
+        {'number': 10**80, 'negative': -100, 'float': 1e-8, 'keys': {'a', 'b'}},
+    ],
+)
+def test_budget_matches_compact_utf8_json_exactly(value):
+    expected = json.dumps(
+        value,
+        ensure_ascii=False,
+        separators=(',', ':'),
+        allow_nan=False,
+        default=lambda value: sorted(value),
+    ).encode('utf-8')
+    assert adapter._budget(value, len(expected)) == 0
+    with pytest.raises(ValueError):
+        adapter._budget(value, len(expected) - 1)
+
+
+@pytest.mark.parametrize(
+    'value',
+    [
+        [[''] * 500 for _ in range(100)],
+        ['\x00' * 100] * 10,
+        [10**100] * 20,
+    ],
+)
+def test_oversized_nested_scalars_reject_before_encoding_or_copy(value, monkeypatch):
+    monkeypatch.setattr(adapter.json, 'dumps', lambda *a, **k: pytest.fail('encoded too early'))
+    monkeypatch.setattr(adapter, 'deepcopy', lambda _: pytest.fail('copied too early'))
+    with pytest.raises(ValueError):
+        adapter._facts({'nested': value}, limit=1000)
+
+
+def test_duplicate_and_unbounded_spellings_reject_before_copy(captured, monkeypatch):
+    ctx = selection(captured)
+    value = page(captured)
+    monkeypatch.setattr(adapter, 'deepcopy', lambda _: pytest.fail('copied invalid model'))
+
+    def unbounded():
+        pytest.fail('iterated unbounded spellings')
+        yield 'booz allen'
+
+    for invalid in (
+        replace(value, items=[value.items[0]] * 8),
+        replace(value, spellings=unbounded()),
+        replace(value, spellings=['booz allen'] * (len(ctx._aliases) + 1)),
+        replace(value, spellings=['x' * 100000]),
+    ):
+        with pytest.raises(ValueError):
+            ctx.select(invalid, enabled=True)
+
+
+def test_full_upstream_shard_cardinality_plus_first_is_accepted(captured):
+    from string import ascii_uppercase
+
+    stage = captured[2]
+    files = {f'listings/{a}{b}.json': b'[]' for a in ascii_uppercase for b in ascii_uppercase}
+    files.update({'listings/Canada.json': b'[]', 'listings/remote.json': b'[]'})
+    files.update(stage.follow.files)
+    assert len(files) == 26**2 + 3
+    updated = replace(stage, follow=replace(stage.follow, files=files))
+    ctx = prepare(captured[1]['listings'], updated, enabled=True, max_rows=100, max_bytes=200000)
+    assert ctx.select(page(captured), enabled=True).follow_company.key == 'booz allen'
+    files['unexpected.json'] = b'[]'
+    with pytest.raises(ValueError):
+        prepare(captured[1]['listings'], updated, enabled=True, max_rows=100, max_bytes=200000)

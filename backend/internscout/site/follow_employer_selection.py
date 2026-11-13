@@ -5,6 +5,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, replace
 import hashlib
 import json
+import math
 from types import MappingProxyType
 
 from .. import follow_catalog as codec
@@ -17,30 +18,55 @@ def _fail():
 
 
 def _budget(value, remaining):
-    """Bound nested input before copying or JSON encoding, including mutated caller rows."""
+    """Charge exact compact UTF-8 JSON bytes without constructing encoded containers."""
     if remaining < 1:
         _fail()
     kind = type(value)
     if kind is str:
-        if len(value) > remaining:
-            _fail()
-        remaining -= len(value.encode('utf-8'))
+        remaining -= 2
+        for char in value:
+            code = ord(char)
+            if 0xD800 <= code <= 0xDFFF:
+                _fail()
+            remaining -= (
+                2
+                if char in '"\\\b\f\n\r\t'
+                else 6
+                if code < 32
+                else 1
+                if code < 128
+                else 2
+                if code < 2048
+                else 3
+                if code < 65536
+                else 4
+            )
+            if remaining < 0:
+                _fail()
     elif kind in (dict, list, set):
         if len(value) > remaining:
             _fail()
-        remaining -= 1
+        remaining -= 2 + max(0, len(value) - 1)
         if kind is dict:
             for key, item in value.items():
                 if type(key) is not str:
                     _fail()
-                remaining = _budget(item, _budget(key, remaining))
+                remaining = _budget(item, _budget(key, remaining) - 1)
         else:
             for item in value:
                 remaining = _budget(item, remaining)
     elif kind in (int, float, bool, type(None)):
-        if kind is int and value.bit_length() > remaining * 8:
-            _fail()
-        remaining -= 1
+        if kind is int:
+            # Bound scalar conversion too; a decimal digit carries fewer than four bits.
+            if value.bit_length() > remaining * 4:
+                _fail()
+            remaining -= len(str(value))
+        elif kind is float:
+            if not math.isfinite(value):
+                _fail()
+            remaining -= len(repr(value))
+        else:
+            remaining -= 4 if value is None or value is True else 5
     else:
         _fail()
     if remaining < 0:
@@ -99,9 +125,27 @@ class EmployerFollowSelection:
             or not model.items
             or len(model.items) > self._source_count
             or len(self._source) != self._source_count
+            or type(model.spellings) is not list
+            or len(model.spellings) > len(self._aliases)
+            or type(model.name) is not str
+            or len(model.name) > 200
+            or not employer._follow_text(model.name, 200)
         ):
             _fail()
-        items = []
+        if any(
+            type(name) is not str
+            or len(name) > 200
+            or not employer._follow_text(name, 200)
+            or name not in self._aliases
+            for name in model.spellings
+        ):
+            _fail()
+        seen = set()
+        for row in model.items:
+            if type(row) is not dict or type(row.get('id')) is not str or row['id'] in seen:
+                _fail()
+            seen.add(row['id'])
+        verified = []
         for row in model.items:
             if type(row) is not dict or type(row.get('id')) is not str:
                 _fail()
@@ -113,7 +157,12 @@ class EmployerFollowSelection:
                 or _facts(row, limit=captured[4]) != captured[1]
             ):
                 _fail()
-            items.append(dict(deepcopy(row), follow_company_key=captured[2]))
+            if self._aliases.get(model.name) != captured[2] or any(
+                self._aliases[name] != captured[2] for name in model.spellings
+            ):
+                _fail()
+            verified.append((row, captured[2]))
+        items = [dict(deepcopy(row), follow_company_key=key) for row, key in verified]
         return employer.with_company_follow(
             replace(model, items=items, spellings=list(model.spellings)),
             aliases=self._aliases,
@@ -137,7 +186,8 @@ def prepare_follow_employer_selection(
         or type(organic_rows) is not list
         or any(type(n) is not int or not 0 < n <= codec._MAX_INTEGER for n in (max_rows, max_bytes))
         or len(organic_rows) > max_rows
-        or len(stage.follow.files) > 26**2 + 1
+        # Catalog permits 26**2 + 2 slim shards; staging adds the independent first preview.
+        or len(stage.follow.files) > 26**2 + 3
     ):
         _fail()
     payload = stage.follow.catalog.payload
