@@ -40,7 +40,7 @@ These exact main Tests and Pages runs passed. Each artifact preserved all 5,148 
 
 ### Follow delivery source progress
 
-The indexed digest cleanup and opt-in scheduler are merged. The selector refuses ambiguous settings before D1 access. The exact native suite covered legacy behavior through migration 0029, the new indexes through 0033, the bounded deadline and database-call limits, and held or uncertain outcomes. The indexed lane has no production trigger or migration. [Cleanup #623](https://github.com/bpmcginley/InternshipFinder/pull/623) · [Scheduler #627](https://github.com/bpmcginley/InternshipFinder/pull/627)
+The indexed digest cleanup and opt-in scheduler are merged. The selector refuses ambiguous settings before D1 access. The exact native suite covered legacy behavior through migration 0029, the new indexes through 0033, the bounded deadline and database-call limits, and held or uncertain outcomes. The indexed lane has no production trigger. Migration 0033 is pending production adoption. [Cleanup #623](https://github.com/bpmcginley/InternshipFinder/pull/623) · [Scheduler #627](https://github.com/bpmcginley/InternshipFinder/pull/627)
 
 The digest link adapter issues both credentials inside the existing budgeted delivery transaction and checks the exact issued credentials again before transport. The maintenance observation adapter accepts a fixed outcome and bounded counts. It has no live recorder. The link release runner verifies exact catalog and label inputs before the existing owner is acquired. It remains unmounted. [Digest links #624](https://github.com/bpmcginley/InternshipFinder/pull/624) · [Observation #628](https://github.com/bpmcginley/InternshipFinder/pull/628) · [Link release #629](https://github.com/bpmcginley/InternshipFinder/pull/629)
 
@@ -52,6 +52,7 @@ These exact main builds passed Tests and Pages. Their artifacts preserved all 5,
 | [#627](https://github.com/bpmcginley/InternshipFinder/pull/627) | [43375858657](https://github.com/bpmcginley/InternshipFinder/actions/runs/43375858657) | [43375858674](https://github.com/bpmcginley/InternshipFinder/actions/runs/43375858674), [14014457031](https://github.com/bpmcginley/InternshipFinder/actions/runs/43375858674/artifacts/14014457031) |
 | [#624](https://github.com/bpmcginley/InternshipFinder/pull/624) | [43376470082](https://github.com/bpmcginley/InternshipFinder/actions/runs/43376470082) | [43376470104](https://github.com/bpmcginley/InternshipFinder/actions/runs/43376470104), [14015385013](https://github.com/bpmcginley/InternshipFinder/actions/runs/43376470104/artifacts/14015385013) |
 | [#628](https://github.com/bpmcginley/InternshipFinder/pull/628) | [43376960894](https://github.com/bpmcginley/InternshipFinder/actions/runs/43376960894) | [43376960902](https://github.com/bpmcginley/InternshipFinder/actions/runs/43376960902), [14015345809](https://github.com/bpmcginley/InternshipFinder/actions/runs/43376960902/artifacts/14015345809) |
+| [#629](https://github.com/bpmcginley/InternshipFinder/pull/629) | [43377363824](https://github.com/bpmcginley/InternshipFinder/actions/runs/43377363824) | [43377363651](https://github.com/bpmcginley/InternshipFinder/actions/runs/43377363651), [14014079997](https://github.com/bpmcginley/InternshipFinder/actions/runs/43377363651/artifacts/14014079997) |
 
 ### Follow cleanup and publication progress
 
