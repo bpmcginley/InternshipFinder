@@ -159,6 +159,7 @@ test("offline routes match the original capture and signed-in cache policy", asy
   // The historical baseline stays immutable. These later routes have their own
   // offline HTTP/D1 tests; future additions must be named explicitly here.
   const added = new Set([
+    "GET /follows/unsubscribe",
     "POST /follows/unsubscribe",
     "POST /follows/confirm",
     "POST /follows/delete-request",
