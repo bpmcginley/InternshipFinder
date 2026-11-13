@@ -133,6 +133,7 @@ def emit_employer_pages(
     top: Callable[..., list],
     select_employer_page: Callable[..., employer.Page],
     render_employer_page: Callable[..., dict],
+    employer_batch: Callable[[list[employer.Page]], list[employer.Page]] | None = None,
 ) -> None:
     by_company, spellings = employers.by_company, employers.spellings
     fields, combos = cohorts.fields, cohorts.combos
@@ -148,6 +149,7 @@ def emit_employer_pages(
     )
 
     directory = employer.Directory(by_company, company_fields, registry, fields, combos)
+    models = []
     for name, items in sorted(by_company.items()):
         path = registry[name]
         model = select_employer_page(
@@ -163,7 +165,13 @@ def emit_employer_pages(
             cohort_details if path in cohort_paths() else None,
             export_stamp=context.export_stamp,
         )
-        add(**render_employer_page(model))
+        if employer_batch is None:
+            add(**render_employer_page(model))
+        else:
+            models.append(model)
+    if employer_batch is not None:
+        for model in employer_batch(models):
+            add(**render_employer_page(model))
 
 
 def emit_kind_and_tracker_pages(

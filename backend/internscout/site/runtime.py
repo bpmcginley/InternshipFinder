@@ -3175,6 +3175,7 @@ def _render_employer_page(model: _employer.Page) -> dict:
         listing_body=_hooks().listing_body,
         state_slug=state_slug,
         employer_facts=employer_facts,
+        follow_script=_state().follow_script,
     )
 
 
@@ -3303,6 +3304,7 @@ def _emit_employer_pages(
         top=top,
         select_employer_page=_select_employer_page,
         render_employer_page=_render_employer_page,
+        employer_batch=_hooks().employer_batch,
     )
 
 
@@ -3879,6 +3881,7 @@ class BuildState:
 
     beacon: str = BEACON
     posting_links: PostingLinks | None = None
+    follow_script: str = "/js/follow-company.mjs"
     baseline: str | None = BASELINE
     generated: datetime | None = GENERATED
     digest_form: str = DIGEST_FORM
@@ -3934,6 +3937,7 @@ class BuildHooks:
     """Late render and input hooks used by the legacy facade."""
 
     load: Callable[[str], dict] = load
+    employer_batch: Callable | None = None
     page: Callable[..., str] = page
     pricing_page: Callable[..., tuple[str, str, str, list]] = pricing_page
     fit_title: Callable[..., str] = fit_title

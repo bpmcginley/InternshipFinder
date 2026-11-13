@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from html import escape as esc
+import re
 
 from ..employer import Page, validated_company_follow
 from .layout import link_list
@@ -23,13 +24,18 @@ def render_employer_page(
     listing_body: Callable[..., str],
     state_slug: Callable[..., str],
     employer_facts: Callable[..., tuple[str, str]],
+    follow_script: str = "/js/follow-company.mjs",
 ) -> dict:
     selected = validated_company_follow(model)
+    if selected and follow_script != "/js/follow-company.mjs" and not re.fullmatch(
+        r"/js/follow-company-modules/[0-9a-f]{64}\.mjs", follow_script
+    ):
+        raise ValueError("Invalid employer Follow script")
     follow = (
         (
             f'<section data-follow-company-key="{esc(selected.key, quote=True)}" '
             f'data-follow-company-label="{esc(selected.label, quote=True)}"></section>'
-            '<script type="module" src="/js/follow-company.mjs"></script>'
+            f'<script type="module" src="{follow_script}"></script>'
         )
         if selected
         else ""
