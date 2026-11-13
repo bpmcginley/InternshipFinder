@@ -47,7 +47,6 @@ export function createOwnedFollowDigestRuntime(options = {}) {
     key,
     catalog,
     limits,
-    relatedLimits,
     loadSnapshot,
     clock = () => new Date(),
     transportTimeoutMs = 10000,
@@ -67,7 +66,13 @@ export function createOwnedFollowDigestRuntime(options = {}) {
         fail();
       selected = snapshot(policy);
       if (!selected.sending) return { status: "disabled" };
-      related = captureFollowDigestRelatedLimits(relatedLimits);
+      const descriptor = Object.getOwnPropertyDescriptor(options, "relatedLimits");
+      if (
+        (descriptor && (!descriptor.enumerable || !Object.hasOwn(descriptor, "value"))) ||
+        (!descriptor && "relatedLimits" in options)
+      )
+        fail();
+      related = captureFollowDigestRelatedLimits(descriptor?.value);
       transport = createFollowEmailTransport({
         enabled: true,
         email,

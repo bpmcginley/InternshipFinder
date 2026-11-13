@@ -215,6 +215,25 @@ export async function malformedRelatedBeforeOwnerOrProvider(db) {
       },
     );
   }
+  for (const mode of ["disabled", "paused", "malformed"]) {
+    const options = {
+      ...f.options,
+      db: noDB,
+      email,
+      enabled: mode !== "disabled",
+      policy: mode === "paused" ? () => ({ sending: false }) : f.options.policy,
+    };
+    Object.defineProperty(options, "relatedLimits", {
+      enumerable: true,
+      get() {
+        inspected++;
+        throw Error("outer accessor");
+      },
+    });
+    assert.deepEqual(await create(options)(), {
+      status: mode === "malformed" ? "unavailable" : "disabled",
+    });
+  }
   assert.deepEqual(await owner(db), before);
   assert.equal(inspected, 0);
   assert.equal(f.calls(), 0);
