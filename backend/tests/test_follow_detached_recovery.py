@@ -586,3 +586,41 @@ def test_out_of_position_parent_header_cannot_attest_expected_edge(sample):
     authority = replace(a, ordinal=2, observation=replace(a.observation, commit=malformed))
     result = run(sample, authority)
     assert result.status == 'held' and result.receipt is None and store.calls == ['load']
+
+
+@pytest.mark.parametrize(
+    'key',
+    [
+        'GIT_CONFIG_GLOBAL',
+        'GIT_CONFIG_NOSYSTEM',
+        'GIT_NO_LAZY_FETCH',
+        'GIT_ALLOW_PROTOCOL',
+    ],
+)
+@pytest.mark.parametrize('variant', ['lowercase_only', 'lowercase_last', 'uppercase_last'])
+def test_posix_environment_requires_literal_controls_without_case_collisions(
+    monkeypatch, key, variant
+):
+    import scripts.follow_detached_recovery as adapter
+
+    # A plain mapping deliberately models POSIX semantics even on Windows, whose
+    # native os.environ folds keys. Canonical controls remain a positive control.
+    safe = {
+        'GIT_CONFIG_GLOBAL': os.devnull,
+        'GIT_CONFIG_NOSYSTEM': '1',
+        'GIT_NO_LAZY_FETCH': '1',
+        'GIT_ALLOW_PROTOCOL': '',
+    }
+    monkeypatch.setattr(adapter.os, 'environ', safe)
+    adapter._detached_environment()
+    value = safe[key]
+    changed = {k: v for k, v in safe.items() if k != key}
+    if variant == 'lowercase_only':
+        changed[key.lower()] = value
+    elif variant == 'lowercase_last':
+        changed.update({key: 'unsafe', key.lower(): value})
+    else:
+        changed.update({key.lower(): value, key: 'unsafe'})
+    monkeypatch.setattr(adapter.os, 'environ', changed)
+    with pytest.raises(ValueError):
+        adapter._detached_environment()

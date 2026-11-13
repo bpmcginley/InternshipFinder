@@ -74,7 +74,12 @@ def _authority(value):
 def _detached_environment():
     # Legacy staged/binding ports inherit the process environment. Require a
     # dedicated process instead of temporarily changing process-global Git state.
-    env = {k.upper(): v for k, v in os.environ.items() if k.upper().startswith("GIT_")}
+    env = {k: v for k, v in os.environ.items() if k.upper().startswith("GIT_")}
+    # POSIX Git reads literal uppercase names. Never normalize a lowercase alias
+    # or allow it to shadow an unsafe uppercase control. Windows os.environ
+    # already exposes its case-insensitive native keys in uppercase.
+    if any(k != k.upper() for k in env):
+        raise ValueError("canonical Git environment names required")
     required = {
         "GIT_CONFIG_GLOBAL": os.devnull,
         "GIT_CONFIG_NOSYSTEM": "1",
