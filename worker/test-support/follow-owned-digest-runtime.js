@@ -648,3 +648,70 @@ export async function nonPlainReceiptRecordsStayClosed(db) {
     if (!valid) await reset(db);
   }
 }
+
+export async function outerTerminalAccessorsCannotReleaseOrSendNext(db) {
+  const f = await fixture(db, 6);
+  let reads = 0,
+    completed = 0;
+  const accessor = (target, key, value) =>
+    Object.defineProperty(target, key, {
+      enumerable: true,
+      configurable: true,
+      get() {
+        reads++;
+        return value;
+      },
+    });
+  for (const field of ["entry", "success", "results", "meta", "changes"]) {
+    const proxy = wrap(db, async (sql, rows) => {
+      if (!sql[1]?.startsWith("UPDATE follow_digest_outbox SET state=?")) return rows;
+      const original = rows[1];
+      if (field === "entry") return accessor([...rows], 1, original);
+      const r = { ...original };
+      if (field === "changes")
+        r.meta = accessor({ ...original.meta }, "changes", original.meta.changes);
+      else accessor(r, field, original[field]);
+      return [rows[0], r];
+    });
+    assert.equal((await f.run({ db: proxy })).status, "held");
+    assert.equal((await owner(db)).phase, "held");
+    assert.equal(reads, 0);
+    assert.equal(f.calls(), ++completed);
+    assert.equal((await f.run()).status, "held");
+    assert.equal(f.calls(), completed);
+    await reset(db);
+  }
+  assert.equal(
+    await db.prepare("SELECT count(*) n FROM follow_digest_outbox WHERE state='queued'").first("n"),
+    1,
+  );
+}
+export async function terminalRecordShapesAndUnusedMetadata(db) {
+  const f = await fixture(db, 3);
+  for (const field of ["receipt", "meta"]) {
+    const proxy = wrap(db, async (sql, rows) => {
+      if (!sql[1]?.startsWith("UPDATE follow_digest_outbox SET state=?")) return rows;
+      const r = { ...rows[1] };
+      if (field === "meta") r.meta = Object.assign(new Date(0), r.meta);
+      return [rows[0], field === "receipt" ? Object.assign(new Date(0), r) : r];
+    });
+    assert.equal((await f.run({ db: proxy })).status, "held");
+    await reset(db);
+  }
+  let reads = 0;
+  const proxy = wrap(db, async (sql, rows) => {
+    if (!sql[1]?.startsWith("UPDATE follow_digest_outbox SET state=?")) return rows;
+    return rows.map((r) => ({
+      ...r,
+      meta: {
+        ...r.meta,
+        get unrelated_native_metadata() {
+          reads++;
+          throw Error("unused");
+        },
+      },
+    }));
+  });
+  assert.equal((await f.run({ db: proxy })).counts.accepted, 1);
+  assert.equal(reads, 0);
+}
