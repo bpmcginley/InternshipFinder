@@ -186,6 +186,7 @@ export class CheckpointIntegration extends DurableObject {
         read: (maxBytes) => this.readSnapshot(maxBytes),
         reservePending: (body, maxBytes) => this.stageSnapshot(body, maxBytes),
         promote: (body, maxBytes, options) => this.promoteSnapshot(body, maxBytes, options),
+        rejectPending: (generation) => this.runtime.rejectPending(generation),
       }),
       maxBytes: 3_000_000,
       writer: await hash("A".repeat(43)),
@@ -350,40 +351,11 @@ export class CheckpointIntegration extends DurableObject {
   recoverAcknowledgement() {
     return this.control.recoverAcknowledgement();
   }
-  async retireExpired(phase) {
-    if (phase !== "pending" && phase !== "accepted") return "held";
-    return this.change((state, now) => {
-      const record = state[phase];
-      if (!record || state.retired || now < record.expires) return false;
-      state.retired = {
-        slot: record.slot,
-        etag: record.etag,
-        nonce: record.nonce,
-        expires: record.expires,
-      };
-      state[phase] = null;
-      return true;
-    });
+  retireExpired(phase) {
+    return this.runtime.retireExpired(phase);
   }
-  async cleanupRetired() {
-    const before = await this.admitted(),
-      retired = before?.retired;
-    if (!retired) return "held";
-    return this.change(
-      (state) => {
-        if (!equal(state, before)) return false;
-        state.retired = null;
-        return true;
-      },
-      async () => {
-        const result = await this.slots.write(
-          retired.slot,
-          retired.etag,
-          await this.slots.tombstone(),
-        );
-        return result.status === "stored";
-      },
-    );
+  cleanupRetired() {
+    return this.runtime.cleanupRetired();
   }
 }
 
