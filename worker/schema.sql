@@ -937,22 +937,28 @@ WHEN OLD.state='attempting' AND NEW.state IN ('accepted','uncertain')
   AND length(OLD.attempted_at)=24
   AND strftime('%Y-%m-%dT%H:%M:%fZ',OLD.attempted_at,'+0 days')=OLD.attempted_at
 BEGIN
-  UPDATE follow_scope_progress SET watermark=(
-    SELECT json_extract(a.value,'$.to') FROM follow_valid_pending v,json_each(v.advances) a
-    WHERE v.job_id=OLD.id AND json_extract(a.value,'$.scopeKey')=follow_scope_progress.scope_key
-  ) WHERE (subscriber_id,scope_key) IN (
-    SELECT OLD.subscriber_id,json_extract(a.value,'$.scopeKey')
-    FROM follow_valid_pending v,json_each(v.advances) a WHERE v.job_id=OLD.id
-  ) AND EXISTS (
-    SELECT 1 FROM follow_valid_pending v,json_each(v.advances) a
-    JOIN follow_subscriptions s ON s.subscriber_id=OLD.subscriber_id
-      AND s.scope_key=json_extract(a.value,'$.scopeKey')
-    WHERE v.job_id=OLD.id AND v.snapshot_at<=OLD.attempted_at
-      AND s.scope_key=follow_scope_progress.scope_key
-      AND s.confirmed_at=json_extract(a.value,'$.confirmedAt')
-      AND follow_scope_progress.scope_generation=json_extract(a.value,'$.generation')
-      AND follow_scope_progress.watermark=json_extract(a.value,'$.from')
-  );
+  -- Validate the pinned pending row once. Drive indexed lookups from its advances.
+  UPDATE follow_scope_progress SET watermark=approved.to_watermark
+  FROM (
+    WITH verified AS MATERIALIZED (
+      SELECT advances FROM follow_valid_pending
+      WHERE job_id=OLD.id AND snapshot_at<=OLD.attempted_at
+    ), approved_advances AS MATERIALIZED (
+      SELECT json_extract(a.value,'$.scopeKey') AS scope,
+        json_extract(a.value,'$.generation') AS generation,
+        json_extract(a.value,'$.confirmedAt') AS confirmed,
+        json_extract(a.value,'$.from') AS from_watermark,
+        json_extract(a.value,'$.to') AS to_watermark
+      FROM verified CROSS JOIN json_each(verified.advances) a
+    )
+    SELECT * FROM approved_advances
+  ) AS approved
+  CROSS JOIN follow_subscriptions s ON s.subscriber_id=OLD.subscriber_id
+    AND s.scope_key=approved.scope AND s.confirmed_at=approved.confirmed
+  WHERE follow_scope_progress.subscriber_id=OLD.subscriber_id
+    AND follow_scope_progress.scope_key=approved.scope
+    AND follow_scope_progress.scope_generation=approved.generation
+    AND follow_scope_progress.watermark=approved.from_watermark;
 END;
 
 -- No advancement before an attempt. Once claimed, cancellation is uncertain for survivors:
