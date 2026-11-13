@@ -10,7 +10,46 @@ import {
 const policyKeys = "deadlineMs,maxD1Calls,maxRows";
 const bounded = (value, max) => Number.isSafeInteger(value) && value >= 1 && value <= max;
 
-export async function runFollowScheduledMaintenance(db, rawPolicy, now = () => performance.now()) {
+export function runFollowScheduledMaintenance(db, rawPolicy, now = () => performance.now()) {
+  return runMaintenance(db, rawPolicy, now);
+}
+
+// Measurement is ephemeral and cannot influence admission or maintenance status.
+export async function measureFollowScheduledMaintenance(
+  db,
+  rawPolicy,
+  measurementClock = () => performance.now(),
+  now = () => performance.now(),
+) {
+  const sample = () => {
+    try {
+      const value = measurementClock();
+      if (typeof value === "number" && Number.isFinite(value) && value >= 0) return value;
+      void Promise.resolve(value).catch(() => {});
+    } catch {
+      /* Invalid measurement suppresses only observation. */
+    }
+    return null;
+  };
+  const start = sample();
+  let d1Calls = 0;
+  const result = await runMaintenance(db, rawPolicy, now, () => {
+    d1Calls++;
+  });
+  const end = sample(),
+    durationMs = Math.ceil(end - start);
+  const observation =
+    start !== null &&
+    end !== null &&
+    end >= start &&
+    Number.isSafeInteger(durationMs) &&
+    d1Calls <= 48
+      ? { status: result.status, durationMs, d1Calls }
+      : null;
+  return { result, observation };
+}
+
+async function runMaintenance(db, rawPolicy, now, countCall) {
   try {
     if (typeof rawPolicy !== "string" || rawPolicy.length > 256) return { status: "unavailable" };
     const policy = JSON.parse(rawPolicy);
@@ -71,7 +110,13 @@ export async function runFollowScheduledMaintenance(db, rawPolicy, now = () => p
     const wrap = (statement) => {
       const wrapped = {
         bind: (...values) => wrap(statement.bind(...values)),
-        all: () => execute(() => statement.all()),
+        all: () =>
+          execute(() => {
+            const all = statement.all;
+            if (typeof all !== "function") throw new Error("Maintenance binding unavailable");
+            countCall?.();
+            return Reflect.apply(all, statement, []);
+          }),
       };
       statements.set(wrapped, statement);
       return wrapped;
@@ -79,14 +124,16 @@ export async function runFollowScheduledMaintenance(db, rawPolicy, now = () => p
     const budgetedDb = {
       prepare: (sql) => wrap(db.prepare(sql)),
       batch: (batch) =>
-        execute(() =>
-          db.batch(
-            batch.map((statement) => {
-              if (!statements.has(statement)) throw new Error("Unknown maintenance statement");
-              return statements.get(statement);
-            }),
-          ),
-        ),
+        execute(() => {
+          const native = batch.map((statement) => {
+            if (!statements.has(statement)) throw new Error("Unknown maintenance statement");
+            return statements.get(statement);
+          });
+          const perform = db.batch;
+          if (typeof perform !== "function") throw new Error("Maintenance binding unavailable");
+          countCall?.();
+          return Reflect.apply(perform, db, [native]);
+        }),
     };
     const page = { enabled: true, maxRows };
     const lanes = [

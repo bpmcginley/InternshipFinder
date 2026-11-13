@@ -449,14 +449,15 @@ export async function prepareTopupStripe(
         success_url: success,
         cancel_url: cancel,
         currency: "usd",
-        "adaptive_pricing[enabled]": "false",
         "expand[]": "line_items",
       };
       for (const [k, v] of Object.entries(metadata(a))) {
         form[`metadata[${k}]`] = v;
         form[`payment_intent_data[metadata][${k}]`] = v;
       }
+      // Managed Payments chooses Adaptive Pricing. An explicit opt-out rejects checkout.
       if (managed) form["managed_payments[enabled]"] = "true";
+      else form["adaptive_pricing[enabled]"] = "false";
       // A POST already sent under the captured settings may have created a session.
       // Preserve verified durable attachment. A stale adapter cannot subsequently open it.
       return verified(await request("checkout/sessions", form, a.idempotencyKey, "POST"), a);

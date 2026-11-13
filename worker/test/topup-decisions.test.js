@@ -62,14 +62,14 @@ test("top-up pending refund progression uses current state, not previous event v
   );
 });
 
-test("top-up each formal active status holds the whole purchase even for a partial dispute", () => {
+test("top-up formal disputes hold the purchase at amounts below, at or above capture", () => {
   for (const status of [
     "needs_response",
     "under_review",
     "appeal_needs_response",
     "appeal_under_review",
   ]) {
-    for (const amount of [1, 100, 325])
+    for (const amount of [1, 100, 325, 326])
       assert.equal(disposition({ disputes: [dispute(status, amount)] }), "held");
   }
   for (const status of ["warning_needs_response", "warning_under_review"]) {
