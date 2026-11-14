@@ -7,7 +7,11 @@ import {
   validateTopupHistoryTraversal,
   HISTORY_TRAVERSAL_BOUNDS,
 } from "./topup-history-traversal.js";
-import { captureTopupCoverage, closeTopupCoverage } from "./topup-history-coverage.js";
+import {
+  advanceTopupCoverage,
+  captureTopupCoverage,
+  closeTopupCoverage,
+} from "./topup-history-coverage.js";
 import { observeVerifiedTopupEvent } from "./topup-history-events.js";
 const on = { enabled: true },
   held = () => ({ status: "held" });
@@ -54,6 +58,7 @@ async function replay(db, env, input, options, wholeWindow) {
     clock,
     timeoutMs,
     excludeEmployerPayments,
+    verifyHistory,
     initial;
   try {
     ({
@@ -64,6 +69,7 @@ async function replay(db, env, input, options, wholeWindow) {
       clock = Date.now,
       timeoutMs,
       excludeEmployerPayments = false,
+      verifyHistory,
     } = options);
     config = record(input);
     config.expected = record(config.expected);
@@ -92,6 +98,7 @@ async function replay(db, env, input, options, wholeWindow) {
       !validTopupHistoryRequestVersion(requestVersion) ||
       typeof excludeEmployerPayments !== "boolean" ||
       (!wholeWindow && excludeEmployerPayments) ||
+      (verifyHistory !== undefined && (!wholeWindow || typeof verifyHistory !== "function")) ||
       (wholeWindow
         ? targetEventId !== undefined
         : typeof targetEventId !== "string" || !/^evt_[A-Za-z0-9_]{1,250}$/.test(targetEventId)) ||
@@ -211,7 +218,21 @@ async function replay(db, env, input, options, wholeWindow) {
       if (!(await current())) fail();
       counts[result.status]++;
     }
-    return wholeWindow ? { status: "handled_unproven", ...counts } : result;
+    if (!wholeWindow) return result;
+    if (verifyHistory) {
+      const advanced = await advanceTopupCoverage(
+        db,
+        { expected: authorized, from: config.from, to: config.to },
+        {
+          verifyHistory,
+          beforeCommit: () => remaining() > 0,
+          commitBy: new Date(initial + timeoutMs).toISOString(),
+        },
+      );
+      if (advanced.status === "committed") return { status: "qualified", ...counts };
+      if (advanced.status !== "unproven") fail();
+    }
+    return { status: "handled_unproven", ...counts };
   }
 
   const timeout = new Promise((_, reject) => {
