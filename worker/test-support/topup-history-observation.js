@@ -356,10 +356,36 @@ export async function nonterminalOrMismatchedAttemptCannotConsumeObservation(db)
 
 export async function observationFencesAnAlreadyCapturedRetirement(db) {
   const f = await settled(db);
-  const result = await retireResolvedTopup(db, f.key, async () => {
-    assert.equal((await observe(db, f.observation, on)).status, "observed");
-    return f.reversals;
-  });
+  const epoch = "b".repeat(32);
+  await db.batch([
+    db
+      .prepare("UPDATE topup_checkout_attempts SET created='2019-12-31T00:00:00.000Z' WHERE id=?")
+      .bind(f.payment.attemptId),
+    db
+      .prepare(
+        "INSERT INTO topup_history_coverage VALUES('test',?,'fixture','2019-01-01T00:00:00.000Z','2022-01-01T00:00:00.000Z',1,'qualified')",
+      )
+      .bind(epoch),
+    db
+      .prepare("UPDATE topup_retention SET coverage_epoch=? WHERE payment_hash=?")
+      .bind(epoch, f.key),
+  ]);
+  const result = await retireResolvedTopup(
+    db,
+    f.key,
+    async () => {
+      assert.equal((await observe(db, f.observation, on)).status, "observed");
+      return f.reversals;
+    },
+    {
+      livemode: false,
+      verifyHistory: (snapshot) => ({
+        status: "verified",
+        snapshot,
+        firstSettledAt: "2019-12-31T12:00:00.000Z",
+      }),
+    },
+  );
   assert.equal(result.status, "stale");
   assert.ok(await readTopupRevision(db, f.key));
   assert.equal((await all(db, "topup_claims"))[0].state, "granted");
