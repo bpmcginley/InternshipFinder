@@ -14922,6 +14922,13 @@
    "fails": 0,
    "added": "2026-09-18"
   },
+  "cmu|wd115|SEI": {
+   "name": "Carnegie Mellon University",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-14",
+   "sector": "education_research"
+  },
   "cna|wd1|CNA_Careers": {
    "name": "CNA Insurance",
    "quant": false,
