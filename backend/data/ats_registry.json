@@ -901,6 +901,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "forgeatomics": {
+   "name": "Forge Atomics Inc.",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-14"
+  },
   "formulary": {
    "name": "Formulary Financial",
    "quant": false,
@@ -1188,6 +1194,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-10-26"
+  },
+  "horizon3ai": {
+   "name": "Horizon3.ai",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-14"
   },
   "hoyoverse": {
    "name": "HoYoverse",
@@ -1652,6 +1664,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-10-31"
+  },
+  "nexus-cognitive": {
+   "name": "Nexus Cognitive Technologies",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-14"
   },
   "niantic-spatial": {
    "name": "Niantic Spatial",
@@ -2144,6 +2162,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "reliable-robotics": {
+   "name": "Reliable Robotics",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-14"
   },
   "relling": {
    "name": "Relling",
@@ -3296,9 +3320,8 @@
   "andurilindustries": {
    "name": "Anduril",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-13"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "anthropic": {
    "name": "Anthropic",
@@ -6689,6 +6712,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-10-10"
+  },
+  "salientmotion": {
+   "name": "Salient Motion",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-14"
   },
   "saltxc": {
    "name": "SALT XC",
@@ -10119,9 +10148,9 @@
   "metlife": {
    "name": "MetLife",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-10-01",
-   "last_fail": "2026-11-13"
+   "last_fail": "2026-11-14"
   },
   "mirego": {
    "name": "Mirego",
@@ -11740,6 +11769,12 @@
    "fails": 0,
    "added": "2026-11-11"
   },
+  "fieldpulse": {
+   "name": "FieldPulse",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-14"
+  },
   "fluidai-medical-careers": {
    "name": "NERv Technology Inc. D.B.A. FluidAI Medical",
    "quant": false,
@@ -12063,10 +12098,9 @@
   "jobs.arkema.com": {
    "name": "Arkema",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-18",
-   "sector": "engineering_manufacturing",
-   "last_fail": "2026-11-13"
+   "sector": "engineering_manufacturing"
   },
   "jobs.cmc.com": {
    "name": "Commercial Metals Company",
@@ -12113,10 +12147,9 @@
   "jobs.paccar.com": {
    "name": "Paccar",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-18",
-   "sector": "engineering_manufacturing",
-   "last_fail": "2026-11-13"
+   "sector": "engineering_manufacturing"
   },
   "jobs.royalcaribbeangroup.com": {
    "name": "Royal Caribbean Group",
@@ -12142,26 +12175,23 @@
   "mhicareers.com": {
    "name": "Mitsubishi Heavy Industries America",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-18",
-   "sector": "engineering_manufacturing",
-   "last_fail": "2026-11-13"
+   "sector": "engineering_manufacturing"
   },
   "www.careerprofile.epiroc.com": {
    "name": "Epiroc",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-18",
-   "sector": "engineering_manufacturing",
-   "last_fail": "2026-11-13"
+   "sector": "engineering_manufacturing"
   },
   "www.careers.zurich.com": {
    "name": "Zurich Insurance",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-18",
-   "sector": "insurance_finance",
-   "last_fail": "2026-11-13"
+   "sector": "insurance_finance"
   },
   "www.optimumcareers.com": {
    "name": "Altice USA",
@@ -12332,6 +12362,12 @@
    "fails": 0,
    "added": "2026-09-14"
   },
+  "bmlltech": {
+   "name": "BMLL Technologies",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-14"
+  },
   "botpress": {
    "name": "Botpress Technologies",
    "quant": false,
@@ -12398,6 +12434,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-10-04"
+  },
+  "crown-equipment": {
+   "name": "Crown Equipment Corporation",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-14"
   },
   "cvshealth": {
    "name": "CVS Health",
@@ -12519,6 +12561,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-14"
+  },
+  "innocence-project": {
+   "name": "Innocence Project",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-14"
   },
   "javelin-global-commodities": {
    "name": "Javelin Global Commodities",
@@ -14254,10 +14302,9 @@
   "brocku|wd3|brocku_careers": {
    "name": "Brock University",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-13",
-   "sector": "education_research",
-   "last_fail": "2026-11-13"
+   "sector": "education_research"
   },
   "brookfield|wd5|bpandc": {
    "name": "Argo Group",
