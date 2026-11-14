@@ -1090,6 +1090,21 @@ async function startCoveredWindow(db, f) {
     .run();
   f.input.expected = (await capture(db, false, on)).coverage;
   f.pages = [[]];
+  const fetch = f.options.fetchImpl;
+  f.account = { object: "account", id: "acct_fixture" };
+  f.price = { object: "price", id: "price_fixture", livemode: false };
+  f.options.expectedAccountId = f.account.id;
+  f.options.fetchImpl = async (url, init) => {
+    const path = new URL(url).pathname;
+    const value = path === "/v1/account" ? f.account : path === "/v1/prices/price_fixture" ? f.price : null;
+    if (!value) return fetch(url, init);
+    assert.equal(init.method, "GET");
+    assert.equal(init.headers["Stripe-Version"], version);
+    assert.equal(init.headers.Authorization, "Bearer fixture-not-a-key");
+    const response = new Response(JSON.stringify(value));
+    Object.defineProperty(response, "url", { value: url });
+    return response;
+  };
 }
 
 export async function completeReplayAndIndependentVerifierAdvanceOnlyContinuousIntervals(db) {
@@ -1105,6 +1120,10 @@ export async function completeReplayAndIndependentVerifierAdvanceOnlyContinuousI
       coverage: f.input.expected,
       from: f.input.from,
       to: f.input.to,
+      accountId: f.account.id,
+      apiVersions: [version],
+      requestVersion: version,
+      excludeEmployerPayments: false,
     });
     return { status: "verified", request };
   };
@@ -1167,4 +1186,25 @@ export async function lateCoverageVerificationCannotAdvanceAfterNativeDeadline(d
   const current = (await capture(db, false, on)).coverage;
   assert.equal(current.covered_through, null);
   assert.notEqual(current.health, "qualified");
+}
+
+export async function boundAccountModeAndKnownCoverageFaultsFailClosed(db) {
+  for (const fault of ["account", "mode", "provider"]) {
+    const f = await setup(db);
+    await startCoveredWindow(db, f);
+    if (fault === "account") f.account.id = "acct_different";
+    if (fault === "mode") f.price.livemode = true;
+    let calls = 0;
+    const verifyHistory = (database, request) => {
+      calls++;
+      return { status: fault === "provider" ? "fault" : "verified", request };
+    };
+    assert.equal((await windowReplay(db, f, { verifyHistory })).status, "closed");
+    assert.equal(calls, fault === "provider" ? 1 : 0);
+    assert.deepEqual((await capture(db, false, on)).coverage, {
+      ...f.input.expected,
+      revision: f.input.expected.revision + 1,
+      health: "closed",
+    });
+  }
 }

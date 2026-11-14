@@ -1,4 +1,6 @@
 // Dormant metadata fencing. Advancing requires an explicit trusted provider and restore verifier.
+import { consumeTopupReplayProof } from "./topup-history-replay.js";
+
 const NOW = "strftime('%Y-%m-%dT%H:%M:%fZ','now')";
 const FIELDS = "mode,epoch,schema_key,starts_at,covered_through,revision,health";
 const SELECT = `SELECT ${FIELDS},${NOW} AS observed_at FROM topup_history_coverage`;
@@ -193,20 +195,22 @@ function windowBounds(before, from, to) {
 // The exact request object binds a positive response to this invocation and DB.
 export async function advanceTopupCoverage(
   db,
-  input,
+  replayProof,
   { verifyHistory, beforeCommit = () => true, commitBy } = {},
 ) {
   if (typeof verifyHistory !== "function" || typeof beforeCommit !== "function")
     return status("disabled");
   try {
-    const { expected, from, to } = own(input, "expected,from,to");
+    const replay = consumeTopupReplayProof(db, replayProof);
+    if (!replay || !instant(commitBy)) throw new Error();
+    const { expected, from, to, ...scope } = replay;
     const before = coverage(expected);
     const end = windowBounds(before, from, to);
-    if (!instant(commitBy)) throw new Error();
-    const request = Object.freeze({ coverage: Object.freeze(before), from, to });
+    const request = Object.freeze({ coverage: Object.freeze(before), from, to, ...scope });
     const result = own(await verifyHistory(db, request), "status,request");
-    if (result.status !== "verified" || result.request !== request || beforeCommit() !== true)
-      return status("unproven");
+    if (result.request !== request || beforeCommit() !== true) return status("unproven");
+    if (result.status === "fault") return status("fault");
+    if (result.status !== "verified") return status("unproven");
     return await mutate(
       db,
       db
