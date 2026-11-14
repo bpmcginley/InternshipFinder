@@ -1082,3 +1082,129 @@ export async function employerEscapedDuplicateNamesCannotHideTopupAssociation(db
 export async function employerMalformedUtf8CannotAuthorizeExclusion(db) {
   await malformedEmployerBytes(db, "utf8");
 }
+
+async function startCoveredWindow(db, f) {
+  await db
+    .prepare("UPDATE topup_history_coverage SET starts_at=?")
+    .bind(new Date(f.input.from * 1000 + 782).toISOString())
+    .run();
+  f.input.expected = (await capture(db, false, on)).coverage;
+  f.pages = [[]];
+  const fetch = f.options.fetchImpl;
+  f.account = { object: "account", id: "acct_fixture" };
+  f.price = { object: "price", id: "price_fixture", livemode: false };
+  f.options.expectedAccountId = f.account.id;
+  f.options.fetchImpl = async (url, init) => {
+    const path = new URL(url).pathname;
+    const value = path === "/v1/account" ? f.account : path === "/v1/prices/price_fixture" ? f.price : null;
+    if (!value) return fetch(url, init);
+    assert.equal(init.method, "GET");
+    assert.equal(init.headers["Stripe-Version"], version);
+    assert.equal(init.headers.Authorization, "Bearer fixture-not-a-key");
+    const response = new Response(JSON.stringify(value));
+    Object.defineProperty(response, "url", { value: url });
+    return response;
+  };
+}
+
+export async function completeReplayAndIndependentVerifierAdvanceOnlyContinuousIntervals(db) {
+  const f = await setup(db);
+  await startCoveredWindow(db, f);
+  const before = f.input.expected;
+  let calls = 0;
+  const verifyHistory = (database, request) => {
+    calls++;
+    assert.equal(database, db);
+    assert.ok(Object.isFrozen(request) && Object.isFrozen(request.coverage));
+    assert.deepEqual(request, {
+      coverage: f.input.expected,
+      from: f.input.from,
+      to: f.input.to,
+      accountId: f.account.id,
+      apiVersions: [version],
+      requestVersion: version,
+      excludeEmployerPayments: false,
+    });
+    return { status: "verified", request };
+  };
+  assert.equal((await windowReplay(db, f, { verifyHistory })).status, "qualified");
+  const first = (await capture(db, false, on)).coverage;
+  assert.deepEqual(first, {
+    ...before,
+    health: "qualified",
+    covered_through: new Date(f.input.to * 1000 - 1).toISOString(),
+    revision: before.revision + 1,
+  });
+  f.input.expected = first;
+  f.input.from = f.input.to - 15;
+  f.input.to += 15;
+  assert.equal((await windowReplay(db, f, { verifyHistory })).status, "qualified");
+  const second = (await capture(db, false, on)).coverage;
+  assert.equal(second.covered_through, new Date(f.input.to * 1000 - 1).toISOString());
+  assert.equal(second.revision, first.revision + 1);
+  assert.equal(calls, 2);
+
+  f.input.expected = second;
+  f.input.from = f.input.to + 1;
+  f.input.to += 15;
+  assert.equal((await windowReplay(db, f, { verifyHistory })).status, "closed");
+  assert.equal(calls, 2, "a gap must never reach the verifier");
+  assert.equal((await capture(db, false, on)).coverage.covered_through, second.covered_through);
+}
+
+export async function coverageVerifierMustAttestExactWindowAndCannotSurviveRotation(db) {
+  const f = await setup(db);
+  await startCoveredWindow(db, f);
+  const copied = (database, request) => ({ status: "verified", request: { ...request } });
+  assert.equal((await windowReplay(db, f, { verifyHistory: copied })).status, "handled_unproven");
+  assert.deepEqual((await capture(db, false, on)).coverage, f.input.expected);
+
+  const verifyHistory = async (database, request) => {
+    const result = await rotate(
+      database,
+      { livemode: false, schemaKey: "synthetic", expected: request.coverage },
+      on,
+    );
+    assert.equal(result.status, "committed");
+    return { status: "verified", request };
+  };
+  assert.equal((await windowReplay(db, f, { verifyHistory })).status, "held");
+  const after = (await capture(db, false, on)).coverage;
+  assert.notEqual(after.epoch, f.input.expected.epoch);
+  assert.equal(after.health, "unproven");
+  assert.equal(after.covered_through, null);
+}
+
+export async function lateCoverageVerificationCannotAdvanceAfterNativeDeadline(db) {
+  const f = await setup(db);
+  await startCoveredWindow(db, f);
+  const verifyHistory = async (database, request) => {
+    f.time += 11000;
+    return { status: "verified", request };
+  };
+  assert.equal((await windowReplay(db, f, { verifyHistory })).status, "held");
+  const current = (await capture(db, false, on)).coverage;
+  assert.equal(current.covered_through, null);
+  assert.notEqual(current.health, "qualified");
+}
+
+export async function boundAccountModeAndKnownCoverageFaultsFailClosed(db) {
+  for (const fault of ["account", "mode", "provider"]) {
+    const f = await setup(db);
+    await startCoveredWindow(db, f);
+    if (fault === "account") f.account.id = "acct_different";
+    if (fault === "mode") f.price.livemode = true;
+    let calls = 0;
+    const verifyHistory = (database, request) => {
+      calls++;
+      return { status: fault === "provider" ? "fault" : "verified", request };
+    };
+    assert.equal((await windowReplay(db, f, { verifyHistory })).status, "closed");
+    assert.equal(calls, fault === "provider" ? 1 : 0);
+    assert.deepEqual((await capture(db, false, on)).coverage, {
+      ...f.input.expected,
+      revision: f.input.expected.revision + 1,
+      health: "closed",
+    });
+  }
+}
