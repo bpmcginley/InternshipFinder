@@ -408,7 +408,7 @@ export async function retirementCanonicalEvidence(db) {
   assert.ok(after.resolved_zero_since > before.resolved_zero_since);
   assert.notEqual(after.evidence_digest, before.evidence_digest);
   assert.equal((await row(db, "topup_reconciliations", f.key)).full_refund, 0); // identical credit flags
-  assert.equal((await retire(db, f, async () => changed)).status, "pending");
+  assert.equal((await retire(db, f, async () => changed)).status, "stale");
   const dated = { ...changed, refunds: changed.refunds.map((r) => ({ ...r, created: 1 })) };
   assert.notEqual(await financialEvidenceDigest(dated), await financialEvidenceDigest(changed));
   assert.equal(await financialEvidenceDigest({ ...dated, created: NaN }), null);
