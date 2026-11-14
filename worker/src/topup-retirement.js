@@ -12,6 +12,9 @@ import {
 } from "./topup-retention.js";
 
 const UTC = "strftime('%Y-%m-%dT%H:%M:%fZ','now')";
+const UTC_MS = "(unixepoch('now')*1000+CAST(substr(strftime('%f','now'),4,3) AS INTEGER))";
+// Hard ceiling from Stripe's Events lookback, not an approved live lag allowance.
+const MAX_COVERAGE_LAG_MS = 30 * 86400000;
 const canonicalTime = (value) =>
   typeof value === "string" &&
   value.length === 24 &&
@@ -23,44 +26,55 @@ const data = (value, key) => {
   return descriptor.value;
 };
 
-// The trusted verifier attests that the exact captured interval remains continuous and
-// current despite provider gaps or database restoration. Its first settlement boundary
-// comes from authoritative provider history, not a purchase date or a reversal snapshot.
-async function firstVerifiedSettlement(verifyHistory, snapshot) {
+// The trusted verifier must justify the configured lag and attest this exact interval
+// against the captured database time. Restore operations must invalidate the epoch before
+// deletion can run. The first settlement boundary comes from authoritative provider history.
+async function verifyRetirementHistory(verifyHistory, snapshot) {
   try {
     const proof = await verifyHistory(snapshot);
     if (
       !proof ||
       ![null, Object.prototype].includes(Object.getPrototypeOf(proof)) ||
-      Reflect.ownKeys(proof).sort().join(",") !== "firstSettledAt,snapshot,status" ||
+      Reflect.ownKeys(proof).sort().join(",") !== "currentThrough,firstSettledAt,snapshot,status" ||
       data(proof, "status") !== "verified" ||
       data(proof, "snapshot") !== snapshot
     )
       return null;
-    const at = data(proof, "firstSettledAt");
-    return canonicalTime(at) &&
-      at >= snapshot.attemptCreated &&
-      at >= snapshot.coverage.startsAt &&
-      at <= snapshot.coverage.coveredThrough &&
-      at <= snapshot.resolvedAt &&
-      at <= snapshot.resolvedZeroSince
-      ? at
-      : null;
+    const firstSettledAt = data(proof, "firstSettledAt"),
+      currentThrough = data(proof, "currentThrough");
+    if (
+      !canonicalTime(firstSettledAt) ||
+      !canonicalTime(currentThrough) ||
+      currentThrough !== snapshot.coverage.coveredThrough ||
+      currentThrough > snapshot.observedAt ||
+      Date.parse(snapshot.observedAt) - Date.parse(currentThrough) > snapshot.maxCoverageLagMs ||
+      firstSettledAt < snapshot.attemptCreated ||
+      firstSettledAt < snapshot.coverage.startsAt ||
+      firstSettledAt > currentThrough ||
+      firstSettledAt > snapshot.resolvedAt ||
+      firstSettledAt > snapshot.resolvedZeroSince
+    )
+      return null;
+    return { firstSettledAt, currentThrough };
   } catch {
     return null;
   }
 }
 
 export async function retireResolvedTopup(db, paymentHash, readFreshEvidence, authority) {
-  let livemode, verifyHistory;
+  let livemode, maxCoverageLagMs, verifyHistory;
   try {
     livemode = data(authority, "livemode");
+    maxCoverageLagMs = data(authority, "maxCoverageLagMs");
     verifyHistory = data(authority, "verifyHistory");
     if (
       typeof paymentHash !== "string" ||
       !/^[a-f0-9]{64}$/.test(paymentHash) ||
       typeof readFreshEvidence !== "function" ||
       typeof livemode !== "boolean" ||
+      !Number.isSafeInteger(maxCoverageLagMs) ||
+      maxCoverageLagMs < 1 ||
+      maxCoverageLagMs > MAX_COVERAGE_LAG_MS ||
       typeof verifyHistory !== "function"
     )
       return { status: "pending" };
@@ -75,7 +89,9 @@ export async function retireResolvedTopup(db, paymentHash, readFreshEvidence, au
         "c.checkout_hash,r.revision,r.loss,r.full_refund,r.hold_ids," +
         "t.resolved_at,t.resolved_zero_since,t.history_proven,t.evidence_digest,t.coverage_epoch," +
         "h.schema_key AS coverage_schema,h.starts_at AS coverage_start," +
-        "h.covered_through,h.revision AS coverage_revision FROM topup_purchases p " +
+        "h.covered_through,h.revision AS coverage_revision," +
+        UTC +
+        " AS observed_at FROM topup_purchases p " +
         "JOIN topup_claims c ON c.payment_hash=p.payment_hash JOIN topup_reconciliations r ON r.payment_hash=p.payment_hash " +
         "JOIN topup_retention t ON t.payment_hash=p.payment_hash " +
         "JOIN topup_checkout_attempts a ON a.checkout_id=p.checkout_id AND a.user_hash=p.user_hash " +
@@ -105,7 +121,8 @@ export async function retireResolvedTopup(db, paymentHash, readFreshEvidence, au
     !canonicalTime(p.resolved_zero_since) ||
     p.resolved_at > p.resolved_zero_since ||
     !p.coverage_epoch ||
-    !Number.isSafeInteger(p.coverage_revision)
+    !Number.isSafeInteger(p.coverage_revision) ||
+    !canonicalTime(p.observed_at)
   )
     return { status: "pending" };
   const [payment, checkout] = await Promise.all([
@@ -204,6 +221,8 @@ export async function retireResolvedTopup(db, paymentHash, readFreshEvidence, au
     resolvedAt: p.resolved_at,
     resolvedZeroSince: p.resolved_zero_since,
     revision: p.revision,
+    observedAt: p.observed_at,
+    maxCoverageLagMs,
     coverage: Object.freeze({
       mode,
       epoch: p.coverage_epoch,
@@ -213,8 +232,9 @@ export async function retireResolvedTopup(db, paymentHash, readFreshEvidence, au
       revision: p.coverage_revision,
     }),
   });
-  const firstSettledAt = await firstVerifiedSettlement(verifyHistory, snapshot);
-  if (!firstSettledAt) return { status: "pending" };
+  const history = await verifyRetirementHistory(verifyHistory, snapshot);
+  if (!history) return { status: "pending" };
+  const { firstSettledAt, currentThrough } = history;
 
   const purchaseTuple =
     "payment_id=? AND checkout_id=? AND user_hash=? AND offer_version=? AND amount=? AND currency=? AND granted=? AND created=?";
@@ -266,9 +286,12 @@ export async function retireResolvedTopup(db, paymentHash, readFreshEvidence, au
           "AND h.covered_through=? AND h.revision=? AND h.health='qualified' " +
           "AND h.starts_at<=? AND a.created<=? AND ?<=t.resolved_at AND ?<=t.resolved_zero_since " +
           "AND h.covered_through>=strftime('%Y-%m-%dT%H:%M:%fZ',t.resolved_zero_since,'+400 days') " +
-          "AND h.covered_through<=" +
+          "AND h.covered_through<=? AND ?<=" +
           UTC +
-          ") " +
+          " " +
+          "AND " +
+          UTC_MS +
+          "-?<=?) " +
           "AND NOT EXISTS(SELECT 1 FROM topup_allocations a JOIN runs u ON u.user_hash=a.user_hash " +
           "AND u.month=a.month AND u.task=a.task AND u.run_id=a.run_id WHERE a.payment_hash=p.payment_hash) " +
           "AND NOT EXISTS(SELECT 1 FROM topup_generation_allocations a JOIN funded_runs f ON f.generation=a.generation " +
@@ -289,12 +312,16 @@ export async function retireResolvedTopup(db, paymentHash, readFreshEvidence, au
         mode,
         p.coverage_schema,
         p.coverage_start,
-        p.covered_through,
+        currentThrough,
         p.coverage_revision,
         firstSettledAt,
         firstSettledAt,
         firstSettledAt,
         firstSettledAt,
+        p.observed_at,
+        p.observed_at,
+        Date.parse(currentThrough),
+        maxCoverageLagMs,
       ),
     // The decisive guard and both deletes use the captured immutable tuples. Cascades
     // remove children, while terminal fingerprints and unrelated account data survive.

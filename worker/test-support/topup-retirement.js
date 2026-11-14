@@ -12,10 +12,12 @@ import { releaseFundedCall } from "../src/funded-run-callbacks.js";
 import { restorePurchasedRun } from "../src/topup-allocation.js";
 import { deleteUser } from "../src/limits.js";
 const epoch = "a".repeat(32);
+const maxCoverageLagMs = 60_000;
 const attested = (snapshot) => ({
   status: "verified",
   snapshot,
   firstSettledAt: "2020-01-03T00:00:00.000Z",
+  currentThrough: snapshot.coverage.coveredThrough,
 });
 async function fixture(db) {
   const id = crypto.randomUUID(),
@@ -100,7 +102,7 @@ async function ready(db, patch = {}) {
   return f;
 }
 const retire = (db, f, reader = async () => f.r, verifyHistory = attested) =>
-  retireResolvedTopup(db, f.key, reader, { livemode: false, verifyHistory });
+  retireResolvedTopup(db, f.key, reader, { livemode: false, maxCoverageLagMs, verifyHistory });
 
 export async function retirementHistory(db) {
   const f = await ready(db);
@@ -656,13 +658,18 @@ export async function retirementRequiresTrustedHistory(db) {
       access++;
       return false;
     },
+    maxCoverageLagMs,
     verifyHistory: verifier,
   };
   assert.equal((await retireResolvedTopup(dormant, f.key, reader, accessor)).status, "pending");
   assert.equal(access, 0);
+  for (const limit of [undefined, 0, -1, 1.5, NaN, "60000", 30 * 86400000 + 1]) {
+    const authority = { livemode: false, maxCoverageLagMs: limit, verifyHistory: verifier };
+    assert.equal((await retireResolvedTopup(dormant, f.key, reader, authority)).status, "pending");
+  }
   assert.equal(storage, 0);
   const operate = (livemode = false) =>
-    retireResolvedTopup(db, f.key, reader, { livemode, verifyHistory: verifier });
+    retireResolvedTopup(db, f.key, reader, { livemode, maxCoverageLagMs, verifyHistory: verifier });
   assert.equal((await operate(true)).status, "pending");
   await db
     .prepare("UPDATE topup_retention SET coverage_epoch=NULL WHERE payment_hash=?")
@@ -691,6 +698,7 @@ export async function retirementRejectsMissingOrMismatchedSettlementAuthority(db
   const badProof = (snapshot) => ({
     status: "verified",
     snapshot,
+    currentThrough: snapshot.coverage.coveredThrough,
     get firstSettledAt() {
       accesses++;
       return attested(snapshot).firstSettledAt;
@@ -706,6 +714,9 @@ export async function retirementRejectsMissingOrMismatchedSettlementAuthority(db
     assert.equal(snapshot.attemptId, f.a.id);
     assert.equal(snapshot.coverage.mode, "test");
     assert.equal(snapshot.coverage.epoch, epoch);
+    assert.equal(snapshot.maxCoverageLagMs, maxCoverageLagMs);
+    assert.equal(new Date(snapshot.observedAt).toISOString(), snapshot.observedAt);
+    assert.ok(snapshot.observedAt >= snapshot.coverage.coveredThrough);
     saved = attested(snapshot);
     return null;
   });
@@ -718,6 +729,8 @@ export async function retirementRejectsMissingOrMismatchedSettlementAuthority(db
     },
     (snapshot) => ({ ...attested(snapshot), status: "restore_uncertain" }),
     (snapshot) => ({ ...attested(snapshot), snapshot: { ...snapshot } }),
+    (snapshot) => ({ ...attested(snapshot), currentThrough: "2020-01-03T00:00:00.000Z" }),
+    (snapshot) => ({ ...attested(snapshot), currentThrough: null }),
     (snapshot) => ({ ...attested(snapshot), firstSettledAt: snapshot.coverage.coveredThrough }),
     (snapshot) => ({ ...attested(snapshot), firstSettledAt: snapshot.coverage.startsAt }),
     (snapshot) => ({ ...attested(snapshot), firstSettledAt: "2020-02-30T00:00:00.000Z" }),
@@ -781,12 +794,48 @@ export async function retirementFencesCoverageChangesAtTheWrite(db) {
     )
     .bind(anchor)
     .run();
-  assert.equal((await retire(db, f)).status, "stale"); // valid interval omits the required 400th day
+  assert.equal((await retire(db, f)).status, "pending"); // interval omits the required 400th day
   await db
     .prepare(
       "UPDATE topup_history_coverage SET covered_through=strftime('%Y-%m-%dT%H:%M:%fZ',?,'+400 days') WHERE mode='test'",
     )
     .bind(anchor)
     .run();
+  assert.equal((await retire(db, f)).status, "pending"); // matured history ending in the past is stale
+  assert.equal((await row(db, "topup_claims", f.key)).state, "granted");
+  await age(db, f.key, 400);
+  await db
+    .prepare(
+      "UPDATE topup_history_coverage SET covered_through=strftime('%Y-%m-%dT%H:%M:%fZ','now','-30 seconds') WHERE mode='test'",
+    )
+    .run();
+  assert.equal((await retire(db, f)).status, "stale"); // fresh enough, but short of the full 400 days
+  await age(db, f.key, 400);
+  assert.equal((await retire(db, f)).status, "retired");
+}
+
+export async function retirementRejectsCoverageThatExpiresAtWrite(db) {
+  const f = await ready(db);
+  let called = false;
+  const delayedDb = {
+    prepare(sql) {
+      // Move only the write's read of the database clock past the accepted lag. The SQL
+      // transaction still uses real storage, bindings and rollback rules.
+      return db.prepare(
+        sql.startsWith("UPDATE topup_claims SET state='retired'")
+          ? sql.replace("unixepoch('now')", "unixepoch('now','+61 seconds')")
+          : sql,
+      );
+    },
+    batch: (statements) => db.batch(statements),
+  };
+  const result = await retire(delayedDb, f, undefined, (snapshot) => {
+    called = true;
+    return attested(snapshot);
+  });
+  assert.equal(called, true);
+  assert.equal(result.status, "stale");
+  assert.equal((await row(db, "topup_claims", f.key)).state, "granted");
+  assert.ok(await row(db, "topup_purchases", f.key));
   assert.equal((await retire(db, f)).status, "retired");
 }

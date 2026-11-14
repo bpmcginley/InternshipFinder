@@ -363,7 +363,7 @@ export async function observationFencesAnAlreadyCapturedRetirement(db) {
       .bind(f.payment.attemptId),
     db
       .prepare(
-        "INSERT INTO topup_history_coverage VALUES('test',?,'fixture','2019-01-01T00:00:00.000Z','2022-01-01T00:00:00.000Z',1,'qualified')",
+        "INSERT INTO topup_history_coverage VALUES('test',?,'fixture','2019-01-01T00:00:00.000Z',strftime('%Y-%m-%dT%H:%M:%fZ','now'),1,'qualified')",
       )
       .bind(epoch),
     db
@@ -379,10 +379,12 @@ export async function observationFencesAnAlreadyCapturedRetirement(db) {
     },
     {
       livemode: false,
+      maxCoverageLagMs: 60_000,
       verifyHistory: (snapshot) => ({
         status: "verified",
         snapshot,
         firstSettledAt: "2019-12-31T12:00:00.000Z",
+        currentThrough: snapshot.coverage.coveredThrough,
       }),
     },
   );
