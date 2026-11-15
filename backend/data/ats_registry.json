@@ -4657,6 +4657,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "fanaticscollectibles": {
+   "name": "Fanatics",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-15"
+  },
   "fanduel": {
    "name": "FanDuel",
    "quant": false,
@@ -15082,6 +15088,13 @@
    "fails": 0,
    "added": "2026-09-18"
   },
+  "cmu|wd115|cmu": {
+   "name": "Carnegie Mellon University",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-15",
+   "sector": "education_research"
+  },
   "cmu|wd115|SEI": {
    "name": "Carnegie Mellon University",
    "quant": false,
@@ -18191,6 +18204,12 @@
    "fails": 0,
    "added": "2026-09-15"
   },
+  "ncratleos|wd1|ext_non_usalteos": {
+   "name": "NCR Atleos",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-15"
+  },
   "ncr|wd1|ext_non_us": {
    "name": "NCR Voyix",
    "quant": false,
@@ -20936,8 +20955,9 @@
   "vst|wd5|vistra_careers": {
    "name": "Vistra",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-11-15"
   },
   "vystarcu|wd1|careers": {
    "name": "VyStar Credit Union",
