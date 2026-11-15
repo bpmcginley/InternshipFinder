@@ -16256,6 +16256,12 @@
    "fails": 0,
    "added": "2026-09-18"
   },
+  "genesys|wd1|2_genesys_jobs": {
+   "name": "Genesys",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-15"
+  },
   "genesys|wd1|Genesys": {
    "name": "Genesys",
    "quant": false,
@@ -18525,6 +18531,13 @@
    "fails": 0,
    "added": "2026-09-18"
   },
+  "oregonstate|wd501|OSU_Careers_Site": {
+   "name": "Oregon State University",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-15",
+   "sector": "education_research"
+  },
   "oregon|wd5|sor_external_career_site": {
    "name": "Oregon State Government",
    "quant": false,
@@ -20131,9 +20144,8 @@
   "tdwilliamson|wd1|TDWCareers": {
    "name": "T.D. Williamson",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-15"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "td|wd3|TD_Bank_Careers": {
    "name": "TD Bank",
@@ -21192,6 +21204,12 @@
    "fails": 0,
    "added": "2026-09-13",
    "sector": "hospitality_sports"
+  },
+  "xboxgaming|wd1|Blizzard_External_Careers": {
+   "name": "Blizzard Entertainment",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-15"
   },
   "xcelenergy|wd1|External": {
    "name": "Xcel Energy",
