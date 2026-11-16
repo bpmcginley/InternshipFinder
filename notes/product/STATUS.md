@@ -15,15 +15,15 @@ Production now runs [#687](https://github.com/bpmcginley/InternshipFinder/pull/6
 `b167fbbf` with migrations through 0035. [#686](https://github.com/bpmcginley/InternshipFinder/pull/686)
 mounted the read-only operator route. The live route returns an empty no-store 401 without a bearer
 and an empty no-store 403 for browser preflight, without CORS authorization. Public configuration
-omits the top-up offer. Scheduled Stripe checks and new sales remain off. All nine checks passed on
+omits the top-up offer. New sales remain off. All nine checks passed on
 the reviewed scheduler head, including 78 focused native Worker tests across related suites. The
 combined clock test exercised employer maintenance and the full configured Stripe request bound.
 
 The live no-charge test verified the $3 USD Checkout and confirmed it was expired and unpaid.
 The signed expiration event initially returned 502 while production lacked the live top-up Price
 configuration. A delivery of the same signed event returned 200 from the production webhook
-after configuration. The temporary previews were removed. Production Stripe recovery and
-scheduled reconciliation are configured. Public checkout remains paused.
+after configuration. The temporary previews were removed. Production Stripe recovery is configured and scheduled reconciliation is enabled. Its first
+production invocation still needs verification. Public checkout remains paused.
 
 The exact Worker release passed 58 focused native tests across settlement, funded spending and
 reconciliation. Worker request and streaming tests passed for the 0.5.9 source release and
@@ -40,10 +40,10 @@ The count below covers the 25 numbered packages in the original Product hand-off
 | --- | --- |
 | Engineering listing cutover | [#329](https://github.com/bpmcginley/InternshipFinder/pull/329) is the last required package. Complete seven clean days of automatic listing delivery, refresh the exact head on current main, review and merge, then verify Tests, Pages, all listing pins and rollback readiness. Earliest observation completion is November 19 at 7:43:05 a.m. Eastern, subject to a continuously clean window. |
 | P-2.1 Follow email | Publish and verify the same-export catalog and archive, wire the site and Worker against trusted pins, and qualify sender policy, preview settings, shared capacity, maintenance cadence, restore and uncertain delivery recovery. Then verify signup, confirmation, digest and unsubscribe on the released path. |
-| P-2.2 One-time top-up | Qualify the actual Stripe account, mode, schema and approved live Price and funded-run configuration. Verify checkout, balance and recovery before enabling sales. Historical coverage and automatic erasure require separate proof under the approved policy. |
+| P-2.2 One-time top-up | Live unpaid Checkout and signed delivery passed. Verify the funded runtime and scheduled reconciliation, then publish disclosures and verify live sales. Historical coverage and automatic erasure require separate proof under the approved policy. |
 | P-2.3 Employer click reporting | After the listing observation, publish annotations only and match the exact export. Verify catalog delivery and current UTC-day maintenance, then qualify Worker intake before browser capture and verify the private aggregate. |
 | P-2.4 Cross-device My List | Implement the approved design after November 24 at 7:26:35 p.m. Eastern. Verify two-device behavior, stale writes, deletion and restore, then coordinate privacy and Worker release. |
-| P-3.1 through P-3.4 Chrome extension | Limit card, review prompt, resume-first setup and practice form source are merged. Bruce reported 0.6.0 submitted with manual publishing selected and asked to defer routine Store review checks. On approval, coordinate manual publication after both refactors, verify the signed version and then publish the install instructions. |
+| P-3.1 through P-3.4 Chrome extension | Limit card, review prompt, resume-first setup and practice form source are merged. Bruce reported 0.6.0 approved with manual publishing selected and asked to defer routine Store review checks. Coordinate manual publication after both refactors, verify the signed version and then publish the install instructions. |
 | P-4.4 Advisor signup | Weekly advisor pages are live. The owner confirmed Tags is disabled and requires a paid upgrade on the current Buttondown plan. The tagged form and matching disclosure remain off. A release requires an owner decision on the paid feature or a revised signup scope, then coordinated publication and rollback verification. |
 
 P-4.1 pilot measurement and the hand-off’s 14-day counter reviews are follow-up on shipped work. The owner’s campaign and subscription choices, distribution announcement, demo clip and private cost inputs remain tracked separately.
