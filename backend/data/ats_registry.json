@@ -15038,9 +15038,8 @@
   "cir|wd108|CIR_External_Career_Site": {
    "name": "Cambridge Investment Research",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-19",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-09-19"
   },
   "cisco|wd5|cisco_careers": {
    "name": "Cisco",
@@ -15057,9 +15056,8 @@
   "cisive|wd108|Cisive": {
    "name": "Cisive",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "citjpl|wd5|Jobs": {
    "name": "NASA Jet Propulsion Laboratory",
@@ -15510,9 +15508,8 @@
   "deezee|wd108|DeeZee_Careers": {
    "name": "Dee Zee",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "deluxe|wd5|USA_CAN": {
    "name": "Deluxe",
@@ -15535,9 +15532,8 @@
   "desjardins|wd10|Desjardins": {
    "name": "Desjardins Group",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "devonenergy|wd5.myworkdaysite.com|Careers": {
    "name": "Devon Energy",
@@ -18967,9 +18963,8 @@
   "plusgrade|wd10|Plusgrade_External_Site": {
    "name": "Plusgrade",
    "quant": false,
-   "fails": 1,
-   "added": "2026-11-12",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-11-12"
   },
   "pnc|wd5|External": {
    "name": "PNC Financial Services",
