@@ -2,6 +2,7 @@ import { env } from "cloudflare:workers";
 import { applyD1Migrations } from "cloudflare:test";
 import { beforeEach, expect, it } from "vitest";
 import { runTopupReconciliationScheduled as run } from "../src/topup-reconciliation-scheduled.js";
+import { createTopupReconciliationStorage } from "../src/topup-reconciliation-storage.js";
 import { captureTopupSettlement, settleFirstTopup } from "../src/topup-first-settlement.js";
 import { deleteUser } from "../src/limits.js";
 import { attempt, session } from "../test-support/topup-stripe.js";
@@ -28,6 +29,8 @@ beforeEach(async () => {
       "topup_claims",
       "topup_checkout_attempts",
       "topup_history_coverage",
+      "topup_reconciliation_cursor",
+      "topup_reconciliation_observations",
       "forget",
     ].map((table) => db.prepare(`DELETE FROM ${table}`)),
   );
@@ -307,5 +310,182 @@ it("overlapping observations cannot acquire the same purchase cursor", async () 
     { status: "complete", attempted: 1, applied: 1, pending: 0, requests: 9 },
   ]);
   expect(await cursor.read(false)).toEqual({ after: p.key, revision: 1 });
+  expect(await balance(p)).toEqual({ available: 0, held: 25 });
+});
+
+const storage = (bindings = db) => createTopupReconciliationStorage(bindings, policy.deadlineMs);
+const marker = (p) =>
+  db
+    .prepare("SELECT * FROM topup_reconciliation_observations WHERE payment_hash=?")
+    .bind(p.key)
+    .first();
+
+it("the durable mode lease prevents another pass wrapping during an admitted Stripe read", async () => {
+  const p = await purchase(1);
+  const primary = context([p], { cursor: storage() });
+  let unblock, started;
+  const blocked = new Promise((resolve) => {
+    unblock = resolve;
+  });
+  const called = new Promise((resolve) => {
+    started = resolve;
+  });
+  let entered = false;
+  const originalFetch = primary.fetch;
+  primary.fetch = async (...args) => {
+    if (!entered) {
+      entered = true;
+      started();
+      await blocked;
+    }
+    return originalFetch(...args);
+  };
+  const first = run(cron, policy, primary);
+  await Promise.race([called, first]);
+  try {
+    expect(entered).toBe(true);
+    expect((await marker(p)).outcome).toBe("pending");
+    expect(await run(cron, policy, context([p], { cursor: storage() }))).toEqual({
+      status: "held",
+      attempted: 0,
+      applied: 0,
+      pending: 0,
+      requests: 0,
+    });
+    expect((await marker(p)).reservation_revision).toBe(1);
+  } finally {
+    unblock();
+  }
+  expect(await first).toMatchObject({ status: "complete", applied: 1, requests: 9 });
+  expect(await marker(p)).toMatchObject({
+    mode: "test",
+    reservation_revision: 1,
+    outcome: "completed",
+    last_completed_at_ms: expect.any(Number),
+    last_gap_at_ms: null,
+  });
+  expect(await run(cron, policy, context([p], { cursor: storage() }))).toMatchObject({
+    status: "wrapped",
+    requests: 0,
+  });
+  expect(await balance(p)).toEqual({ available: 0, held: 25 });
+});
+
+it("a missed observation and an interrupted reservation stay visible after successful refresh", async () => {
+  const p = await purchase(1);
+  expect(await run(cron, policy, context([], { cursor: storage() }))).toMatchObject({
+    status: "complete",
+    pending: 1,
+    requests: 1,
+  });
+  const missed = await marker(p);
+  expect(missed).toMatchObject({
+    outcome: "missed",
+    last_gap_at_ms: expect.any(Number),
+    last_completed_at_ms: null,
+  });
+  await run(cron, policy, context([], { cursor: storage() })); // bounded wrap
+  const interrupted = storage();
+  const state = await interrupted.read(false);
+  expect(
+    await interrupted.advance(false, state, { after: p.key, revision: state.revision + 1 }),
+  ).toBeTruthy();
+  expect((await marker(p)).outcome).toBe("pending");
+  await db
+    .prepare("UPDATE topup_reconciliation_cursor SET lease_until_ms=0 WHERE mode='test'")
+    .run();
+  expect(await interrupted.guard(false)).toBe(false);
+  expect(
+    await interrupted.finish(false, { after: p.key, revision: state.revision + 1 }, 2),
+  ).toBeNull();
+  await run(cron, policy, context([], { cursor: storage() })); // bounded wrap
+  expect(await run(cron, policy, context([p], { cursor: storage() }))).toMatchObject({
+    status: "complete",
+    applied: 1,
+    requests: 9,
+  });
+  const complete = await marker(p);
+  expect(complete.outcome).toBe("completed");
+  expect(complete.last_gap_at_ms).toBeGreaterThanOrEqual(missed.last_gap_at_ms);
+  expect(complete.last_completed_at_ms).toBeGreaterThanOrEqual(complete.last_gap_at_ms);
+  await deleteUser(db, p.a.user_hash);
+  expect(await marker(p)).toBeNull();
+});
+
+it("the expired lease rejects the financial transaction even after an earlier positive owner check", async () => {
+  const p = await purchase(1);
+  let injectExpiry = false;
+  const port = storage({
+    prepare: (sql) => db.prepare(sql),
+    batch: async (statements) => {
+      if (injectExpiry) {
+        await db
+          .prepare("UPDATE topup_reconciliation_cursor SET lease_until_ms=0 WHERE mode='test'")
+          .run();
+      }
+      return db.batch(statements);
+    },
+  });
+  const before = await port.read(false);
+  const reserved = await port.advance(false, before, {
+    after: p.key,
+    revision: before.revision + 1,
+  });
+  expect(await port.guard(false)).toBe(true);
+  injectExpiry = true;
+  await expect(
+    port.write(false, [
+      db.prepare("UPDATE topup_purchases SET available=0,held=25 WHERE payment_hash=?").bind(p.key),
+    ]),
+  ).rejects.toThrow();
+  expect(await balance(p)).toEqual({ available: 25, held: 0 });
+  expect(await port.finish(false, reserved, 1)).toBeNull();
+});
+
+it("mixed-mode rows never create an observation marker for the other account mode", async () => {
+  const p = await purchase(1, true);
+  expect(await run(cron, policy, context([p], { cursor: storage() }))).toMatchObject({
+    status: "complete",
+    pending: 1,
+    requests: 0,
+  });
+  expect(await marker(p)).toBeNull();
+  expect(
+    await run(cron, { ...policy, livemode: true }, context([p], { cursor: storage() })),
+  ).toMatchObject({
+    status: "complete",
+    applied: 1,
+    requests: 9,
+  });
+  expect(await marker(p)).toMatchObject({ mode: "live", outcome: "completed" });
+});
+
+it("a newer reconciliation revision leaves a missed marker after a prior write acknowledgment", async () => {
+  const p = await purchase(1);
+  const port = storage();
+  const gated = {
+    ...port,
+    async finish(live, reservation, appliedRevision) {
+      expect(appliedRevision).toBe(2);
+      // Model the independently verified webhook winning between financial acknowledgement
+      // and the scheduled marker write.
+      await db
+        .prepare("UPDATE topup_reconciliations SET revision=3 WHERE payment_hash=? AND revision=?")
+        .bind(p.key, appliedRevision)
+        .run();
+      return port.finish(live, reservation, appliedRevision);
+    },
+  };
+  expect(await run(cron, policy, context([p], { cursor: gated }))).toMatchObject({
+    status: "complete",
+    attempted: 1,
+    applied: 0,
+    pending: 1,
+  });
+  expect(await marker(p)).toMatchObject({
+    outcome: "missed",
+    last_completed_at_ms: null,
+    last_gap_at_ms: expect.any(Number),
+  });
   expect(await balance(p)).toEqual({ available: 0, held: 25 });
 });
