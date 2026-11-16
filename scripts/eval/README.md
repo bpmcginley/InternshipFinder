@@ -127,6 +127,27 @@ providers is kept in `bench-spend.json`, and every call is refused once the tota
 
 Results and the verdict: [haiku-vs-flash.md](haiku-vs-flash.md).
 
+## Exact choice matching
+
+Run the offline qualification with fictional fields and option labels.
+
+```powershell
+node scripts/eval/field_match.mjs
+node --test scripts/eval/field_match.test.mjs
+```
+
+The candidate request uses the Worker's existing Gemini 3.5 Flash-Lite `field_match` settings.
+It sends only the confirmed value and enabled option labels and expects a single index. An
+accepted reply needs independent proof of one exact label match against the original and fresh
+option lists. A missing, inaccurate, or stale result goes back to the existing Auto-Apply flow.
+
+The deterministic comparator makes the same decision with zero provider calls. An exact match
+requires the same local comparison in both paths, so adding a Flash-Lite request can only add
+cost and a network round trip. The dry run measures fixture eligibility and fallback parity.
+A wider semantic matching candidate needs a separate benchmark with verified field readback,
+unchanged fallback outcomes, and lower cost per completed application at equal or better median
+and 95th-percentile completion times.
+
 ## Gemini 4 Hydrogen and the compact Auto-Apply workflow
 
 This pilot sends 12 fictional form snapshots through the extension's request builder and the Worker's
