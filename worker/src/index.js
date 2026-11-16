@@ -27,6 +27,7 @@ import { runFollowArchiveDeployment } from "./follow-archive-deployment.js";
 import { followTokenEndpoints } from "./follow-token-endpoint.js";
 import { followUnsubscribeEndpoint } from "./follow-unsubscribe-endpoint.js";
 import { followUnsubscribePreview } from "./follow-unsubscribe-preview.js";
+import { topupManualReviewHttp } from "./topup-manual-review-http.js";
 import { topupCheckoutResponse, topupOfferResponse } from "./topup-checkout-http.js";
 import { canRecoverAttachedTopup } from "./topup-attached-recovery.js";
 import { topupRecoveryResponse } from "./topup-recovery-http.js";
@@ -699,6 +700,7 @@ const safeRouteHandlers = {
 
   // Bruce's terminal (scripts/placement.mjs orders, pilot-code): the same admin rules as the placements.
   // Not tied to ordersOn, so pilot codes can be made before buying opens.
+  "POST /admin/topup-review": topupManualReviewHttp,
   "GET /admin/orders": async ({ request, db, env }) => {
     await requireAdmin(request, env);
     return json(await listOrders(db));
@@ -764,6 +766,9 @@ async function route(request, env, ctx, d) {
 
 // deps (tests only): { fetch, now: () => Date, config, followSignupRelease }
 export async function handle(request, env, ctx, deps = {}) {
+  // The terminal-only route handles its own method and origin policy before generic CORS.
+  if (new URL(request.url).pathname.replace(/\/+$/, "") === "/admin/topup-review")
+    return exactRoutes.get("POST /admin/topup-review")({ request, env });
   const d = { fetch: (...args) => fetch(...args), now: () => new Date(), config: CONFIG, ...deps };
   let res;
   try {

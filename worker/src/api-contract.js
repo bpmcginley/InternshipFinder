@@ -363,6 +363,14 @@ export const ROUTES = Object.freeze([
     "orders",
   ),
   route(
+    "POST",
+    "/admin/topup-review",
+    "admin",
+    "Exact path without query. JSON [null] or [continuation cursor], up to 128 bytes.",
+    "Private no-store JSON {candidates, next}; 404 when disabled. No CORS or mutation.",
+    "TOPUP_MANUAL_REVIEW_ENABLED",
+  ),
+  route(
     "GET",
     "/admin/orders",
     "admin",
@@ -390,7 +398,7 @@ export const SPECIAL_ROUTES = Object.freeze([
     "OPTIONS",
     "*",
     "public",
-    "Any path; handled before routing",
+    "Handled before normal routing, except the terminal top-up review path",
     "204, no body; allowed origins receive CORS headers",
   ),
   route(

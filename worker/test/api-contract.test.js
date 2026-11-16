@@ -171,6 +171,7 @@ test("offline routes match the original capture and signed-in cache policy", asy
     "GET /billing/topup/offer",
     "POST /billing/topup/checkout",
     "POST /billing/topup/recover",
+    "POST /admin/topup-review",
   ]);
   assert.equal(exactCases.length + added.size, ROUTES.length);
   assert.deepEqual(
