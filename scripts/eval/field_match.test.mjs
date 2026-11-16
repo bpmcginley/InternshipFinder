@@ -3,7 +3,7 @@ import test from "node:test";
 import { CONFIG } from "../../worker/src/config.js";
 import { acceptLiteReply, buildLiteRequest, exactOption, fixtures } from "./field_match.mjs";
 
-test("rules and validated Lite agree across exact, ambiguous and unknown fixture outcomes", () => {
+test("rules and validated Lite choose the same exact labels or simulated fallback", () => {
   const existingFlashFlow = Symbol("existing Auto-Apply flow");
   const choose = (field, index) =>
     index === null ? existingFlashFlow : field.options[index].label;
@@ -18,7 +18,8 @@ test("rules and validated Lite agree across exact, ambiguous and unknown fixture
 
 test("candidate sends only the confirmed value and enabled option labels through field_match", () => {
   const field = {
-    confirmed: true,
+    fieldRef: "city",
+    confirmedForField: true,
     value: "Boston",
     options: [
       { label: "Please select" },
@@ -40,6 +41,12 @@ test("candidate sends only the confirmed value and enabled option labels through
   assert.deepEqual(request.generationConfig.thinkingConfig, { thinkingLevel: "minimal" });
   assert.equal(request.generationConfig.maxOutputTokens, 32);
   assert.equal(request.generationConfig.responseMimeType, "application/json");
+  assert.deepEqual(request.generationConfig.responseJsonSchema, {
+    type: "object",
+    properties: { index: { type: "integer", minimum: -1, maximum: 3 } },
+    required: ["index"],
+    additionalProperties: false,
+  });
   assert.equal(request.tools, undefined);
 });
 
@@ -62,7 +69,8 @@ test("refuses wrong, missing and malformed output instead of returning a field c
 test("refuses stale evidence before an option could be selected", () => {
   const field = fixtures[0];
   const fresh = [
-    { ...field, confirmed: false },
+    { ...field, confirmedForField: false },
+    { ...field, fieldRef: "different field with the same options" },
     { ...field, value: "Connecticut" },
     { ...field, options: field.options.toReversed() },
     { ...field, options: [...field.options, { label: "Maine" }] },

@@ -10,8 +10,16 @@ const isPlaceholder = (label) => {
   );
 };
 
-function matchOptions({ value, confirmed, options }) {
-  if (confirmed !== true || typeof value !== "string" || !normalized(value)) return [];
+// The caller supplies a confirmed fact already mapped to this exact field.
+function matchOptions({ fieldRef, value, confirmedForField, options }) {
+  if (
+    typeof fieldRef !== "string" ||
+    !fieldRef ||
+    confirmedForField !== true ||
+    typeof value !== "string" ||
+    !normalized(value)
+  )
+    return [];
   return options.flatMap(({ label, disabled }, index) => {
     const text = normalized(label);
     return !disabled && text && !isPlaceholder(text) ? [{ index, label, text }] : [];
@@ -63,7 +71,8 @@ export function acceptLiteReply(text, requested, current) {
   const exact = exactOption(requested);
   if (
     exact === null ||
-    current.confirmed !== true ||
+    current.confirmedForField !== true ||
+    requested.fieldRef !== current.fieldRef ||
     requested.value !== current.value ||
     requested.options.length !== current.options.length ||
     requested.options.some(
@@ -142,11 +151,18 @@ export const fixtures = [
     name: "unconfirmed answer",
     value: "Boston",
     options: choices("Boston"),
-    confirmed: false,
+    confirmedForField: false,
+    expected: null,
+  },
+  {
+    name: "yes from a different question",
+    value: "Yes",
+    options: choices("Yes", "No"),
+    confirmedForField: false,
     expected: null,
   },
   { name: "blank answer", value: " ", options: choices("Boston"), expected: null },
-].map((field) => ({ confirmed: true, ...field }));
+].map((field) => ({ fieldRef: field.name, confirmedForField: true, ...field }));
 
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
   const checks = fixtures.map((field) => {
@@ -166,7 +182,7 @@ if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) 
         fixtures: fixtures.length,
         passed: checks.filter((check) => check.pass && check.replyParses).length,
         exactLocal: covered,
-        existingFallback: fixtures.length - covered,
+        simulatedFallback: fixtures.length - covered,
         localProviderCalls: 0,
         liteCallsToReturnSameExactMatches: covered,
         liteQualifies: false,

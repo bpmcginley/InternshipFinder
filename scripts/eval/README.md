@@ -136,14 +136,17 @@ node scripts/eval/field_match.mjs
 node --test scripts/eval/field_match.test.mjs
 ```
 
-The candidate request uses the Worker's existing Gemini 3.5 Flash-Lite `field_match` settings.
-It sends only the confirmed value and enabled option labels and expects a single index. An
-accepted reply needs independent proof of one exact label match against the original and fresh
-option lists. A missing, inaccurate, or stale result goes back to the existing Auto-Apply flow.
+The candidate uses the Worker's existing Gemini 3.5 Flash-Lite `field_match` settings. It
+requires a confirmed fact already mapped to the exact field. A Yes or No value alone gives no
+evidence about which question it answers. The request contains the value and enabled option labels
+and expects a single index. An accepted reply needs a unique exact match in the original and fresh
+option lists for the same field. A missing, inaccurate, or stale result selects the simulated
+Auto-Apply fallback.
 
 The deterministic comparator makes the same decision with zero provider calls. An exact match
 requires the same local comparison in both paths, so adding a Flash-Lite request can only add
-cost and a network round trip. The dry run measures fixture eligibility and fallback parity.
+cost and a network round trip. The dry run measures fixture eligibility and simulated fallback
+selection.
 A wider semantic matching candidate needs a separate benchmark with verified field readback,
 unchanged fallback outcomes, and lower cost per completed application at equal or better median
 and 95th-percentile completion times.
