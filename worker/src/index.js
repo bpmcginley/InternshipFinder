@@ -28,6 +28,8 @@ import { followTokenEndpoints } from "./follow-token-endpoint.js";
 import { followUnsubscribeEndpoint } from "./follow-unsubscribe-endpoint.js";
 import { followUnsubscribePreview } from "./follow-unsubscribe-preview.js";
 import { topupManualReviewHttp } from "./topup-manual-review-http.js";
+import { runTopupReconciliationScheduled } from "./topup-reconciliation-scheduled.js";
+import { createTopupReconciliationStorage } from "./topup-reconciliation-storage.js";
 import { topupCheckoutResponse, topupOfferResponse } from "./topup-checkout-http.js";
 import { canRecoverAttachedTopup } from "./topup-attached-recovery.js";
 import { topupRecoveryResponse } from "./topup-recovery-http.js";
@@ -861,10 +863,14 @@ function scheduleFollowDigest(event, ctx, deps) {
     }
     const captured = Object.fromEntries(Object.entries(descriptors).map(([k, d]) => [k, d.value]));
     ctx.waitUntil(runFollowDigestRelease(captured));
+    return true;
   } catch {
     // No sensitive error, retry, provider fallback or second scheduled job.
   }
 }
+
+const TOPUP_RECONCILIATION_CRON = "12,42 * * * *";
+const TOPUP_RECONCILIATION_DEADLINE_MS = 30_000;
 
 export function handleScheduled(event, env, ctx, deps = {}) {
     // The half-hourly trigger is the repository's clock (clock.js); the daily one is the cleanup.
@@ -937,7 +943,31 @@ export function handleScheduled(event, env, ctx, deps = {}) {
         );
         return;
       }
-      scheduleFollowDigest(event, ctx, deps);
+      if (scheduleFollowDigest(event, ctx, deps)) return;
+      if (event?.cron !== TOPUP_RECONCILIATION_CRON ||
+          env.TOPUP_RECONCILIATION_ENABLED !== "1") return;
+      const mode = env.STRIPE_TOPUP_MODE;
+      if (mode !== "test" && mode !== "live") return;
+      const db = env.DB;
+      const run = runTopupReconciliationScheduled(
+        event.cron,
+        {
+          enabled: true,
+          cron: TOPUP_RECONCILIATION_CRON,
+          deadlineMs: TOPUP_RECONCILIATION_DEADLINE_MS,
+          limit: 1,
+          livemode: mode === "live",
+          maxRequests: 21,
+        },
+        {
+          cursor: createTopupReconciliationStorage(db, TOPUP_RECONCILIATION_DEADLINE_MS),
+          db,
+          env,
+          fetch,
+          monotonicNow: () => performance.now(),
+        },
+      );
+      ctx.waitUntil(run.then(({ status }) => console.info("top-up reconciliation", status)));
       return;
     }
     const now = new Date();

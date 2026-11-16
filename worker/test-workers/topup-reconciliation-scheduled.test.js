@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 import { applyD1Migrations } from "cloudflare:test";
-import { beforeEach, expect, it } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import worker from "../src/index.js";
 import { runTopupReconciliationScheduled as run } from "../src/topup-reconciliation-scheduled.js";
 import { createTopupReconciliationStorage } from "../src/topup-reconciliation-storage.js";
 import { captureTopupSettlement, settleFirstTopup } from "../src/topup-first-settlement.js";
@@ -57,6 +58,11 @@ beforeEach(async () => {
         .bind(next.after, next.revision, mode(live), expected.after, expected.revision)
         .first(),
   };
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 async function purchase(n, livemode = false) {
@@ -192,6 +198,79 @@ function context(purchases = [], overrides = {}) {
 }
 const balance = (p) =>
   db.prepare("SELECT available,held FROM topup_purchases WHERE payment_hash=?").bind(p.key).first();
+
+const workerCron = "12,42 * * * *";
+function workerSchedule(bindings, eventCron = workerCron) {
+  const pending = [];
+  worker.scheduled({ cron: eventCron, scheduledTime: 0 }, bindings, {
+    waitUntil: (work) => pending.push(work),
+  });
+  return Promise.all(pending);
+}
+
+it("the default Worker entry requires the exact trigger, enable flag and Stripe mode", async () => {
+  const unopened = (settings) => ({
+    ...settings,
+    get DB() {
+      throw Error("unexpected storage");
+    },
+    get STRIPE_SECRET_KEY() {
+      throw Error("unexpected credential");
+    },
+  });
+  expect(await workerSchedule(unopened())).toEqual([]);
+  expect(await workerSchedule(unopened({ TOPUP_RECONCILIATION_ENABLED: "true" }))).toEqual([]);
+  const enabled = { TOPUP_RECONCILIATION_ENABLED: "1" };
+  expect(
+    await workerSchedule(unopened({ ...enabled, STRIPE_TOPUP_MODE: "test" }), "13,43 * * *"),
+  ).toEqual([]);
+  expect(await workerSchedule(unopened(enabled))).toEqual([]);
+  expect(await workerSchedule(unopened({ ...enabled, STRIPE_TOPUP_MODE: "LIVE" }))).toEqual([]);
+});
+
+it("a configured Follow trigger retains precedence over the top-up trigger", async () => {
+  for (const selector of ["FOLLOW_MAINTENANCE_CRON", "FOLLOW_LINKS_CRON", "FOLLOW_ARCHIVE_CRON"]) {
+    const bindings = {
+      TOPUP_RECONCILIATION_ENABLED: "1",
+      STRIPE_TOPUP_MODE: "test",
+      [selector]: workerCron,
+      get DB() {
+        throw Error("unexpected top-up storage");
+      },
+    };
+    expect(await workerSchedule(bindings)).toEqual([]);
+  }
+});
+
+it("the enabled Worker reconciles one purchase without retiring it or altering history", async () => {
+  const items = [await purchase(1, true), await purchase(2, true)].sort((a, b) =>
+    a.key.localeCompare(b.key),
+  );
+  const [first, second] = items;
+  const verifiedFetch = vi.fn(context(items).fetch);
+  vi.stubGlobal("fetch", verifiedFetch);
+  const log = vi.spyOn(console, "info").mockImplementation(() => {});
+  const bindings = {
+    DB: db,
+    ...context().env,
+    STRIPE_TOPUP_MODE: "live",
+    TOPUP_RECONCILIATION_ENABLED: "1",
+    TOPUPS_ENABLED: "0",
+  };
+  const history = () => db.prepare("SELECT * FROM topup_history_coverage").all();
+  const before = (await history()).results;
+  expect(await workerSchedule(bindings)).toEqual([undefined]);
+  expect(verifiedFetch).toHaveBeenCalledTimes(9);
+  expect(log.mock.calls).toEqual([["top-up reconciliation", "complete"]]);
+  expect(await balance(first)).toEqual({ available: 0, held: 25 });
+  expect(await balance(second)).toEqual({ available: 25, held: 0 });
+  expect(await marker(first)).toMatchObject({ mode: "live", outcome: "completed" });
+  expect(await marker(second)).toBeNull();
+  expect((await history()).results).toEqual(before);
+  expect(
+    await db.prepare("SELECT state FROM topup_claims WHERE payment_hash=?").bind(first.key).first(),
+  ).toEqual({ state: "granted" });
+});
 
 it("default off, unmatched and malformed selectors do not open context or storage", async () => {
   const unopened = Object.defineProperty({}, "db", {
