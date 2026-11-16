@@ -863,13 +863,11 @@ function scheduleFollowDigest(event, ctx, deps) {
     }
     const captured = Object.fromEntries(Object.entries(descriptors).map(([k, d]) => [k, d.value]));
     ctx.waitUntil(runFollowDigestRelease(captured));
-    return true;
   } catch {
     // No sensitive error, retry, provider fallback or second scheduled job.
   }
 }
 
-const TOPUP_RECONCILIATION_CRON = "12,42 * * * *";
 const TOPUP_RECONCILIATION_DEADLINE_MS = 30_000;
 
 export function handleScheduled(event, env, ctx, deps = {}) {
@@ -879,6 +877,29 @@ export function handleScheduled(event, env, ctx, deps = {}) {
       if (env.EMPLOYER_POSTING_MAINTENANCE_ENABLED === "1") {
         ctx.waitUntil(maintainEmployerPostings(env.DB, { enabled: true }));
       }
+      if (env.TOPUP_RECONCILIATION_ENABLED !== "1") return;
+      const mode = env.STRIPE_TOPUP_MODE;
+      if (mode !== "test" && mode !== "live") return;
+      const db = env.DB;
+      const run = runTopupReconciliationScheduled(
+        event.cron,
+        {
+          enabled: true,
+          cron: CLOCK_CRON,
+          deadlineMs: TOPUP_RECONCILIATION_DEADLINE_MS,
+          limit: 1,
+          livemode: mode === "live",
+          maxRequests: 21,
+        },
+        {
+          cursor: createTopupReconciliationStorage(db, TOPUP_RECONCILIATION_DEADLINE_MS),
+          db,
+          env,
+          fetch,
+          monotonicNow: () => performance.now(),
+        },
+      );
+      ctx.waitUntil(run.then(({ status }) => console.info("top-up reconciliation", status)));
       return;
     }
     if (event && event.cron === STUDENT_BILLING_CRON) {
@@ -943,31 +964,7 @@ export function handleScheduled(event, env, ctx, deps = {}) {
         );
         return;
       }
-      if (scheduleFollowDigest(event, ctx, deps)) return;
-      if (event?.cron !== TOPUP_RECONCILIATION_CRON ||
-          env.TOPUP_RECONCILIATION_ENABLED !== "1") return;
-      const mode = env.STRIPE_TOPUP_MODE;
-      if (mode !== "test" && mode !== "live") return;
-      const db = env.DB;
-      const run = runTopupReconciliationScheduled(
-        event.cron,
-        {
-          enabled: true,
-          cron: TOPUP_RECONCILIATION_CRON,
-          deadlineMs: TOPUP_RECONCILIATION_DEADLINE_MS,
-          limit: 1,
-          livemode: mode === "live",
-          maxRequests: 21,
-        },
-        {
-          cursor: createTopupReconciliationStorage(db, TOPUP_RECONCILIATION_DEADLINE_MS),
-          db,
-          env,
-          fetch,
-          monotonicNow: () => performance.now(),
-        },
-      );
-      ctx.waitUntil(run.then(({ status }) => console.info("top-up reconciliation", status)));
+      scheduleFollowDigest(event, ctx, deps);
       return;
     }
     const now = new Date();

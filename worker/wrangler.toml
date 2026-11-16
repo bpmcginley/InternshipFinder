@@ -16,8 +16,7 @@ enabled = false
 # 2026-10-23: reports get a separate small D1 budget after daily financial cleanup. Revert: omit 07:47.
 # 2026-10-23: student billing recovery gets a separate bounded request budget at 07:27 UTC.
 # was: recovery shared financial cleanup. Revert: remove 07:27 and its billing handler together.
-# The separate top-up check exits immediately until its explicit flag below is enabled.
-crons = ["17 7 * * *", "4,34 * * * *", "47 7 * * *", "27 7 * * *", "12,42 * * * *"]
+crons = ["17 7 * * *", "4,34 * * * *", "47 7 * * *", "27 7 * * *"]
 
 [[d1_databases]]
 binding = "DB"
@@ -82,7 +81,8 @@ GLOBAL_RPM = "120"
 # The paid plans are dormant until this is "1" and the Stripe secrets are set. While it is off,
 # nothing about paying is shown and the billing routes answer 404.
 PAYMENTS_ENABLED = "1"
-# Scheduled top-up checks use migration 0035 and the explicitly selected STRIPE_TOPUP_MODE.
+# The repository clock also runs top-up reconciliation when enabled. It requires migration 0035
+# and an explicitly selected STRIPE_TOPUP_MODE.
 TOPUP_RECONCILIATION_ENABLED = "0"
 # Stripe Managed Payments: Stripe is the merchant of record, so it charges and remits sales tax or
 # VAT for the student's country and handles disputes. Needs Managed Payments activated at
