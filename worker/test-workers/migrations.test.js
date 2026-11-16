@@ -45,6 +45,7 @@ const migrationNames = [
   "0032_follow_finalize_attempt_cost.sql",
   "0033_follow_digest_expiry_candidates.sql",
   "0034_topup_purchase_coverage_epoch.sql",
+  "0035_topup_reconciliation_schedule.sql",
 ];
 const legacySql = [...env.TEST_SCHEMA_SQL, ...env.TEST_EXTRA_SCHEMA_SQL];
 const databases = [env.LEGACY_DB, env.MIGRATION_DB];
@@ -72,6 +73,8 @@ beforeEach(async () => {
       // tables explicitly so their migrations replay against the actual prior shape.
       [
         "follow_delivery_owner",
+        "topup_reconciliation_observations",
+        "topup_reconciliation_cursor",
         "topup_history_coverage",
         "topup_history_receipts",
         "follow_management_outbox",
@@ -116,7 +119,7 @@ it("migrations create the complete legacy schema, including constraints and trig
   await initialize();
   const expected = await schema(env.LEGACY_DB);
   expect(await schema(env.MIGRATION_DB)).toEqual(expected);
-  expect(expected.objects.filter((row) => row.type === "table")).toHaveLength(68);
+  expect(expected.objects.filter((row) => row.type === "table")).toHaveLength(70);
   expect(expected.objects.filter((row) => row.type === "index")).toHaveLength(41);
   expect(expected.objects.filter((row) => row.type === "trigger")).toHaveLength(20);
   expect(expected.objects.filter((row) => row.type === "view")).toHaveLength(4);
