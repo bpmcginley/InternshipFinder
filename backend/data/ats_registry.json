@@ -13292,10 +13292,9 @@
   "acushnetgolf|wd12|ACU": {
    "name": "Acushnet Holdings",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-13",
-   "sector": "hospitality_sports",
-   "last_fail": "2026-11-16"
+   "sector": "hospitality_sports"
   },
   "acxiomllc|wd5|AcxiomUSA": {
    "name": "Acxiom",
@@ -13540,9 +13539,8 @@
   "alteryx|wd108|AlteryxCareers": {
    "name": "Alteryx",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "amainc|wd12|ama_careers": {
    "name": "Analytical Mechanics Associates",
@@ -13560,9 +13558,8 @@
   "ambarella|wd108|ambarella": {
    "name": "Ambarella",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "amcor|wd5|amcor_external_career_site": {
    "name": "Amcor",
@@ -13664,9 +13661,8 @@
   "ancestry|wd501|Careers": {
    "name": "Ancestry",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "andersonsinc|wd1|TheAndersonsCareers": {
    "name": "The Andersons",
@@ -13707,9 +13703,8 @@
   "applied|wd501|applied": {
    "name": "Applied Fluid Power",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "aptiv|wd5|aptiv_careers": {
    "name": "Aptiv",
@@ -14569,9 +14564,8 @@
   "buildertrend|wd108|External_Careers": {
    "name": "Buildertrend",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "burlington|wd5|BurlingtonCareers": {
    "name": "Burlington Stores",
@@ -14928,9 +14922,8 @@
   "chathamfinancial|wd501|ChathamFinancial": {
    "name": "Chatham Financial",
    "quant": false,
-   "fails": 1,
-   "added": "2026-11-12",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-11-12"
   },
   "chemours|wd103|Chemours": {
    "name": "Chemours",
@@ -16526,9 +16519,8 @@
   "greatamerica|wd12|greatamericacareers": {
    "name": "GreatAmerica Financial Services",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "greenheckgroup|wd5|external": {
    "name": "Greenheck Group",
@@ -16640,10 +16632,9 @@
   "habitat|wd12|External": {
    "name": "Habitat for Humanity",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-15",
-   "sector": "nonprofit",
-   "last_fail": "2026-11-16"
+   "sector": "nonprofit"
   },
   "haier|wd3|ge_appliances": {
    "name": "GE Appliances",
@@ -17759,9 +17750,8 @@
   "marmon|wd501|Marmon_Careers": {
    "name": "Marmon Holdings",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "mars|wd3|external": {
    "name": "Mars",
@@ -18144,10 +18134,9 @@
   "msk|wd108|MSKCC_Careers_Primary": {
    "name": "Memorial Sloan Kettering",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-15",
-   "sector": "health",
-   "last_fail": "2026-11-16"
+   "sector": "health"
   },
   "mtb|wd5|Campus": {
    "name": "M&T Bank",
@@ -19349,9 +19338,8 @@
   "risepoint|wd503|Risepoint": {
    "name": "Risepoint",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-19",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-09-19"
   },
   "ritehite|wd12|RHH": {
    "name": "Rite Hite",
@@ -19508,10 +19496,9 @@
   "saintleo|wd503|SLU": {
    "name": "Saint Leo University",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-13",
-   "sector": "education_research",
-   "last_fail": "2026-11-16"
+   "sector": "education_research"
   },
   "saintlukes|wd1|saintlukeshealthcareers": {
    "name": "SLNH Saint Luke's North Hospital",
@@ -20797,16 +20784,14 @@
   "upbound|wd501|Acima": {
    "name": "Acima",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-21",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-09-21"
   },
   "upbound|wd501|Upbound": {
    "name": "Upbound Group",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-21",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-09-21"
   },
   "upenn|wd1.myworkdaysite.com|Wharton": {
    "name": "The Wharton School",
