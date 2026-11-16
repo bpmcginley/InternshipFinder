@@ -398,7 +398,7 @@ export const SPECIAL_ROUTES = Object.freeze([
     "OPTIONS",
     "*",
     "public",
-    "Any path; handled before routing",
+    "Handled before normal routing, except the terminal top-up review path",
     "204, no body; allowed origins receive CORS headers",
   ),
   route(

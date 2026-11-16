@@ -218,7 +218,8 @@ it("dispatches before generic preflight, CORS and database access", async () => 
   await assertEmpty(await handle(request({ address: url + "/" }), bindings, {}), 404);
   assert.equal(databaseReads, 0);
   await applyD1Migrations(env.DB, env.TEST_MIGRATIONS);
-  const ready = await handle(request(), { ...access, DB: env.DB }, {});
+  const afterEnd = request({ body: JSON.stringify(["f".repeat(64)]) });
+  const ready = await handle(afterEnd, { ...access, DB: env.DB }, {});
   assert.equal(ready.status, 200);
   assert.equal(ready.headers.get("Cache-Control"), "no-store");
   assert.deepEqual(await ready.json(), { candidates: [], next: null });
