@@ -46,20 +46,12 @@
    "on": "2026-10-17",
    "why": "dead"
   },
-  "designmehair": {
-   "on": "2026-10-02",
-   "why": "dead"
-  },
   "msgsports": {
    "on": "2026-10-30",
    "why": "dead"
   },
   "oldmissioncapital": {
    "on": "2026-10-24",
-   "why": "dead"
-  },
-  "postman": {
-   "on": "2026-10-02",
    "why": "dead"
   },
   "pretiuminternships2027": {
@@ -640,6 +632,10 @@
   },
   "butcherbox": {
    "on": "2026-10-29",
+   "why": "dead"
+  },
+  "metlife": {
+   "on": "2026-11-16",
    "why": "dead"
   },
   "saronic": {
@@ -1495,6 +1491,10 @@
   "lowes|wd5|lws_external_cs": {
    "on": "2026-09-30",
    "why": "robots"
+  },
+  "magellanhealth|wd5|magellan_health_careers": {
+   "on": "2026-11-16",
+   "why": "dead"
   },
   "marmon|wd501|marmon_msip_internships": {
    "on": "2026-11-14",
