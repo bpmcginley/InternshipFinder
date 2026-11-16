@@ -188,7 +188,7 @@ it("returns one fixed read-only D1 page with opaque continuation and the approve
   assert.deepEqual((await snapshot()).results, before);
 });
 
-it("returns a private empty failure when storage is unavailable and remains outside the default handler", async () => {
+it("returns a private empty failure when storage is unavailable", async () => {
   const req = request();
   const surrogate = {
     ...access,
@@ -197,10 +197,30 @@ it("returns a private empty failure when storage is unavailable and remains outs
     },
   };
   await assertEmpty(await review({ request: req, env: surrogate }), 503);
-  const defaultReply = await handle(request(), access, {});
-  assert.equal(defaultReply.status, 404);
-  assert.deepEqual(await defaultReply.json(), {
-    error: "not_found",
-    message: "No such endpoint",
-  });
+});
+
+it("dispatches before generic preflight, CORS and database access", async () => {
+  let databaseReads = 0;
+  const bindings = {
+    ...access,
+    get DB() {
+      databaseReads++;
+      throw new Error("unexpected DB access");
+    },
+  };
+  await assertEmpty(await handle(request(), {}, {}), 404);
+  await assertEmpty(await handle(request({ auth: "" }), bindings, {}), 401);
+  const extra = { Origin: "https://internscout.org" };
+  await assertEmpty(await handle(request({ extra }), bindings, {}), 403);
+  const preflight = request({ method: "OPTIONS", extra, auth: "" });
+  await assertEmpty(await handle(preflight, bindings, {}), 403);
+  await assertEmpty(await handle(request({ method: "GET" }), bindings, {}), 405);
+  await assertEmpty(await handle(request({ address: url + "/" }), bindings, {}), 404);
+  assert.equal(databaseReads, 0);
+  await applyD1Migrations(env.DB, env.TEST_MIGRATIONS);
+  const afterEnd = request({ body: JSON.stringify(["f".repeat(64)]) });
+  const ready = await handle(afterEnd, { ...access, DB: env.DB }, {});
+  assert.equal(ready.status, 200);
+  assert.equal(ready.headers.get("Cache-Control"), "no-store");
+  assert.deepEqual(await ready.json(), { candidates: [], next: null });
 });

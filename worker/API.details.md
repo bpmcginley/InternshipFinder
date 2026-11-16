@@ -12,7 +12,7 @@ dashboard (`docs/index.html`). Update the route data and these notes together, t
   `hpnbb…` is the Chrome Web Store copy, whose ID the store assigned.
   <!-- was: Methods `GET, POST, DELETE, OPTIONS`; headers `Authorization, Content-Type`. -->
   Methods `GET, POST, PUT, DELETE, OPTIONS` (`PUT` is for `PUT /profile`); headers `Authorization, Content-Type`.
-  A preflight (`OPTIONS`, any path) answers 204 with these headers for an allowed origin.
+  A preflight (`OPTIONS`) answers 204 with these headers for an allowed origin. The terminal-only top-up review route rejects browser origins without CORS.
 
 ## One-click follow unsubscribe
 

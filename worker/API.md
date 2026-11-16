@@ -6,7 +6,7 @@ This describes checked-in code, not deployed feature configuration. Shapes are d
 
 ## Route contract
 
-The router trims trailing slashes before exact matching. Global OPTIONS is handled first; the media prefix delegates validation and unsupported methods to social-video.js. The attached top-up recovery route returns 405 for other methods. Other unknown method/path pairs return 404. Common errors and CORS behavior remain documented below.
+The terminal top-up review route requires its exact path and handles methods before generic CORS. The remaining router trims trailing slashes before exact matching. Global OPTIONS is handled before normal dispatch; the media prefix delegates validation and unsupported methods to social-video.js. The attached top-up recovery route returns 405 for other methods. Other unknown method/path pairs return 404. Common errors and CORS behavior remain documented below.
 
 | Method and path | Authentication | Feature gate | Request shape | Response shape |
 |---|---|---|---|---|
@@ -61,10 +61,11 @@ The router trims trailing slashes before exact matching. Global OPTIONS is handl
 | `POST /employer/review` | review-signature | orders | Form {order, sig, action: approve\|refuse, reason?} | HTML decision result |
 | `GET /employer/credit` | credit-token | orders | Query {credit, t} | JSON {credit, status, amount, unused_days, role, choose_by, processing?, code?} |
 | `POST /employer/credit` | site-origin + credit-token | orders | JSON {credit, token, choice: refund\|credit} | JSON {done, amount, code?} |
+| `POST /admin/topup-review` | admin | TOPUP_MANUAL_REVIEW_ENABLED | Exact path without query. JSON [null] or [continuation cursor], up to 128 bytes. | Private no-store JSON {candidates, next}; 404 when disabled. No CORS or mutation. |
 | `GET /admin/orders` | admin | none | none | JSON {orders: [{id, created, status, package, start, amount, company, roles}]} |
 | `POST /admin/pilot-codes` | admin | none | Optional JSON {note?} | JSON {code, note, created, made, max} |
 | `GET /demand` | demand-token | none | Authorization: Bearer DEMAND_TOKEN | JSON {states: {[code]: number}, users: number, updated: ISO} |
-| `OPTIONS *` | public | none | Any path; handled before routing | 204, no body; allowed origins receive CORS headers |
+| `OPTIONS *` | public | none | Handled before normal routing, except the terminal top-up review path | 204, no body; allowed origins receive CORS headers |
 | `GET /social-video/*` | public | none | Dated lowercase MP4 filename, no query; optional single Range header | video/mp4 200 or 206; invalid files 404, unsupported methods 405, ranges 416, upstream failures 502 |
 | `HEAD /social-video/*` | public | none | Dated lowercase MP4 filename, no query; optional single Range header | Same successful media metadata as GET, no body; same validation and error statuses |
 | `* *` | public | none | Unmatched normalized method/path | 404 JSON {error: not_found, message}; not a catch-all authenticated route |
@@ -103,7 +104,7 @@ dashboard (`docs/index.html`). Update the route data and these notes together, t
   `hpnbb…` is the Chrome Web Store copy, whose ID the store assigned.
   <!-- was: Methods `GET, POST, DELETE, OPTIONS`; headers `Authorization, Content-Type`. -->
   Methods `GET, POST, PUT, DELETE, OPTIONS` (`PUT` is for `PUT /profile`); headers `Authorization, Content-Type`.
-  A preflight (`OPTIONS`, any path) answers 204 with these headers for an allowed origin.
+  A preflight (`OPTIONS`) answers 204 with these headers for an allowed origin. The terminal-only top-up review route rejects browser origins without CORS.
 
 ## One-click follow unsubscribe
 
