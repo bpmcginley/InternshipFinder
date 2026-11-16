@@ -1,8 +1,29 @@
 # InternScout product status
 
-Updated: 2026-11-13. Owner: product lead. Instructions: [HANDOFF.md](HANDOFF.md) and [refactor coordination](../refactor/HANDOFF.md).
+Updated: 2026-11-16. Owner: product lead. Instructions: [HANDOFF.md](HANDOFF.md) and [refactor coordination](../refactor/HANDOFF.md).
 
 ## Current position
+
+### AI run top-up launch on November 16
+
+The approved [Stripe history design](P-2.2-observed-stripe-history.md) and
+[manual-review runbook](P-2.2bs-manual-review-runbook.md) are merged. Stripe's live catalog shows the
+active one-time $3 USD offer for 25 Auto-Apply runs. The isolated sandbox has previously completed
+a purchase and verified signed settlement and replay without granting a second credit.
+
+Production now runs [#687](https://github.com/bpmcginley/InternshipFinder/pull/687) from
+`b167fbbf` with migrations through 0035. [#686](https://github.com/bpmcginley/InternshipFinder/pull/686)
+mounted the read-only operator route. The live route returns an empty no-store 401 without a bearer
+and an empty no-store 403 for browser preflight, without CORS authorization. Public configuration
+omits the top-up offer. Scheduled Stripe checks and new sales remain off. All nine checks passed on
+the reviewed scheduler head, including 78 focused native Worker tests across related suites. The
+combined clock test exercised employer maintenance and the full configured Stripe request bound.
+
+The remaining release steps are to qualify production Checkout and signed delivery without a charge,
+verify the funded client settings and scheduled reconciliation, publish the approved privacy and
+terms in [#681](https://github.com/bpmcginley/InternshipFinder/pull/681), then enable and verify
+checkout. The no-charge Stripe test uses a preview protected by Cloudflare Access. Independently
+verified history is required for retirement. Purchases with unverified gaps stay pending.
 
 ### Remaining work across both refactors
 
@@ -744,6 +765,8 @@ The golden harness now covers static assets as well as generated pages. Each sit
 | D | P-2.1au native checkpoint test budget | audit_worker_extension | `codex/product-checkpoint-test-budget` | [#485](https://github.com/bpmcginley/InternshipFinder/pull/485) | Merged as `ae151b70` after exact independent review and hosted checks | 58 native cases pass with a dedicated 15-second test budget after a hosted case exceeded the default five-second limit. Real SQLite expiry assertions, single attempts and the 120-second outer wrapper are unchanged. Coverage and stress evidence tracked in the PR; no production changes. |
 
 ## Waiting for Bruce
+
+- **AI top-up preflight.** Enable Cloudflare Access for previews of the production Worker with the owner sign-in. This gives the operator a private surface for the no-charge Stripe Checkout test.
 
 - **Reviewed Follow drafts.** [#653 database deadline](https://github.com/bpmcginley/InternshipFinder/pull/653) and [#654 scheduled digest](https://github.com/bpmcginley/InternshipFinder/pull/654) are staged with exact review and hosted checks. Follow and top-up sales remain off.
 
