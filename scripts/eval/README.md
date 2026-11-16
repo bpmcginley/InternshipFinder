@@ -186,3 +186,5 @@ for resume claims and Deep Dive question quality. The experiment customizes prom
 [Gemini Developer API](https://ai.google.dev/gemini-api/docs/model-tuning) does not offer fine-tuning.
 
 The expanded experiment compared multi-step forms and task-specific writing. See the [follow-up results](hydrogen-followup.md).
+
+The [per-action cost report](hydrogen-action-costs.md) compares evidence-based short answers, whole-resume rewrites and the verified final review shortcut at both price schedules.
