@@ -1,6 +1,8 @@
 // The queue is rewritten whole on every update, so nothing heavy may live on a job.
 import test from "node:test";
 import assert from "node:assert/strict";
+import { postingGone } from "../background/page-state.js";
+import { isAtsHost, originPattern } from "../lib/hosts.js";
 
 const data = {};
 let refuse = null; // a key prefix whose set() fails, to play a full disk
@@ -33,6 +35,26 @@ const file = () => ({
   type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   size: 450_000,
   b64: BYTES,
+});
+
+test("a Taleo direct apply URL reaches the queue and its login stays in scope", async () => {
+  const apply_url = "https://acme.taleo.net/careersection/123/jobapply.ftl?lang=en&job=MA-42";
+  const login = "https://acme.taleo.net/careersection/iam/accessmanagement/login.jsf";
+  const { added: [id] } = await addJobs([
+    { id: "taleo-MA-42", company: "Acme", title: "Software Engineering Intern", apply_url },
+  ]);
+  try {
+    const job = await getJob(id);
+    assert.equal(job.apply_url, apply_url);
+    for (const url of [apply_url, login]) {
+      assert.ok(isAtsHost(url));
+      assert.equal(originPattern(url), "https://acme.taleo.net/*");
+      const frame = { frameId: 0, url, title: "Applicant Login", headings: ["Applicant Login"] };
+      assert.equal(postingGone(job, { top: frame }, [frame]), false);
+    }
+  } finally {
+    await removeJob(id);
+  }
 });
 
 test("a tailored file's bytes are stored beside the queue, not in it", async () => {

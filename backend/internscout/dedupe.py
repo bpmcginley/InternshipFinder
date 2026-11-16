@@ -13,6 +13,8 @@ _GH_ID = re.compile(r"(?:gh_jid|token)=(\d+)")
 # the apply link. Neither changes which job it is.
 _LOCALE = re.compile(r"/[a-z]{2}-[A-Z]{2}(?=/)")
 _APPLY_TAIL = re.compile(r"/appl(?:y|ication)/?$")
+_TALEO_APPLY = re.compile(r"(/careersection/[0-9]+)/jobapply\.ftl")
+_TALEO_HOST = re.compile(r"[a-z0-9-]+\.taleo\.net")
 # Query parameters that say which job a link opens, on the boards that put the id there.
 _ID_PARAMS = frozenset({"job", "pid", "jobid", "job_id", "reqid", "req_id", "requisitionid", "jk"})
 
@@ -179,9 +181,25 @@ def _canon_job(url: str | None) -> str | None:
     # all 119 Textron postings came out as one URL, and two of them with the same title - one with a
     # term, one without - would have been folded into a single listing. The params that name the job
     # are kept; everything else is still dropped, as before.)
-    ids = sorted((k.lower(), v) for k, v in parse_qsl(s.query) if k.lower() in _ID_PARAMS and v)
+    query = parse_qsl(s.query, keep_blank_values=True)
+    ids = sorted((k.lower(), v) for k, v in query if k.lower() in _ID_PARAMS and v)
+    path = s.path
+    host = s.netloc.lower()
+    section = (
+        _TALEO_APPLY.fullmatch(path)
+        if s.scheme == "https" and _TALEO_HOST.fullmatch(host)
+        else None
+    )
+    if (
+        section
+        and len(ids) == 1
+        and ids[0][0] == "job"
+        and sorted(k for k, _ in query) in (["job"], ["job", "lang"])
+    ):
+        # The same career section and requisition can have a details URL and a direct URL.
+        path = f"{section[1]}/jobdetail.ftl"
     tail = "?" + "&".join("%s=%s" % kv for kv in ids) if ids else ""
-    return s.netloc.lower() + _APPLY_TAIL.sub("", _LOCALE.sub("", s.path)).rstrip("/") + tail
+    return host + _APPLY_TAIL.sub("", _LOCALE.sub("", path)).rstrip("/") + tail
 
 
 def merge_batch(items: list[dict]) -> dict[str, dict]:
