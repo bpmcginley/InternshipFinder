@@ -61,6 +61,7 @@ The router trims trailing slashes before exact matching. Global OPTIONS is handl
 | `POST /employer/review` | review-signature | orders | Form {order, sig, action: approve\|refuse, reason?} | HTML decision result |
 | `GET /employer/credit` | credit-token | orders | Query {credit, t} | JSON {credit, status, amount, unused_days, role, choose_by, processing?, code?} |
 | `POST /employer/credit` | site-origin + credit-token | orders | JSON {credit, token, choice: refund\|credit} | JSON {done, amount, code?} |
+| `POST /admin/topup-review` | admin | TOPUP_MANUAL_REVIEW_ENABLED | Exact path without query. JSON [null] or [continuation cursor], up to 128 bytes. | Private no-store JSON {candidates, next}; 404 when disabled. No CORS or mutation. |
 | `GET /admin/orders` | admin | none | none | JSON {orders: [{id, created, status, package, start, amount, company, roles}]} |
 | `POST /admin/pilot-codes` | admin | none | Optional JSON {note?} | JSON {code, note, created, made, max} |
 | `GET /demand` | demand-token | none | Authorization: Bearer DEMAND_TOKEN | JSON {states: {[code]: number}, users: number, updated: ISO} |

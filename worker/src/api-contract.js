@@ -363,6 +363,14 @@ export const ROUTES = Object.freeze([
     "orders",
   ),
   route(
+    "POST",
+    "/admin/topup-review",
+    "admin",
+    "Exact path without query. JSON [null] or [continuation cursor], up to 128 bytes.",
+    "Private no-store JSON {candidates, next}; 404 when disabled. No CORS or mutation.",
+    "TOPUP_MANUAL_REVIEW_ENABLED",
+  ),
+  route(
     "GET",
     "/admin/orders",
     "admin",

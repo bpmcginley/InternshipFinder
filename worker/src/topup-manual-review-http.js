@@ -26,7 +26,7 @@ function decodeCursor(bytes, declared) {
   return tuple;
 }
 
-// Held for a separate route-table change. The admin terminal supplies [null] or [cursor].
+// The admin terminal supplies [null] or [cursor].
 export async function topupManualReviewHttp({ request, env }) {
   try {
     if (env.TOPUP_MANUAL_REVIEW_ENABLED !== "1" || new URL(request.url).pathname !== PATH)
