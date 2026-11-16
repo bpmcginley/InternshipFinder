@@ -1287,6 +1287,12 @@
    "added": "2026-11-15",
    "last_fail": "2026-11-16"
   },
+  "instil": {
+   "name": "Instil Software Ltd",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-16"
+  },
   "instructure": {
    "name": "Instructure",
    "quant": false,
@@ -14272,9 +14278,8 @@
   "bdc|wd10|BDC_Careers": {
    "name": "BDC Venture Capital",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "bdo|wd3|BDO": {
    "name": "BDO Canada",
@@ -14742,9 +14747,8 @@
   "capitalpower|wd10|External": {
    "name": "Capital Power",
    "quant": false,
-   "fails": 1,
-   "added": "2026-11-13",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-11-13"
   },
   "cardinalhealth|wd1|EXT": {
    "name": "Cardinal Health",
@@ -17055,9 +17059,8 @@
   "insperity|wd12|NSP": {
    "name": "Insperity",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "inspirebrands|wd5|InspireCareers": {
    "name": "Inspire Brands",
@@ -17160,9 +17163,8 @@
   "investquebec|wd10|ext": {
    "name": "Investissement Québec",
    "quant": false,
-   "fails": 1,
-   "added": "2026-11-10",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-11-10"
   },
   "iqvia|wd1|IQVIA": {
    "name": "IQVIA",
