@@ -121,17 +121,19 @@ export function createTopupReconciliationStorage(db, leaseMs) {
       );
     },
     async write(livemode, statements) {
-      // Failed CHECK rolls back the entire admitted D1 batch. Claim takeover cannot
-      // interleave between the ownership assertion and the purchase revision CAS.
+      // A failed CHECK rolls back the batch. Lease time can change between statements,
+      // so verify ownership on both sides of the purchase revision CAS.
       const assertion = db
         .prepare(
           `INSERT INTO topup_reconciliation_cursor(mode,revision)
          SELECT ?, -1 WHERE NOT EXISTS (SELECT 1 FROM topup_reconciliation_cursor WHERE ${ACTIVE})`,
         )
         .bind(modeOf(livemode), ...ownership(livemode));
-      const [receipt, ...results] = await db.batch([assertion, ...statements]);
-      if (receipt?.success !== true || receipt.meta?.changes !== 0) invalid();
-      return results;
+      const receipts = await db.batch([assertion, ...statements, assertion]);
+      if (!Array.isArray(receipts) || receipts.length !== statements.length + 2) invalid();
+      const acknowledged = (receipt) => receipt?.success === true && receipt.meta?.changes === 0;
+      if (!acknowledged(receipts[0]) || !acknowledged(receipts.at(-1))) invalid();
+      return receipts.slice(1, -1);
     },
     async finish(livemode, reservation, appliedRevision) {
       const [mode, token] = ownership(livemode);

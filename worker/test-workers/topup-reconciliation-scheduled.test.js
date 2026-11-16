@@ -442,6 +442,35 @@ it("the expired lease rejects the financial transaction even after an earlier po
   expect(await port.finish(false, reserved, 1)).toBeNull();
 });
 
+it("expiry inside a financial batch rolls back the purchase write and the expired cursor", async () => {
+  const p = await purchase(1);
+  const port = storage();
+  const before = await port.read(false);
+  const reserved = await port.advance(false, before, {
+    after: p.key,
+    revision: before.revision + 1,
+  });
+  expect(await port.guard(false)).toBe(true);
+  const originalCursor = await db
+    .prepare("SELECT * FROM topup_reconciliation_cursor WHERE mode='test'")
+    .first();
+  // Force expiry after the financial write in the same D1 transaction.
+  await expect(
+    port.write(false, [
+      db.prepare("UPDATE topup_purchases SET available=0,held=25 WHERE payment_hash=?").bind(p.key),
+      db.prepare("UPDATE topup_reconciliation_cursor SET lease_until_ms=0 WHERE mode='test'"),
+    ]),
+  ).rejects.toThrow();
+  expect(await balance(p)).toEqual({ available: 25, held: 0 });
+  expect(
+    await db.prepare("SELECT * FROM topup_reconciliation_cursor WHERE mode='test'").first(),
+  ).toEqual(originalCursor);
+  expect(await marker(p)).toMatchObject({
+    outcome: "pending",
+    reservation_revision: reserved.revision,
+  });
+});
+
 it("mixed-mode rows never create an observation marker for the other account mode", async () => {
   const p = await purchase(1, true);
   expect(await run(cron, policy, context([p], { cursor: storage() }))).toMatchObject({
