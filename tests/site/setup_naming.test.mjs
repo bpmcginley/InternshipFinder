@@ -36,13 +36,13 @@ test("the install page's steps and HowTo say Set up Auto-Apply, and keep Deep Di
   );
   assert.match(
     html,
-    /<strong>Set up Auto-Apply<\/strong> opens in a new tab: sign in and add your resume \(about 2 minutes\)\./,
+    /<h2>Set up Auto-Apply<\/h2>\s*<p>.*<strong>Choose resume<\/strong>.*<strong>Continue to setup<\/strong>.*<\/p>\s*<p>When prompted, choose <strong>Sign in with Google<\/strong> or <strong>Sign in with Microsoft<\/strong>/,
   );
-  // was: ...(about 2 minutes\)\."/ at the end of step 1's text. Since U6 it opens step 2's.
   assert.match(
     html,
-    /"name":"Set up Auto-Apply","text":"Auto-Apply setup opens in a new tab: sign in and add your resume \(about 2 minutes\)\./,
+    /"name":"Set up Auto-Apply","text":"Auto-Apply setup opens in a new tab\. Select Choose resume and add your resume\. Select Continue to setup, then sign in with Google or a personal Microsoft account\./,
   );
+  assert.match(html, /After you turn on Auto-Apply, choose <strong>Practice Auto-Apply<\/strong>/);
   assert.match(
     html,
     /the optional <strong>Deep Dive<\/strong> \(a short interview and your writing voice\)/,
