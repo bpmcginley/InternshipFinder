@@ -430,7 +430,7 @@ for (const replaced of [false, true]) {
 }
 
 test(
-  "legacy auth keeps its original unbound layout behavior when the job is paused",
+  "legacy auth keeps its unbound token and cancels tailoring when the job is paused",
   { timeout: 5000 },
   async (t) => {
     const gate = heldReply();
@@ -441,17 +441,15 @@ test(
     t.mock.method(chrome.storage.session, "get", async (key) => ({ [key]: { token: legacy } }));
     const controller = new AbortController();
     const tailoring = tailorResume(storeOf(), JOBS[0], { signal: controller.signal });
+    const rejection = assert.rejects(tailoring, { name: "AbortError" });
     const original = await gate.reached;
-    assert.equal(original.signal, undefined);
+    assert.equal(original.signal, controller.signal);
     controller.abort();
     gate.finish();
-    assertValid(await tailoring);
+    await rejection;
     assert.deepEqual(
       requests.map(({ kind, authorization }) => [kind, authorization]),
-      [
-        ["layout", "Bearer " + legacy],
-        ["edit", "Bearer " + legacy],
-      ],
+      [["layout", "Bearer " + legacy]],
     );
   },
 );

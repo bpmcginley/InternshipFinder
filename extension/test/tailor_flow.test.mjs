@@ -500,3 +500,52 @@ test("format-preserving cache identity follows profile-derived output filename",
     assert.equal((await tailorResume(store, JOB)).reused, true);
   }
 });
+
+test("stopping Word, PDF and template tailoring cancels the active request without a fallback", async () => {
+  const originalFetch = globalThis.fetch;
+  try {
+    for (const [file, expected] of [
+      [await docx("Garamond"), "docx"],
+      [pdf(), "layout"],
+      [null, "template"],
+    ]) {
+      reset();
+      const controller = new AbortController();
+      let onRequest;
+      const requested = new Promise((resolve) => {
+        onRequest = resolve;
+      });
+      const attempts = [];
+      globalThis.fetch = async (_url, init) => {
+        attempts.push(kindOfCall(JSON.parse(init.body).system));
+        onRequest(init.signal);
+        return new Promise((_resolve, reject) => {
+          controller.signal.addEventListener("abort", () => reject(controller.signal.reason), {
+            once: true,
+          });
+        });
+      };
+      const result = tailorResume(storeOf(file), JOB, {
+        signal: controller.signal,
+      });
+      const rejection = assert.rejects(result, { name: "AbortError" });
+      const sentSignal = await requested;
+      controller.abort();
+      await rejection;
+      assert.equal(sentSignal, controller.signal);
+      assert.deepEqual(attempts, [expected]);
+      assert.deepEqual(data, {});
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("an already canceled resume job does not make a model request", async () => {
+  reset();
+  const signal = AbortSignal.abort();
+  await assert.rejects(tailorResume(storeOf(null), JOB, { signal }), {
+    name: "AbortError",
+  });
+  assert.deepEqual(calls, []);
+});
