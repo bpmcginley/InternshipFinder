@@ -130,19 +130,34 @@ export async function runTopupReconciliationScheduled(eventCron, descriptor = {}
     )
       fail();
 
+    const fenced = Object.hasOwn(cursor, "leaseMs");
+    if (
+      fenced &&
+      (cursor.leaseMs !== deadlineMs ||
+        ["guard", "write", "finish", "close"].some(
+          (method) => typeof cursor[method] !== "function",
+        ))
+    )
+      fail();
+    const assertOwner = async () => {
+      live();
+      if (fenced && (await cursor.guard(livemode)) !== true) fail();
+      live();
+    };
     const guardedDb = {
       prepare(sql) {
         live();
         return db.prepare(sql);
       },
-      batch(statements) {
-        live();
-        // The existing revision CAS still fences any mutation admitted before cutoff.
-        return db.batch(statements);
+      async batch(statements) {
+        await assertOwner();
+        // In the fenced composition, the current lease and purchase revision must
+        // both survive the same D1 write transaction.
+        return fenced ? cursor.write(livemode, statements) : db.batch(statements);
       },
     };
     const fetch = async (url, init) => {
-      live();
+      await assertOwner();
       if (
         requests >= maxRequests ||
         typeof url !== "string" ||
@@ -172,8 +187,10 @@ export async function runTopupReconciliationScheduled(eventCron, descriptor = {}
 
     const run = async () => {
       live();
-      let state = cursorState(await cursor.read(livemode));
+      const admitted = await cursor.read(livemode);
       live();
+      if (admitted === null) return result("held");
+      let state = cursorState(admitted);
       const page = await db
         .prepare(
           "SELECT payment_hash,offer_version FROM topup_purchases WHERE payment_hash>? " +
@@ -215,9 +232,17 @@ export async function runTopupReconciliationScheduled(eventCron, descriptor = {}
         state = committed;
         return true;
       };
+      const finishRun = async (status) => {
+        // Close only an acknowledged, fully settled pass. A timed-out or uncertain
+        // invocation leaves its lease to expire rather than unblocking a replacement early.
+        live();
+        if (fenced && (await cursor.close(livemode)) !== true) return result("held");
+        live();
+        return result(status);
+      };
       if (!entries.length) {
-        if (!state.after) return result("complete");
-        return result((await advance("")) ? "wrapped" : "held");
+        if (!state.after) return finishRun("complete");
+        return (await advance("")) ? finishRun("wrapped") : result("held");
       }
 
       for (const { paymentHash, version } of entries) {
@@ -226,29 +251,34 @@ export async function runTopupReconciliationScheduled(eventCron, descriptor = {}
         if (!(await advance(paymentHash))) return result("held");
         attempted++;
         const offer = historicalTopupOffer(config, version, livemode);
-        if (!offer) {
-          pending++;
-          continue;
+        let appliedRevision = null;
+        if (offer) {
+          try {
+            const refreshed = await recoverTopupPurchase(
+              guardedDb,
+              config,
+              paymentHash,
+              offer,
+              fetch,
+            );
+            live();
+            if (refreshed.status === "applied") appliedRevision = refreshed.revision;
+          } catch {
+            // A failed item can record a miss and allow rotation. A lost lease cannot.
+            await assertOwner();
+          }
         }
-        try {
-          const refreshed = await recoverTopupPurchase(
-            guardedDb,
-            config,
-            paymentHash,
-            offer,
-            fetch,
-          );
+        if (fenced) {
+          await assertOwner();
+          const observed = await cursor.finish(livemode, state, appliedRevision);
           live();
-          if (refreshed.status === "applied") applied++;
+          if (!["completed", "missed", null].includes(observed)) fail();
+          if (observed === "completed") applied++;
           else pending++;
-        } catch {
-          // An unavailable record cannot block neighboring purchases. The existing CAS
-          // prevents resubmitting an uncertain financial result in this invocation.
-          live();
-          pending++;
-        }
+        } else if (appliedRevision !== null) applied++;
+        else pending++;
       }
-      return result("complete");
+      return finishRun("complete");
     };
 
     const timeout = new Promise((resolve) => {
