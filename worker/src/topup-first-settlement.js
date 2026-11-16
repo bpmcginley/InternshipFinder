@@ -7,6 +7,7 @@ import {
   topupRetentionStatement,
   topupHistoryProven,
   financialEvidenceDigest,
+  topupEnrollmentForSettlement,
 } from "./topup-retention.js";
 // The supported pre-tax economics verified independently of the tax-inclusive charge.
 export const TOPUP_SETTLEMENT_TERMS = Object.freeze({ amount: 300, currency: "usd", units: 25 });
@@ -42,7 +43,15 @@ export async function captureTopupSettlement(db, attemptId, session) {
 // Inputs must come from the authenticated payment/reversal readers, never HTTP claims or
 // redirects. Decision prior state is initial ONLY because the guarded insert must win a
 // new durable claim. Existing/deleted/retired claims cannot enter this path.
-export async function settleFirstTopup(db, capture, payment, reversals, now = new Date(), session) {
+export async function settleFirstTopup(
+  db,
+  capture,
+  payment,
+  reversals,
+  now = new Date(),
+  session,
+  enrollment,
+) {
   // Validate original JSON types before structuredClone can erase custom prototypes.
   const hashing = financialEvidenceDigest(reversals);
   let a, p, r;
@@ -51,6 +60,7 @@ export async function settleFirstTopup(db, capture, payment, reversals, now = ne
   } catch {
     return { status: "retry" };
   }
+  const enrolled = topupEnrollmentForSettlement(db, enrollment, a, p?.livemode);
   if (
     !uuid(a?.id) ||
     !revision(a.revision) ||
@@ -178,6 +188,7 @@ export async function settleFirstTopup(db, capture, payment, reversals, now = ne
       topupFinanciallyResolved(r, { loss: false }),
       topupHistoryProven(r, { loss: false, historyProven: true }, decision),
       await hashing,
+      enrolled,
     ),
     // Terminal state consumes this capture; no second increment can overflow.
     db.prepare("DELETE FROM topup_attempt_revisions WHERE attempt_id=? AND changes()=1").bind(a.id),

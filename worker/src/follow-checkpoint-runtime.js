@@ -4,6 +4,10 @@ import { createFollowCheckpointSnapshotReader } from "./follow-checkpoint-snapsh
 import { createFollowCheckpointStage } from "./follow-checkpoint-stage.js";
 import { createFollowCheckpointPromotion } from "./follow-checkpoint-promotion.js";
 
+import { createFollowCheckpointRetirement } from "./follow-checkpoint-retirement.js";
+
+import { createFollowCheckpointCleanup } from "./follow-checkpoint-cleanup.js";
+
 const unavailable = () => ({ state: "unavailable" });
 const closedMutation = async () => {
   throw new Error("Follow checkpoint runtime unavailable");
@@ -15,6 +19,9 @@ export function createFollowCheckpointRuntime(options = {}) {
       read: async () => unavailable(),
       reservePending: closedMutation,
       promote: closedMutation,
+      rejectPending: closedMutation,
+      retireExpired: async () => "held",
+      cleanupRetired: async () => "held",
       reservations: createFollowCheckpointReservation(),
     };
   const { control, slots, codec, witness, maxBytes, maxHeaderBytes, maxControlBytes } = options;
@@ -71,5 +78,12 @@ export function createFollowCheckpointRuntime(options = {}) {
     read,
     change: (action) => control.change(action),
   });
-  return { read, reservePending, promote, reservations };
+  const retirement = createFollowCheckpointRetirement({ control, maxHeaderBytes, maxControlBytes });
+  const cleanupRetired = createFollowCheckpointCleanup({
+    control,
+    slots,
+    maxHeaderBytes,
+    maxControlBytes,
+  });
+  return { read, reservePending, promote, reservations, ...retirement, cleanupRetired };
 }

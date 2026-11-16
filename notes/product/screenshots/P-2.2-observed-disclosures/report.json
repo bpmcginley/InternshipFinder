@@ -1,0 +1,162 @@
+[
+  {
+    "phase": "before",
+    "page": "privacy",
+    "width": 1280,
+    "height": 766,
+    "colorScheme": "light",
+    "overflow": false,
+    "pageErrors": [],
+    "blockedExternalRequests": 1
+  },
+  {
+    "phase": "before",
+    "page": "privacy",
+    "width": 1280,
+    "height": 766,
+    "colorScheme": "dark",
+    "overflow": false,
+    "pageErrors": [],
+    "blockedExternalRequests": 1
+  },
+  {
+    "phase": "before",
+    "page": "privacy",
+    "width": 375,
+    "height": 1373,
+    "colorScheme": "light",
+    "overflow": false,
+    "pageErrors": [],
+    "blockedExternalRequests": 1
+  },
+  {
+    "phase": "before",
+    "page": "privacy",
+    "width": 375,
+    "height": 1373,
+    "colorScheme": "dark",
+    "overflow": false,
+    "pageErrors": [],
+    "blockedExternalRequests": 1
+  },
+  {
+    "phase": "before",
+    "page": "terms",
+    "width": 1280,
+    "height": 1033,
+    "colorScheme": "light",
+    "overflow": false,
+    "pageErrors": [],
+    "blockedExternalRequests": 1
+  },
+  {
+    "phase": "before",
+    "page": "terms",
+    "width": 1280,
+    "height": 1033,
+    "colorScheme": "dark",
+    "overflow": false,
+    "pageErrors": [],
+    "blockedExternalRequests": 1
+  },
+  {
+    "phase": "before",
+    "page": "terms",
+    "width": 375,
+    "height": 1825,
+    "colorScheme": "light",
+    "overflow": false,
+    "pageErrors": [],
+    "blockedExternalRequests": 1
+  },
+  {
+    "phase": "before",
+    "page": "terms",
+    "width": 375,
+    "height": 1825,
+    "colorScheme": "dark",
+    "overflow": false,
+    "pageErrors": [],
+    "blockedExternalRequests": 1
+  },
+  {
+    "phase": "after",
+    "page": "privacy",
+    "width": 1280,
+    "height": 740,
+    "colorScheme": "light",
+    "overflow": false,
+    "pageErrors": [],
+    "blockedExternalRequests": 1
+  },
+  {
+    "phase": "after",
+    "page": "privacy",
+    "width": 1280,
+    "height": 740,
+    "colorScheme": "dark",
+    "overflow": false,
+    "pageErrors": [],
+    "blockedExternalRequests": 1
+  },
+  {
+    "phase": "after",
+    "page": "privacy",
+    "width": 375,
+    "height": 1267,
+    "colorScheme": "light",
+    "overflow": false,
+    "pageErrors": [],
+    "blockedExternalRequests": 1
+  },
+  {
+    "phase": "after",
+    "page": "privacy",
+    "width": 375,
+    "height": 1267,
+    "colorScheme": "dark",
+    "overflow": false,
+    "pageErrors": [],
+    "blockedExternalRequests": 1
+  },
+  {
+    "phase": "after",
+    "page": "terms",
+    "width": 1280,
+    "height": 964,
+    "colorScheme": "light",
+    "overflow": false,
+    "pageErrors": [],
+    "blockedExternalRequests": 1
+  },
+  {
+    "phase": "after",
+    "page": "terms",
+    "width": 1280,
+    "height": 964,
+    "colorScheme": "dark",
+    "overflow": false,
+    "pageErrors": [],
+    "blockedExternalRequests": 1
+  },
+  {
+    "phase": "after",
+    "page": "terms",
+    "width": 375,
+    "height": 1730,
+    "colorScheme": "light",
+    "overflow": false,
+    "pageErrors": [],
+    "blockedExternalRequests": 1
+  },
+  {
+    "phase": "after",
+    "page": "terms",
+    "width": 375,
+    "height": 1730,
+    "colorScheme": "dark",
+    "overflow": false,
+    "pageErrors": [],
+    "blockedExternalRequests": 1
+  }
+]

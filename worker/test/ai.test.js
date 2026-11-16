@@ -491,3 +491,9 @@ test("the day's figure is settled to what the call really cost, like the month's
   assert.ok(spend_cents > 0);
   assert.ok(Math.abs(day.cents - spend_cents) < 1e-9, `${day.cents} vs ${spend_cents}`);
 });
+
+// Actual legacy route qualification uses synthetic sessions and provider streams.
+import { fakeD1 } from "./helpers.js";
+import * as legacyWireScenarios from "../test-support/legacy-provider-response.js";
+for (const [name, scenario] of Object.entries(legacyWireScenarios))
+  test(`legacy wire: ${name}`, () => scenario(fakeD1()));

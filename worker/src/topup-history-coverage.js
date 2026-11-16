@@ -1,4 +1,6 @@
-// Dormant metadata fencing, not evidence of provider completeness or retirement authority.
+// Dormant metadata fencing. Advancing requires an explicit trusted provider and restore verifier.
+import { consumeTopupReplayProof } from "./topup-history-replay.js";
+
 const NOW = "strftime('%Y-%m-%dT%H:%M:%fZ','now')";
 const FIELDS = "mode,epoch,schema_key,starts_at,covered_through,revision,health";
 const SELECT = `SELECT ${FIELDS},${NOW} AS observed_at FROM topup_history_coverage`;
@@ -159,6 +161,80 @@ export async function rotateTopupCoverage(db, input, options = {}) {
     return status("unavailable");
   }
 }
+const day = 86400;
+const isoSecond = (value) => new Date(value * 1000).toISOString();
+
+// Replay uses [from, to) in whole Stripe seconds. The persisted UTC bound is inclusive.
+function windowBounds(before, from, to) {
+  if (
+    !Number.isSafeInteger(from) ||
+    !Number.isSafeInteger(to) ||
+    from < 0 ||
+    from >= to ||
+    to - from > 30 * day ||
+    before.health === "closed" ||
+    before.revision === Number.MAX_SAFE_INTEGER
+  )
+    throw new Error();
+  const earliest = Math.floor(Date.parse(before.starts_at) / 1000);
+  const end = new Date(to * 1000 - 1).toISOString();
+  if (
+    from < earliest ||
+    !instant(end) ||
+    end < before.starts_at ||
+    (before.covered_through === null
+      ? from !== earliest
+      : isoSecond(from) > before.covered_through || end <= before.covered_through)
+  )
+    throw new Error();
+  return end;
+}
+
+// Only a trusted server caller may supply the verifier, after complete bounded replay.
+// It owns account identity, mode, provider completeness and restore verification.
+// The exact request object binds a positive response to this invocation and DB.
+export async function advanceTopupCoverage(
+  db,
+  replayProof,
+  { verifyHistory, beforeCommit = () => true, commitBy } = {},
+) {
+  if (typeof verifyHistory !== "function" || typeof beforeCommit !== "function")
+    return status("disabled");
+  try {
+    const replay = consumeTopupReplayProof(db, replayProof);
+    if (!replay || !instant(commitBy)) throw new Error();
+    const { expected, from, to, ...scope } = replay;
+    const before = coverage(expected);
+    const end = windowBounds(before, from, to);
+    const request = Object.freeze({ coverage: Object.freeze(before), from, to, ...scope });
+    const result = own(await verifyHistory(db, request), "status,request");
+    if (result.request !== request || beforeCommit() !== true) return status("unproven");
+    if (result.status === "fault") return status("fault");
+    if (result.status !== "verified") return status("unproven");
+    return await mutate(
+      db,
+      db
+        .prepare(
+          `UPDATE topup_history_coverage
+      SET covered_through=?,health='qualified',revision=revision+1
+      WHERE ${guard} AND ?<=${NOW} AND ${NOW}<?`,
+        )
+        .bind(end, ...bindings(before), end, commitBy),
+      before.mode,
+      before.epoch,
+      before.revision + 1,
+      {
+        schema_key: before.schema_key,
+        health: "qualified",
+        starts_at: before.starts_at,
+        covered_through: end,
+      },
+    );
+  } catch {
+    return status("unavailable");
+  }
+}
+
 // Closure preserves the last known bounds but invalidates every old revision. It cannot qualify a gap.
 export async function closeTopupCoverage(db, expected, options = {}) {
   if (options?.enabled !== true) return status("disabled");

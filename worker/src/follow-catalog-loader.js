@@ -3,14 +3,17 @@ import { copyFollowCatalogPrevious, parseFollowCatalog } from "./follow-catalog.
 
 const positive = (n) => Number.isSafeInteger(n) && n > 0;
 const digest = (s) => typeof s === "string" && /^[a-f0-9]{64}$/.test(s);
+const typedArray = Object.getPrototypeOf(Uint8Array.prototype);
+const byteLength = Object.getOwnPropertyDescriptor(typedArray, "byteLength").get;
+const arrayType = Object.getOwnPropertyDescriptor(typedArray, Symbol.toStringTag).get;
 const unavailable = () => ({ status: "unavailable" });
 const fail = () => {
   throw new Error("Follow catalog unavailable");
 };
 
 // Copy the same release authority before an HTTP caller admits the request body.
-export function prepareFollowCatalogRelease(options) {
-  const { origin, maxBytes, maxKeys, deadlineMs } = options;
+export function prepareFollowPublicRead(options) {
+  const { origin, maxBytes, deadlineMs } = options;
   const release = { ...options.release };
   const allowed = new URL(origin),
     target = new URL(release.url);
@@ -27,23 +30,38 @@ export function prepareFollowCatalogRelease(options) {
     target.password ||
     target.search ||
     target.hash ||
-    Object.keys(release).sort().join(",") !==
-      "catalogSha256,expiresAt,notBefore,sourceSha256,url" ||
-    !digest(release.sourceSha256) ||
-    !digest(release.catalogSha256) ||
     !Number.isSafeInteger(release.notBefore) ||
     release.notBefore < 0 ||
     !positive(release.expiresAt) ||
     release.notBefore >= release.expiresAt ||
-    ![maxBytes, maxKeys, deadlineMs].every(positive) ||
+    ![maxBytes, deadlineMs].every(positive) ||
     deadlineMs > 2147483647
   )
     fail();
-  const previousValid = copyFollowCatalogPrevious(options.previousValid, maxKeys);
-  return { origin, release, maxBytes, maxKeys, deadlineMs, previousValid };
+  return { origin, release, maxBytes, deadlineMs };
 }
 
-export async function loadFollowCatalog(options = {}) {
+export function prepareFollowCatalogRelease(options) {
+  const prepared = prepareFollowPublicRead(options);
+  const { release } = prepared,
+    { maxKeys } = options;
+  if (
+    Object.keys(release).sort().join(",") !==
+      "catalogSha256,expiresAt,notBefore,sourceSha256,url" ||
+    !digest(release.sourceSha256) ||
+    !digest(release.catalogSha256) ||
+    !positive(maxKeys)
+  )
+    fail();
+  const previousValid = copyFollowCatalogPrevious(options.previousValid, maxKeys);
+  return { ...prepared, maxKeys, previousValid };
+}
+
+export const loadFollowCatalog = (options = {}) => readFollowPublic(options, true);
+// Raw bytes for the consumed link-release composition; integrity is checked before ownership.
+export const loadFollowPublicBytes = (options = {}) => readFollowPublic(options, false);
+
+async function readFollowPublic(options, catalogRead) {
   if (options?.enabled !== true) return { status: "disabled" };
   let controller,
     reader,
@@ -72,8 +90,9 @@ export async function loadFollowCatalog(options = {}) {
     releaseReader();
   };
   try {
-    const { release, maxBytes, maxKeys, deadlineMs, previousValid } =
-      prepareFollowCatalogRelease(options);
+    const { release, maxBytes, maxKeys, deadlineMs, previousValid } = catalogRead
+      ? prepareFollowCatalogRelease(options)
+      : prepareFollowPublicRead(options);
     if ([get, now, schedule, cancel].some((value) => typeof value !== "function")) fail();
     let last = -Infinity;
     const clock = () => {
@@ -130,10 +149,11 @@ export async function loadFollowCatalog(options = {}) {
         const { done, value } = await reader.read();
         check();
         if (done) break;
-        if (!(value instanceof Uint8Array) || !value.length || value.length > maxBytes - size)
-          fail();
+        if (arrayType.call(value) !== "Uint8Array") fail();
+        const length = byteLength.call(value);
+        if (!length || length > maxBytes - size) fail();
         chunks.push(new Uint8Array(value));
-        size += value.length;
+        size += length;
       }
       reader.releaseLock();
       reader = null;
@@ -143,6 +163,10 @@ export async function loadFollowCatalog(options = {}) {
       for (const chunk of chunks) {
         bytes.set(chunk, offset);
         offset += chunk.length;
+      }
+      if (!catalogRead) {
+        check();
+        return { status: "available", bytes };
       }
       const catalog = await parseFollowCatalog(bytes, {
         maxBytes,

@@ -14,6 +14,7 @@ function observe(
   let count = 0;
   const wrap = (statement, sql) => ({
     raw: statement,
+    sql,
     bind: (...args) => wrap(statement.bind(...args), sql),
     run: async () => {
       count++;
@@ -34,7 +35,10 @@ function observe(
       prepare: (sql) => wrap(db.prepare(sql), sql),
       batch: async (statements) => {
         count += statements.length;
-        return afterBatch(await db.batch(statements.map((s) => s.raw)));
+        const result = await db.batch(statements.map((s) => s.raw));
+        for (let i = 0; i < statements.length; i++)
+          result[i] = await after(statements[i].sql, result[i]);
+        return afterBatch(result);
       },
     },
   };
@@ -159,7 +163,7 @@ export async function continuationAlternatesKindsAndMeasuresRealStatementBudget(
       result = await runtime({ ...limits, continuation });
     assert.equal(result.status, "processed");
     assert.equal(result.dispatch.counts.accepted, 1);
-    assert.equal(measured.count() - before, 16); // One expiry + dispatch selection/admission + exact claim/fence.
+    assert.equal(measured.count() - before, 17); // Expiry plus direct-count receipt, dispatch admission and exact claim/fence.
     continuation = result.dispatch.continuation;
   }
   assert.deepEqual(sent, ["confirmation", "management", "confirmation", "management"]);

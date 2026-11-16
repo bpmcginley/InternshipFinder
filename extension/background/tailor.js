@@ -159,8 +159,10 @@ async function tailorWith(store, job, system, prompt, build, extra, salt = "", r
     system,
     messages: [{ role: "user", content: prompt }],
   });
+  throwIfAborted(request.signal);
   const out = jsonOf(resp);
   const made = await build(out);
+  throwIfAborted(request.signal);
   if (!made) return null;
   const tailored = {
     file: { name: made.name, type: made.type, size: made.bytes.length, b64: toB64(made.bytes) },
@@ -172,11 +174,12 @@ async function tailorWith(store, job, system, prompt, build, extra, salt = "", r
     ...(made.note ? { note: made.note } : {}),
   };
   await writeTailored(key, tailored);
+  throwIfAborted(request.signal);
   return { ...tailored, cost_usd: resp.cost_usd || 0 };
 }
 
 // ---------- 1. Word original, edited in place ----------
-async function tailorDocx(store, job, orig) {
+async function tailorDocx(store, job, orig, request) {
   const opened = await openDocx(orig.b64);
   const parsed = bulletGroups(opened.xml);
   // was: ... < 3) return null;
@@ -198,6 +201,7 @@ async function tailorDocx(store, job, orig) {
       note: "This is your own Word file with only the bullets below changed. Open it to check it still fits the page.",
     },
     await fingerprint(orig),
+    request,
   );
 }
 
@@ -265,6 +269,7 @@ async function readLayout(store, job, orig, fp, request) {
       },
     ],
   });
+  throwIfAborted(request.signal);
   let doc = null,
     why = "";
   // was: try { doc = normalizeLayout(jsonOf(resp)); } catch { doc = null; }
@@ -411,7 +416,7 @@ async function tailorFromProfile(store, job, request) {
     `${prompt}\n${BUILD}\nLOCAL_FACTS:${JSON.stringify([baseName(store), tailoringCacheFacts(store)])}`,
   );
   const hit = await readTailored(key);
-  throwIfAborted(request?.signal);
+  throwIfAborted(request.signal);
   if (hit) return { ...hit, cost_usd: 0, reused: true };
 
   const resp = await callAI({
@@ -424,6 +429,7 @@ async function tailorFromProfile(store, job, request) {
     system: SYSTEM,
     messages: [{ role: "user", content: prompt }],
   });
+  throwIfAborted(request.signal);
   const out = jsonOf(resp);
   const { resume, diff } = applyTailoring(store, out);
   const bytes = renderResume(resume);
@@ -446,37 +452,37 @@ async function tailorFromProfile(store, job, request) {
     created: Date.now(),
   };
   await writeTailored(key, tailored);
+  throwIfAborted(request.signal);
   return { ...tailored, cost_usd: resp.cost_usd || 0 };
 }
 
 export async function tailorResume(store, job, { signal } = {}) {
+  throwIfAborted(signal);
   const orig = store.files && store.files.resume;
   let spent = 0,
     why = "",
-    keeps = false,
-    request;
+    keeps = false;
+  let request = { signal };
   if (orig && orig.b64) {
     const isDocx = /\.docx$/i.test(orig.name || "") || orig.type === DOCX_TYPE;
     const isPdf = orig.type === "application/pdf" || /\.pdf$/i.test(orig.name || "");
     keeps = isDocx || isPdf;
     if (!isDocx && isPdf && isWorker(store.ai)) {
       const session = await getSession().catch(() => null);
-      if (session) {
-        throwIfAborted(signal);
-        request = { signal, workerSession: session.token };
-      }
+      throwIfAborted(signal);
+      if (session) request = { signal, workerSession: session.token };
     }
     try {
       const made = isDocx
-        ? await tailorDocx(store, job, orig)
+        ? await tailorDocx(store, job, orig, request)
         : isPdf
-          ? await tailorPdf(store, job, orig, request || {})
+          ? await tailorPdf(store, job, orig, request)
           : null;
       if (made && made.file) return made;
       if (made && made.fallthrough_cost) spent = made.fallthrough_cost;
       why = (made && made.why) || (made === null ? "the reply could not be used" : "");
     } catch (e) {
-      throwIfAborted(request?.signal);
+      throwIfAborted(signal);
       if (isAccountError(e)) throw e;
       // A file we could not read is not a reason to go without a tailored resume: use the template.
       // (Still true in review mode. In automatic mode, see below.)

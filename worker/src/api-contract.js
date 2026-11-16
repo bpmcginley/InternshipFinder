@@ -33,8 +33,16 @@ export const ROUTES = Object.freeze([
     "/follows/unsubscribe",
     "follow-unsubscribe-token",
     "Exactly one query parameter token=deletion-only UUID.secret; URL-encoded or multipart List-Unsubscribe=One-Click, at most 4,096 bytes with an absolute 5-second body-read deadline; no login, cookies or Origin required",
-    "Empty no-store 204 for deletion/replay/unknown/wrong-purpose; malformed 400; body timeout/capacity/storage 503 with Retry-After: 60; GET/HEAD fall through to 404 without mutation",
+    "Empty no-store 204 for deletion/replay/unknown/wrong-purpose; malformed 400; body timeout/capacity/storage 503 with Retry-After: 60; HEAD falls through to 404 without mutation",
     "none; deletion remains available when signup or sending is off",
+  ),
+  route(
+    "GET",
+    "/follows/unsubscribe",
+    "public",
+    "Exact path. Any query receives identical static HTML without storage access or credential reflection. Browser removes query/fragment before explicit action.",
+    "No-store HTML 200 with hashed CSP, no-referrer, frame-deny and noindex. Explicit button makes existing one-click POST; opening alone never unsubscribes.",
+    "none; existing issued capabilities remain available",
   ),
   route(
     "POST",
@@ -74,7 +82,7 @@ export const ROUTES = Object.freeze([
     "site-origin",
     "UTF-8 JSON {email, link, scope}. No query or fragment. Scope is a company key or exact field/state arrays. Explicit link=true requires a current non-refreshing session. Up to 16 KiB and five seconds to read.",
     "Empty no-store 202 for accepted or duplicate signup; 400 invalid, 403 Origin, 415 media type, 503 unavailable, 404 without qualified opt-in.",
-    "FOLLOW_SIGNUP_ENABLED and a current trusted catalog release supplier; no default supplier",
+    "FOLLOW_SIGNUP_ENABLED and a current trusted release from FOLLOW_SIGNUP_RELEASE or the injected supplier",
   ),
   route(
     "GET",
@@ -355,6 +363,14 @@ export const ROUTES = Object.freeze([
     "orders",
   ),
   route(
+    "POST",
+    "/admin/topup-review",
+    "admin",
+    "Exact path without query. JSON [null] or [continuation cursor], up to 128 bytes.",
+    "Private no-store JSON {candidates, next}; 404 when disabled. No CORS or mutation.",
+    "TOPUP_MANUAL_REVIEW_ENABLED",
+  ),
+  route(
     "GET",
     "/admin/orders",
     "admin",
@@ -382,7 +398,7 @@ export const SPECIAL_ROUTES = Object.freeze([
     "OPTIONS",
     "*",
     "public",
-    "Any path; handled before routing",
+    "Handled before normal routing, except the terminal top-up review path",
     "204, no body; allowed origins receive CORS headers",
   ),
   route(

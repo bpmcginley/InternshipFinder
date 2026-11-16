@@ -1,5 +1,7 @@
 // Dormant draft producer contract. No fetch, clock, schema, watermark write or send caller.
 import { canonicalFollow } from "./follows.js";
+import { followMailDirectRoles } from "./follow-mail.js";
+import { selectFollowRelatedRoles } from "./follow-related-roles.js";
 
 const encoder = new TextEncoder();
 const bytes = (value) => encoder.encode(value).length;
@@ -51,7 +53,15 @@ const posting = (value) => {
 
 // Limits and upperBound are trusted explicit inputs, never defaults inferred from the clock
 // or this untrusted JSON. The producer attests a complete eligible window, never a top-N cut.
-export function matchFollowSnapshot(input, follows, { catalog, limits, upperBound } = {}) {
+export function matchFollowSnapshot(input, follows, options) {
+  return matchSnapshot(input, follows, options);
+}
+
+export function matchFollowSnapshotWithRelated(input, follows, options, relatedLimits) {
+  return matchSnapshot(input, follows, options, { limits: relatedLimits });
+}
+
+function matchSnapshot(input, follows, { catalog, limits, upperBound } = {}, related = null) {
   if (
     !limits ||
     ![
@@ -182,5 +192,12 @@ export function matchFollowSnapshot(input, follows, { catalog, limits, upperBoun
     refs,
     advances,
   };
-  return bytes(JSON.stringify(result)) > limits.maxResultBytes ? invalid("result_bound") : result;
+  if (bytes(JSON.stringify(result)) > limits.maxResultBytes) return invalid("result_bound");
+  if (related === null) return result;
+  const selected = selectFollowRelatedRoles(
+    snapshot.roles,
+    followMailDirectRoles(result.roles),
+    related.limits,
+  );
+  return selected.status === "selected" ? { ...result, similar: selected.similar } : selected;
 }

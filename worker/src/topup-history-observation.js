@@ -122,12 +122,35 @@ export async function observeTopupHistory(db, input, options = {}) {
   }
 }
 // First successful daily maintenance must repeatedly drain due pages. No schedule is mounted.
+function cleanupCount(rows, limit) {
+  const own = (value, key) => {
+    const d = Object.getOwnPropertyDescriptor(value, key);
+    if (!d || !Object.hasOwn(d, "value")) throw new Error();
+    return d.value;
+  };
+  if (!Array.isArray(rows) || own(rows, "length") !== 1) throw new Error();
+  const row = own(rows, "0"),
+    success = own(row, "success"),
+    results = own(row, "results"),
+    meta = own(row, "meta"),
+    changes = own(meta, "changes");
+  if (
+    success !== true ||
+    !Array.isArray(results) ||
+    own(results, "length") !== 0 ||
+    !Number.isSafeInteger(changes) ||
+    changes < 0 ||
+    changes > limit
+  )
+    throw new Error();
+  return changes;
+}
 export async function cleanupTopupHistoryReceipts(db, options = {}) {
   if (options?.enabled !== true) return result("disabled");
   const { limit } = options;
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > 256) return result("unavailable");
   try {
-    const [row] = checked(
+    const removed = cleanupCount(
       await db.batch([
         db
           .prepare(
@@ -135,10 +158,9 @@ export async function cleanupTopupHistoryReceipts(db, options = {}) {
           )
           .bind(limit),
       ]),
-      1,
+      limit,
     );
-    if (row.results.length || row.meta.changes > limit) throw new Error();
-    return { status: "cleaned", removed: row.meta.changes };
+    return { status: "cleaned", removed };
   } catch {
     return result("unavailable");
   }

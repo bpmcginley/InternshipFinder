@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { renderFollowMail, sendFollowMail } from "../src/follow-mail.js";
+import { createFollowLinkPresentation } from "../src/follow-link-presentation.js";
 
 const SITE = "https://site.example.test";
 const ACTIONS = "https://actions.example.test";
@@ -442,4 +443,105 @@ test("encoded reserved action paths cannot fall through to legacy query links", 
     links: { ...input.links, confirmation: legacy },
   });
   assert.ok(message.text.includes(`Confirm: ${legacy}`));
+});
+
+const publicSite = "https://internscout.org";
+const publicWorker = "https://internscout-api.bpmcginley.workers.dev";
+const credential = (n) => `00000000-0000-4000-8000-00000000000${n}.${"a".repeat(64)}`;
+const presentationLabels = () => ({
+  companies: new Map([["fixture-key", "Fixture & Company"]]),
+  fields: new Map([["software", "Software Engineering"]]),
+  states: new Map([["NY", "New York"]]),
+});
+const presentationInput = (labels = presentationLabels()) => ({
+  from: input.from,
+  postalAddress: input.postalAddress,
+  labels,
+});
+const privateTokens = {
+  confirmation: credential(1),
+  deleteRequest: `fd_${credential(2)}`,
+  unsubscribe: credential(3),
+  management: credential(4),
+};
+const companyScope = '{"kind":"company","company":"fixture-key"}';
+const searchScope = '{"kind":"search","fields":["software"],"states":["NY"]}';
+
+test("link presentation connects existing email templates to exact capability paths", () => {
+  const { confirmation, management } = createFollowLinkPresentation(presentationInput());
+  const unsubscribe = `${publicWorker}/follows/unsubscribe?token=${privateTokens.unsubscribe}`;
+  const confirmationMail = renderFollowMail("confirm", {
+    ...confirmation.present({ scopeKey: companyScope, ...privateTokens }),
+    to: input.to,
+  });
+  assert.equal(confirmationMail.subject, "Confirm your InternScout follows");
+  assert.equal(confirmationMail.headers["List-Unsubscribe"], `<${unsubscribe}>`);
+  assert.equal(confirmationMail.headers["List-Unsubscribe-Post"], "List-Unsubscribe=One-Click");
+  assert.deepEqual(confirmationMail.text.split("\n").slice(0, 4), [
+    "You asked for new internships matching Fixture & Company.",
+    `Confirm: ${publicSite}/follows/action.html#purpose=confirm&token=${privateTokens.confirmation}`,
+    "This link expires in 7 days. If you did not ask for this, ignore this email. We will delete the request after 7 days.",
+    `Delete this request: ${publicSite}/follows/action.html#purpose=delete-request&token=${privateTokens.deleteRequest}`,
+  ]);
+
+  const managementMail = renderFollowMail("manage", {
+    ...management.presentation,
+    links: management.buildLinks(privateTokens),
+    to: input.to,
+  });
+  assert.deepEqual(managementMail.headers, confirmationMail.headers);
+  assert.deepEqual(managementMail.text.split("\n").slice(0, 3), [
+    `Manage your follows: ${publicSite}/follows/manage.html#token=${privateTokens.management}`,
+    "This link expires in 30 minutes. If you did not request it, ignore this email.",
+    `Unsubscribe: ${unsubscribe}`,
+  ]);
+});
+
+test("link presentation snapshots trusted labels and admits only canonical confirmed-request scopes", () => {
+  const labels = presentationLabels();
+  const { confirmation } = createFollowLinkPresentation(presentationInput(labels));
+  labels.companies.set("fixture-key", "Changed");
+  labels.fields.clear();
+  assert.equal(confirmation.present({ scopeKey: companyScope, ...privateTokens }).summary, "Fixture & Company");
+  assert.equal(confirmation.present({ scopeKey: searchScope, ...privateTokens }).summary, "Software Engineering; New York");
+  assert.equal(
+    confirmation.present({ scopeKey: '{"kind":"search","fields":[],"states":["NY"]}', ...privateTokens }).summary,
+    "all fields; New York",
+  );
+  for (const scopeKey of [
+    '{"kind":"company","company":"unknown"}',
+    '{"company":"fixture-key","kind":"company"}',
+    '{"kind":"search","fields":["software","software"],"states":[]}',
+    '{"kind":"search","fields":[],"states":[]}',
+    '{"kind":"search","fields":["software"],"states":[],"q":"private"}',
+    '{invalid',
+  ])
+    assert.throws(() => confirmation.present({ scopeKey, ...privateTokens }), /Follow link presentation unavailable/);
+});
+
+test("broad canonical scopes fit the existing renderer length bound", () => {
+  const labels = presentationLabels();
+  for (const key of ["design", "science", "software"]) labels.fields.set(key, `${key} ${"x".repeat(175)}`);
+  const { confirmation } = createFollowLinkPresentation(presentationInput(labels));
+  const summary = confirmation.present({
+    scopeKey: '{"kind":"search","fields":["design","science","software"],"states":["NY"]}',
+    ...privateTokens,
+  }).summary;
+  assert.equal(summary, "3 fields; 1 state");
+});
+
+test("link presentation rejects malformed, mispurposed and repeated capabilities", () => {
+  const { confirmation, management } = createFollowLinkPresentation(presentationInput());
+  for (const overrides of [
+    { confirmation: `${privateTokens.confirmation}\n` },
+    { confirmation: privateTokens.deleteRequest },
+    { confirmation: privateTokens.unsubscribe },
+    { deleteRequest: privateTokens.confirmation },
+    { deleteRequest: `fd_${privateTokens.confirmation}` },
+    { deleteRequest: `fd_${privateTokens.unsubscribe}` },
+    { unsubscribe: `${privateTokens.unsubscribe}&extra=1` },
+  ])
+    assert.throws(() => confirmation.present({ scopeKey: companyScope, ...privateTokens, ...overrides }), /Follow link presentation unavailable/);
+  assert.throws(() => management.buildLinks({ ...privateTokens, management: privateTokens.unsubscribe }), /Follow link presentation unavailable/);
+  assert.throws(() => createFollowLinkPresentation({ labels: presentationLabels() }), /Follow link presentation unavailable/);
 });

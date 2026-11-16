@@ -99,7 +99,7 @@ test("manual multi-currency prices pin USD and reject non-USD replies", async ()
   );
   assert.equal(posts, 2);
 });
-test("Managed Payments uses the existing switch without subscription offers", async () => {
+test("Managed Payments keeps USD verification and leaves Adaptive Pricing to Stripe", async () => {
   let form;
   const cap = await prepareTopupStripe(
     { ...env, STRIPE_MANAGED_PAYMENTS: "1" },
@@ -113,6 +113,8 @@ test("Managed Payments uses the existing switch without subscription offers", as
   assert.equal(cap.enabled, true);
   assert.equal((await cap.create(attempt())).units, 25);
   assert.equal(form.get("managed_payments[enabled]"), "true");
+  assert.equal(form.has("adaptive_pricing[enabled]"), false);
+  assert.equal(form.get("currency"), "usd");
 });
 test("creation and retrieval fail closed on mismatched identity, contents or URL", async () => {
   for (const change of [

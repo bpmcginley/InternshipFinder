@@ -159,3 +159,89 @@ export function createDashboardFollow(browser) {
     });
   };
 }
+
+// Only same-export #570 annotations on the CURRENT organic store row are authoritative.
+export function companyFollowSelection(row, current) {
+  const text = (value, units, bytes) =>
+    typeof value === "string" &&
+    value.length > 0 &&
+    value.length <= units &&
+    value === value.trim() &&
+    !/[\x00-\x1f\x7f\ud800-\udfff]/u.test(value) &&
+    new TextEncoder().encode(value).length <= bytes;
+  if (
+    current?.active !== true ||
+    current.authoritative !== true ||
+    !current.index ||
+    current.legacy !== false ||
+    current.row !== row ||
+    !row ||
+    row._savedMissing ||
+    row.status !== "open" ||
+    !["id", "company_name", "follow_company_key"].every((k) => Object.hasOwn(row, k)) ||
+    typeof row.id !== "string" ||
+    !/^[a-f0-9]{16}$/.test(row.id) ||
+    !text(row.follow_company_key, 200, 200) ||
+    !text(row.company_name, 200, 800)
+  )
+    return null;
+  return { kind: "company", company: { key: row.follow_company_key, label: row.company_name } };
+}
+
+export function createCompanyFollow(browser) {
+  const { useRef } = browser.React,
+    h = browser.React.createElement;
+  const Form = createFollowForm({ ...browser.React, h });
+  const enabled =
+    browser.document?.documentElement?.getAttribute?.("data-follow-signup-enabled") === "1";
+  return function CompanyFollow({ row, auth, generation, getAuth, getCurrent }) {
+    const previous = useRef({ revision: 0 });
+    if (!enabled) return null;
+    const current = getCurrent();
+    const selection = companyFollowSelection(row, current);
+    const signature = JSON.stringify(selection),
+      identity = row?.id;
+    if (
+      previous.current.row !== row ||
+      previous.current.index !== current?.index ||
+      previous.current.signature !== signature ||
+      previous.current.identity !== identity ||
+      previous.current.openRevision !== current?.revision
+    )
+      previous.current = {
+        row,
+        index: current?.index,
+        signature,
+        identity,
+        openRevision: current?.revision,
+        revision: previous.current.revision + 1,
+      };
+    if (!selection) return null;
+    const revision = previous.current.revision;
+    const isCurrent = () => {
+      const next = getCurrent();
+      return (
+        browser.document.documentElement.getAttribute("data-follow-signup-enabled") === "1" &&
+        previous.current.revision === revision &&
+        row.id === identity &&
+        next?.index === current.index &&
+        next?.revision === current.revision &&
+        JSON.stringify(companyFollowSelection(row, next)) === signature
+      );
+    };
+    return h(Form, {
+      enabled: true,
+      selection,
+      signedIn: dashboardFollowSession(auth, browser.IS),
+      sessionGeneration: JSON.stringify([generation, revision]),
+      request: createDashboardFollowRequest(browser, {
+        enabled,
+        selection,
+        generation,
+        getAuth,
+        renderedToken: auth?.token,
+        isCurrent,
+      }),
+    });
+  };
+}

@@ -680,14 +680,15 @@ async function loop(id, run) {
 
     const results = [];
     let stop = null, stopped = false;
-    // Only an actual, immediately preceding fill and Next on this document can qualify.
-    const [fill, next] = uses;
+    // Only actual text fills immediately followed by Next on this document can qualify.
+    const fills = uses.slice(0, -1), next = uses.at(-1);
     const initial = frames[0];
-    let reviewTransition = uses.length === 2 && !accountPage && frames.length === 1 &&
+    let reviewTransition = fills.length > 0 && !accountPage && frames.length === 1 &&
       initial?.frameId === 0 && typeof initial.documentId === "string" && initial.documentId &&
-      fill.name === "fill" && typeof fill.input?.ref === "string" &&
-      snap.index[fill.input.ref]?.kind === "text" && typeof fill.input.text === "string" &&
-      fill.input.text.trim() &&
+      fills.every((fill) => fill.name === "fill" && typeof fill.input?.ref === "string" &&
+        snap.index[fill.input.ref]?.kind === "text" && typeof fill.input.text === "string" &&
+        fill.input.text.trim()) &&
+      new Set(fills.map((fill) => fill.input.ref)).size === fills.length &&
       next.name === "click" && initial.buttons.some((button) =>
         next.input?.ref === "0:" + button.ref && !button.blocked && /^next$/i.test(button.text));
     for (const u of uses) {
