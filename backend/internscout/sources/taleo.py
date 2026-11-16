@@ -43,43 +43,108 @@ _HISTORY = re.compile(r'name="initialHistory"[^>]*value="([^"]*)"')
 _DETAIL_PATH = re.compile(r"(/careersection/[0-9]+)/jobdetail\.ftl")
 _REQUISITION = re.compile(r"job=([a-zA-Z0-9][a-zA-Z0-9_-]*)")
 _LANGUAGE = re.compile(r"[a-z]{2}(?:[_-][A-Za-z]{2})?")
+_APPLY_LABELS = {
+    "apply",
+    "apply now",
+    "apply online",
+    "apply for this job",
+    "apply for this position",
+}
+_RAW_TEXT_TAGS = (
+    "script",
+    "style",
+    "title",
+    "textarea",
+    "xmp",
+    "iframe",
+    "noembed",
+    "noframes",
+    "noscript",
+)
+_INACTIVE_TAGS = {*_RAW_TEXT_TAGS, "template", "plaintext", "select", "datalist", "svg", "math"}
+_INLINE_HIDDEN = re.compile(
+    r"(?:^|;)\s*(?:display\s*:\s*none|visibility\s*:\s*(?:hidden|collapse)|"
+    r"content-visibility\s*:\s*hidden|opacity\s*:\s*0(?:\.0*)?)(?:\s*!important)?\s*(?:;|$)",
+    re.I,
+)
 
 
 class _ApplicationLinks(HTMLParser):
+    CDATA_CONTENT_ELEMENTS = _RAW_TEXT_TAGS
+
     def __init__(self):
         super().__init__()
         self.hrefs: list[str] = []
         self.has_base = False
-        self.inert_tags: list[str] = []
+        self.blocked: list[str] = []
+        self.anchor: str | None = None
+        self.label: list[str] = []
+
+    @staticmethod
+    def _inactive(tag, attributes):
+        if tag in _INACTIVE_TAGS or (tag in ("details", "dialog") and "open" not in attributes):
+            return True
+        if {"hidden", "inert", "disabled"} & attributes.keys():
+            return True
+        if any(
+            (attributes.get(name) or "").strip().lower() == "true"
+            for name in ("aria-disabled", "aria-hidden")
+        ):
+            return True
+        style = re.sub(r"/\*.*?\*/", "", attributes.get("style") or "", flags=re.S)
+        return bool(_INLINE_HIDDEN.search(style))
 
     def handle_starttag(self, tag, attrs):
-        if tag in ("template", "noscript"):
-            self.inert_tags.append(tag)
-        if self.inert_tags:
-            return
-        attributes = dict(attrs)
+        # Browsers use the first duplicate HTML attribute. For a link, ambiguity means fallback.
+        attributes = dict(reversed(attrs))
         if tag == "base" and "href" in attributes:
             self.has_base = True
-        href = attributes.get("href")
-        if (
-            tag == "a"
-            and len(attributes) == len(attrs)
-            and href
-            and not {"onclick", "hidden", "disabled", "inert"} & attributes.keys()
-            and (attributes.get("aria-disabled") or "").lower() != "true"
-            and (attributes.get("aria-hidden") or "").lower() != "true"
-        ):
-            self.hrefs.append(href)
+        if self.blocked:
+            if tag == self.blocked[-1] or tag in _INACTIVE_TAGS:
+                self.blocked.append(tag)
+            return
+        if self._inactive(tag, attributes):
+            self.blocked.append(tag)
+            return
+        if tag == "a":
+            aria_label = " ".join((attributes.get("aria-label") or "").lower().split())
+            self.anchor = (
+                attributes.get("href")
+                if self.anchor is None
+                and len(attributes) == len(attrs)
+                and "onclick" not in attributes
+                and (not aria_label or aria_label in _APPLY_LABELS)
+                else None
+            )
+            self.label = []
+
+    def handle_startendtag(self, tag, attrs):
+        if tag in ("svg", "math"):
+            return
+        # In HTML, a slash does not close a non-void start tag.
+        self.handle_starttag(tag, attrs)
+
+    def handle_data(self, data):
+        if self.anchor is not None and not self.blocked:
+            self.label.append(data)
 
     def handle_endtag(self, tag):
-        if self.inert_tags and tag == self.inert_tags[-1]:
-            self.inert_tags.pop()
+        if self.blocked:
+            if tag == self.blocked[-1] != "plaintext":
+                self.blocked.pop()
+            return
+        if tag == "a":
+            label = " ".join("".join(self.label).lower().split())
+            if self.anchor and label in _APPLY_LABELS:
+                self.hrefs.append(self.anchor)
+            self.anchor = None
 
 
 def _direct_apply_url(html: str, detail_url: str) -> str | None:
     # Oracle's supported Career Section - Job Application URL retains the numeric section and
     # requisition from Job Details. An employer can disable Apply Online on a given posting,
-    # so require an explicit link on that detail page instead of guessing the new destination.
+    # so require an explicit Apply anchor on that detail page instead of guessing the destination.
+    # Static markup can rule out disabled/hidden states it declares, without loading site CSS or JS.
     detail = urllib.parse.urlsplit(detail_url)
     section = _DETAIL_PATH.fullmatch(detail.path)
     req = _REQUISITION.fullmatch(detail.query)
@@ -90,6 +155,7 @@ def _direct_apply_url(html: str, detail_url: str) -> str | None:
     page.feed(html)
     page.close()
     expected_path = f"{section[1]}/jobapply.ftl"
+    direct_urls = set()
     for href in page.hrefs:
         if not href.isascii() or "\\" in href or any(c.isspace() for c in href):
             continue
@@ -111,9 +177,13 @@ def _direct_apply_url(html: str, detail_url: str) -> str | None:
         if link.fragment or params.keys() != {"job", "lang"} or params["job"] != [req[1]]:
             continue
         if len(lang) == 1 and _LANGUAGE.fullmatch(lang[0]):
-            return urllib.parse.urlunsplit(
-                (link.scheme, link.netloc, expected_path, f"lang={lang[0]}&job={req[1]}", "")
+            direct_urls.add(
+                urllib.parse.urlunsplit(
+                    (link.scheme, link.netloc, expected_path, f"lang={lang[0]}&job={req[1]}", "")
+                )
             )
+    if len(direct_urls) == 1:
+        return direct_urls.pop()
     return None
 
 

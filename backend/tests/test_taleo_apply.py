@@ -17,6 +17,7 @@ from internscout.sources.taleo import _direct_apply_url, fetch_taleo_board
 
 DETAIL = "https://acme.taleo.net/careersection/123/jobdetail.ftl?job=MA-42"
 DIRECT = "https://acme.taleo.net/careersection/123/jobapply.ftl?lang=en&job=MA-42"
+APPLY_LINK = '<a href="jobapply.ftl?lang=en&amp;job=MA-42">Apply Online</a>'
 
 
 @pytest.mark.parametrize(
@@ -34,25 +35,56 @@ def test_only_a_taleo_link_for_the_exact_posting_is_reused(relative):
 @pytest.mark.parametrize(
     "html",
     [
-        '<a href="jobapply.ftl?lang=en&amp;job=MA-43">Wrong posting</a>',
-        '<a href="/careersection/124/jobapply.ftl?lang=en&amp;job=MA-42">Wrong section</a>',
-        '<a href="https://other.taleo.net/careersection/123/jobapply.ftl?lang=en&amp;job=MA-42">Wrong tenant</a>',
-        '<a href="https:///careersection/123/jobapply.ftl?lang=en&amp;job=MA-42">Incomplete authority</a>',
-        '<a href="jobapply.ftl?lang=en&amp;job=MA-42&amp;job=MA-43">Conflicting identifiers</a>',
-        '<a href="jobapply.ftl?lang=en&amp;job=MA-42&amp;returnUrl=https://example.test">Unknown parameter</a>',
-        '<a href="jobapply.ftl?lang=&amp;job=MA-42">Missing locale</a>',
-        '<a href="jobapply.ftl?lang=en&amp;job=MA-42" aria-disabled="true">Disabled</a>',
-        '<a href="jobapply.ftl?lang=en&amp;job=MA-42" onclick="return false">Intercepted</a>',
-        '<a href="jobapply.ftl?lang=en&amp;job=MA-42" inert>Inert</a>',
-        '<template><a href="jobapply.ftl?lang=en&amp;job=MA-42">Template link</a></template>',
-        '<noscript><a href="jobapply.ftl?lang=en&amp;job=MA-42">Scripting fallback</a></noscript>',
-        '<!-- <a href="jobapply.ftl?lang=en&amp;job=MA-42">Commented-out link</a> -->',
-        '<a href="/wrong" href="jobapply.ftl?lang=en&amp;job=MA-42">Conflicting hrefs</a>',
-        '<base href="https://other.taleo.net/"><a href="jobapply.ftl?lang=en&amp;job=MA-42">Different base</a>',
+        APPLY_LINK.replace("MA-42", "MA-43"),
+        APPLY_LINK.replace('href="', 'href="/careersection/124/'),
+        APPLY_LINK.replace('href="', 'href="https://other.taleo.net/careersection/123/'),
+        APPLY_LINK.replace('href="', 'href="https:///careersection/123/'),
+        APPLY_LINK.replace('MA-42"', 'MA-42&amp;job=MA-43"'),
+        APPLY_LINK.replace('MA-42"', 'MA-42&amp;returnUrl=https://example.test"'),
+        APPLY_LINK.replace("lang=en", "lang="),
+        APPLY_LINK.replace("<a ", '<a aria-disabled="true" '),
+        APPLY_LINK.replace("<a ", '<a onclick="return false" '),
+        APPLY_LINK.replace("<a ", "<a inert "),
+        APPLY_LINK.replace("<a ", '<a href="/wrong" '),
+        APPLY_LINK.replace("Apply Online", "Preview"),
+        APPLY_LINK.replace("<a ", '<a aria-label="Preview" '),
+        APPLY_LINK + APPLY_LINK.replace("lang=en", "lang=fr"),
+        "<!-- " + APPLY_LINK + " -->",
+        '<base href="https://other.taleo.net/">' + APPLY_LINK,
     ],
 )
 def test_ambiguous_or_unavailable_direct_links_fall_back(html):
     assert _direct_apply_url(html, DETAIL) is None
+
+
+@pytest.mark.parametrize(
+    ("opening", "closing"),
+    [
+        ("<div hidden><div>", "</div></div>"),
+        ("<fieldset disabled>", "</fieldset>"),
+        ("<div aria-hidden='true'>", "</div>"),
+        ("<div inert>", "</div>"),
+        ("<div style='display: /* hide */ none !important;'>", "</div>"),
+        ("<div style='color: red; visibility: hidden'>", "</div>"),
+        ("<details>", "</details>"),
+        ("<template>", "</template>"),
+        ("<noscript>", "</noscript>"),
+        ("<textarea>", "</textarea>"),
+        ("<title>", "</title>"),
+        ("<select>", "</select>"),
+    ],
+)
+def test_markup_hidden_by_an_ancestor_or_raw_text_is_not_an_apply_affordance(opening, closing):
+    hidden = opening + APPLY_LINK + closing
+    assert _direct_apply_url(hidden, DETAIL) is None
+    assert _direct_apply_url(hidden + APPLY_LINK, DETAIL) == DIRECT
+
+
+def test_only_visible_link_text_counts_and_exact_duplicate_targets_are_allowed():
+    hidden_label = APPLY_LINK.replace("Apply Online", "<span hidden>Apply Online</span>")
+    visible_label = APPLY_LINK.replace("Apply Online", "<span>Apply </span><b>Online</b>")
+    assert _direct_apply_url(hidden_label, DETAIL) is None
+    assert _direct_apply_url(visible_label + APPLY_LINK, DETAIL) == DIRECT
 
 
 @pytest.mark.parametrize(
@@ -91,8 +123,7 @@ def test_scan_preserves_provenance_and_exports_the_application_url(
         if str(request.url) == detail and redirects:
             return httpx.Response(302, headers={"location": "/landing"})
         assert str(request.url) == detail or (redirects and request.url.path == "/landing")
-        apply_link = '<a href="jobapply.ftl?lang=en&amp;job=MA-42">Apply Online</a>'
-        return httpx.Response(200, text=apply_link if has_link else "")
+        return httpx.Response(200, text=APPLY_LINK if has_link else "")
 
     company = {"name": "Acme", "ats_token": f"acme|{section}|987654"}
     with httpx.Client(transport=httpx.MockTransport(handle), follow_redirects=True) as client:
@@ -125,7 +156,8 @@ def test_scan_preserves_provenance_and_exports_the_application_url(
         pipeline.run([raw], verbose=False, completed_boards={("taleo", company["ats_token"])})
         with sessions() as db:
             [current] = db.scalars(select(Listing)).all()
-            public = shard_row(_listing_dict(current))
+            current_public = _listing_dict(current)
+            public = shard_row(current_public)
             assert public["id"] == previous_public["id"]
             assert public["ats"] == "taleo"
             assert public["status"] == "open"
@@ -136,6 +168,9 @@ def test_scan_preserves_provenance_and_exports_the_application_url(
             closed_by_scan([], [previous_public], {("taleo", company["ats_token"])}, [expected])
             == 0
         )
+        assert (
+            closed_by_scan([], [current_public], {("taleo", company["ats_token"])}, [detail]) == 0
+        )
     finally:
         engine.dispose()
 
@@ -145,6 +180,7 @@ def test_taleo_canonicalization_stays_within_the_same_section_tenant_and_job():
     assert not same_job(DIRECT.replace("MA-42", "MA-43"), DETAIL)
     assert not same_job(DIRECT.replace("/123/", "/124/"), DETAIL)
     assert not same_job(DIRECT.replace("acme.", "other."), DETAIL)
+    assert not same_job(DIRECT.replace("https:", "http:"), DETAIL)
     assert not same_job(DIRECT + "&job=MA-43", DETAIL)
     assert not same_job(DIRECT + "&job=", DETAIL)
     assert not same_job(DIRECT + "&redirect=/other", DETAIL)

@@ -185,7 +185,11 @@ def _canon_job(url: str | None) -> str | None:
     ids = sorted((k.lower(), v) for k, v in query if k.lower() in _ID_PARAMS and v)
     path = s.path
     host = s.netloc.lower()
-    section = _TALEO_APPLY.fullmatch(path) if _TALEO_HOST.fullmatch(host) else None
+    section = (
+        _TALEO_APPLY.fullmatch(path)
+        if s.scheme == "https" and _TALEO_HOST.fullmatch(host)
+        else None
+    )
     if (
         section
         and len(ids) == 1
