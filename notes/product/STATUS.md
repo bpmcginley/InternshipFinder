@@ -19,11 +19,18 @@ omits the top-up offer. Scheduled Stripe checks and new sales remain off. All ni
 the reviewed scheduler head, including 78 focused native Worker tests across related suites. The
 combined clock test exercised employer maintenance and the full configured Stripe request bound.
 
-The remaining release steps are to qualify production Checkout and signed delivery without a charge,
-verify the funded client settings and scheduled reconciliation, publish the approved privacy and
-terms in [#681](https://github.com/bpmcginley/InternshipFinder/pull/681), then enable and verify
-checkout. The no-charge Stripe test uses a preview protected by Cloudflare Access. Independently
-verified history is required for retirement. Purchases with unverified gaps stay pending.
+The live no-charge test verified the $3 USD Checkout and confirmed it was expired and unpaid.
+The signed expiration event initially returned 502 while production lacked the live top-up Price
+configuration. A delivery of the same signed event returned 200 from the production webhook
+after configuration. The temporary previews were removed. Production Stripe recovery and
+scheduled reconciliation are configured. Public checkout remains paused.
+
+The exact Worker release passed 58 focused native tests across settlement, funded spending and
+reconciliation. Worker request and streaming tests passed for the 0.5.9 source release and
+0.6.0 candidate. Confirm the first live reconciliation and verify the funded runtime settings
+before publishing the approved [privacy and terms](https://github.com/bpmcginley/InternshipFinder/pull/681)
+and enabling checkout. Independently verified history is required for retirement. Purchases with
+unverified gaps stay pending.
 
 ### Remaining work across both refactors
 
@@ -766,7 +773,6 @@ The golden harness now covers static assets as well as generated pages. Each sit
 
 ## Waiting for Bruce
 
-- **AI top-up preflight.** Enable Cloudflare Access for previews of the production Worker with the owner sign-in. This gives the operator a private surface for the no-charge Stripe Checkout test.
 
 - **Reviewed Follow drafts.** [#653 database deadline](https://github.com/bpmcginley/InternshipFinder/pull/653) and [#654 scheduled digest](https://github.com/bpmcginley/InternshipFinder/pull/654) are staged with exact review and hosted checks. Follow and top-up sales remain off.
 
