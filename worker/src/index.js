@@ -28,6 +28,8 @@ import { followTokenEndpoints } from "./follow-token-endpoint.js";
 import { followUnsubscribeEndpoint } from "./follow-unsubscribe-endpoint.js";
 import { followUnsubscribePreview } from "./follow-unsubscribe-preview.js";
 import { topupManualReviewHttp } from "./topup-manual-review-http.js";
+import { runTopupReconciliationScheduled } from "./topup-reconciliation-scheduled.js";
+import { createTopupReconciliationStorage } from "./topup-reconciliation-storage.js";
 import { topupCheckoutResponse, topupOfferResponse } from "./topup-checkout-http.js";
 import { canRecoverAttachedTopup } from "./topup-attached-recovery.js";
 import { topupRecoveryResponse } from "./topup-recovery-http.js";
@@ -866,6 +868,8 @@ function scheduleFollowDigest(event, ctx, deps) {
   }
 }
 
+const TOPUP_RECONCILIATION_DEADLINE_MS = 30_000;
+
 export function handleScheduled(event, env, ctx, deps = {}) {
     // The half-hourly trigger is the repository's clock (clock.js); the daily one is the cleanup.
     if (event && event.cron === CLOCK_CRON) {
@@ -873,6 +877,29 @@ export function handleScheduled(event, env, ctx, deps = {}) {
       if (env.EMPLOYER_POSTING_MAINTENANCE_ENABLED === "1") {
         ctx.waitUntil(maintainEmployerPostings(env.DB, { enabled: true }));
       }
+      if (env.TOPUP_RECONCILIATION_ENABLED !== "1") return;
+      const mode = env.STRIPE_TOPUP_MODE;
+      if (mode !== "test" && mode !== "live") return;
+      const db = env.DB;
+      const run = runTopupReconciliationScheduled(
+        event.cron,
+        {
+          enabled: true,
+          cron: CLOCK_CRON,
+          deadlineMs: TOPUP_RECONCILIATION_DEADLINE_MS,
+          limit: 1,
+          livemode: mode === "live",
+          maxRequests: 21,
+        },
+        {
+          cursor: createTopupReconciliationStorage(db, TOPUP_RECONCILIATION_DEADLINE_MS),
+          db,
+          env,
+          fetch,
+          monotonicNow: () => performance.now(),
+        },
+      );
+      ctx.waitUntil(run.then(({ status }) => console.info("top-up reconciliation", status)));
       return;
     }
     if (event && event.cron === STUDENT_BILLING_CRON) {

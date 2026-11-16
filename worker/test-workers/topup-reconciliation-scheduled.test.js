@@ -1,6 +1,8 @@
 import { env } from "cloudflare:workers";
 import { applyD1Migrations } from "cloudflare:test";
-import { beforeEach, expect, it } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import worker from "../src/index.js";
+import { CLOCK_CRON } from "../src/clock.js";
 import { runTopupReconciliationScheduled as run } from "../src/topup-reconciliation-scheduled.js";
 import { createTopupReconciliationStorage } from "../src/topup-reconciliation-storage.js";
 import { captureTopupSettlement, settleFirstTopup } from "../src/topup-first-settlement.js";
@@ -57,6 +59,11 @@ beforeEach(async () => {
         .bind(next.after, next.revision, mode(live), expected.after, expected.revision)
         .first(),
   };
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 async function purchase(n, livemode = false) {
@@ -192,6 +199,135 @@ function context(purchases = [], overrides = {}) {
 }
 const balance = (p) =>
   db.prepare("SELECT available,held FROM topup_purchases WHERE payment_hash=?").bind(p.key).first();
+
+function workerSchedule(bindings, eventCron = CLOCK_CRON) {
+  const pending = [];
+  worker.scheduled({ cron: eventCron, scheduledTime: 0 }, bindings, {
+    waitUntil: (work) => pending.push(work),
+  });
+  return Promise.all(pending);
+}
+
+it("the default Worker requires the clock event, enable flag and Stripe mode for top-up", async () => {
+  const unopened = (settings) => ({
+    ...settings,
+    get DB() {
+      throw Error("unexpected storage");
+    },
+    get STRIPE_SECRET_KEY() {
+      throw Error("unexpected credential");
+    },
+  });
+  expect(await workerSchedule(unopened())).toHaveLength(1);
+  expect(await workerSchedule(unopened({ TOPUP_RECONCILIATION_ENABLED: "true" }))).toHaveLength(1);
+  const enabled = { TOPUP_RECONCILIATION_ENABLED: "1" };
+  expect(
+    await workerSchedule(unopened({ ...enabled, STRIPE_TOPUP_MODE: "test" }), "12,42 * * * *"),
+  ).toEqual([]);
+  expect(await workerSchedule(unopened(enabled))).toHaveLength(1);
+  expect(await workerSchedule(unopened({ ...enabled, STRIPE_TOPUP_MODE: "LIVE" }))).toHaveLength(1);
+});
+
+function countedDb(observation) {
+  const native = new WeakMap();
+  const track = (statement) => {
+    const invoke =
+      (method) =>
+      (...args) => {
+        observation.calls++;
+        observation.statements++;
+        return statement[method](...args);
+      };
+    const wrapper = {
+      bind: (...args) => track(statement.bind(...args)),
+      all: invoke("all"),
+      first: invoke("first"),
+      run: invoke("run"),
+    };
+    native.set(wrapper, statement);
+    return wrapper;
+  };
+  return {
+    prepare: (sql) => track(db.prepare(sql)),
+    batch(statements) {
+      observation.calls++;
+      observation.statements += statements.length;
+      return db.batch(statements.map((statement) => native.get(statement)));
+    },
+  };
+}
+
+it("the shared clock fits maximum top-up pagination, employer maintenance and GitHub dispatch", async () => {
+  const items = [await purchase(1, true), await purchase(2, true)].sort((a, b) =>
+    a.key.localeCompare(b.key),
+  );
+  const [first, second] = items;
+  const verifiedFetch = context(items).fetch;
+  const provider = vi.fn(async (url, options) => {
+    const { origin, pathname, searchParams } = new URL(url);
+    if (origin === "https://api.github.com") {
+      expect(options.method).toBe("POST");
+      expect(pathname).toMatch(/\/actions\/workflows\/catchup\.yml\/dispatches$/);
+      return new Response(null, { status: 204 });
+    }
+    expect(origin).toBe("https://api.stripe.com");
+    expect(options.method).toBe("GET");
+    expect(options.redirect).toBe("manual");
+    if (!["/v1/refunds", "/v1/disputes"].includes(pathname)) return verifiedFetch(url, options);
+    expect(searchParams.get("charge")).toBe(first.charge.id);
+    const page = Number(searchParams.get("starting_after")?.at(-1) || 0) + 1;
+    const refund = pathname === "/v1/refunds";
+    const item = refund
+      ? {
+          ...first.dispute,
+          object: "refund",
+          id: "re_fixture_" + page,
+          status: "failed",
+          amount: 1,
+        }
+      : { ...first.dispute, id: "du_fixture_" + page };
+    return Response.json({ object: "list", url: pathname, has_more: page < 4, data: [item] });
+  });
+  vi.stubGlobal("fetch", provider);
+  const log = vi.spyOn(console, "info").mockImplementation(() => {});
+  const queries = { calls: 0, statements: 0 };
+  const bindings = {
+    DB: countedDb(queries),
+    ...context().env,
+    STRIPE_TOPUP_MODE: "live",
+    GITHUB_DISPATCH_TOKEN: "fixture-dispatch",
+    EMPLOYER_POSTING_MAINTENANCE_ENABLED: "1",
+    TOPUP_RECONCILIATION_ENABLED: "1",
+    TOPUPS_ENABLED: "0",
+  };
+  await db.batch([
+    db.prepare("INSERT OR IGNORE INTO employer_posting_day_caps VALUES(date('now'),7)"),
+    db.prepare(
+      "INSERT INTO employer_posting_counts VALUES(date('now','-91 days'),'clock-fixture',1)",
+    ),
+  ]);
+  const history = () => db.prepare("SELECT * FROM topup_history_coverage").all();
+  const before = (await history()).results;
+  expect(await workerSchedule(bindings)).toEqual([
+    { started: true },
+    { status: "ready" },
+    undefined,
+  ]);
+  expect(provider).toHaveBeenCalledTimes(22);
+  expect(queries).toEqual({ calls: 35, statements: 43 });
+  expect(log.mock.calls).toEqual([["top-up reconciliation", "complete"]]);
+  expect(
+    await db.prepare("SELECT * FROM employer_posting_counts WHERE company='clock-fixture'").first(),
+  ).toBeNull();
+  expect(await balance(first)).toEqual({ available: 0, held: 25 });
+  expect(await balance(second)).toEqual({ available: 25, held: 0 });
+  expect(await marker(first)).toMatchObject({ mode: "live", outcome: "completed" });
+  expect(await marker(second)).toBeNull();
+  expect((await history()).results).toEqual(before);
+  expect(
+    await db.prepare("SELECT state FROM topup_claims WHERE payment_hash=?").bind(first.key).first(),
+  ).toEqual({ state: "granted" });
+});
 
 it("default off, unmatched and malformed selectors do not open context or storage", async () => {
   const unopened = Object.defineProperty({}, "db", {
