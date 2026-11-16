@@ -1156,6 +1156,10 @@
 ],
 "guest worldwide - somerset nj|NJ":null,
 "hacc financial center|PA":null,
+"hackettstown|NJ":[
+40.8539,
+-74.8293
+],
 "hamilton square|NJ":[
 40.2301,
 -74.6613
@@ -2698,6 +2702,7 @@
 -75.1443
 ],
 "sf-hq|NY":null,
+"sf/ny/la|NY":null,
 "sf|NY":null,
 "shady grove|PA":[
 39.7779,

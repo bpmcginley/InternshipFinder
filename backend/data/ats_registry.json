@@ -10564,6 +10564,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "questanalytics": {
+   "name": "Quest Analytics",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-16"
+  },
   "ravl_io": {
    "name": "RAVL",
    "quant": false,
@@ -14271,9 +14277,8 @@
   "bci|wd10|BCI_Careers": {
    "name": "British Columbia Investment",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "bdc|wd10|BDC_Careers": {
    "name": "BDC Venture Capital",
