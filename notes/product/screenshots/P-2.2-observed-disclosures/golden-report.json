@@ -1,0 +1,16 @@
+{
+  "beforeCommit": "88b3ebec629e9833c3c976417307754a7e956182",
+  "files": 846,
+  "changed": [
+    "privacy.html",
+    "terms.html"
+  ],
+  "before": {
+    "privacy.html": "223f9661fbdb28941d2e68772cc80a4d70349768144a6bac3800a2bda259eedf",
+    "terms.html": "205bf84a65f92a721eb0f15a3721bf0c744697e4adaae0ef77eb2e17a283785a"
+  },
+  "after": {
+    "privacy.html": "de37055f0116171094d32d0a877e50fce18bcc488372cdb67ea0708aa17733f2",
+    "terms.html": "a14b7be0a37d70dd2ccb6c49fef2a04a47342cd6763f3bbd0ce30e8ba2c65a93"
+  }
+}
