@@ -1,4 +1,5 @@
-// Internal scheduler. The host owns trigger selection and durable per-mode cursor storage.
+// Internal scheduler. The host owns trigger selection and must serialize whole invocations
+// per Stripe mode, including cursor wrap. Per-item CAS alone does not serialize in-flight reads.
 import { recoverTopupPurchase } from "./topup-purchase-recovery.js";
 import { PAYMENT_EVIDENCE_BOUNDS } from "./topup-payment-evidence.js";
 import { REVERSAL_BOUNDS } from "./topup-reversal-evidence.js";
