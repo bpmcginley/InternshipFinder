@@ -2,8 +2,9 @@
 import assert from "node:assert/strict";
 import { applyD1Migrations } from "cloudflare:test";
 import { env } from "cloudflare:workers";
-import { beforeEach, it } from "vitest";
-import { handle } from "../src/index.js";
+import { afterEach, beforeEach, it, vi } from "vitest";
+import worker, { handle } from "../src/index.js";
+import { createFollowLinkPresentation } from "../src/follow-link-presentation.js";
 import { createOwnedFollowLinkRuntime } from "../src/follow-owned-runtime.js";
 import { createOwnedFollowDigestRuntime } from "../src/follow-owned-digest-runtime.js";
 import { enqueueFollowArchiveSubscriber } from "../src/follow-archive-enqueue.js";
@@ -86,6 +87,8 @@ const tokenFrom = (message, prefix) => {
   return new URLSearchParams(new URL(line.slice(prefix.length)).hash.slice(1)).get("token");
 };
 
+afterEach(() => vi.unstubAllGlobals());
+
 beforeEach(async () => {
   await applyD1Migrations(env.DB, env.TEST_MIGRATIONS);
   await env.DB.batch(
@@ -155,7 +158,7 @@ async function fixture(ttl = 60000) {
       policy: () => linkPolicy,
       transportTimeoutMs: 1000,
     });
-  return { release, deps, sent, fetches, binding, http, link };
+  return { bytes, release, deps, sent, fetches, binding, http, link };
 }
 
 async function confirmed(f) {
@@ -187,7 +190,8 @@ async function confirmed(f) {
   return sub;
 }
 
-async function archiveFor(f, sub) {
+async function archiveFor(f, sub, options = {}) {
+  const selectedIndex = options.indexUrl ?? indexUrl;
   // Wait only for the native DB clock to become strictly later than actual confirmation.
   let at;
   const until = Date.now() + 2000;
@@ -234,13 +238,13 @@ async function archiveFor(f, sub) {
   });
   const requests = [];
   const archive = {
-    indexUrl,
+    indexUrl: selectedIndex,
     clock: () => new Date(),
     fetch: async (url, options) => {
       assert.equal(options.method, "GET");
       requests.push(url);
-      if (url === indexUrl) return new Response(manifest);
-      assert.equal(url, new URL(digest + ".json", indexUrl).href);
+      if (url === selectedIndex) return new Response(manifest);
+      assert.equal(url, new URL(digest + ".json", selectedIndex).href);
       return new Response(snapshot);
     },
     bounds: {
@@ -252,15 +256,18 @@ async function archiveFor(f, sub) {
       deadlineMs: 5000,
     },
   };
-  const receipt = await enqueueFollowArchiveSubscriber(env.DB, sub.subscriber_id, {
-    archive,
-    catalog,
-    limits,
-    maxProgressBytes: 4000,
-    maxPendingBytes: 4000,
-  });
-  assert.equal(receipt.status, "queued");
-  assert.equal(requests.length, 2);
+  let receipt;
+  if (!options.deferEnqueue) {
+    receipt = await enqueueFollowArchiveSubscriber(env.DB, sub.subscriber_id, {
+      archive,
+      catalog,
+      limits,
+      maxProgressBytes: 4000,
+      maxPendingBytes: 4000,
+    });
+    assert.equal(receipt.status, "queued");
+    assert.equal(requests.length, 2);
+  }
   const key = await crypto.subtle.importKey(
     "raw",
     new Uint8Array(32).fill(7),
@@ -292,9 +299,14 @@ async function archiveFor(f, sub) {
       limits,
       loadSnapshot: reader.loadSnapshot,
       clock: () => new Date(at),
-      policy: () => ({ sending: true, cap: 10, present }),
+      policy: () => ({
+        sending: true,
+        cap: 10,
+        present: options.present ?? present,
+        ...(options.buildLinks ? { buildLinks: options.buildLinks } : {}),
+      }),
     });
-  return { runtime, receipt, at };
+  return { runtime, receipt, at, archive, manifest, snapshot, digest };
 }
 
 async function management(f) {
@@ -449,4 +461,234 @@ it("SQLite cutoff rejects a signup admitted by a lagging Worker after the catalo
   assert.equal(await count("rate"), 1);
   assert.equal(await env.DB.prepare("SELECT calls FROM rate").first("calls"), 1);
   assert.equal(f.sent.length, 0);
+}, 15000);
+
+it("default HTTP and scheduled deployments complete one pinned signup-to-unsubscribe lifecycle", async () => {
+  const f = await fixture(),
+    currentUrl = `${site}/data/follows/current.json`,
+    labelsUrl = `${site}/data/follow-labels.json`,
+    archiveUrl = `${site}/data/follows/index.json`,
+    linksCron = "11 3 * * *",
+    archiveCron = "21 3 * * *";
+  const handoffs = [],
+    send = f.binding.send;
+  f.binding.send = async (message) => {
+    handoffs.push({
+      owner: await owner(),
+      attempts: await env.DB.prepare("SELECT attempts FROM follow_send_budget").first("attempts"),
+    });
+    return send(message);
+  };
+  const release = { ...f.release, url: currentUrl };
+  const catalogDescriptor = {
+    version: 1,
+    origin: site,
+    predecessor: { genesis: true },
+    release,
+    maxBytes: 4000,
+    maxKeys: 10,
+    deadlineMs: 10000,
+  };
+  const labels = encode({
+    version: 1,
+    source_sha256: release.sourceSha256,
+    catalog_sha256: release.catalogSha256,
+    companies: [["fixture", "Fixture"]],
+    fields: [["swe", "Software Engineering"]],
+    states: [["MA", "Massachusetts"]],
+  });
+  const files = new Map([
+      [currentUrl, f.bytes],
+      [labelsUrl, labels],
+    ]),
+    requests = [];
+  vi.stubGlobal("fetch", async (url, init) => {
+    assert.equal(init.method, "GET");
+    assert.equal(new URL(url).origin, site);
+    assert.ok(files.has(url), "unexpected synthetic URL; never forward to network");
+    requests.push(url);
+    return Object.defineProperty(new Response(files.get(url)), "url", { value: url });
+  });
+  const bindings = {
+    ...settings,
+    DB: env.DB,
+    EMAIL: f.binding,
+    FOLLOW_SIGNUP_RELEASE: JSON.stringify({ ...catalogDescriptor, dailyLimit: 10 }),
+    FOLLOW_LINKS_ENABLED: "1",
+    FOLLOW_LINKS_CRON: linksCron,
+    FOLLOW_LINKS_RELEASE: JSON.stringify({
+      version: 1,
+      origin: site,
+      predecessor: catalogDescriptor.predecessor,
+      deadlineMs: 10000,
+      policy: {
+        from: presentation.from,
+        postalAddress: presentation.postalAddress,
+        cap: 10,
+        maxCandidates: 1,
+        maxExpired: 2,
+        transportTimeoutMs: 1000,
+      },
+      release: {
+        catalogUrl: currentUrl,
+        labelsUrl,
+        sourceSha256: release.sourceSha256,
+        catalogSha256: release.catalogSha256,
+        labelsSha256: await followSnapshotDigest(labels),
+        notBefore: release.notBefore,
+        expiresAt: release.expiresAt,
+        maxCatalogBytes: 4000,
+        maxLabelBytes: 4000,
+        maxKeys: 10,
+      },
+    }),
+    FOLLOW_ARCHIVE_ENABLED: "1",
+    FOLLOW_ARCHIVE_CRON: archiveCron,
+  };
+  const scheduled = async (cron, selected = bindings) => {
+    const pending = [];
+    worker.scheduled({ cron }, selected, { waitUntil: (job) => pending.push(job) });
+    assert.equal(pending.length, 1);
+    return (await Promise.all(pending))[0];
+  };
+  const http = (path, body, plain = false) => worker.fetch(post(path, body, plain), bindings);
+  assert.equal(
+    (
+      await worker.fetch(post("/follows/signup", signupBody), {
+        ...bindings,
+        FOLLOW_SIGNUP_ENABLED: "0",
+      })
+    ).status,
+    404,
+  );
+  assert.equal(requests.length, 0);
+  assert.equal((await http("/follows/signup", signupBody)).status, 202);
+  assert.deepEqual(requests, [currentUrl]);
+  assert.equal(await count("follow_confirmation_outbox"), 1);
+  assert.equal(f.sent.length, 0);
+  assert.deepEqual(await scheduled(linksCron), { status: "processed" });
+  assert.deepEqual(requests, [currentUrl, currentUrl, labelsUrl]);
+  assert.equal(f.sent.length, 1);
+  assert.equal(
+    (await http("/follows/confirm", tokenFrom(f.sent[0], "Confirm: "), true)).status,
+    204,
+  );
+  const sub = await env.DB.prepare(
+    "SELECT subscriber_id,scope_key,confirmed_at FROM follow_subscriptions",
+  ).first();
+  assert.ok(sub.confirmed_at);
+  const privatePresentation = createFollowLinkPresentation({
+    ...presentation,
+    labels: { companies: new Map([["fixture", "Fixture"]]), fields: new Map(), states: new Map() },
+  }).management;
+  const a = await archiveFor(f, sub, {
+    deferEnqueue: true,
+    indexUrl: archiveUrl,
+    buildLinks: privatePresentation.buildLinks,
+    present: async () => ({
+      ...privatePresentation.presentation,
+      links: { matchingPage: `${site}/?field=swe`, publicShare: `${site}/?field=swe` },
+    }),
+  });
+  files.set(archiveUrl, a.manifest);
+  files.set(new URL(a.digest + ".json", archiveUrl).href, a.snapshot);
+  bindings.FOLLOW_ARCHIVE_RELEASE = JSON.stringify({
+    version: 1,
+    catalog: catalogDescriptor,
+    archive: {
+      indexUrl: archiveUrl,
+      indexSha256: await followSnapshotDigest(a.manifest),
+      bounds: a.archive.bounds,
+    },
+    limits,
+    budget: {
+      maxPages: 2,
+      pageSize: 1,
+      maxSubscribers: 2,
+      maxD1Calls: 48,
+      maxStatements: 100,
+      maxFetches: 6,
+      deadlineMs: 10000,
+    },
+    maxProgressBytes: 4000,
+    maxPendingBytes: 4000,
+  });
+  const priorOwner = await owner();
+  const queued = await scheduled(archiveCron);
+  assert.equal(queued.status, "pass-complete", JSON.stringify(queued));
+  assert.equal(queued.counts.queued, 1);
+  assert.deepEqual(requests.slice(3), [
+    currentUrl,
+    archiveUrl,
+    new URL(a.digest + ".json", archiveUrl).href,
+  ]);
+  assert.deepEqual(await owner(), priorOwner);
+  assert.equal(f.sent.length, 1);
+  assert.equal(await count("follow_digest_outbox"), 1);
+  assert.equal(await count("follow_pending_progress"), 1);
+  assert.deepEqual(await a.runtime()(), { status: "processed", counts: { accepted: 1 } });
+  assert.equal(f.sent.length, 2);
+  assert.match(f.sent[1].text, /Synthetic role/);
+  assert.equal(
+    await env.DB.prepare("SELECT attempts FROM follow_send_budget").first("attempts"),
+    2,
+  );
+  assert.equal(
+    await env.DB.prepare("SELECT watermark FROM follow_scope_progress").first("watermark"),
+    a.at,
+  );
+  assert.equal(await count("follow_pending_progress"), 0);
+  assert.equal((await owner()).phase, "ready");
+  assert.deepEqual(await a.runtime()(), { status: "processed", counts: {} });
+  assert.equal(f.sent.length, 2);
+  const manage = tokenFrom(f.sent[1], "Manage my follows: ");
+  assert.equal((await http("/follows/manage/list", [manage, null])).status, 200);
+  assert.deepEqual(
+    handoffs.map(({ owner: row, attempts }) => [row.singleton, row.phase, attempts]),
+    [
+      [1, "running", 1],
+      [1, "running", 2],
+    ],
+  );
+  assert.equal(f.sent.filter((m) => m.subject === "New internships for your follows").length, 1);
+  const unsubscribe = f.sent[1].headers["List-Unsubscribe"].slice(1, -1);
+  assert.notEqual(unsubscribe, f.sent[0].headers["List-Unsubscribe"].slice(1, -1));
+  assert.equal(new URL(unsubscribe).pathname, "/follows/unsubscribe");
+  assert.equal(f.sent[1].headers["List-Unsubscribe-Post"], "List-Unsubscribe=One-Click");
+  const closed = {
+    ...bindings,
+    FOLLOW_SIGNUP_ENABLED: "0",
+    FOLLOW_LINKS_ENABLED: "0",
+    FOLLOW_ARCHIVE_ENABLED: "0",
+    FOLLOW_MANAGEMENT_REQUEST_ENABLED: "0",
+  };
+  const remove = () =>
+    worker.fetch(
+      new Request(unsubscribe, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: "List-Unsubscribe=One-Click",
+        credentials: "omit",
+        redirect: "manual",
+      }),
+      closed,
+    );
+  assert.equal((await remove()).status, 204);
+  assert.equal((await remove()).status, 204);
+  for (const table of [
+    "follow_subscribers",
+    "follow_subscriptions",
+    "follow_tokens",
+    "follow_digest_outbox",
+    "follow_pending_progress",
+    "follow_scope_progress",
+  ])
+    assert.equal(await count(table), 0);
+  assert.equal((await owner()).phase, "ready");
+  assert.equal(await count("follow_digest_days"), 1);
+  assert.equal(
+    await env.DB.prepare("SELECT attempts FROM follow_send_budget").first("attempts"),
+    2,
+  );
+  assert.equal(f.sent.length, 2);
 }, 15000);
