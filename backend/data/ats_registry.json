@@ -2990,6 +2990,12 @@
    "fails": 0,
    "added": "2026-09-14"
   },
+  "canyonaeroconnect": {
+   "name": "Canyon AeroConnect",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-17"
+  },
   "cetci": {
    "name": "Critical Environment Technologies",
    "quant": false,
@@ -3010,6 +3016,12 @@
   },
   "fpwa": {
    "name": "FPWA",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-17"
+  },
+  "fsp": {
+   "name": "FSP",
    "quant": false,
    "fails": 0,
    "added": "2026-11-17"
@@ -3093,6 +3105,12 @@
    "fails": 0,
    "added": "2026-11-17"
   },
+  "rcoc": {
+   "name": "Road Commission for Oakland County",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-17"
+  },
   "ruekertmielke": {
    "name": "Ruekert & Mielke",
    "quant": false,
@@ -3111,11 +3129,23 @@
    "fails": 0,
    "added": "2026-11-17"
   },
+  "sedarotech": {
+   "name": "Sedaro",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-17"
+  },
   "specteraerospace": {
    "name": "Specter Aerospace",
    "quant": false,
    "fails": 0,
    "added": "2026-09-14"
+  },
+  "surepoint": {
+   "name": "SurePoint Ag Systems",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-17"
   },
   "tnuck": {
    "name": "Tuckernuck",
@@ -12569,9 +12599,10 @@
   "mhicareers.com": {
    "name": "Mitsubishi Heavy Industries America",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-18",
-   "sector": "engineering_manufacturing"
+   "sector": "engineering_manufacturing",
+   "last_fail": "2026-11-17"
   },
   "www.careerprofile.epiroc.com": {
    "name": "Epiroc",
@@ -15710,9 +15741,8 @@
   "directsupply|wd501|direct-supply-careers": {
    "name": "Direct Supply",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "directv|wd1|careers": {
    "name": "DIRECTV",
@@ -16811,6 +16841,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "havas|wd3.myworkdaysite.com|GroupExternalCareerSite": {
+   "name": "Havas",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-17"
   },
   "hbfuller|wd1|Careers": {
    "name": "H.B. Fuller",
@@ -18402,9 +18438,8 @@
   "navcanada|wd10|NAV_Careers": {
    "name": "NAV CANADA",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "nbtbancorp|wd12|NBT-B": {
    "name": "NBT Bank",
@@ -18576,9 +18611,8 @@
   "nordsonhcm|wd501|nordsoncareers": {
    "name": "Nordson",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "northeastern|wd1|careers": {
    "name": "Northeastern University",
@@ -20622,9 +20656,8 @@
   "toyota|wd503|tmna": {
    "name": "Toyota",
    "quant": false,
-   "fails": 1,
-   "added": "2026-10-21",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-10-21"
   },
   "transamerica|wd5|AUK_JobSite": {
    "name": "Aegon Asset Management",
@@ -21307,10 +21340,9 @@
   "websteronline|wd12|WebsterExternalCareerSite": {
    "name": "Webster Bank",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-13",
-   "sector": "insurance_finance",
-   "last_fail": "2026-11-16"
+   "sector": "insurance_finance"
   },
   "wellington|wd5|Campus": {
    "name": "Wellington Management",
@@ -21394,9 +21426,8 @@
   "wilburellis|wd12|wilbur-ellis": {
    "name": "Wilbur-Ellis",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "wiley|wd1|wiley_careers": {
    "name": "Wiley",

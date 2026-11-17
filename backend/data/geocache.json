@@ -1781,6 +1781,7 @@
 40.7815,
 -73.9591
 ],
+"new york - midtown|NY":null,
 "new york - new york city|NY":[
 40.7127,
 -74.006
@@ -1791,6 +1792,7 @@
 ],
 "new york - park avenue|NY":null,
 "new york - remote|NY":null,
+"new york - tribeca|NY":null,
 "new york city & northern new jersey|NY":null,
 "new york city (3 days on-site|NY":null,
 "new york city (4 days on-site|NY":null,
@@ -2524,6 +2526,7 @@
 "princeton - nj - us|NJ":null,
 "princeton - nj|NJ":null,
 "princeton lvl - nj|NJ":null,
+"puteaux|NY":null,
 "quakertown|PA":[
 40.4418,
 -75.3416
