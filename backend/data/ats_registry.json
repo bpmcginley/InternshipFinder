@@ -3099,6 +3099,12 @@
    "fails": 0,
    "added": "2026-10-14"
   },
+  "prometheusgroup": {
+   "name": "Prometheus Group",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-17"
+  },
   "punchcut": {
    "name": "Punchcut",
    "quant": false,
@@ -12571,9 +12577,10 @@
   "jobs.paccar.com": {
    "name": "Paccar",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-18",
-   "sector": "engineering_manufacturing"
+   "sector": "engineering_manufacturing",
+   "last_fail": "2026-11-17"
   },
   "jobs.royalcaribbeangroup.com": {
    "name": "Royal Caribbean Group",
@@ -12607,9 +12614,10 @@
   "www.careerprofile.epiroc.com": {
    "name": "Epiroc",
    "quant": false,
-   "fails": 0,
+   "fails": 1,
    "added": "2026-09-18",
-   "sector": "engineering_manufacturing"
+   "sector": "engineering_manufacturing",
+   "last_fail": "2026-11-17"
   },
   "www.careers.zurich.com": {
    "name": "Zurich Insurance",
@@ -12946,6 +12954,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-10-14"
+  },
+  "falcomm": {
+   "name": "Falcomm",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-17"
   },
   "fasanara": {
    "name": "Fasanara",
