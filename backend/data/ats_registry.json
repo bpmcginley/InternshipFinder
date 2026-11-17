@@ -2230,6 +2230,12 @@
    "fails": 0,
    "added": "2026-10-28"
   },
+  "remanence": {
+   "name": "Remanence",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-17"
+  },
   "remarcable-inc": {
    "name": "Remarcable",
    "quant": false,
@@ -2936,6 +2942,18 @@
    "fails": 0,
    "added": "2026-09-14"
   },
+  "alloptions": {
+   "name": "All Options",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-17"
+  },
+  "angelhost": {
+   "name": "Angel Host",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-17"
+  },
   "armstrongfluidtechnology": {
    "name": "Armstrong Fluid Technology",
    "quant": false,
@@ -2960,17 +2978,41 @@
    "fails": 0,
    "added": "2026-09-14"
   },
+  "birdseyeaccount": {
+   "name": "Birdseye Security Solutions",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-17"
+  },
   "calpionplutus": {
    "name": "Calpion/Plutus Health",
    "quant": false,
    "fails": 0,
    "added": "2026-09-14"
   },
+  "cetci": {
+   "name": "Critical Environment Technologies",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-17"
+  },
+  "ecmtek": {
+   "name": "ECM Tek",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-17"
+  },
   "euna": {
    "name": "EUNA Solutions",
    "quant": false,
    "fails": 0,
    "added": "2026-09-14"
+  },
+  "fpwa": {
+   "name": "FPWA",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-17"
   },
   "fullbay": {
    "name": "Fullbay",
@@ -2990,6 +3032,12 @@
    "fails": 0,
    "added": "2026-09-18",
    "sector": "social_research"
+  },
+  "ipconfigure": {
+   "name": "IPConfigure",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-17"
   },
   "lunaroutpost": {
    "name": "Lunar Outpost",
@@ -3021,6 +3069,12 @@
    "fails": 0,
    "added": "2026-10-28"
   },
+  "northstarearthandspace": {
+   "name": "NorthStar Earth & Space",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-17"
+  },
   "pictonmahoney": {
    "name": "Picton Mahoney Asset Management",
    "quant": false,
@@ -3051,6 +3105,12 @@
    "fails": 0,
    "added": "2026-09-14"
   },
+  "securitymetrics": {
+   "name": "SecurityMetrics",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-17"
+  },
   "specteraerospace": {
    "name": "Specter Aerospace",
    "quant": false,
@@ -3075,6 +3135,12 @@
    "fails": 0,
    "added": "2026-09-14",
    "sector": "education_research"
+  },
+  "xradar": {
+   "name": "Xradar",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-17"
   }
  },
  "eightfold": {
@@ -8205,6 +8271,12 @@
    "added": "2026-09-15",
    "sector": "health"
   },
+  "careers-iqt": {
+   "name": "IQT",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-17"
+  },
   "careers-lynker": {
    "name": "Lynker",
    "quant": false,
@@ -12420,10 +12492,9 @@
   "jobs.arkema.com": {
    "name": "Arkema",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-18",
-   "sector": "engineering_manufacturing",
-   "last_fail": "2026-11-17"
+   "sector": "engineering_manufacturing"
   },
   "jobs.cmc.com": {
    "name": "Commercial Metals Company",
@@ -16562,9 +16633,8 @@
   "gorbel|wd501|gorbelcareers": {
    "name": "Gorbel",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-23",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-09-23"
   },
   "goto|wd5|GoToCareers": {
    "name": "GoTo Group",
@@ -20709,10 +20779,9 @@
   "ubc|wd10|ubcstaffjobs": {
    "name": "University of British Columbia",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-13",
-   "sector": "education_research",
-   "last_fail": "2026-11-16"
+   "sector": "education_research"
   },
   "ucar|wd5|UCAR_Careers": {
    "name": "University Corporation for Atmospheric Research",
