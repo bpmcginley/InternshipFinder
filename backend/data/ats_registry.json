@@ -2607,6 +2607,12 @@
    "fails": 0,
    "added": "2026-10-24"
   },
+  "trainline": {
+   "name": "Trainline",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-18"
+  },
   "trajectory": {
    "name": "Trajectory",
    "quant": false,
@@ -10902,8 +10908,9 @@
   "thinkahead": {
    "name": "AHEAD",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-11-18"
   },
   "traackr": {
    "name": "Traackr",
@@ -19697,9 +19704,8 @@
   "scanhealthplan|wd108|scancareers": {
    "name": "SCAN",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "scgov|wd5|SCGOV": {
    "name": "Sarasota County",
@@ -20243,9 +20249,8 @@
   "swib|wd12|ext": {
    "name": "State of Wisconsin Investment Board",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "swift|wd3|join-swift": {
    "name": "Swift",
