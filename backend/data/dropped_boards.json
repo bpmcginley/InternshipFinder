@@ -1,5 +1,9 @@
 {
  "ashby": {
+  "atomicsemi": {
+   "on": "2026-11-18",
+   "why": "dead"
+  },
   "beaconsoftware": {
    "on": "2026-10-31",
    "why": "dead"
@@ -16,18 +20,58 @@
    "on": "2026-11-02",
    "why": "dead"
   },
+  "inspiration-commerce-group": {
+   "on": "2026-11-18",
+   "why": "dead"
+  },
+  "latitude": {
+   "on": "2026-11-18",
+   "why": "dead"
+  },
+  "lindy": {
+   "on": "2026-11-18",
+   "why": "dead"
+  },
+  "mach": {
+   "on": "2026-11-18",
+   "why": "dead"
+  },
   "maximor": {
    "on": "2026-10-17",
    "why": "dead"
   },
+  "mtesting.ai": {
+   "on": "2026-11-18",
+   "why": "dead"
+  },
+  "odin-dynamics": {
+   "on": "2026-11-18",
+   "why": "dead"
+  },
   "tilderesearch": {
    "on": "2026-11-02",
+   "why": "dead"
+  },
+  "veeda-labs": {
+   "on": "2026-11-18",
+   "why": "dead"
+  },
+  "whatnot": {
+   "on": "2026-11-18",
    "why": "dead"
   }
  },
  "greenhouse": {
   "altmansoloncampus": {
    "on": "2026-11-09",
+   "why": "dead"
+  },
+  "appliedintuition": {
+   "on": "2026-11-18",
+   "why": "dead"
+  },
+  "arine": {
+   "on": "2026-11-18",
    "why": "dead"
   },
   "atlassand": {
@@ -46,6 +90,38 @@
    "on": "2026-10-17",
    "why": "dead"
   },
+  "dustyrobotics": {
+   "on": "2026-11-18",
+   "why": "dead"
+  },
+  "fireworksai": {
+   "on": "2026-11-18",
+   "why": "dead"
+  },
+  "glossgenius": {
+   "on": "2026-11-18",
+   "why": "dead"
+  },
+  "iherb": {
+   "on": "2026-11-18",
+   "why": "dead"
+  },
+  "maintainx": {
+   "on": "2026-11-18",
+   "why": "dead"
+  },
+  "marqeta": {
+   "on": "2026-11-18",
+   "why": "dead"
+  },
+  "memphismeats": {
+   "on": "2026-11-18",
+   "why": "dead"
+  },
+  "mqreferrals": {
+   "on": "2026-11-18",
+   "why": "dead"
+  },
   "msgsports": {
    "on": "2026-10-30",
    "why": "dead"
@@ -60,6 +136,14 @@
   },
   "rdccareers": {
    "on": "2026-10-13",
+   "why": "dead"
+  },
+  "superbet": {
+   "on": "2026-11-18",
+   "why": "dead"
+  },
+  "transcarent": {
+   "on": "2026-11-18",
    "why": "dead"
   },
   "viseai": {
@@ -84,6 +168,14 @@
    "on": "2026-10-24",
    "why": "robots"
   },
+  "campus-americas": {
+   "on": "2026-11-18",
+   "why": "dead"
+  },
+  "campus-globalcareers-atlassian": {
+   "on": "2026-11-18",
+   "why": "dead"
+  },
   "campus-us-corgan": {
    "on": "2026-10-24",
    "why": "robots"
@@ -107,6 +199,10 @@
   "careers-aluminumdynamics": {
    "on": "2026-10-24",
    "why": "robots"
+  },
+  "careers-americas": {
+   "on": "2026-11-18",
+   "why": "dead"
   },
   "careers-apogeeusa": {
    "on": "2026-10-24",
@@ -404,6 +500,10 @@
    "on": "2026-10-24",
    "why": "robots"
   },
+  "careers-revolutioncompany": {
+   "on": "2026-11-18",
+   "why": "dead"
+  },
   "careers-riversideresearch": {
    "on": "2026-10-24",
    "why": "robots"
@@ -427,6 +527,10 @@
   "careers-sentinel": {
    "on": "2026-11-07",
    "why": "robots"
+  },
+  "careers-sharpusa": {
+   "on": "2026-11-18",
+   "why": "dead"
   },
   "careers-shawmut": {
    "on": "2026-10-03",
@@ -560,10 +664,6 @@
    "on": "2026-10-06",
    "why": "robots"
   },
-  "jobs-legrand": {
-   "on": "2026-10-04",
-   "why": "dead"
-  },
   "jobs-tollbrothers": {
    "on": "2026-09-30",
    "why": "robots"
@@ -630,12 +730,16 @@
    "on": "2026-10-29",
    "why": "dead"
   },
+  "calstart": {
+   "on": "2026-11-18",
+   "why": "dead"
+  },
   "metlife": {
    "on": "2026-11-16",
    "why": "dead"
   },
-  "saronic": {
-   "on": "2026-10-04",
+  "xpansiv": {
+   "on": "2026-11-18",
    "why": "dead"
   }
  },
@@ -646,8 +750,16 @@
   }
  },
  "rippling": {
+  "acretrader-jobs": {
+   "on": "2026-11-18",
+   "why": "dead"
+  },
   "citylogix": {
    "on": "2026-11-04",
+   "why": "dead"
+  },
+  "etg": {
+   "on": "2026-11-18",
    "why": "dead"
   }
  },
@@ -766,6 +878,10 @@
   },
   "carlisle": {
    "on": "2026-11-13",
+   "why": "robots"
+  },
+  "cityofcampbellriver": {
+   "on": "2026-11-18",
    "why": "robots"
   },
   "cityofphiladelphia": {
@@ -1279,6 +1395,16 @@
   "wise": {
    "on": "2026-10-19",
    "why": "robots"
+  }
+ },
+ "taleo": {
+  "energytransfer|etp_ext": {
+   "on": "2026-11-18",
+   "why": "dead"
+  },
+  "kp|external": {
+   "on": "2026-11-18",
+   "why": "dead"
   }
  },
  "workday": {

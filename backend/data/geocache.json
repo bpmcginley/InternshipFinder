@@ -426,6 +426,10 @@
 41.0634,
 -73.9576
 ],
+"bloomfield|NJ":[
+40.7935,
+-74.1979
+],
 "bloomsburg|PA":[
 41.0045,
 -76.4537
@@ -594,6 +598,10 @@
 "centre hall|PA":[
 40.8445,
 -77.6836
+],
+"chadds ford|PA":[
+39.872,
+-75.5914
 ],
 "chalfont|PA":[
 40.287,
@@ -1794,6 +1802,7 @@
 40.7127,
 -74.006
 ],
+"new york - onsite|NY":null,
 "new york - park avenue|NY":null,
 "new york - remote|NY":null,
 "new york - tribeca|NY":null,
@@ -2403,6 +2412,7 @@
 "pa - wyomissing|PA":null,
 "pa - yardley|PA":null,
 "pa - yeadon|PA":null,
+"pa metro|PA":null,
 "pa-butler|PA":null,
 "pa-canonsburg|PA":null,
 "pa-client-state|PA":null,

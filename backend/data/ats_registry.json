@@ -234,13 +234,6 @@
    "fails": 0,
    "added": "2026-11-13"
   },
-  "atomicsemi": {
-   "name": "Atomic Semi",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-11-15",
-   "last_fail": "2026-11-17"
-  },
   "auctor": {
    "name": "Auctor",
    "quant": false,
@@ -1280,13 +1273,6 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "inspiration-commerce-group": {
-   "name": "Inspiration Commerce Group",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-11-15",
-   "last_fail": "2026-11-17"
-  },
   "instil": {
    "name": "Instil Software Ltd",
    "quant": false,
@@ -1408,13 +1394,6 @@
    "fails": 0,
    "added": "2026-10-28"
   },
-  "latitude": {
-   "name": "Latitude.io",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-11-15",
-   "last_fail": "2026-11-17"
-  },
   "leantechniques": {
    "name": "Lean TECHniques",
    "quant": false,
@@ -1438,13 +1417,6 @@
    "quant": false,
    "fails": 0,
    "added": "2026-10-28"
-  },
-  "lindy": {
-   "name": "Lindy",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-11-15",
-   "last_fail": "2026-11-17"
   },
   "linear": {
    "name": "Linear",
@@ -1494,13 +1466,6 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "mach": {
-   "name": "Mach Industries",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-11-15",
-   "last_fail": "2026-11-17"
-  },
   "mach9": {
    "name": "Mach9",
    "quant": false,
@@ -1530,6 +1495,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "MaticRobots": {
+   "name": "Matic",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-18"
   },
   "matterworks": {
    "name": "Matterworks",
@@ -1657,13 +1628,6 @@
    "quant": false,
    "fails": 0,
    "added": "2026-11-10"
-  },
-  "mtesting.ai": {
-   "name": "Mistral AI",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-11-15",
-   "last_fail": "2026-11-17"
   },
   "MUBI": {
    "name": "MUBI",
@@ -1796,13 +1760,6 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
-  },
-  "odin-dynamics": {
-   "name": "Odin Dynamics, Inc",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-11-15",
-   "last_fail": "2026-11-17"
   },
   "odys-aviation": {
    "name": "Odys Aviation",
@@ -2512,6 +2469,12 @@
    "fails": 0,
    "added": "2026-10-29"
   },
+  "subzero": {
+   "name": "Sub-Zero, Inc.",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-18"
+  },
   "super.com": {
    "name": "Super",
    "quant": false,
@@ -2752,13 +2715,6 @@
    "fails": 0,
    "added": "2026-10-23"
   },
-  "veeda-labs": {
-   "name": "Veeda AI",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-11-15",
-   "last_fail": "2026-11-17"
-  },
   "vega": {
    "name": "Vega Investment Technologies",
    "quant": false,
@@ -2813,6 +2769,12 @@
    "fails": 0,
    "added": "2026-10-22"
   },
+  "warp-sciences": {
+   "name": "Warp Sciences",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-18"
+  },
   "watershed": {
    "name": "Watershed",
    "quant": false,
@@ -2854,13 +2816,6 @@
    "quant": false,
    "fails": 0,
    "added": "2026-10-30"
-  },
-  "whatnot": {
-   "name": "Whatnot",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-11-15",
-   "last_fail": "2026-11-17"
   },
   "whoop": {
    "name": "Whoop",
@@ -3530,13 +3485,6 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "appliedintuition": {
-   "name": "Applied Intuition",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-11-15",
-   "last_fail": "2026-11-17"
-  },
   "applovin": {
    "name": "AppLovin",
    "quant": false,
@@ -3597,13 +3545,6 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
-  },
-  "arine": {
-   "name": "Arine",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-11-15",
-   "last_fail": "2026-11-17"
   },
   "armada": {
    "name": "Armada",
@@ -3688,6 +3629,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-10-27"
+  },
+  "attainpartners": {
+   "name": "Attain Partners",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-18"
   },
   "attentive": {
    "name": "Attentive",
@@ -4582,13 +4529,6 @@
    "fails": 0,
    "added": "2026-09-15"
   },
-  "dustyrobotics": {
-   "name": "Dusty Robotics",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-11-15",
-   "last_fail": "2026-11-17"
-  },
   "dvtrading": {
    "name": "DV Group",
    "quant": false,
@@ -4866,13 +4806,6 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
-  },
-  "fireworksai": {
-   "name": "Fireworks AI",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-11-15",
-   "last_fail": "2026-11-17"
   },
   "fiveringsllc": {
    "name": "Five Rings",
@@ -5191,13 +5124,6 @@
    "fails": 0,
    "added": "2026-11-03"
   },
-  "glossgenius": {
-   "name": "GlossGenius",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-11-15",
-   "last_fail": "2026-11-17"
-  },
   "glossier": {
    "name": "Glossier",
    "quant": false,
@@ -5507,13 +5433,6 @@
    "quant": false,
    "fails": 0,
    "added": "2026-10-06"
-  },
-  "iherb": {
-   "name": "iHerb",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-11-15",
-   "last_fail": "2026-11-17"
   },
   "imc": {
    "name": "IMC Trading",
@@ -6014,13 +5933,6 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "maintainx": {
-   "name": "MaintainX",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-11-15",
-   "last_fail": "2026-11-17"
-  },
   "majorleaguebaseball": {
    "name": "Major League Baseball",
    "quant": false,
@@ -6052,13 +5964,6 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
-  },
-  "marqeta": {
-   "name": "Marqeta",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-11-15",
-   "last_fail": "2026-11-17"
   },
   "mastercontrol": {
    "name": "MasterControl",
@@ -6101,13 +6006,6 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
-  },
-  "memphismeats": {
-   "name": "Memphis Meats",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-11-15",
-   "last_fail": "2026-11-17"
   },
   "memx": {
    "name": "MEMX",
@@ -6200,13 +6098,6 @@
    "fails": 0,
    "added": "2026-09-18",
    "sector": "nonprofit"
-  },
-  "mqreferrals": {
-   "name": "Marqeta",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-11-15",
-   "last_fail": "2026-11-17"
   },
   "msfcareers": {
    "name": "Doctors Without Borders",
@@ -6709,9 +6600,9 @@
   "postman": {
    "name": "Postman",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-11-16",
-   "last_fail": "2026-11-17"
+   "last_fail": "2026-11-18"
   },
   "practisinglawinstitute": {
    "name": "Practising Law Institute",
@@ -7430,13 +7321,6 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "superbet": {
-   "name": "Superbet",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-11-15",
-   "last_fail": "2026-11-17"
-  },
   "superior": {
    "name": "Superior",
    "quant": false,
@@ -7661,13 +7545,6 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
-  },
-  "transcarent": {
-   "name": "Transcarent",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-11-15",
-   "last_fail": "2026-11-17"
   },
   "transmarketgroup": {
    "name": "TransMarket Group",
@@ -8162,20 +8039,6 @@
   }
  },
  "icims": {
-  "campus-americas": {
-   "name": "Atlassian",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-11-15",
-   "last_fail": "2026-11-17"
-  },
-  "campus-globalcareers-atlassian": {
-   "name": "Atlassian",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-11-15",
-   "last_fail": "2026-11-17"
-  },
   "campus-libertymutual": {
    "name": "Liberty Mutual",
    "quant": false,
@@ -8193,13 +8056,6 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-15"
-  },
-  "careers-americas": {
-   "name": "Atlassian",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-11-15",
-   "last_fail": "2026-11-17"
   },
   "careers-axway": {
    "name": "Axway",
@@ -8369,13 +8225,6 @@
    "fails": 0,
    "added": "2026-09-15"
   },
-  "careers-revolutioncompany": {
-   "name": "Revolution",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-11-15",
-   "last_fail": "2026-11-17"
-  },
   "careers-rovisys": {
    "name": "RoviSys",
    "quant": false,
@@ -8394,13 +8243,6 @@
    "fails": 0,
    "added": "2026-09-18",
    "sector": "behavioral_health"
-  },
-  "careers-sharpusa": {
-   "name": "Sharp Electronics",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-11-15",
-   "last_fail": "2026-11-17"
   },
   "careers-simventions": {
    "name": "SimVentions",
@@ -8502,9 +8344,9 @@
   "globalcareers-atlassian": {
    "name": "Atlassian",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-11-17",
-   "last_fail": "2026-11-17"
+   "last_fail": "2026-11-18"
   },
   "gsk-us-earlytalent": {
    "name": "GSK",
@@ -8517,6 +8359,13 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-15"
+  },
+  "jobs-legrand": {
+   "name": "Legrand North America",
+   "quant": false,
+   "fails": 1,
+   "added": "2026-11-18",
+   "last_fail": "2026-11-18"
   },
   "staff-emory": {
    "name": "Emory University",
@@ -8595,6 +8444,18 @@
    "quant": false,
    "fails": 0,
    "added": "2026-10-31"
+  },
+  "careers.bge.com": {
+   "name": "BGE",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-18"
+  },
+  "careers.bissell.com": {
+   "name": "Bissell",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-18"
   },
   "careers.cdmsmith.com": {
    "name": "CDM Smith",
@@ -9511,6 +9372,12 @@
    "fails": 0,
    "added": "2026-09-18"
   },
+  "pathlabs": {
+   "name": "Pathlabs",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-18"
+  },
   "perspectivetherapeutics": {
    "name": "Perspective Therapeutics",
    "quant": false,
@@ -9734,6 +9601,24 @@
    "fails": 0,
    "added": "2026-09-15"
   },
+  "blountfinefoods": {
+   "name": "Blount Fine Foods",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-18"
+  },
+  "cmimedia": {
+   "name": "CMI Media Group",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-18"
+  },
+  "compunetix": {
+   "name": "Compunetix",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-18"
+  },
   "elire": {
    "name": "Elire",
    "quant": false,
@@ -9752,6 +9637,12 @@
    "fails": 0,
    "added": "2026-09-15",
    "sector": "nonprofit"
+  },
+  "gei-consultants": {
+   "name": "GEI Consultants",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-18"
   },
   "inogen": {
    "name": "Inogen",
@@ -9777,12 +9668,24 @@
    "fails": 0,
    "added": "2026-09-15"
   },
+  "nychdc": {
+   "name": "New York City Housing Development Corporation",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-18"
+  },
   "panynj": {
    "name": "Port Authority of New York and New Jersey",
    "quant": false,
    "fails": 0,
    "added": "2026-09-15",
    "sector": "government_policy"
+  },
+  "ross-video-careers": {
+   "name": "Ross Video",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-18"
   },
   "sews": {
    "name": "Sumitomo Electric Wiring Systems",
@@ -10038,13 +9941,6 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
-  },
-  "calstart": {
-   "name": "CALSTART",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-11-15",
-   "last_fail": "2026-11-17"
   },
   "camstex": {
    "name": "CAMS",
@@ -10806,6 +10702,13 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "saronic": {
+   "name": "Saronic",
+   "quant": false,
+   "fails": 1,
+   "added": "2026-11-18",
+   "last_fail": "2026-11-18"
+  },
   "saviynt": {
    "name": "Saviynt",
    "quant": false,
@@ -11115,13 +11018,6 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
-  },
-  "Xpansiv": {
-   "name": "Xpansiv",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-11-15",
-   "last_fail": "2026-11-17"
   },
   "xsolla": {
    "name": "Xsolla",
@@ -12008,13 +11904,6 @@
    "fails": 0,
    "added": "2026-09-14"
   },
-  "acretrader-jobs": {
-   "name": "AcreTrader",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-11-15",
-   "last_fail": "2026-11-17"
-  },
   "amika-careers": {
    "name": "amika",
    "quant": false,
@@ -12159,13 +12048,6 @@
    "fails": 0,
    "added": "2026-09-14"
   },
-  "etg": {
-   "name": "Exploration Technology Corp.",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-11-15",
-   "last_fail": "2026-11-17"
-  },
   "exacare-inc": {
    "name": "exacare ai",
    "quant": false,
@@ -12199,9 +12081,9 @@
   "gitar-careers": {
    "name": "Gitar, Inc.",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-11-17",
-   "last_fail": "2026-11-17"
+   "last_fail": "2026-11-18"
   },
   "golden": {
    "name": "Golden Analytics",
@@ -12359,6 +12241,12 @@
    "fails": 0,
    "added": "2026-10-03"
   },
+  "raptor-maps-inc": {
+   "name": "Raptor Maps",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-18"
+  },
   "rev-robotics": {
    "name": "REV Robotics",
    "quant": false,
@@ -12370,6 +12258,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-14"
+  },
+  "smarty": {
+   "name": "Smarty",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-18"
   },
   "spreeai": {
    "name": "SpreeAI ",
@@ -12450,10 +12344,10 @@
   "careers.gulfstream.com": {
    "name": "Gulfstream Aerospace",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-11-17",
    "sector": "engineering_manufacturing",
-   "last_fail": "2026-11-17"
+   "last_fail": "2026-11-18"
   },
   "careers.hfsinclair.com": {
    "name": "HF Sinclair",
@@ -12577,10 +12471,9 @@
   "jobs.paccar.com": {
    "name": "Paccar",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-18",
-   "sector": "engineering_manufacturing",
-   "last_fail": "2026-11-17"
+   "sector": "engineering_manufacturing"
   },
   "jobs.royalcaribbeangroup.com": {
    "name": "Royal Caribbean Group",
@@ -12606,18 +12499,16 @@
   "mhicareers.com": {
    "name": "Mitsubishi Heavy Industries America",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-18",
-   "sector": "engineering_manufacturing",
-   "last_fail": "2026-11-17"
+   "sector": "engineering_manufacturing"
   },
   "www.careerprofile.epiroc.com": {
    "name": "Epiroc",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-18",
-   "sector": "engineering_manufacturing",
-   "last_fail": "2026-11-17"
+   "sector": "engineering_manufacturing"
   },
   "www.careers.zurich.com": {
    "name": "Zurich Insurance",
@@ -12653,26 +12544,12 @@
    "fails": 0,
    "added": "2026-09-15"
   },
-  "energytransfer|etp_ext": {
-   "name": "Energy Transfer Partners",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-11-15",
-   "last_fail": "2026-11-17"
-  },
   "hyatt|10780": {
    "name": "Hyatt",
    "quant": false,
    "fails": 0,
    "added": "2026-09-15",
    "sector": "hospitality_sports"
-  },
-  "kp|external": {
-   "name": "Kaiser Permanente",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-11-15",
-   "last_fail": "2026-11-17"
   },
   "lbl|5": {
    "name": "Lawrence Berkeley National Laboratory",
@@ -12924,6 +12801,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-14"
+  },
+  "ecliptic-enterprises-corporation": {
+   "name": "Ecliptic Enterprises",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-18"
   },
   "elevate-semiconductor": {
    "name": "Elevate Semiconductor",
@@ -13965,9 +13848,8 @@
   "arlo|wd12|external_careers": {
    "name": "Arlo",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "arraytechinc|wd5|Array_Careers": {
    "name": "ARRAY Technologies",
@@ -13996,9 +13878,8 @@
   "askbio|wd12|AskBio": {
    "name": "AskBio",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "asmglobal|wd1|careers": {
    "name": "ASM Global",
@@ -16234,6 +16115,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "fireflyspace|wd115|firefly": {
+   "name": "Firefly Aerospace",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-18"
+  },
   "firstam|wd1|fctcareers": {
    "name": "First Canadian Title",
    "quant": false,
@@ -17356,6 +17243,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-11-10"
+  },
+  "invitationhomes|wd503|INVH": {
+   "name": "Invitation Homes",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-18"
   },
   "iqvia|wd1|IQVIA": {
    "name": "IQVIA",
