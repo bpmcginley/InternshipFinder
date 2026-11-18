@@ -13639,9 +13639,8 @@
   "amainc|wd12|ama_careers": {
    "name": "Analytical Mechanics Associates",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "amat|wd1|External": {
    "name": "Applied Materials",
@@ -13827,9 +13826,8 @@
   "ardian|wd103|ArdianCareers": {
    "name": "Ardian",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "argonne|wd1|Argonne_Careers": {
    "name": "Argonne National Laboratory",
@@ -16505,6 +16503,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-18"
+  },
+  "giro|wd10|GIRO": {
+   "name": "GIRO",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-18"
   },
   "gi|wd1|Global_Infrastructure": {
    "name": "Global Infrastructure",
