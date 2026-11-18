@@ -2957,6 +2957,12 @@
    "fails": 0,
    "added": "2026-11-17"
   },
+  "csmc": {
+   "name": "Canadian Strategic Missions",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-18"
+  },
   "ecmtek": {
    "name": "ECM Tek",
    "quant": false,
@@ -3101,6 +3107,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-14"
+  },
+  "ssicorporate": {
+   "name": "SSI",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-18"
   },
   "surepoint": {
    "name": "SurePoint Ag Systems",
