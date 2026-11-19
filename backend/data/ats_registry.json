@@ -19128,9 +19128,8 @@
   "postman|wd108|careers": {
    "name": "Postman",
    "quant": false,
-   "fails": 1,
-   "added": "2026-11-14",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-11-14"
   },
   "premera|wd5|premera": {
    "name": "Premera Blue Cross",
