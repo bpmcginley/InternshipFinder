@@ -1484,6 +1484,12 @@
    "fails": 0,
    "added": "2026-11-10"
   },
+  "makermaker.ai": {
+   "name": "MakerMaker",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-19"
+  },
   "Marathon%20Fusion": {
    "name": "Marathon Fusion",
    "quant": false,
@@ -15013,9 +15019,8 @@
   "charlottenc|wd12|citgov": {
    "name": "City of Charlotte",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "chartermfg|wd5|Charter_Careers": {
    "name": "Charter Manufacturing",
@@ -16324,10 +16329,9 @@
   "fticonsulting|wd108|CompassLexeconCareers": {
    "name": "Compass Lexecon",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-18",
-   "sector": "economic_consulting",
-   "last_fail": "2026-11-16"
+   "sector": "economic_consulting"
   },
   "fticonsulting|wd108|FTIConsultingCareers": {
    "name": "FTI Consulting",
@@ -16959,9 +16963,8 @@
   "hq|wd12|Securian_External": {
    "name": "Securian Financial Group",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "hrhub|wd3|Euronext_Career_Page": {
    "name": "Euronext",
@@ -20108,9 +20111,8 @@
   "spscommerce|wd108|SPS": {
    "name": "SPS Commerce",
    "quant": false,
-   "fails": 1,
-   "added": "2026-10-14",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-10-14"
   },
   "ssctech|wd1.myworkdaysite.com|SSCTechnologies": {
    "name": "SS&C",
