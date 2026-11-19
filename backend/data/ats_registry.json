@@ -3467,6 +3467,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "amperity": {
+   "name": "Amperity",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-19"
+  },
   "ampsortation": {
    "name": "Amp Robotics",
    "quant": false,
@@ -6989,6 +6995,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "scoutspace": {
+   "name": "Scout Space",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-19"
   },
   "seatgeek": {
    "name": "SeatGeek",
@@ -19643,9 +19655,8 @@
   "salesforce|wd12|Futureforce_Internships": {
    "name": "Salesforce",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "salesforce|wd12|futureforce_newgradroles": {
    "name": "Salesforce",
@@ -19657,9 +19668,8 @@
   "salesforce|wd12|Salesforce_Research": {
    "name": "Salesforce",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "sallie-mae|wd5|Careers": {
    "name": "Sallie Mae",
