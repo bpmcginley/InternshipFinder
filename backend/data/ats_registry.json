@@ -5915,6 +5915,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "lucidsoftware": {
+   "name": "Lucid",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-19"
+  },
   "lumbermens": {
    "name": "Lumbermen's",
    "quant": false,
@@ -6614,13 +6620,6 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-18"
-  },
-  "postman": {
-   "name": "Postman",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-11-16",
-   "last_fail": "2026-11-18"
   },
   "practisinglawinstitute": {
    "name": "Practising Law Institute",
@@ -8362,9 +8361,9 @@
   "globalcareers-atlassian": {
    "name": "Atlassian",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-11-17",
-   "last_fail": "2026-11-18"
+   "last_fail": "2026-11-19"
   },
   "gsk-us-earlytalent": {
    "name": "GSK",
@@ -8381,9 +8380,9 @@
   "jobs-legrand": {
    "name": "Legrand North America",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-11-18",
-   "last_fail": "2026-11-18"
+   "last_fail": "2026-11-19"
   },
   "staff-emory": {
    "name": "Emory University",
@@ -8444,6 +8443,12 @@
    "fails": 0,
    "added": "2026-09-18",
    "sector": "engineering_manufacturing"
+  },
+  "careers.andersen.com": {
+   "name": "Andersen",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-19"
   },
   "careers.arcfield.com": {
    "name": "Arcfield",
@@ -8872,6 +8877,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-11-10"
+  },
+  "jobs.sheetz.com": {
+   "name": "Sheetz",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-19"
   },
   "jobs.statefarm.com": {
    "name": "State Farm",
@@ -10723,9 +10734,9 @@
   "saronic": {
    "name": "Saronic",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-11-18",
-   "last_fail": "2026-11-18"
+   "last_fail": "2026-11-19"
   },
   "saviynt": {
    "name": "Saviynt",
@@ -10908,9 +10919,8 @@
   "thinkahead": {
    "name": "AHEAD",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-18"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "traackr": {
    "name": "Traackr",
@@ -12100,9 +12110,9 @@
   "gitar-careers": {
    "name": "Gitar, Inc.",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-11-17",
-   "last_fail": "2026-11-18"
+   "last_fail": "2026-11-19"
   },
   "golden": {
    "name": "Golden Analytics",
@@ -12363,10 +12373,10 @@
   "careers.gulfstream.com": {
    "name": "Gulfstream Aerospace",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-11-17",
    "sector": "engineering_manufacturing",
-   "last_fail": "2026-11-18"
+   "last_fail": "2026-11-19"
   },
   "careers.hfsinclair.com": {
    "name": "HF Sinclair",
@@ -16637,9 +16647,8 @@
   "greyco|wd108|GTI": {
    "name": "Greystone",
    "quant": false,
-   "fails": 1,
-   "added": "2026-11-12",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-11-12"
   },
   "greystar|wd1|External": {
    "name": "Greystar Worldwide",
@@ -17689,6 +17698,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-10-25"
+  },
+  "liveramp|wd5|LiveRampCareers": {
+   "name": "LiveRamp",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-19"
   },
   "llbean|wd1|LLBean_Careers": {
    "name": "L.L.Bean",
@@ -20456,9 +20471,8 @@
   "texaspsf|wd501|TexasPSFCareers": {
    "name": "Texas Permanent School Fund Corporation",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "thales|wd3|careers": {
    "name": "Thales",
@@ -20501,9 +20515,8 @@
   "thgrp|wd12|envita": {
    "name": "Envita Solutions",
    "quant": false,
-   "fails": 1,
-   "added": "2026-11-13",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-11-13"
   },
   "thinkbrg|wd5|BRG_External_Career_Site": {
    "name": "BRG",
@@ -21519,9 +21532,8 @@
   "zebra|wd501|Zebra_careers": {
    "name": "Zebra Technologies",
    "quant": false,
-   "fails": 1,
-   "added": "2026-10-20",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-10-20"
   },
   "zeissgroup|wd3|External": {
    "name": "Zeiss",

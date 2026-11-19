@@ -297,6 +297,10 @@
 42.7006,
 -74.0337
 ],
+"altoona|PA":[
+40.5194,
+-78.3968
+],
 "ambler|PA":[
 40.1545,
 -75.2222
@@ -663,6 +667,10 @@
 "clark|NJ":[
 40.6234,
 -74.3148
+],
+"claysburg|PA":[
+40.2967,
+-78.4497
 ],
 "clifton park|NY":[
 42.863,
@@ -2466,6 +2474,7 @@
 "pennsylvania - philadelphia|PA":null,
 "pennsylvania - radnor|PA":null,
 "pennsylvania - remote|PA":null,
+"pennsylvania remote (usa|PA":null,
 "pennsylvania remote work|PA":null,
 "pennsylvania|PA":[
 40.0117,

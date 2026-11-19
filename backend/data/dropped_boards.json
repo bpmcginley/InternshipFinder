@@ -130,6 +130,10 @@
    "on": "2026-10-24",
    "why": "dead"
   },
+  "postman": {
+   "on": "2026-11-19",
+   "why": "dead"
+  },
   "pretiuminternships2027": {
    "on": "2026-11-09",
    "why": "dead"
@@ -1595,10 +1599,6 @@
   "jainglobal|wd5|externalsite": {
    "on": "2026-09-30",
    "why": "robots"
-  },
-  "liveramp|wd5|liverampcareers": {
-   "on": "2026-10-05",
-   "why": "dead"
   },
   "lowes|wd5|lws_external_cs": {
    "on": "2026-09-30",
