@@ -1351,6 +1351,10 @@
 40.096,
 -75.1257
 ],
+"johnson city|NY":[
+42.1157,
+-75.9588
+],
 "johnstown|PA":[
 40.3267,
 -78.922
@@ -1848,6 +1852,7 @@
 "new york city-remote|NY":null,
 "new york hauppauge|NY":null,
 "new york metro area|NY":null,
+"new york metropolitan area|NY":null,
 "new york new york united states|NY":null,
 "new york ny usa|NY":null,
 "new york ny|NY":[

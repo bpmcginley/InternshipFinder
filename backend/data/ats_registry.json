@@ -14,6 +14,12 @@
    "added": "2026-09-18",
    "sector": "education_research"
   },
+  "93fdfc70-37a2-4cde-ba86-0da4925db4c8": {
+   "name": "iA",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-20"
+  },
   "c8a69c17-a9c1-45ff-8324-98137a9b6b4d": {
    "name": "Greater Boston Food Bank",
    "quant": false,
@@ -2987,6 +2993,12 @@
    "fails": 0,
    "added": "2026-11-17"
   },
+  "efifoundation": {
+   "name": "EFI Foundation",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-20"
+  },
   "euna": {
    "name": "EUNA Solutions",
    "quant": false,
@@ -3035,6 +3047,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-15"
+  },
+  "mariastechnology": {
+   "name": "Marias Technology",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-20"
   },
   "marqueebrands": {
    "name": "Marquee Brands",
@@ -3095,6 +3113,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-11-17"
+  },
+  "rexa": {
+   "name": "REXA",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-20"
   },
   "ruekertmielke": {
    "name": "Ruekert & Mielke",
@@ -11940,6 +11964,12 @@
    "fails": 0,
    "added": "2026-09-19"
   },
+  "icfcjb.fa.ocs.oraclecloud.com|Aerospace": {
+   "name": "Honeywell Aerospace",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-20"
+  },
   "jpmc.fa.oraclecloud.com|CX_1001": {
    "name": "JPMorgan Chase",
    "quant": false,
@@ -17940,6 +17970,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "masseyservices|wd5|masseyservices": {
+   "name": "Massey Services",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-20"
   },
   "massgeneralbrigham|wd1|mgbexternal": {
    "name": "Mass General Brigham",
