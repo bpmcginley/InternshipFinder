@@ -2915,6 +2915,12 @@
    "fails": 0,
    "added": "2026-11-17"
   },
+  "amii": {
+   "name": "Amii",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-20"
+  },
   "angelhost": {
    "name": "Angel Host",
    "quant": false,
@@ -4401,6 +4407,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "deliveroo": {
+   "name": "Deliveroo",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-20"
+  },
   "detroitlions": {
    "name": "Detroit Lions",
    "quant": false,
@@ -5395,6 +5407,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "horizontradingsolutions": {
+   "name": "Horizon Trading Solutions",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-20"
   },
   "hpiq": {
    "name": "HP IQ",
@@ -8376,13 +8394,6 @@
    "fails": 0,
    "added": "2026-09-15"
   },
-  "globalcareers-atlassian": {
-   "name": "Atlassian",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-11-17",
-   "last_fail": "2026-11-19"
-  },
   "gsk-us-earlytalent": {
    "name": "GSK",
    "quant": false,
@@ -8398,9 +8409,9 @@
   "jobs-legrand": {
    "name": "Legrand North America",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-11-18",
-   "last_fail": "2026-11-19"
+   "last_fail": "2026-11-20"
   },
   "staff-emory": {
    "name": "Emory University",
@@ -9524,6 +9535,12 @@
    "fails": 0,
    "added": "2026-09-18"
   },
+  "southernmississippitradingllc": {
+   "name": "Southern Mississippi Trading",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-20"
+  },
   "southernstatesllc": {
    "name": "Southern States, LLC",
    "quant": false,
@@ -9567,6 +9584,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-18"
+  },
+  "taranawireless": {
+   "name": "Tarana Wireless",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-20"
   },
   "techinsights": {
    "name": "TechInsights",
@@ -10752,9 +10775,9 @@
   "saronic": {
    "name": "Saronic",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-11-18",
-   "last_fail": "2026-11-19"
+   "last_fail": "2026-11-20"
   },
   "saviynt": {
    "name": "Saviynt",
@@ -11975,6 +11998,12 @@
    "fails": 0,
    "added": "2026-09-14"
   },
+  "barrys-careers": {
+   "name": "Barry's",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-20"
+  },
   "blue-robotics": {
    "name": "Blue Robotics",
    "quant": false,
@@ -12124,13 +12153,6 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-14"
-  },
-  "gitar-careers": {
-   "name": "Gitar, Inc.",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-11-17",
-   "last_fail": "2026-11-19"
   },
   "golden": {
    "name": "Golden Analytics",
@@ -12354,6 +12376,12 @@
    "fails": 0,
    "added": "2026-09-14"
   },
+  "uplinq": {
+   "name": "Uplinq",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-20"
+  },
   "usare": {
    "name": "American Rare Earths",
    "quant": false,
@@ -12387,14 +12415,6 @@
    "fails": 0,
    "added": "2026-09-18",
    "sector": "energy_environment"
-  },
-  "careers.gulfstream.com": {
-   "name": "Gulfstream Aerospace",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-11-17",
-   "sector": "engineering_manufacturing",
-   "last_fail": "2026-11-19"
   },
   "careers.hfsinclair.com": {
    "name": "HF Sinclair",
@@ -16656,9 +16676,8 @@
   "gresearch|wd103|G-Research": {
    "name": "G-Research",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "greyco|wd108|GTI": {
    "name": "Greystone",
@@ -16903,10 +16922,9 @@
   "hmhw|wd12|hmh_careers": {
    "name": "HMH",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-13",
-   "sector": "education_research",
-   "last_fail": "2026-11-16"
+   "sector": "education_research"
   },
   "hntb|wd5|hntb_careers": {
    "name": "HNTB",

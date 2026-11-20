@@ -648,6 +648,10 @@
    "on": "2026-11-07",
    "why": "robots"
   },
+  "globalcareers-atlassian": {
+   "on": "2026-11-20",
+   "why": "dead"
+  },
   "ideas-sas": {
    "on": "2026-10-03",
    "why": "robots"
@@ -764,6 +768,10 @@
   },
   "etg": {
    "on": "2026-11-18",
+   "why": "dead"
+  },
+  "gitar-careers": {
+   "on": "2026-11-20",
    "why": "dead"
   }
  },
@@ -1399,6 +1407,12 @@
   "wise": {
    "on": "2026-10-19",
    "why": "robots"
+  }
+ },
+ "successfactors": {
+  "careers.gulfstream.com": {
+   "on": "2026-11-20",
+   "why": "dead"
   }
  },
  "taleo": {
