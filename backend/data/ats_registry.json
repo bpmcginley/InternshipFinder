@@ -3017,6 +3017,12 @@
    "fails": 0,
    "added": "2026-09-14"
   },
+  "flare": {
+   "name": "Flare",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-20"
+  },
   "fpwa": {
    "name": "FPWA",
    "quant": false,
@@ -3161,6 +3167,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-11-17"
+  },
+  "silverlogic": {
+   "name": "The SilverLogic",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-20"
   },
   "smule": {
    "name": "Smule",
@@ -3556,6 +3568,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "aon3d": {
+   "name": "AON3D",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-20"
   },
   "aperaaiinc": {
    "name": "Apera AI",
@@ -11509,8 +11527,9 @@
   "ekmu.fa.em3.oraclecloud.com|CX_6009": {
    "name": "Fife Council",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-14"
+   "fails": 1,
+   "added": "2026-09-14",
+   "last_fail": "2026-11-20"
   },
   "elcn.fa.us2.oraclecloud.com|CX": {
    "name": "EXP",
@@ -11534,8 +11553,9 @@
   "elyq.fa.em3.oraclecloud.com|CX": {
    "name": "Newham",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-19"
+   "fails": 1,
+   "added": "2026-09-19",
+   "last_fail": "2026-11-20"
   },
   "emit.fa.ca3.oraclecloud.com|CX_2001": {
    "name": "WSP",
@@ -11649,8 +11669,9 @@
   "fa-errt-saasfaprod1.fa.ocs.oraclecloud.com|CX_2001": {
    "name": "SCOR",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-14"
+   "fails": 1,
+   "added": "2026-09-14",
+   "last_fail": "2026-11-20"
   },
   "fa-ertb-saasfaprod1.fa.ocs.oraclecloud.com|CX_2": {
    "name": "Photon",
@@ -11733,8 +11754,9 @@
   "fa-evmr-saasfaprod1.fa.ocs.oraclecloud.com|CX_1": {
    "name": "Nokia",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-14"
+   "fails": 1,
+   "added": "2026-09-14",
+   "last_fail": "2026-11-20"
   },
   "fa-ewgu-saasfaprod1.fa.ocs.oraclecloud.com|CX_2001": {
    "name": "Chubb",
@@ -20764,9 +20786,8 @@
   "trinitylifesciences|wd108|Trinity": {
    "name": "Trinity Life Sciences",
    "quant": false,
-   "fails": 1,
-   "added": "2026-11-12",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-11-12"
   },
   "troweprice|wd5|TRowePrice": {
    "name": "T. Rowe Price",
@@ -21040,9 +21061,8 @@
   "usertesting|wd12|UserTesting": {
    "name": "UserTesting",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "usnh|wd5|Careers": {
    "name": "University System of New Hampshire",
