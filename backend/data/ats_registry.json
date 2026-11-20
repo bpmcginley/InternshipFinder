@@ -2637,6 +2637,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "trener-robotics": {
+   "name": "Trener Robotics",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-20"
+  },
   "triumph-arcade": {
    "name": "Triumph",
    "quant": false,
@@ -2945,6 +2951,12 @@
    "fails": 0,
    "added": "2026-09-14"
   },
+  "avnan": {
+   "name": "Avnan",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-20"
+  },
   "berkshiregrey": {
    "name": "Berkshire Grey",
    "quant": false,
@@ -3084,6 +3096,12 @@
    "fails": 0,
    "added": "2026-11-17"
   },
+  "ottawatourism": {
+   "name": "Ottawa Tourism",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-20"
+  },
   "pictonmahoney": {
    "name": "Picton Mahoney Asset Management",
    "quant": false,
@@ -3143,6 +3161,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-11-17"
+  },
+  "smule": {
+   "name": "Smule",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-20"
   },
   "specteraerospace": {
    "name": "Specter Aerospace",
@@ -3416,6 +3440,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "aisi": {
+   "name": "AI Security Institute",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-20"
   },
   "akunacapital": {
    "name": "Akunacapital",
@@ -5480,6 +5510,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "icapitalnetwork": {
+   "name": "iCapital Network",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-20"
   },
   "icon": {
    "name": "ICON",
@@ -19028,9 +19064,8 @@
   "petermillarllc|wd12|PMI": {
    "name": "Peter Millar",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "petronascanada|wd3|PETRONASCanada": {
    "name": "PETRONAS Canada",
