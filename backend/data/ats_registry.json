@@ -2993,6 +2993,12 @@
    "fails": 0,
    "added": "2026-11-17"
   },
+  "convverge": {
+   "name": "Convverge",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-21"
+  },
   "csmc": {
    "name": "Canadian Strategic Missions",
    "quant": false,
@@ -3216,6 +3222,12 @@
    "fails": 0,
    "added": "2026-09-14",
    "sector": "education_research"
+  },
+  "vaticoutsourcing": {
+   "name": "Vatic Outsourcing",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-21"
   },
   "xradar": {
    "name": "Xradar",
@@ -9486,6 +9498,12 @@
    "fails": 0,
    "added": "2026-10-08"
   },
+  "nottinghamspirk": {
+   "name": "Nottingham Spirk",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-21"
+  },
   "novatechengineering": {
    "name": "Nova-Tech Engineering",
    "quant": false,
@@ -9697,6 +9715,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-18"
+  },
+  "thekentuckyscienceandtechnologycorporation": {
+   "name": "Kentucky Science and Technology Corporation",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-21"
   },
   "trilogyinnovations": {
    "name": "Trilogy Innovations",
@@ -11224,10 +11248,9 @@
   "ebcs.fa.em2.oraclecloud.com|CX_1": {
    "name": "Arcadis",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-14",
-   "sector": "energy_environment",
-   "last_fail": "2026-11-21"
+   "sector": "energy_environment"
   },
   "ebgj.fa.us2.oraclecloud.com|CX_1": {
    "name": "Texas Instruments",
@@ -11238,9 +11261,8 @@
   "ebwb.fa.us2.oraclecloud.com|CX": {
    "name": "Hologic",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-11-21"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "ebwg.fa.us2.oraclecloud.com|CX": {
    "name": "ACI Worldwide ",
@@ -11251,9 +11273,8 @@
   "ebwh.fa.us2.oraclecloud.com|CX_1001": {
    "name": "Macy's",
    "quant": false,
-   "fails": 1,
-   "added": "2026-10-06",
-   "last_fail": "2026-11-21"
+   "fails": 0,
+   "added": "2026-10-06"
   },
   "ebxr.fa.us2.oraclecloud.com|CX_1": {
    "name": "DTCC",
@@ -11270,9 +11291,8 @@
   "ecge.fa.us2.oraclecloud.com|CX_1003": {
    "name": "Blue Shield of California",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-11-21"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "ecnf.fa.us2.oraclecloud.com|CX": {
    "name": "Tradeweb",
@@ -11289,9 +11309,8 @@
   "edbz.fa.us2.oraclecloud.com|CX": {
    "name": "Texas Instruments",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-11-21"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "edel.fa.us2.oraclecloud.com|CX_2001": {
    "name": "Fortinet",
@@ -11314,16 +11333,14 @@
   "edyy.fa.us2.oraclecloud.com|CX_2002": {
    "name": "Sinclair",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-11-21"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "eedu.fa.em3.oraclecloud.com|CX_1003": {
    "name": "WTW",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-11-21"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "eeho.fa.us2.oraclecloud.com|CX_45001": {
    "name": "Oracle",
@@ -11334,18 +11351,16 @@
   "eeik.fa.us2.oraclecloud.com|CX_1": {
    "name": "University of Wyoming",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-14",
-   "sector": "education_research",
-   "last_fail": "2026-11-21"
+   "sector": "education_research"
   },
   "eevd.fa.us6.oraclecloud.com|CX_1": {
    "name": "Hearst",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-14",
-   "sector": "media",
-   "last_fail": "2026-11-21"
+   "sector": "media"
   },
   "eewl.fa.us6.oraclecloud.com|CX": {
    "name": "Sundt",
@@ -11362,24 +11377,21 @@
   "eezy.fa.ca2.oraclecloud.com|CX": {
    "name": "ATCO",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-11-21"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "efds.fa.em5.oraclecloud.com|CX_1": {
    "name": "Ford Motor Company",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-11-21"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "efet.fa.us2.oraclecloud.com|CX_1009": {
    "name": "Hilton Worldwide",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-14",
-   "sector": "hospitality_sports",
-   "last_fail": "2026-11-21"
+   "sector": "hospitality_sports"
   },
   "efsp.fa.us6.oraclecloud.com|CX": {
    "name": "Hoffman Construction",
@@ -11390,9 +11402,8 @@
   "egay.fa.us6.oraclecloud.com|CX_4001": {
    "name": "NOV",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-11-21"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "egpy.fa.us2.oraclecloud.com|JoinAbt": {
    "name": "Abt Global",
@@ -11416,23 +11427,20 @@
   "egud.fa.us2.oraclecloud.com|CX_1": {
    "name": "AutoZone",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-21",
-   "last_fail": "2026-11-21"
+   "fails": 0,
+   "added": "2026-09-21"
   },
   "egug.fa.us2.oraclecloud.com|CX_1": {
    "name": "American Express",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-11-21"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "egup.fa.us2.oraclecloud.com|CX": {
    "name": "Vertiv",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-11-21"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "ehac.fa.us6.oraclecloud.com|CX_1": {
    "name": "Williams-Sonoma",
@@ -11449,16 +11457,14 @@
   "ehtc.fa.ca2.oraclecloud.com|CX_1": {
    "name": "Metrolinx",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-11-21"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "ehth.fa.em2.oraclecloud.com|CX_2001": {
    "name": "Garrett Motion",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-11-21"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "ehtl.fa.us6.oraclecloud.com|CX": {
    "name": "Resideo",
@@ -11488,52 +11494,45 @@
   "ejko.fa.us2.oraclecloud.com|CX_2": {
    "name": "Emergent Holdings ",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-11-21"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "ejko.fa.us2.oraclecloud.com|CX_3": {
    "name": "Blue Cross Blue Shield of Michigan",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-11-21"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "ejov.fa.ca2.oraclecloud.com|CX": {
    "name": "GHD",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-11-21"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "ejrz.fa.us2.oraclecloud.com|CX_5001": {
    "name": "VITAS Healthcare",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-11-21"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "ejta.fa.us6.oraclecloud.com|CX_2001": {
    "name": "Fortive",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-11-21"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "ejwl.fa.us2.oraclecloud.com|CX": {
    "name": "Marriott International",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-15",
-   "sector": "hospitality_sports",
-   "last_fail": "2026-11-21"
+   "sector": "hospitality_sports"
   },
   "ekaw.fa.us2.oraclecloud.com|CX": {
    "name": "Securitas",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-11-21"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "ekbq.fa.em2.oraclecloud.com|CX_2": {
    "name": "Schroders",
@@ -11562,16 +11561,14 @@
   "ekkf.fa.em2.oraclecloud.com|CX": {
    "name": "Samsonite",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-11-21"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "ekkh.fa.us2.oraclecloud.com|CX_2002": {
    "name": "Hormel Foods",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-11-21"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "ekmu.fa.em3.oraclecloud.com|CX_6009": {
    "name": "Fife Council",
@@ -11607,16 +11604,14 @@
   "emit.fa.ca3.oraclecloud.com|CX_2001": {
    "name": "WSP",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-11-21"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "emje.fa.us6.oraclecloud.com|CX_1001": {
    "name": "Southern Company",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-11-21"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "emqz.fa.us2.oraclecloud.com|CX_1": {
    "name": "Wayne County",
@@ -11633,9 +11628,8 @@
   "eofe.fa.us2.oraclecloud.com|CX_1001": {
    "name": "BNY",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-11-21"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "eoje.fa.us2.oraclecloud.com|CX_1001": {
    "name": "Black Box",
@@ -11646,10 +11640,9 @@
   "eppr.fa.us2.oraclecloud.com|CX_2": {
    "name": "Northwell Health",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-14",
-   "sector": "health",
-   "last_fail": "2026-11-21"
+   "sector": "health"
   },
   "epyc.fa.us2.oraclecloud.com|CX_1001": {
    "name": "Clean Harbors",
@@ -11660,23 +11653,20 @@
   "erqh.fa.us2.oraclecloud.com|CX_1001": {
    "name": "Atlantic Health System",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-11-21"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "etyy.fa.ap2.oraclecloud.com|CX_1": {
    "name": "Kulicke & Soffa",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-11-21"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "ewvl.fa.us8.oraclecloud.com|CX_1": {
    "name": "Savannah River National Laboratory",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-11-21"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "fa-elzs-saasfaprod1.fa.ocs.oraclecloud.com|CX": {
    "name": "Manhattan DA - Support Staff Openings",
@@ -11687,9 +11677,8 @@
   "fa-eomj-saasfaprod1.fa.ocs.oraclecloud.com|CX_1001": {
    "name": "First West Credit Union",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-11-21"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "fa-eowa-saasfaprod1.fa.ocs.oraclecloud.com|CSXCareers": {
    "name": "CSX",
@@ -11718,16 +11707,14 @@
   "fa-erjf-saasfaprod1.fa.ocs.oraclecloud.com|CX_1": {
    "name": "Strathcona County",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-11-21"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "fa-erqb-saasfaprod1.fa.ocs.oraclecloud.com|CX_1": {
    "name": "ADT",
    "quant": false,
-   "fails": 1,
-   "added": "2026-10-13",
-   "last_fail": "2026-11-21"
+   "fails": 0,
+   "added": "2026-10-13"
   },
   "fa-errt-saasfaprod1.fa.ocs.oraclecloud.com|CX_2001": {
    "name": "SCOR",
@@ -11744,9 +11731,8 @@
   "fa-esgu-saasfaprod1.fa.ocs.oraclecloud.com|CX_1": {
    "name": "Mortenson",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-11-21"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "fa-espx-saasfaprod1.fa.ocs.oraclecloud.com|CX_1": {
    "name": "Cummins",
@@ -11757,23 +11743,20 @@
   "fa-essf-saasfaprod1.fa.ocs.oraclecloud.com|CX_1": {
    "name": "Berkshire Hathaway Energy",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-11-21"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "fa-etbx-saasfaprod1.fa.ocs.oraclecloud.com|nfcu": {
    "name": "Navy Federal",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-11-21"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "fa-etgw-saasfaprod1.fa.ocs.oraclecloud.com|CX_1": {
    "name": "TriNet",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-11-21"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "fa-etqo-saasfaprod1.fa.ocs.oraclecloud.com|CX_1": {
    "name": "HEXAWARE",
@@ -11784,9 +11767,8 @@
   "fa-etum-saasfaprod1.fa.ocs.oraclecloud.com|CX_1": {
    "name": "GuideWell Mutual",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-11-21"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "fa-etvl-saasfaprod1.fa.ocs.oraclecloud.com|CX_1": {
    "name": "Zensar",
@@ -11803,23 +11785,20 @@
   "fa-euwp-saasfaprod1.fa.ocs.oraclecloud.com|CX_1": {
    "name": "Mayo Clinic",
    "quant": false,
-   "fails": 1,
-   "added": "2026-10-06",
-   "last_fail": "2026-11-21"
+   "fails": 0,
+   "added": "2026-10-06"
   },
   "fa-euxc-saasfaprod1.fa.ocs.oraclecloud.com|CX_1": {
    "name": "Citco",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-11-21"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "fa-evcg-saasfaprod1.fa.ocs.oraclecloud.com|CX_1": {
    "name": "BGIS",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-11-21"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "fa-evmr-saasfaprod1.fa.ocs.oraclecloud.com|CX_1": {
    "name": "Nokia",
@@ -11830,17 +11809,15 @@
   "fa-ewgu-saasfaprod1.fa.ocs.oraclecloud.com|CX_2001": {
    "name": "Chubb",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-14",
-   "sector": "insurance_finance",
-   "last_fail": "2026-11-21"
+   "sector": "insurance_finance"
   },
   "fa-ewjt-saasfaprod1.fa.ocs.oraclecloud.com|CX_2": {
    "name": "EXL",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-11-21"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "fa-ewmy-saasfaprod1.fa.ocs.oraclecloud.com|CX_1": {
    "name": "Verisk",
@@ -11863,32 +11840,28 @@
   "fa-exby-saasfaprod1.fa.ocs.oraclecloud.com|CX_1013": {
    "name": "BC Pensions",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-11-21"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "fa-exhh-saasfaprod1.fa.ocs.oraclecloud.com|StaplesInc": {
    "name": "Staples",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-15",
-   "sector": "retail_consumer",
-   "last_fail": "2026-11-21"
+   "sector": "retail_consumer"
   },
   "fa-exjq-saasfaprod1.fa.ocs.oraclecloud.com|SHEIN": {
    "name": "SHEIN",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-11-21"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "fa-exki-saasfaprod1.fa.ocs.oraclecloud.com|CX_1": {
    "name": "Fanatics",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-14",
-   "sector": "hospitality_sports",
-   "last_fail": "2026-11-21"
+   "sector": "hospitality_sports"
   },
   "fa-exkk-saasfaprod1.fa.ocs.oraclecloud.com|CX_1": {
    "name": "Arlington County VA",
@@ -11899,8 +11872,9 @@
   "fa-exmi-saasfaprod1.fa.ocs.oraclecloud.com|CX_1": {
    "name": "Weatherford",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-14"
+   "fails": 1,
+   "added": "2026-09-14",
+   "last_fail": "2026-11-21"
   },
   "fa-extu-saasfaprod1.fa.ocs.oraclecloud.com|CX_1": {
    "name": "Akamai Technologies",
@@ -11941,17 +11915,15 @@
   "hccz.fa.em3.oraclecloud.com|CX_2": {
    "name": "Pearson",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-09-14",
-   "sector": "education_research",
-   "last_fail": "2026-11-21"
+   "sector": "education_research"
   },
   "hcgn.fa.us2.oraclecloud.com|CX_1": {
    "name": "Citizens Financial Group",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-11-21"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "hcjy.fa.us2.oraclecloud.com|CX_1": {
    "name": "Cooper Companies",
@@ -11962,9 +11934,8 @@
   "hckd.fa.us2.oraclecloud.com|CX_1": {
    "name": "Molina Healthcare",
    "quant": false,
-   "fails": 1,
-   "added": "2026-10-31",
-   "last_fail": "2026-11-21"
+   "fails": 0,
+   "added": "2026-10-31"
   },
   "hckz.fa.us2.oraclecloud.com|CX_1": {
    "name": "Seaspan",
@@ -11975,9 +11946,8 @@
   "hcog.fa.em2.oraclecloud.com|CX_1": {
    "name": "Intertek",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-11-21"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "hcor.fa.us2.oraclecloud.com|CX_1": {
    "name": "Midmark ",
@@ -11994,9 +11964,8 @@
   "hcut.fa.ap2.oraclecloud.com|CX_1": {
    "name": "APL Logistics",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-11-21"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "hcwp.fa.us2.oraclecloud.com|CX_1": {
    "name": "Coherent ",
@@ -12025,9 +11994,8 @@
   "hdep.fa.us2.oraclecloud.com|CX": {
    "name": "Digital Realty",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-11-21"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "hdhl.fa.us6.oraclecloud.com|CX_1": {
    "name": "Stantec",
@@ -12039,16 +12007,14 @@
   "hdjq.fa.us2.oraclecloud.com|CX_1": {
    "name": "Emerson Electric",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-11-21"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "hdks.fa.ca2.oraclecloud.com|CX_1": {
    "name": "Definity Financial",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-11-21"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "hdnn.fa.us6.oraclecloud.com|CX": {
    "name": "Arconic",
@@ -12114,9 +12080,8 @@
   "jpmc.fa.oraclecloud.com|CX_1001": {
    "name": "JPMorgan Chase",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-11-21"
+   "fails": 0,
+   "added": "2026-09-14"
   }
  },
  "recruitee": {
@@ -15170,6 +15135,12 @@
    "fails": 0,
    "added": "2026-09-17"
   },
+  "centier|wd501|centierbankcareers": {
+   "name": "Centier Bank",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-21"
+  },
   "centific|wd1|Centific_Global": {
    "name": "Centific",
    "quant": false,
@@ -16374,6 +16345,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "firstpremier|wd503|PREMIER_Careers": {
+   "name": "First PREMIER Bank",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-21"
   },
   "firstquality|wd5|firstquality": {
    "name": "First Quality",
