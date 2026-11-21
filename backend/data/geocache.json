@@ -627,6 +627,10 @@
 40.1378,
 -79.8981
 ],
+"charlotte|NY":[
+42.301,
+-79.2319
+],
 "chatham|NJ":[
 40.7409,
 -74.3837
@@ -640,6 +644,10 @@
 -74.0015
 ],
 "cherry hill - nj|NJ":null,
+"cherry hill township|NJ":[
+39.9348,
+-75.0307
+],
 "chester|PA":[
 39.8496,
 -75.3557
@@ -822,6 +830,10 @@
 "delta|PA":[
 39.727,
 -76.3266
+],
+"denver|PA":[
+40.2331,
+-76.1372
 ],
 "dickson city|PA":[
 41.4715,
@@ -2471,6 +2483,10 @@
 "paterson|NJ":[
 40.9168,
 -74.1718
+],
+"paulsboro|NJ":[
+39.8304,
+-75.2405
 ],
 "pa|PA":null,
 "penn state altoona|PA":null,
