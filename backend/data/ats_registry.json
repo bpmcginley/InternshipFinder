@@ -11482,9 +11482,8 @@
   "ejhp.fa.us6.oraclecloud.com|CX_2": {
    "name": "Sherwin-Williams",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-11-21"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "ejia.fa.us6.oraclecloud.com|CX_1001": {
    "name": "S&C Electric Company",
@@ -17833,6 +17832,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "littelfuse|wd1|Littelfuse-University-Relations": {
+   "name": "Littelfuse",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-21"
+  },
   "livanova|wd5|search": {
    "name": "LivaNova",
    "quant": false,
@@ -21172,9 +21177,8 @@
   "valeris|wd108|Valeris": {
    "name": "Valeris",
    "quant": false,
-   "fails": 1,
-   "added": "2026-10-30",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-10-30"
   },
   "valmont|wd1|ValmontCareers": {
    "name": "Valmont",
