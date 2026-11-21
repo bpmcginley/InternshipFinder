@@ -11482,8 +11482,9 @@
   "ejhp.fa.us6.oraclecloud.com|CX_2": {
    "name": "Sherwin-Williams",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-14"
+   "fails": 1,
+   "added": "2026-09-14",
+   "last_fail": "2026-11-21"
   },
   "ejia.fa.us6.oraclecloud.com|CX_1001": {
    "name": "S&C Electric Company",
@@ -11872,9 +11873,8 @@
   "fa-exmi-saasfaprod1.fa.ocs.oraclecloud.com|CX_1": {
    "name": "Weatherford",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-14",
-   "last_fail": "2026-11-21"
+   "fails": 0,
+   "added": "2026-09-14"
   },
   "fa-extu-saasfaprod1.fa.ocs.oraclecloud.com|CX_1": {
    "name": "Akamai Technologies",
@@ -14604,9 +14604,8 @@
   "bigcommerce|wd12|Commerce": {
    "name": "BigCommerce",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "biibhr|wd3|external": {
    "name": "Biogen",
@@ -15824,9 +15823,8 @@
   "diamondbackenergy|wd12|DBE": {
    "name": "Diamondback Energy",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "dickssportinggoods|wd1|DSG": {
    "name": "Dick's Sporting Goods",
