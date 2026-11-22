@@ -15,15 +15,26 @@ Production now runs [#687](https://github.com/bpmcginley/InternshipFinder/pull/6
 `b167fbbf` with migrations through 0035. [#686](https://github.com/bpmcginley/InternshipFinder/pull/686)
 mounted the read-only operator route. The live route returns an empty no-store 401 without a bearer
 and an empty no-store 403 for browser preflight, without CORS authorization. Public configuration
-omits the top-up offer. Scheduled Stripe checks and new sales remain off. All nine checks passed on
+now advertises the top-up after activation. All nine checks passed on
 the reviewed scheduler head, including 78 focused native Worker tests across related suites. The
 combined clock test exercised employer maintenance and the full configured Stripe request bound.
 
-The remaining release steps are to qualify production Checkout and signed delivery without a charge,
-verify the funded client settings and scheduled reconciliation, publish the approved privacy and
-terms in [#681](https://github.com/bpmcginley/InternshipFinder/pull/681), then enable and verify
-checkout. The no-charge Stripe test uses a preview protected by Cloudflare Access. Independently
-verified history is required for retirement. Purchases with unverified gaps stay pending.
+The live no-charge test verified the $3 USD Checkout and confirmed it was expired and unpaid.
+The signed expiration event initially returned 502 while production lacked the live top-up Price
+configuration. A delivery of the same signed event returned 200 from the production webhook
+after configuration. The temporary previews were removed. Stripe recovery and scheduled reconciliation are enabled. The first production reconciliation
+initialized and released its database lease before checkout opened.
+
+The exact Worker release passed 58 focused native tests across settlement, funded spending and
+reconciliation. A separate local D1 rehearsal used the deployed configuration and both the 0.5.9
+source release and 0.6.0 candidate to verify that a synthetic top-up credited 25 runs and one
+streamed Auto-Apply call consumed exactly one. The rehearsal used no paid provider calls.
+
+The [privacy and terms](https://github.com/bpmcginley/InternshipFinder/pull/681) published from
+`5f0e028e` before activation. The production Worker advertises the one-time offer, requires session
+authentication and keeps normal subscription payments enabled. No live payment was taken in testing.
+Independently verified history remains required for retirement. Purchases with unverified gaps stay
+pending.
 
 ### Remaining work across both refactors
 
@@ -33,10 +44,10 @@ The count below covers the 25 numbered packages in the original Product hand-off
 | --- | --- |
 | Engineering listing cutover | [#329](https://github.com/bpmcginley/InternshipFinder/pull/329) is the last required package. Complete seven clean days of automatic listing delivery, refresh the exact head on current main, review and merge, then verify Tests, Pages, all listing pins and rollback readiness. Earliest observation completion is November 19 at 7:43:05 a.m. Eastern, subject to a continuously clean window. |
 | P-2.1 Follow email | Publish and verify the same-export catalog and archive, wire the site and Worker against trusted pins, and qualify sender policy, preview settings, shared capacity, maintenance cadence, restore and uncertain delivery recovery. Then verify signup, confirmation, digest and unsubscribe on the released path. |
-| P-2.2 One-time top-up | Qualify the actual Stripe account, mode, schema and approved live Price and funded-run configuration. Verify checkout, balance and recovery before enabling sales. Historical coverage and automatic erasure require separate proof under the approved policy. |
+| P-2.2 One-time top-up | Live. Unpaid Checkout, signed webhook delivery, scheduled reconciliation, published disclosures and funded client verification passed. Historical coverage and automatic erasure require separate proof under the approved policy. |
 | P-2.3 Employer click reporting | After the listing observation, publish annotations only and match the exact export. Verify catalog delivery and current UTC-day maintenance, then qualify Worker intake before browser capture and verify the private aggregate. |
 | P-2.4 Cross-device My List | Implement the approved design after November 24 at 7:26:35 p.m. Eastern. Verify two-device behavior, stale writes, deletion and restore, then coordinate privacy and Worker release. |
-| P-3.1 through P-3.4 Chrome extension | Limit card, review prompt, resume-first setup and practice form source are merged. Bruce reported 0.6.0 submitted with manual publishing selected and asked to defer routine Store review checks. On approval, coordinate manual publication after both refactors, verify the signed version and then publish the install instructions. |
+| P-3.1 through P-3.4 Chrome extension | Limit card, review prompt, resume-first setup and practice form source are merged. Bruce reported 0.6.0 approved with manual publishing selected and asked to defer routine Store review checks. Coordinate manual publication after both refactors, verify the signed version and then publish the install instructions. |
 | P-4.4 Advisor signup | Weekly advisor pages are live. The owner confirmed Tags is disabled and requires a paid upgrade on the current Buttondown plan. The tagged form and matching disclosure remain off. A release requires an owner decision on the paid feature or a revised signup scope, then coordinated publication and rollback verification. |
 
 P-4.1 pilot measurement and the hand-off’s 14-day counter reviews are follow-up on shipped work. The owner’s campaign and subscription choices, distribution announcement, demo clip and private cost inputs remain tracked separately.
@@ -767,7 +778,6 @@ The golden harness now covers static assets as well as generated pages. Each sit
 
 ## Waiting for Bruce
 
-- **AI top-up preflight.** Enable Cloudflare Access for previews of the production Worker with the owner sign-in. This gives the operator a private surface for the no-charge Stripe Checkout test.
 
 - **Reviewed Follow drafts.** [#653 database deadline](https://github.com/bpmcginley/InternshipFinder/pull/653) and [#654 scheduled digest](https://github.com/bpmcginley/InternshipFinder/pull/654) are staged with exact review and hosted checks. Follow and top-up sales remain off.
 
