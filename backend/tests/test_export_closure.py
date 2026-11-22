@@ -8,6 +8,7 @@ its missing roles while a failed or capped board keeps them carried, as before.
 
 import json
 import sys
+from datetime import date
 
 import httpx
 import pytest
@@ -26,6 +27,27 @@ ROLES = [
     "Mechanical Engineering Intern",
     "Finance Intern",
 ]
+
+
+def test_houseai_rows_are_not_carried_without_fresh_eligibility(tmp_path):
+    previous = [
+        {
+            "company_name": "House AI",
+            "ats": "direct",
+            "stage": ["internship"],
+            "title": title,
+            "status": "open",
+            "apply_url": f"https://www.houseaiapp.com/careers/role-{index}/apply",
+            "last_seen": "2026-11-30T20:00:00Z",
+            "via_search": True,
+        }
+        for index, title in enumerate(ROLES)
+    ]
+    listings = []
+    today = date(2026, 12, 1)
+    assert carry_open_boards(listings, str(tmp_path), today=today, prev=previous) == 0
+    assert carry_search_finds(listings, str(tmp_path), today=today, prev=previous) == 0
+    assert listings == []
 
 
 @pytest.fixture(autouse=True)
