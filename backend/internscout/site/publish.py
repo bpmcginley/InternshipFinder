@@ -116,6 +116,35 @@ def _today_utc() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
 
+def _write_redirects(site_dir: str, paths: set[str], state: runtime.BuildState) -> None:
+    redirects = [
+        ("/internships/at/altera-corporation/", "/internships/at/altera/", "Altera internships")
+    ]
+    for name in ("Computer Science", "Statistics and Data Science"):
+        target = state.major_destinations.get(name)
+        if target:
+            path = f"/internships/for/{runtime.slugify(name)}-majors/"
+            redirects.append((path, target, f"Internships for {name} majors"))
+
+    for path, target, label in redirects:
+        if path in paths or target not in paths:
+            continue
+        folder = Path(site_dir, path.strip("/"))
+        folder.mkdir(parents=True, exist_ok=True)
+        canonical = esc(state.site + target)
+        (folder / "index.html").write_text(
+            '<!doctype html>\n<html lang="en"><head><meta charset="utf-8">'
+            '<meta name="viewport" content="width=device-width, initial-scale=1">'
+            f'<title>{esc(label)} | InternScout</title>'
+            f'<meta http-equiv="refresh" content="0;url={canonical}">'
+            f'<link rel="canonical" href="{canonical}">'
+            f'</head><body><p>{esc(label)} have moved to '
+            f'<a href="{esc(target)}">{esc(label)}</a>.</p></body></html>\n',
+            encoding="utf-8",
+            newline="\n",
+        )
+
+
 def _write_site(
     site_dir: str,
     pages: list[dict],
@@ -143,23 +172,7 @@ def _write_site(
         os.makedirs(folder, exist_ok=True)
         with open(os.path.join(folder, "index.html"), "w", encoding="utf-8", newline="\n") as f:
             f.write(p["html"])
-    # 2026-11-02: GitHub Pages serves static files; was: the retired URL returned 404.
-    # A zero-second meta refresh preserves the retired Altera
-    # link without creating another listing page or changing sitemap/indexing eligibility.
-    # Emit it only when the real destination survived the existing page-generation rules.
-    if any(p["path"] == "/internships/at/altera/" for p in pages):
-        folder = os.path.join(site_dir, "internships", "at", "altera-corporation")
-        os.makedirs(folder, exist_ok=True)
-        with open(os.path.join(folder, "index.html"), "w", encoding="utf-8", newline="\n") as f:
-            f.write(
-                '<!doctype html>\n<html lang="en"><head><meta charset="utf-8">'
-                '<meta name="viewport" content="width=device-width, initial-scale=1">'
-                '<title>Altera internships | InternScout</title>'
-                '<meta http-equiv="refresh" content="0;url=https://internscout.org/internships/at/altera/">'
-                '<link rel="canonical" href="https://internscout.org/internships/at/altera/">'
-                '</head><body><p>Altera internships have moved to '
-                '<a href="/internships/at/altera/">Altera internships</a>.</p></body></html>\n'
-            )
+    _write_redirects(site_dir, {p["path"] for p in pages}, state)
     now = state.generated or datetime.now(timezone.utc)  # was: now = datetime.now(timezone.utc)
     with open(os.path.join(site_dir, "404.html"), "w", encoding="utf-8", newline="\n") as f:
         f.write(runtime.invoke(state, hooks, runtime.not_found, f"{now:%B} {now.day}, {now.year}"))

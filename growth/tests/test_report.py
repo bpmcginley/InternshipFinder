@@ -7,6 +7,7 @@ import os
 import re
 import sys
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 
 import pytest
 
@@ -17,6 +18,15 @@ report = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(report)
 
 NOW = datetime(2026, 9, 28, 13, tzinfo=timezone.utc)
+
+def test_page_counts_use_generator_kinds_not_url_depth(monkeypatch):
+    snapshot = SimpleNamespace(pages=[{"kind": "combo"}, {"kind": "outlook"}, {"kind": "major"}])
+    monkeypatch.setattr(report.site_entry, "build_snapshot", lambda _: snapshot)
+
+    summary = report.pages_section("docs")[1]
+
+    assert "3 pages generated" in summary
+    assert "1 field in a place, 1 major, 0 employer, 1 other" in summary
 
 HOSTILE = [
     "evil.example/[click me](https://evil.example)",

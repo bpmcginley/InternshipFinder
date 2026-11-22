@@ -13,7 +13,7 @@ SPREAD = 10
 # Console, 28 days to 2026-10-07: 6.1% against 2.0%), so there are more field-in-a-place pages where
 # students look. A field in a US metro (US_METRO_PAGES) gets a page at MIN_COMBO like a state; one of
 # the fields the growth plan markets first (growth/README.md, "Primary: market now": these are those
-# majors' tags in majors.json) in the Northeast, remote or a metro gets one at MIN_COMBO_PRIORITY. Every
+# majors' tags in majors.json) in a priority place or a metro gets one at MIN_COMBO_PRIORITY. Every
 # page these rules add must also be its own list: MIN_EMPLOYERS_NEW employers at least (not one
 # employer's page under a place's name), and not near_same as a page already made (the field's own
 # page, the field in the metro's state, or another field in the same place).
@@ -32,7 +32,7 @@ PRIORITY_FIELDS = frozenset(
     }
 )
 PRIORITY_PLACES = frozenset(
-    {"MA", "CT", "RI", "NH", "VT", "ME", "NY", "NJ", "PA", "remote"}
+    {"MA", "CT", "RI", "NH", "VT", "ME", "NY", "NJ", "PA", "CA", "TX", "WA", "remote"}
 )  # and the metros
 MIN_COMBO_PRIORITY = 10
 MIN_EMPLOYERS_NEW = 3

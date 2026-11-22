@@ -152,7 +152,6 @@ GOOGLE_JOBS_FOCUS_QUERIES = [
     "psychology internship undergraduate",
     "anthropology archaeology internship",
     "survey research internship",
-    "linguistics translation internship",
 ]
 # Searches made every day, whatever else rotates. The Ontario Public Service's job site
 # (gojobs.gov.on.ca) sits behind a bot check that answers with a CAPTCHA, which InternScout does not
