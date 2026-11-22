@@ -156,3 +156,94 @@ contextual invitations, promotion drafts, and measurement; their changes are con
 - The SEO landing pages are script-generated — never hand-edit generated pages; change the generator.
 - Watch for time-dependent test assertions (the Oct 8 fix was a date-sensitive test). Prefer fixed clocks or relative dates in new tests.
 - There's a weekly growth report (`growth/report.py`) and a Bluesky brand-post workflow — don't duplicate them.
+
+
+## Growth punch list for the laptop agent (2026-11-22)
+
+From Muse's weekly InternScout growth check (CI growth report issue #691,
+week ending Nov 16, 2026, HEAD 5f0e028). Bruce asked for this to be committed
+here for the laptop session to execute. Work through it in order; check items
+off in this file as you finish them, and note anything you skip and why.
+
+### Where things stand (Nov 16 data)
+
+- Visits: 1,920 (Nov 9-16), up 470 on the week before. `/internships/`
+  landing pages brought 1,280 of 1,920 (66%). Referrers: Bing 320 vs
+  Google 90. Top pages: `/` (580), `/internships/government/washington-dc/`
+  (70), `/internships/summer-2027/` (60), `/internships/spring-2027/` (40),
+  `/install.html` (40), `/internships/toronto/` (30),
+  `/internships/electrical-engineering/` (30).
+- Listings: 19,876 open roles, 2,425 new, 75 held (stats.json, Nov 11).
+- 7 majors marketable now (all above 200, all down slightly from
+  expirations): Informatics 863, Computer Engineering 704, Computer
+  Science 620, Operations and Information Management 463, Statistics and
+  Data Science 286, Industrial Engineering 266, Management 250.
+  Electrical Engineering, Finance and Marketing are below 200.
+- 14 majors too thin to market: Art History 8, Dance 8, Theater 8, Music 7,
+  the 9 language-area studies majors at 5 each, Biomedical Engineering 4
+  (worst).
+- Demand states students actually pick: REMOTE, MA, NY, CT, NH, RI, CA, NJ,
+  FL, ME, VT, TX, WA, QC, IL.
+- Landing pages: 2,178 total (160 field/state, 590 field-in-state, 25
+  major, 815 employer). Major pages dropped 27 to 25; field-in-state fell
+  600 to 590 for the third straight week.
+- Bluesky: 2 posts this week, 0 likes, 0 reposts; seventh straight week at
+  zero engagement.
+- Outreach is handled by Muse's autonomous Tuesday run (rest of US +
+  Canada only, never MA/UMass). The Nov 24 batch is already researched:
+  UGA, NC State, Clemson, UT Knoxville, UC Davis, Michigan State College
+  of Social Science, plus 4 follow-ups (UTM, UBC, Maryland, Duke). Do not
+  duplicate outreach from the laptop.
+
+### Tasks, in priority order
+
+1. [ ] **Marketing focus (guidance, not code):** keep all marketing and
+   lead messaging on the 7 strong majors above. Keep Electrical
+   Engineering, Finance and Marketing out of lead messaging until they
+   re-cross 200 open roles. Hold marketing for the 14 thin majors.
+2. [ ] **Double down on what brings visits:** `/internships/` pages are
+   66% of visits and Bing out-refers Google ~3.5x. Keep IndexNow/Bing
+   submissions current, keep the top pages fresh (government/DC,
+   summer-2027, spring-2027, Toronto, electrical-engineering), and
+   prioritize new field-in-state pages for the demand states students
+   pick (REMOTE, MA, NY, CT, CA, TX, WA) over low-demand states.
+3. [ ] **Fix the focus-search mismatch (seventh week):** daily focus
+   searches point at languages (5 open nearby, 11 majors depend on it),
+   museums (2 open, 4 majors) and theater (2 open, 2 majors). Rotate
+   languages, museums and theater out of the daily focus rotation until
+   supply exists, or pair them with the scraper push in item 5.
+4. [ ] **Close the major-page gap:** verify whether Computer Science and
+   Statistics and Data Science have `/internships/for/<major>-majors/`
+   pages (they were the 2 marketable majors missing one on Nov 14), build
+   any missing ones, and find which 2 major pages disappeared (27 to 25).
+5. [ ] **Scraper builds, biggest need first:** Biomedical Engineering
+   (4 roles) via biotech/medtech employer pipelines; the 9 language
+   majors (5 each) via bilingual/localization and cross-border ops roles;
+   Art History (8), Dance (8), Theater (8), Music (7) via performing-arts,
+   museum and nonprofit employer feeds.
+6. [ ] **Distribution shift:** Bluesky is at zero engagement for the
+   seventh straight week (17 posts, 0 likes, 0 reposts). Shift brand
+   effort to short-form video (repo has reels.py, youtube.py,
+   instagram.py) using this week's hook: 48 new data science and
+   analytics internships in the Northeast and remote from CarGurus,
+   DreamWorks Animation, Tonic, WTW and more, aimed at Stats & Data
+   Science and Computer Science audiences. SEO/Bing is the channel
+   actually delivering visits; treat Bluesky as a posting log, not a
+   growth lever.
+7. [ ] **Explain the page-count drops:** field-in-state pages fell again
+   (600 to 590, third straight fall) while total pages slipped 2,192 to
+   2,178. Find which pages disappeared before expanding further; confirm
+   the deploy sitemap and IndexNow submissions still cover the near-page
+   set.
+8. [ ] **House AI check:** 34 listings as of Nov 14, with 10 Fall 2026
+   roles closing Nov 30. Confirm they close on Nov 30 and no stale
+   listings remain after that date.
+
+### Guardrails
+
+- No outreach sends from the laptop; Muse's Tuesday run owns that.
+- Nothing sends, merges, or submits without Bruce's explicit word.
+- Reporting gap is resolved in CI (Visits and Demand sections now
+  connected in the weekly GitHub report). Local runs still lack the
+  Cloudflare/demand tokens; read the CI issue for growth data instead of
+  re-running `growth/report.py` locally.
