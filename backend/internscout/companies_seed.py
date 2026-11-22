@@ -2681,6 +2681,12 @@ GREENHOUSE += [
         'is_quant_target': False,
         'sector': 'arts_museums',
     },
+    {
+        'name': 'David Zwirner',
+        'ats_token': 'davidzwirnergallery',
+        'is_quant_target': False,
+        'sector': 'arts_museums',
+    },
 ]
 WORKDAY += [
     {

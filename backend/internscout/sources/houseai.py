@@ -1,18 +1,8 @@
 """House AI (houseaiapp.com): one employer's own careers site, read the same way as UHN.
 
-houseaiapp.com/careers lists Fall 2026 internships; each role page embeds a
-schema.org JobPosting (title, HTML description, datePosted, validThrough,
-employmentType, TELECOMMUTE location, workHours). The roles are unpaid with
-academic-credit support; the Fall term runs August 10 - December 18, 2026 and
-applications close October 31, 2026. The site's robots.txt allows public
-crawling (Allow: /, only /api/ and /auth/ disallowed).
-
-Added 2026-10-24 at the employer's request (Aashika Samson, Recruiting
-Coordinator, aashika@houseaiapp.com); the reply to her promised the roles
-would be listed as unpaid. The pipeline's pay classifier (insights.py) tags a
-listing "unpaid" when its description says so, so the facts line below leads
-with it. This is a free pipeline source, not a paid placement: House AI did
-not go through employer checkout.
+Each role page embeds a schema.org JobPosting with the current eligibility,
+term, and deadline. Only roles explicitly open to U.S. or Canadian applicants
+belong in the North American catalog. This is a free pipeline source.
 """
 
 from __future__ import annotations
@@ -21,6 +11,7 @@ import logging
 import json
 import re
 from datetime import date, datetime
+from urllib.parse import urlsplit
 
 from .base import client
 from ..console_log import console, console_exception
@@ -30,17 +21,41 @@ from ..classify import is_internship
 HUB_URL = "https://www.houseaiapp.com/careers"
 SITE = "https://www.houseaiapp.com"
 COMPANY = {"name": "House AI"}
-# Fall 2026 batch facts, from the careers hub FAQ. The close date itself is
-# read per role from its validThrough; this line covers term + credit support.
-TERM_LINE = (
-    "Fall term August 10 - December 18, 2026. "
-    "Course credit supported (faculty sponsor forms, professor "
-    "check-ins, end-of-term evaluations)."
-)
-
 _SLUG_RE = re.compile(r'href="/careers/([a-z0-9][a-z0-9-]*)"')
-_SKIP_SLUGS = {"cities", "course-credit"}
+_SKIP_SLUGS = {"cities", "course-credit", "search"}
 _LD_RE = re.compile(r'<script type="application/ld\+json">(.*?)</script>', re.S)
+_COUNTRY_ALIASES = {
+    "us": "United States",
+    "usa": "United States",
+    "united states": "United States",
+    "united states of america": "United States",
+    "ca": "Canada",
+    "can": "Canada",
+    "canada": "Canada",
+    "uk": "United Kingdom",
+    "gb": "United Kingdom",
+}
+
+
+def is_houseai_role_url(url: str | None) -> bool:
+    try:
+        parts = urlsplit(url or "")
+        return parts.hostname in {"houseaiapp.com", "www.houseaiapp.com"} and bool(
+            re.fullmatch(r"/careers/[a-z0-9][a-z0-9-]*(?:/apply)?/?", parts.path)
+        )
+    except ValueError:
+        return False
+
+
+def _countries(requirements) -> list[str]:
+    entries = requirements if isinstance(requirements, list) else [requirements]
+    names = {}
+    for entry in entries:
+        if isinstance(entry, dict) and entry.get("@type") == "Country":
+            name = entry.get("name")
+            if isinstance(name, str) and (name := name.strip()):
+                names.setdefault(name.casefold(), name)
+    return list(dict.fromkeys(_COUNTRY_ALIASES.get(key, name) for key, name in names.items()))
 
 
 def role_slugs(hub_html: str) -> list[str]:
@@ -55,46 +70,73 @@ def role_slugs(hub_html: str) -> list[str]:
     return out
 
 
-def _valid_through(value: str | None) -> date | None:
+def _valid_through(value: str | None) -> datetime | None:
+    if not isinstance(value, str):
+        return None
     try:
-        return datetime.fromisoformat((value or "").strip()).date()
+        return datetime.fromisoformat(value.strip())
     except ValueError:
         return None
 
 
+def _deadline_passed(closes: datetime, today: date | None) -> bool:
+    if today is not None:
+        return closes.date() < today
+    if closes.tzinfo is not None:
+        return closes < datetime.now(closes.tzinfo)
+    return closes.date() < date.today()
+
+
+def _text(value) -> str:
+    return value.strip() if isinstance(value, str) else ""
+
+
 def parse_houseai_jobposting(jp: dict, today: date | None = None) -> dict | None:
     """One schema.org JobPosting -> a board item, or None to skip it."""
-    today = today or date.today()
     if not isinstance(jp, dict) or jp.get("@type") != "JobPosting":
         return None
-    title = (jp.get("title") or "").strip()
+    title = _text(jp.get("title"))
     emp_types = jp.get("employmentType") or []
     if isinstance(emp_types, str):
         emp_types = [emp_types]
+    if not isinstance(emp_types, list):
+        return None
     emp_types = [str(e).upper() for e in emp_types]
     if "INTERN" not in emp_types or not is_internship(title, "Intern Part-time"):
         return None
     closes = _valid_through(jp.get("validThrough"))
-    if closes and closes < today:
+    if closes and _deadline_passed(closes, today):
         return None
-    url = (jp.get("url") or "").strip()
-    if not url:
+    if jp.get("jobLocationType") != "TELECOMMUTE":
         return None
-    hours = (jp.get("workHours") or "20 hours per week").strip()
-    facts = f"Unpaid. {hours}. Fully remote (US or UK). {TERM_LINE}"
+    countries = _countries(jp.get("applicantLocationRequirements"))
+    locations = [
+        f"Remote - {country}" for country in ("United States", "Canada") if country in countries
+    ]
+    if not locations:
+        return None
+    url = _text(jp.get("url"))
+    if not is_houseai_role_url(url):
+        return None
+    path = urlsplit(url).path.rstrip("/").removesuffix("/apply")
+    url = f"{SITE}{path}"
+    hours = _text(jp.get("workHours"))
+    facts = f"Remote eligibility: {', '.join(countries)}."
+    if hours:
+        facts += f" {hours.rstrip('.')}."
     if closes:
         facts += f" Applications close {closes.strftime('%B %d, %Y')}."
-    description = " ".join(x for x in (facts, html_to_text(jp.get("description") or "")) if x)
+    description = " ".join(x for x in (facts, html_to_text(_text(jp.get("description")))) if x)
     return board_item(
         COMPANY,
         source="houseai",
         title=title,
-        locations=["Remote"],
+        locations=locations,
         url=url,
-        apply_url=url.rstrip("/") + "/apply",
-        posted_at=(jp.get("datePosted") or "")[:10] or None,
+        apply_url=url + "/apply",
+        posted_at=_text(jp.get("datePosted"))[:10] or None,
         description=description,
-        employment_type="Intern Part-time",
+        employment_type="Intern Part-time" if "PART_TIME" in emp_types else "Intern",
     )
 
 

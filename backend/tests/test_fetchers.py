@@ -1663,11 +1663,15 @@ def _houseai_jp(**over):
     jp = {
         "@type": "JobPosting",
         "title": "Blog Writer Intern",
-        "description": "<p>Write articles about design.</p>",
+        "description": "<p>Write articles about design. Unpaid.</p><p>Spring 2027 term.</p>",
         "datePosted": "2026-10-13",
         "validThrough": "2026-10-31T23:59:59-04:00",
         "employmentType": ["INTERN", "PART_TIME"],
         "jobLocationType": "TELECOMMUTE",
+        "applicantLocationRequirements": [
+            {"@type": "Country", "name": "USA"},
+            {"@type": "Country", "name": "United Kingdom"},
+        ],
         "workHours": "20 hours per week",
         "url": "https://www.houseaiapp.com/careers/blog-writer-intern",
     }
@@ -1677,15 +1681,21 @@ def _houseai_jp(**over):
 
 def test_houseai_parses_unpaid_remote_intern():
     from datetime import date
+    from internscout.insights import extract
+    from internscout.normalize import normalize
 
     item = parse_houseai_jobposting(_houseai_jp(), date(2026, 10, 24))
     assert item is not None
     assert item["title"] == "Blog Writer Intern"
     assert item["company_name"] == "House AI"
-    assert item["locations"] == ["Remote"]
+    assert item["locations"] == ["Remote - United States"]
     assert item["url"] == "https://www.houseaiapp.com/careers/blog-writer-intern"
     assert item["apply_url"] == "https://www.houseaiapp.com/careers/blog-writer-intern/apply"
-    assert item["description"].startswith("Unpaid.")
+    assert extract(item["description"])["pay"] == "unpaid"
+    assert "Remote eligibility: United States, United Kingdom." in item["description"]
+    assert "Fall 2026" not in item["description"]
+    assert normalize(item)["term"] == "Spring 2027"
+    assert normalize(item)["is_remote"]
     assert "October 31, 2026" in item["description"]
     assert item["source"] == "houseai"
 
@@ -1702,12 +1712,33 @@ def test_houseai_skips_expired_and_non_intern():
     )
 
 
+def test_houseai_requires_north_american_eligibility_and_keeps_last_open_date():
+    from datetime import date
+
+    deadline = date(2026, 11, 30)
+    for requirements in (
+        None,
+        {"@type": "Country", "name": "India"},
+        [{"@type": "Country", "name": "United Kingdom"}],
+    ):
+        posting = _houseai_jp(applicantLocationRequirements=requirements)
+        assert parse_houseai_jobposting(posting, date(2026, 10, 24)) is None
+
+    posting = _houseai_jp(
+        applicantLocationRequirements={"@type": "Country", "name": "Canada"},
+        validThrough="2026-11-30T23:59:59-05:00",
+    )
+    assert parse_houseai_jobposting(posting, deadline)["locations"] == ["Remote - Canada"]
+    assert parse_houseai_jobposting(posting, date(2026, 12, 1)) is None
+
+
 def test_houseai_role_slugs_skip_hub_pages():
     html = (
         '<a href="/careers/blog-writer-intern">x</a>'
         '<a href="/careers/blog-writer-intern">x</a>'
         '<a href="/careers/cities">x</a>'
         '<a href="/careers/course-credit">x</a>'
+        '<a href="/careers/search">x</a>'
         '<a href="/careers#faq">x</a>'
     )
     assert role_slugs(html) == ["blog-writer-intern"]
@@ -1715,3 +1746,41 @@ def test_houseai_role_slugs_skip_hub_pages():
 
 def test_houseai_page_without_jobposting_is_none():
     assert parse_houseai_page("<html><body>no jobs here</body></html>") is None
+
+
+def test_houseai_skips_malformed_record_without_losing_valid_posting():
+    from datetime import date
+    import json
+
+    postings = {"@graph": [_houseai_jp(employmentType=7), _houseai_jp(workHours={})]}
+    page = f'<script type="application/ld+json">{json.dumps(postings)}</script>'
+    assert parse_houseai_page(page, date(2026, 10, 24))["title"] == _houseai_jp()["title"]
+
+
+def test_houseai_builds_the_apply_link_from_the_canonical_role_path():
+    from datetime import date
+
+    url = _houseai_jp()["url"]
+    item = parse_houseai_jobposting(
+        _houseai_jp(url=f"{url}/apply/?from=listing#intro"), date(2026, 10, 24)
+    )
+    assert item["url"] == url
+    assert item["apply_url"] == url + "/apply"
+
+
+def test_houseai_uses_the_employers_deadline_timezone(monkeypatch):
+    from datetime import datetime, timezone
+    from internscout.sources import houseai
+
+    class Clock(datetime):
+        instant = datetime(2026, 12, 1, 4, 59, 58, tzinfo=timezone.utc)
+
+        @classmethod
+        def now(cls, tz=None):
+            return cls.instant.astimezone(tz)
+
+    monkeypatch.setattr(houseai, "datetime", Clock)
+    posting = _houseai_jp(validThrough="2026-11-30T23:59:59-05:00")
+    assert parse_houseai_jobposting(posting) is not None
+    Clock.instant = datetime(2026, 12, 1, 5, 0, tzinfo=timezone.utc)
+    assert parse_houseai_jobposting(posting) is None

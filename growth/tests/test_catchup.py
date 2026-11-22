@@ -1,9 +1,13 @@
 """growth/catchup.py: start the jobs GitHub's scheduler is late with, and let only one of each run."""
 
 import importlib.util
+import io
 import os
 import sys
+from urllib.error import HTTPError
 from datetime import datetime, timedelta, timezone
+
+import pytest
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 _spec = importlib.util.spec_from_file_location(
@@ -13,6 +17,26 @@ cu = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(cu)
 
 TUE = datetime(2026, 9, 29, 16, 4, tzinfo=timezone.utc)  # a Tuesday, just after the post hour
+
+
+@pytest.mark.parametrize(("method", "attempts"), [("GET", 2), ("POST", 1)])
+def test_gateway_retry_only_repeats_read_only_calls(monkeypatch, method, attempts):
+    seen = []
+
+    def call(request, **kwargs):
+        seen.append(request.get_method())
+        if len(seen) == 1:
+            raise HTTPError(request.full_url, 502, "Bad Gateway", None, None)
+        return io.BytesIO(b'{"workflow_runs": []}')
+
+    monkeypatch.setattr(cu.time, "sleep", lambda _: None)
+    monkeypatch.setattr(cu.urllib.request, "urlopen", call)
+    if method == "GET":
+        assert cu._call(method, "test") == {"workflow_runs": []}
+    else:
+        with pytest.raises(HTTPError):
+            cu._call(method, "test")
+    assert seen == [method] * attempts
 
 
 def _run(i, created, status="completed", conclusion="success"):

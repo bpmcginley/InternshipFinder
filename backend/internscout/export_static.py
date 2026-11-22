@@ -34,6 +34,7 @@ from .pay import only_placeholder_amounts
 from .score import W
 from .region import evaluate_locations
 from .scan_evidence import FULL_LIST, SEARCH_SCOPED, canonical, export_board
+from .sources.houseai import is_houseai_role_url
 
 DESC_CHARS = 1500
 # 2026-10-23: distinguish pre-truncation extraction from legacy exported eligibility (DQ-1).
@@ -568,6 +569,8 @@ def carry_open_boards(
     missing detail metadata, and keyword scans retain community/legacy rows with unknown scope.
     These cases do not require a board-wide collapse, but keep the existing freshness bound.
     A board that failed, hit a page cap, or has no way to prove a full read keeps the old rule.
+    House AI roles require current verification of country eligibility and deadline. Do not
+    carry a role omitted by its parser as if its previous broad remote label were still valid.
     """
     prev = previous_export(out_dir) if prev is None else prev
     today = today or datetime.now(timezone.utc).date()
@@ -587,7 +590,12 @@ def carry_open_boards(
     now_open = Counter(board_of(x) for x in listings if x.get("status") == "open")
     was_open: dict[tuple, list[dict]] = defaultdict(list)
     for it in prev:
-        if it.get("status") == "open" and it.get("ats") and it.get("company_name"):
+        if (
+            it.get("status") == "open"
+            and it.get("ats")
+            and it.get("company_name")
+            and not is_houseai_role_url(it.get("apply_url"))
+        ):
             # The last export's rows answer today's stage question too, before they are counted.
             # When the research rule stopped admitting staff jobs on the bare word, a lab whose
             # board was mostly "Research Scientist" lost more than half its rows in one run, which
@@ -675,6 +683,7 @@ def carry_search_finds(
             not it.get("via_search")
             or it.get("status") != "open"
             or not url
+            or is_houseai_role_url(url)
             or url in have
             or _requisition_key(it, icims_hosts, gh_tenants) in have_requisitions
             or (it.get("id") and it["id"] in have_ids)
