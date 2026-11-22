@@ -9,6 +9,10 @@ const browser = { window: {}, URL, URLSearchParams };
 vm.createContext(browser);
 vm.runInContext(readFileSync(new URL("../../docs/js/share.js", import.meta.url), "utf8"), browser);
 const fields = ["swe", "data", "finance", "accounting", "marketing", "mechanical", "electrical"];
+const fieldIds = (count) => Array.from(
+  { length: count },
+  (_, n) => "field_" + String.fromCharCode(97 + Math.floor(n / 26), 97 + (n % 26)),
+);
 const initial = { fields, states: ["all"], company: [], q: "", status: "open", sort: "new" };
 const defaults = { sort: "new" };
 
@@ -27,10 +31,8 @@ test("normal share and reload retain more than six selected fields", () => {
   assert.equal(new URLSearchParams(search).get("utm_source"), "club");
 });
 
-test("every supported field survives one shared URL in original order", () => {
-  const majors = JSON.parse(readFileSync(new URL("../../docs/data/majors.json", import.meta.url)));
-  assert(majors.fields.length > 6);
-  const reversed = [...majors.fields].reverse();
+test("a full selection survives one shared URL in original order without an export", () => {
+  const reversed = fieldIds(128).reverse();
   assert.deepEqual(
     filtersFromUrl(filterSearch("", { ...initial, fields: reversed }, defaults)).fields,
     reversed,
@@ -69,10 +71,7 @@ test("oversize field input is rejected without altering other filters", () => {
 });
 
 test("bounded unique fields preserve order while duplicates consume no capacity", () => {
-  const names = Array.from(
-    { length: 129 },
-    (_, n) => "field_" + String.fromCharCode(97 + Math.floor(n / 26), 97 + (n % 26)),
-  );
+  const names = fieldIds(129);
   assert.deepEqual(
     filtersFromUrl("?field=" + names.flatMap((v) => [v, v]).join(",")).fields,
     names.slice(0, 128),
