@@ -7192,8 +7192,9 @@
   "shein": {
    "name": "SHEIN",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-11-22"
   },
   "shield": {
    "name": "Shield",
@@ -13779,6 +13780,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "allegion|wd5|EarlyTalent_Careers": {
+   "name": "Allegion",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-22"
+  },
   "allegromicro|wd5|allegrocareers": {
    "name": "Allegro MicroSystems",
    "quant": false,
@@ -15192,9 +15199,8 @@
   "cgg|wd103|viridiencareers": {
    "name": "Viridien",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "chamberlain|wd1|Chamberlain_Group": {
    "name": "Chamberlain Group",
@@ -19326,9 +19332,8 @@
   "polarsemi|wd501|Polar": {
    "name": "Polar Semiconductor",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "politico|wd108|POLITICO": {
    "name": "Politico",
