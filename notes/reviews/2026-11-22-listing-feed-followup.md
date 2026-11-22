@@ -1,0 +1,5 @@
+# House AI and museum listings follow-up
+
+- House AI now reads eligibility and the application deadline from each employer posting. An explicitly U.S. or Canada remote role stays in the matching country; unverified and other-country roles are omitted. Previous copies of omitted roles are not carried into the next clean production export. The role description supplies current term and pay, replacing fixed fall-cycle copy.
+- The existing Greenhouse adapter accepts the David Zwirner gallery board. The [employer listing](https://job-boards.greenhouse.io/davidzwirnergallery/jobs/5295054007) verified a museum partnership internship; the `arts_museums` seed supplies the employer's sector without overriding job-specific fields.
+- Offline checks cover the employer's timezone at the close boundary, unsupported eligibility, canonical links, malformed job records, and both prior-export carry paths. Verify the results in a normal ingest and its Pages deployment after merge. The advertised November 30 deadline still needs live confirmation after that date.
