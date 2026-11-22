@@ -3884,6 +3884,13 @@
    "fails": 0,
    "added": "2026-11-05"
   },
+  "bcg": {
+   "name": "Boston Consulting Group",
+   "quant": false,
+   "fails": 1,
+   "added": "2026-11-22",
+   "last_fail": "2026-11-22"
+  },
   "betterhelpcom": {
    "name": "BetterHelp",
    "quant": false,
@@ -5938,6 +5945,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "laika": {
+   "name": "Laika Inc",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-22"
+  },
   "laskoproducts": {
    "name": "Lasko Products",
    "quant": false,
@@ -6328,6 +6341,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "nerostechnologies": {
+   "name": "Neros Technologies",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-22"
   },
   "netcraft": {
    "name": "Netcraft",
