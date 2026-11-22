@@ -1,6 +1,7 @@
 """scan_boards: which failures age a board toward MAX_FAILS, and which get a second try."""
 
 import httpx
+from datetime import datetime, timezone
 from internscout import run_ingest
 from internscout.discover import MAX_FAILS
 from internscout.sources.common import RobotsDisallowed
@@ -51,6 +52,54 @@ def test_a_dead_board_still_ages(monkeypatch):
     assert calls["t0"] == 1
     assert reg["fakeats"]["t0"]["fails"] == 1
     assert reg["fakeats"]["t1"]["fails"] == 0
+
+
+def test_systemic_throttle_leaves_retry_budget_for_other_providers(monkeypatch, capsys):
+    calls = []
+    monkeypatch.setattr(run_ingest, "RETRY_MAX", 1)
+    monkeypatch.setattr(run_ingest, "RETRY_PAUSE", 0)
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+
+    def fetch(c, jobs, workers):
+        calls.append([ats for ats, _, _ in jobs])
+        return {(ats, token): _status(429) if len(calls) == 1 else [] for ats, token, _ in jobs}
+
+    monkeypatch.setattr(run_ingest, "_fetch_boards", fetch)
+    monkeypatch.setitem(run_ingest.BOARD_FETCHERS, "a-throttled", None)
+    monkeypatch.setitem(run_ingest.BOARD_FETCHERS, "z-transient", None)
+    reg = _reg("a-throttled", 12) | _reg("z-transient", 1)
+    run_ingest.scan_boards(reg)
+
+    assert calls[1:] == [["z-transient"]]
+    assert all(entry["fails"] == 0 for entry in reg["a-throttled"].values())
+    assert "::warning title=Listing provider rate limited::a-throttled: 12 of 12" in capsys.readouterr().out
+
+
+def test_retry_after_only_allows_a_retry_within_the_existing_delay():
+    now = datetime(2026, 11, 22, 16, 0, tzinfo=timezone.utc)
+    error = _status(429)
+    for value in ("120", "Sun, 22 Nov 2026 16:02:00 GMT", "invalid"):
+        error.response.headers["Retry-After"] = value
+        assert not run_ingest._can_retry_this_run(error, now)
+    for value in ("10", "Sun, 22 Nov 2026 16:00:10 GMT"):
+        error.response.headers["Retry-After"] = value
+        assert run_ingest._can_retry_this_run(error, now)
+
+
+def test_isolated_throttle_with_long_retry_after_does_not_age_the_board(monkeypatch):
+    error = _status(429)
+    error.response.headers["Retry-After"] = "120"
+    calls = []
+
+    def fetch(c, co):
+        calls.append(co["ats_token"])
+        raise error
+
+    monkeypatch.setitem(run_ingest.BOARD_FETCHERS, "isolated", fetch)
+    reg = _reg("isolated", 1)
+    run_ingest.scan_boards(reg, workers=1, verbose=False)
+    assert calls == ["t0"]
+    assert reg["isolated"]["t0"]["fails"] == 0
 
 
 def test_an_ats_failing_on_most_boards_does_not_age_them(monkeypatch):

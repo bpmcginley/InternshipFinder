@@ -10,11 +10,13 @@ Usage:
 
 from __future__ import annotations
 import argparse
+import logging
 import os
 import time
 import httpx
 from collections import Counter
-from datetime import date
+from datetime import date, datetime, timezone
+from email.utils import parsedate_to_datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from .console_log import console, console_exception
 from .sources import (
@@ -102,6 +104,23 @@ def _transient(e: Exception) -> bool:
     )
 
 
+def _can_retry_this_run(error: Exception, now: datetime) -> bool:
+    if not isinstance(error, httpx.HTTPStatusError):
+        return True
+    value = error.response.headers.get("Retry-After", "").strip()
+    if not value:
+        return True
+    if value.isascii() and value.isdecimal():
+        if len(value) > 10:
+            return False
+        return int(value) <= RETRY_PAUSE
+    try:
+        retry_at = parsedate_to_datetime(value)
+    except (ValueError, OverflowError):
+        return False
+    return retry_at.tzinfo is not None and (retry_at - now).total_seconds() <= RETRY_PAUSE
+
+
 class BoardItems(list):
     """List-compatible fetch result with explicit authoritative-scan evidence and page counts."""
 
@@ -180,6 +199,7 @@ def scan_boards(
     out: list[dict] = []
     per_ats, failed, closed = Counter(), Counter(), Counter()
     causes: dict[str, Counter] = {}
+    size = Counter(ats for ats, _, _ in jobs)
     t0 = time.monotonic()
     with client() as c:
         res = _fetch_boards(c, jobs, workers)
@@ -188,11 +208,33 @@ def scan_boards(
             for j in jobs
             if isinstance(res[j[0], j[1]], Exception) and _transient(res[j[0], j[1]])
         ]
-        again = transient[:RETRY_MAX]
+        throttled = Counter(ats for ats, tok, _ in transient if _cause(res[ats, tok]) == "429")
+        deferred = {
+            ats
+            for ats, count in throttled.items()
+            if size[ats] >= SYSTEMIC_MIN_BOARDS and count >= SYSTEMIC_SHARE * size[ats]
+        }
+        now = datetime.now(timezone.utc)
+        again = [
+            (ats, tok, co)
+            for ats, tok, co in transient
+            if ats not in deferred and _can_retry_this_run(res[ats, tok], now)
+        ][:RETRY_MAX]
         if again:
             time.sleep(RETRY_PAUSE)
             res.update(_fetch_boards(c, again, RETRY_WORKERS))
-    size = Counter(ats for ats, _, _ in jobs)
+    if deferred and verbose:
+        console(
+            f"[boards] deferred same-run retries for rate-limited providers: {', '.join(sorted(deferred))}",
+            level=logging.WARNING,
+        )
+        if os.environ.get("GITHUB_ACTIONS") == "true":
+            for ats in sorted(deferred):
+                print(
+                    f"::warning title=Listing provider rate limited::{ats}: "
+                    f"{throttled[ats]} of {size[ats]} boards returned HTTP 429. "
+                    "Retries were deferred; coverage is reduced. Check the ingest report before expanding coverage."
+                )
     for (ats, tok), r in res.items():
         if isinstance(r, RobotsDisallowed):
             closed[ats] += 1
@@ -217,8 +259,7 @@ def scan_boards(
         elif isinstance(r, Exception):
             if metrics is not None:
                 metrics.board_result(ats, tok, "failed", cause=_cause(r))
-            # was: if ats not in systemic:
-            if ats not in systemic and (systemic_guard or not _transient(r)):
+            if ats not in systemic and _cause(r) != "429" and (systemic_guard or not _transient(r)):
                 record_result(reg, ats, tok, False)
         else:
             if metrics is not None:
