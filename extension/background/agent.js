@@ -890,9 +890,10 @@ async function logAnswer(job, label, answer, kind) {
 }
 
 // Resume after ask_user / pause_for_user / manual pause.
-export async function resumeJob(id, answer) {
+/** @param {(job: any) => boolean} [matches] */
+export async function resumeJob(id, answer, matches) {
   const job = await getJob(id);
-  if (!job) return;
+  if (!job || (matches && !matches(job))) return null;
   let pending = job.pending || { results: [] };
   if (pending.waitId) {
     const text = answer ? `The human answered: ${answer}` : "The human handled it. Continue from the new snapshot.";
@@ -902,13 +903,28 @@ export async function resumeJob(id, answer) {
     pending = { results: pending.results || [], note: "The human asked you to keep going: re-check the page for anything unfilled or wrong, then call ready_to_submit again." };
   }
   // gen: a run still winding down from before the pause must not carry on as this one (agent.js owns).
-  await updateJob(id, (j) => ({ status: "queued", pending, question: "", reason: "", steps: 0, gen: (j.gen || 0) + 1 }));
+  return updateJob(id, (j) => !matches || matches(j)
+    ? { status: "queued", pending, question: "", reason: "", steps: 0, gen: (j.gen || 0) + 1 }
+    : null);
 }
 
 export async function checkSubmitted(tabId) {
   const res = await inFrames(tabId, () => {
-    const t = (document.body && document.body.innerText) || "";
-    return /thank(s| you)[^.\n]{0,60}(appl|submi|interest)|application (has been |was )?(successfully )?(submitted|received|complete)|we('ve| have) received your application|successfully (applied|submitted)|you('ve| have) (successfully )?applied/i.test(t);
+    const text = document.body?.innerText || "";
+    const confirmations = [
+      /^(?:your )?application (?:(?:has been|was) )?(?:successfully )?(?:submitted|received)(?: successfully)?[.!]?$/i,
+      /^we(?:'ve| have) received your application(?=$|[.!,:]| (?:and|for) )/i,
+      /^(?:thank(?:s| you) for submitting your application|you(?:'ve| have) (?:successfully )?(?:applied|submitted your application))[.!]?$/i,
+      /^(?:(?:votre )?candidature (?:a (?:bien )?été )?(?:envoyée|soumise|reçue)|nous avons (?:bien )?reçu votre candidature)[.!]?$/i,
+      /^(?:(?:(?:tu|su) )?solicitud (?:(?:ha sido )?(?:enviada|recibida)|se ha (?:enviado|recibido))(?: correctamente)?|hemos recibido (?:tu|su) solicitud)[.!]?$/i,
+      /^(?:(?:ihre )?bewerbung (?:wurde )?(?:erfolgreich )?(?:eingereicht|abgesendet|eingegangen)|wir haben ihre bewerbung erhalten)[.!]?$/i,
+      /^(?:(?:la (?:tua|sua) )?candidatura (?:è stata )?(?:inviata|ricevuta)(?: con successo)?|abbiamo ricevuto la (?:tua|sua) candidatura)[.!]?$/i,
+      /^(?:(?:sua )?candidatura (?:foi )?(?:enviada|recebida)(?: com sucesso)?|recebemos (?:a )?sua candidatura)[.!]?$/i,
+      /^ご?応募(?:を受け付けました|が完了しました|が送信されました)[。！!]?$/,
+    ];
+    return text.normalize("NFC").replace(/’/g, "'").split(/[\r\n]+|(?<=[.!?。！？])\s+/u)
+      .map((line) => line.trim().replace(/\s+/g, " "))
+      .some((line) => confirmations.some((pattern) => pattern.test(line)));
   });
   return res.some((r) => r.result === true);
 }
