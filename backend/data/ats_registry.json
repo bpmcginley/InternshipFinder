@@ -20354,9 +20354,8 @@
   "standoutforgood|wd12|StandOutForGood": {
    "name": "Altar'd State",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "starfish|wd501|Careers": {
    "name": "Torch Technologies",
