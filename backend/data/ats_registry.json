@@ -4492,6 +4492,13 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "davidzwirnergallery": {
+   "name": "David Zwirner",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-22",
+   "sector": "arts_museums"
+  },
   "deeplocal": {
    "name": "Deeplocal",
    "quant": false,
@@ -18258,9 +18265,8 @@
   "menasha|wd12|menashacorp": {
    "name": "Menasha Corporation",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "merceruniversity|wd1|student": {
    "name": "Mercer University",
