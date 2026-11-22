@@ -14,11 +14,75 @@ const route = (method, path, auth, request, response, gate = "none") =>
 export const ROUTES = Object.freeze([
   route(
     "POST",
+    "/follows/confirm",
+    "follow-action-token",
+    "No query parameters. Exactly one confirmation token as a 101-byte text/plain body with an absolute 5-second read deadline.",
+    "Empty no-store 204 for confirmation, 410 for unavailable confirmation, 400 for malformed input, 503 with Retry-After: 60 for timeout/capacity/storage. GET/HEAD fall through to 404.",
+    "none; authorizes only an existing confirmation credential",
+  ),
+  route(
+    "POST",
+    "/follows/delete-request",
+    "follow-action-token",
+    "No query parameters. Exactly one fd_ request-deletion token as a 104-byte text/plain body with an absolute 5-second read deadline.",
+    "Empty no-store 204 for deletion/replay/unknown, 400 for malformed input, 503 with Retry-After: 60 for timeout/capacity/storage. GET/HEAD fall through to 404.",
+    "none; deletion remains available when signup or sending is off",
+  ),
+  route(
+    "POST",
     "/follows/unsubscribe",
     "follow-unsubscribe-token",
     "Exactly one query parameter token=deletion-only UUID.secret; URL-encoded or multipart List-Unsubscribe=One-Click, at most 4,096 bytes with an absolute 5-second body-read deadline; no login, cookies or Origin required",
-    "Empty no-store 204 for deletion/replay/unknown/wrong-purpose; malformed 400; body timeout/capacity/storage 503 with Retry-After: 60; GET/HEAD fall through to 404 without mutation",
+    "Empty no-store 204 for deletion/replay/unknown/wrong-purpose; malformed 400; body timeout/capacity/storage 503 with Retry-After: 60; HEAD falls through to 404 without mutation",
     "none; deletion remains available when signup or sending is off",
+  ),
+  route(
+    "GET",
+    "/follows/unsubscribe",
+    "public",
+    "Exact path. Any query receives identical static HTML without storage access or credential reflection. Browser removes query/fragment before explicit action.",
+    "No-store HTML 200 with hashed CSP, no-referrer, frame-deny and noindex. Explicit button makes existing one-click POST; opening alone never unsubscribes.",
+    "none; existing issued capabilities remain available",
+  ),
+  route(
+    "POST",
+    "/follows/manage/list",
+    "follow-management-token + site-origin",
+    "UTF-8 JSON [managementToken, null or cursor]. No query or fragment. Up to 16 KiB and five seconds to read.",
+    "No-store JSON {scopes: [{scope_key, created, confirmed_at}], next} 200; empty 410 unavailable capability; 400 malformed, 403 Origin, 415 media type, 503 retryable; 404 when disabled.",
+    "FOLLOW_MANAGEMENT_ENABLED",
+  ),
+  route(
+    "POST",
+    "/follows/manage/remove",
+    "follow-management-token + site-origin",
+    "UTF-8 JSON [managementToken, scopeKey]. No query or fragment. Up to 16 KiB and five seconds to read.",
+    "No-store JSON {removed} 200; empty 400 malformed, 403 Origin, 415 media type, 503 retryable; 404 when disabled.",
+    "FOLLOW_MANAGEMENT_ENABLED",
+  ),
+  route(
+    "POST",
+    "/follows/manage/delete",
+    "follow-management-token + site-origin",
+    "UTF-8 JSON [managementToken]. No query or fragment. Up to 16 KiB and five seconds to read.",
+    "No-store JSON {deleted} 200; empty 400 malformed, 403 Origin, 415 media type, 503 retryable; 404 when disabled.",
+    "FOLLOW_MANAGEMENT_ENABLED",
+  ),
+  route(
+    "POST",
+    "/follows/manage/request",
+    "site-origin",
+    "UTF-8 JSON {email}. No query or fragment. Up to 16 KiB and five seconds to read. Requires explicit TTL and daily cap.",
+    "Empty no-store 202 for accepted, unknown or duplicate requests; 400 malformed, 403 Origin, 415 media type, 503 retryable; 404 when disabled.",
+    "FOLLOW_MANAGEMENT_ENABLED and FOLLOW_MANAGEMENT_REQUEST_ENABLED",
+  ),
+  route(
+    "POST",
+    "/follows/signup",
+    "site-origin",
+    "UTF-8 JSON {email, link, scope}. No query or fragment. Scope is a company key or exact field/state arrays. Explicit link=true requires a current non-refreshing session. Up to 16 KiB and five seconds to read.",
+    "Empty no-store 202 for accepted or duplicate signup; 400 invalid, 403 Origin, 415 media type, 503 unavailable, 404 without qualified opt-in.",
+    "FOLLOW_SIGNUP_ENABLED and a current trusted release from FOLLOW_SIGNUP_RELEASE or the injected supplier",
   ),
   route(
     "GET",
@@ -299,6 +363,14 @@ export const ROUTES = Object.freeze([
     "orders",
   ),
   route(
+    "POST",
+    "/admin/topup-review",
+    "admin",
+    "Exact path without query. JSON [null] or [continuation cursor], up to 128 bytes.",
+    "Private no-store JSON {candidates, next}; 404 when disabled. No CORS or mutation.",
+    "TOPUP_MANUAL_REVIEW_ENABLED",
+  ),
+  route(
     "GET",
     "/admin/orders",
     "admin",
@@ -326,7 +398,7 @@ export const SPECIAL_ROUTES = Object.freeze([
     "OPTIONS",
     "*",
     "public",
-    "Any path; handled before routing",
+    "Handled before normal routing, except the terminal top-up review path",
     "204, no body; allowed origins receive CORS headers",
   ),
   route(
@@ -353,6 +425,9 @@ export const SPECIAL_ROUTES = Object.freeze([
 ]);
 
 export const AUTH = Object.freeze({
+  "follow-action-token": "Purpose-specific follow bearer in the POST body, checked against its stored hash.",
+  "follow-management-token":
+    "Purpose-specific management bearer in the JSON POST body, checked against its stored hash. Management routes require the exact https://internscout.org Origin and existing CORS permission.",
   "follow-unsubscribe-token":
     "Existing hashed, deletion-only follow token in the HTTPS URL query; never a confirmation, management or request-only deletion capability.",
   public: "No sign-in required; route-specific validation still applies.",

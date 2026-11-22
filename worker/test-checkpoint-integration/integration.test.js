@@ -236,9 +236,29 @@ test("fresh native SQLite transaction blocks promotion crossing the original pen
 
 test("seven-day predecessor cutoff cannot promote or retire the live pending slot", async () => {
   const object = stub(),
-    value = await records({ old: true, oldAge: 7 * DAY - 1000 });
+    value = await records({ old: true });
   await object.initialize(value.pending, value.old);
-  await new Promise((resolve) => setTimeout(resolve, 1100));
+  // Establish the complete live fixture before backdating its matching metadata.
+  // The real SQLite clock, payload bytes and physical slot identities are unchanged.
+  const expired = JSON.parse(new TextDecoder().decode(value.old));
+  expired.accepted_at = wire((await object.now()) - 7 * DAY - 1);
+  const pending = JSON.parse(new TextDecoder().decode(value.pending));
+  pending.predecessor.checkpoint_sha256 = await hash(bytes(expired));
+  value.old = bytes(expired);
+  value.pending = bytes(pending);
+  value.generation = await hash(value.pending);
+  await runInDurableObject(object, async (instance) => {
+    const old = (await instance.descriptor(value.old, "accepted", 1)).record;
+    const next = (await instance.descriptor(value.pending, "pending", 0)).record;
+    expect(
+      await instance.change((state, now) => {
+        if (now < old.expires) return false;
+        state.accepted = { ...state.accepted, ...old };
+        state.pending = { ...state.pending, ...next };
+        return true;
+      }),
+    ).toBe("committed");
+  });
   const before = await etags();
   expect((await object.read("accepted")).status).toBe("expired");
   expect((await object.read("pending")).bytes).toEqual(value.pending);

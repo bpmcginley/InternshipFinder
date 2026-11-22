@@ -19,6 +19,7 @@
 // Signed out, cloud_sync off, or a Worker without profile saving (404, 503 sync_off): nothing happens.
 import {
   loadStore,
+  readStoreWith,
   updateStore,
   emptyStore,
   deepMerge,
@@ -232,38 +233,51 @@ async function stampPending() {
 }
 
 async function restore(serverProfile, updated, expectedHash, epoch, expectedUpdated) {
-  let changed = false,
+  let marker,
     localChanged = false,
     stopped = false;
-  await updateStore((s) => {
-    if (!allowed(s, epoch)) {
-      stopped = true;
-      return;
-    }
-    const before = hashOf(syncedSubset(s));
-    // 2026-10-23: a network reply must not replace edits made while it was pending (EXT-3).
-    // was: restore unconditionally used the profile read before GET/PUT. Revert: remove this check.
-    // 2026-10-23: a just-stamped manual edit may have the same hash as the GET snapshot.
-    // was: hash alone; a delayed timestamp could let an older remote copy overwrite that edit.
-    // Revert: remove the expectedUpdated comparison and its call arguments.
-    if (
-      before !== expectedHash ||
-      (s.settings.profile_updated_at ?? null) !== (expectedUpdated ?? null)
-    ) {
-      localChanged = true;
-      return;
-    }
-    applyServer(s, serverProfile, updated);
-    // The account's own hash, not the merged one: when this device kept something the account lacks
-    // (a finished Deep Dive), the difference shows up as an edit and is pushed.
-    s.settings.profile_synced_hash = hashOf(serverSubset(serverProfile));
-    changed = hashOf(syncedSubset(s)) !== before;
-  });
+  await updateStore(
+    async (s) => {
+      if (!allowed(s, epoch)) {
+        stopped = true;
+        return;
+      }
+      const before = hashOf(syncedSubset(s));
+      // 2026-10-23: a network reply must not replace edits made while it was pending (EXT-3).
+      // was: restore unconditionally used the profile read before GET/PUT. Revert: remove this check.
+      // 2026-10-23: a just-stamped manual edit may have the same hash as the GET snapshot.
+      // was: hash alone; a delayed timestamp could let an older remote copy overwrite that edit.
+      // Revert: remove the expectedUpdated comparison and its call arguments.
+      if (
+        before !== expectedHash ||
+        (s.settings.profile_updated_at ?? null) !== (expectedUpdated ?? null)
+      ) {
+        localChanged = true;
+        return;
+      }
+      const next = applyServer({ ...s, settings: { ...s.settings } }, serverProfile, updated);
+      // The account's own hash, not the merged one: when this device kept something the account lacks
+      // (a finished Deep Dive), the difference shows up as an edit and is pushed.
+      next.settings.profile_synced_hash = hashOf(serverSubset(serverProfile));
+      if (hashOf(syncedSubset(next)) !== before) {
+        const previous = await local(RESTORED_KEY);
+        if (!allowed(s, epoch)) {
+          stopped = true;
+          return;
+        }
+        const at = new Date(Math.max(Date.now(), time(previous?.at) + 1)).toISOString();
+        marker = { updated, at, shown: false };
+      }
+      return next;
+    },
+    {
+      // Open onboarding pages must see the new revision as soon as they can read the restored profile.
+      storagePatch: () => (marker ? { [RESTORED_KEY]: marker } : {}),
+    },
+  );
   if (stopped) return { state: "off" };
   if (localChanged) return { state: "local_changed" };
-  if (changed)
-    await chrome.storage.local.set({ [RESTORED_KEY]: { updated, at: nowIso(), shown: false } });
-  return { state: changed ? "restored" : "same", updated };
+  return { state: marker ? "restored" : "same", updated };
 }
 
 async function push(token, epoch) {
@@ -457,11 +471,18 @@ export async function deleteSyncedAccount(removeAccount) {
 }
 
 // ---------- for pages ----------
+// Read the profile and its revision together. Claim the notice before releasing the same lock.
+export function loadProfileWithRestore() {
+  return readStoreWith(async (store) => {
+    const marker = await local(RESTORED_KEY);
+    const notice = marker && !marker.shown ? marker : null;
+    if (notice) await chrome.storage.local.set({ [RESTORED_KEY]: { ...notice, shown: true } });
+    return { store, revision: marker?.at ?? null, notice };
+  });
+}
+
 // The last restore, once: returns it and marks it shown, or null.
 export async function takeRestored() {
-  const r = await local(RESTORED_KEY);
-  if (!r || r.shown) return null;
-  await chrome.storage.local.set({ [RESTORED_KEY]: { ...r, shown: true } });
-  return r;
+  return (await loadProfileWithRestore()).notice;
 }
 export const restoredAt = async () => ((await local(RESTORED_KEY)) || {}).at || null;

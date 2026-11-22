@@ -5,6 +5,8 @@ export const env = {
   TOPUPS_ENABLED: "1",
   PAYMENTS_ENABLED: "1",
   STRIPE_SECRET_KEY: "fixture-not-a-key",
+  STRIPE_WEBHOOK_SECRET: "fixture-not-a-signing-key",
+  STRIPE_TOPUP_MODE: "test",
   STRIPE_PRICE_TOPUP: "price_fixture",
   SITE_URL: "https://example.invalid",
 };

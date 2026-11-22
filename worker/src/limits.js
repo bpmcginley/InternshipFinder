@@ -2,6 +2,7 @@
 import { HttpError } from "./http.js";
 import { canUpgrade, paymentsInfo } from "./billing.js";
 import { forgetStatements } from "./referral.js";
+import { forgetLinkedFollowStatements } from "./follow-account-deletion.js";
 import { forgetCopies, forgetSessions } from "./session.js";
 import { forgetProfile } from "./profile.js";
 import { countEvent } from "./visits.js";
@@ -542,6 +543,7 @@ export async function deleteUser(db, user, now = new Date()) {
     db.prepare("INSERT INTO forget (user_hash, month) VALUES (?, ?) ON CONFLICT(user_hash) DO UPDATE SET month = excluded.month")
       .bind(user, month),
     ...forgetStatements(db, user),
+    ...forgetLinkedFollowStatements(db, user),
     forgetProfile(db, user),
     forgetSessions(db, user),
     forgetCopies(db, user),

@@ -203,10 +203,10 @@ async function confirmAccounts(store, frames, active) {
 
 // ---------- tailored resume ----------
 // own: loop()'s status writer, so a Pause pressed while the resume is tailored is not overwritten.
-async function tailorStep(id, job, store, own = (patch) => updateJob(id, patch)) {
+async function tailorStep(id, job, store, own, signal) {
   await updateJob(id, { activity: "Tailoring your resume to this posting…" });
   try {
-    const { cost_usd, reused, ...t } = await tailorResume(store, job);
+    const { cost_usd, reused, ...t } = await tailorResume(store, job, { signal });
     // Nothing worth changing for this posting: the student's own file is the better thing to send than
     // a re-saved or redrawn copy of it, and there is nothing to ask them to review.
     if (!Array.isArray(t.diff) || !t.diff.length) {
@@ -237,6 +237,7 @@ async function tailorStep(id, job, store, own = (patch) => updateJob(id, patch))
     await appendLog(id, { kind: "tailor", text: `Tailored resume: ${t.diff.length} change(s)${reused ? ", reused from an earlier run at no cost" : ""}${auto ? ", used automatically" : ""}.` });
     if (!auto) job = await own({ status: "needs_you", reason: "Review the tailored resume: use it, or keep your original.", question: "", activity: "" });
   } catch (e) {
+    if (signal.aborted && e === signal.reason) return getJob(id);
     const msg = String((e && e.message) || e);
     // was: job = await updateJob(id, { tailored: { status: "failed", error: msg } });
     // A failure can still have cost something (the layout of a PDF was read before it was refused).
@@ -392,7 +393,7 @@ async function loop(id, run) {
   // batch_tailor "skipped": "Use my original for all" on another job of this batch (U5), so nothing is
   // tailored, and none of the allowance is spent on it.
   if (!job.tailored && (store.settings.tailor_resume || "off") !== "off" && job.batch_tailor !== "skipped" && canTailor(store, job) && (isWorker(store.ai) || !(await spend()).over)) {
-    job = await tailorStep(id, job, store, own);
+    job = await tailorStep(id, job, store, own, run.signal);
     if (!owns(job, gen)) return; // waiting for the human to approve it, or stopped meanwhile
   }
   if (!(await active())) return;
@@ -679,14 +680,15 @@ async function loop(id, run) {
 
     const results = [];
     let stop = null, stopped = false;
-    // Only an actual, immediately preceding fill and Next on this document can qualify.
-    const [fill, next] = uses;
+    // Only actual text fills immediately followed by Next on this document can qualify.
+    const fills = uses.slice(0, -1), next = uses.at(-1);
     const initial = frames[0];
-    let reviewTransition = uses.length === 2 && !accountPage && frames.length === 1 &&
+    let reviewTransition = fills.length > 0 && !accountPage && frames.length === 1 &&
       initial?.frameId === 0 && typeof initial.documentId === "string" && initial.documentId &&
-      fill.name === "fill" && typeof fill.input?.ref === "string" &&
-      snap.index[fill.input.ref]?.kind === "text" && typeof fill.input.text === "string" &&
-      fill.input.text.trim() &&
+      fills.every((fill) => fill.name === "fill" && typeof fill.input?.ref === "string" &&
+        snap.index[fill.input.ref]?.kind === "text" && typeof fill.input.text === "string" &&
+        fill.input.text.trim()) &&
+      new Set(fills.map((fill) => fill.input.ref)).size === fills.length &&
       next.name === "click" && initial.buttons.some((button) =>
         next.input?.ref === "0:" + button.ref && !button.blocked && /^next$/i.test(button.text));
     for (const u of uses) {

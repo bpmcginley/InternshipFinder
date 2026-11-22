@@ -7,13 +7,29 @@ import { authenticateUser, bearerOf, providers, userHash, verifyIdToken } from "
 import { copySession, createSession, dropExpiredSessions, endSession, isSessionToken, sessionInfo } from "./session.js";
 import { MAX_PROFILE_BYTES, deleteProfile, getProfile, putProfile, requireSync, syncOn } from "./profile.js";
 import { callGemini, costCents, estimateCents, readUsageFromSSE, sanitizeRequest } from "./gemini.js";
+import { boundLegacySSE } from "./legacy-provider-response.js";
 import { allowanceFor, cleanup, upgradeOffer, deleteUser, globalRpm, isPaused, monthOf, release, remainingOf, settle, shownLimit, usageFor } from "./limits.js";
 import { admitAiLifecycle, fundedPurchaseCreationReady, respondFundedAi } from "./ai-lifecycle.js";
 import { purchasedRunsFor } from "./funded-purchase.js";
 import { bonusFor, claim, inviteInfo, noteAccount } from "./referral.js";
 import { cleanStates, demandCounts, dropStale, setDemand, touchSeen } from "./demand.js";
 import { countEvent, countHit } from "./visits.js";
+import { createFollowManagementHttp } from "./follow-management-http.js";
+import { createFollowManagementRequestHttp } from "./follow-management-request-http.js";
+import { loadFollowCatalog, prepareFollowCatalogRelease } from "./follow-catalog-loader.js";
+import { createFollowSignupRoute } from "./follow-signup-route.js";
+import { prepareFollowSignupDeployment } from "./follow-signup-release.js";
+import { runFollowScheduledMaintenance, measureFollowScheduledMaintenance } from "./follow-scheduled-maintenance.js";
+import { createFollowMaintenanceObservation } from "./follow-maintenance-observation.js";
+import { runFollowScheduledLinks } from "./follow-scheduled-links.js";
+import { runFollowDigestRelease } from "./follow-digest-release.js";
+import { runFollowArchiveDeployment } from "./follow-archive-deployment.js";
+import { followTokenEndpoints } from "./follow-token-endpoint.js";
 import { followUnsubscribeEndpoint } from "./follow-unsubscribe-endpoint.js";
+import { followUnsubscribePreview } from "./follow-unsubscribe-preview.js";
+import { topupManualReviewHttp } from "./topup-manual-review-http.js";
+import { runTopupReconciliationScheduled } from "./topup-reconciliation-scheduled.js";
+import { createTopupReconciliationStorage } from "./topup-reconciliation-storage.js";
 import { topupCheckoutResponse, topupOfferResponse } from "./topup-checkout-http.js";
 import { canRecoverAttachedTopup } from "./topup-attached-recovery.js";
 import { topupRecoveryResponse } from "./topup-recovery-http.js";
@@ -77,6 +93,108 @@ function corsHeaders(request, env) {
     Vary: "Origin",
   };
 }
+
+// Keep concurrency per isolate while binding authority and storage to each request.
+const followManagement = createFollowManagementHttp({ enabled: true });
+const followManagementRequest = createFollowManagementRequestHttp({ enabled: true });
+const followSignup = createFollowSignupRoute({ enabled: true });
+const followOriginAllowed = (request, env) =>
+  request.headers.get("Origin") === "https://internscout.org" &&
+  !!corsHeaders(request, env)["Access-Control-Allow-Origin"];
+const followPolicyInteger = (value) => {
+  const parsed = typeof value === "string" ? Number(value) : NaN;
+  return String(parsed) === value ? parsed : NaN;
+};
+
+const manageFollow = (operation) => ({ request, env, db, d }) => {
+  if (env.FOLLOW_MANAGEMENT_ENABLED !== "1")
+    throw new HttpError(404, "not_found", "No such endpoint");
+  return followManagement[operation](request, {
+    db,
+    now: d.now,
+    originAllowed: (r) => followOriginAllowed(r, env),
+  });
+};
+
+const requestFollowManagement = ({ request, env, db }) => {
+  if (env.FOLLOW_MANAGEMENT_ENABLED !== "1" || env.FOLLOW_MANAGEMENT_REQUEST_ENABLED !== "1")
+    throw new HttpError(404, "not_found", "No such endpoint");
+  return followManagementRequest(request, {
+    db,
+    originAllowed: (r) => followOriginAllowed(r, env),
+    ttlMs: followPolicyInteger(env.FOLLOW_MANAGEMENT_REQUEST_TTL_MS),
+    dailyLimit: followPolicyInteger(env.FOLLOW_MANAGEMENT_REQUEST_DAILY_CAP),
+  });
+};
+
+const followSignupClosed = () => json({ error: "not_found", message: "No such endpoint" }, 404);
+
+function prepareFollowSignupAdmission({ db, now, d }) {
+  let policy, dailyLimit, latest = +now;
+  const clock = () => {
+    const value = d.now(), at = +value;
+    if (
+      !(value instanceof Date) || !Number.isSafeInteger(at) || at < latest ||
+      (policy && (at < policy.release.notBefore || at >= policy.release.expiresAt))
+    ) throw new Error("Follow signup clock unavailable");
+    latest = at;
+    return new Date(at);
+  };
+  try {
+    if (!Number.isSafeInteger(latest)) return followSignupClosed();
+    const supplied = d.followSignupRelease();
+    if (
+      !supplied ||
+      typeof supplied !== "object" ||
+      Array.isArray(supplied) ||
+      Object.keys(supplied).sort().join(",") !==
+        "dailyLimit,deadlineMs,maxBytes,maxKeys,origin,previousValid,release"
+    ) {
+      void Promise.prototype.then.call(Promise.resolve(supplied), undefined, () => {});
+      return followSignupClosed();
+    }
+    ({ dailyLimit } = supplied);
+    policy = prepareFollowCatalogRelease(supplied);
+    if (!Number.isSafeInteger(dailyLimit) || dailyLimit <= 0 ||
+        !Number.isFinite(+new Date(policy.release.expiresAt))) return followSignupClosed();
+    clock();
+  } catch {
+    return followSignupClosed();
+  }
+  return {
+    db,
+    dailyLimit,
+    clock,
+    loadCatalog: async () => {
+      const result = await loadFollowCatalog({
+        ...policy, enabled: true, fetch: d.fetch, now: () => +clock(),
+      });
+      return result.status === "available"
+        ? { ...result, expiresAt: policy.release.expiresAt }
+        : result;
+    },
+  };
+}
+
+const signupFollow = ({ request, env, db, now, d }) => {
+  if (env.FOLLOW_SIGNUP_ENABLED !== "1" ||
+      (typeof d.followSignupRelease !== "function" && typeof env.FOLLOW_SIGNUP_RELEASE !== "string"))
+    return followSignupClosed();
+  return followSignup(request, {
+    originAllowed: (r) => followOriginAllowed(r, env),
+    prepareAdmission: () => {
+      if (typeof d.followSignupRelease === "function")
+        return prepareFollowSignupAdmission({ db, now, d });
+      try {
+        return { db, ...prepareFollowSignupDeployment(env.FOLLOW_SIGNUP_RELEASE, {
+          fetch: d.fetch, now: d.now, initialTime: now instanceof Date ? +now : NaN,
+        }) };
+      } catch {
+        return followSignupClosed();
+      }
+    },
+  });
+};
 
 const topupOriginAllowed = (request, env) =>
   DASHBOARD_ORIGINS.includes(request.headers.get("Origin")) &&
@@ -199,6 +317,14 @@ const withAdmin = (handler) => async (context) => {
 const safeRouteHandlers = {
   // Token deletion stays available independently of future signup/sending switches.
   "POST /follows/unsubscribe": async ({ request, db, now }) => followUnsubscribeEndpoint(request, db, now),
+  "GET /follows/unsubscribe": async ({ request }) => followUnsubscribePreview(request),
+  "POST /follows/confirm": async ({ request, db, d }) => followTokenEndpoints.confirm(request, db, d.now),
+  "POST /follows/delete-request": async ({ request, db, d }) => followTokenEndpoints.deleteRequest(request, db, d.now),
+  "POST /follows/manage/list": manageFollow("list"),
+  "POST /follows/manage/remove": manageFollow("remove"),
+  "POST /follows/manage/delete": manageFollow("deleteAll"),
+  "POST /follows/manage/request": requestFollowManagement,
+  "POST /follows/signup": signupFollow,
 
   // Stay signed in: trade a fresh provider ID token for a long-lived session token (session.js).
   // Only an ID token can start a session, so a stolen session token cannot make more of itself.
@@ -468,8 +594,14 @@ const safeRouteHandlers = {
     const price = (usage) => (usage ? costCents(model, usage, d.config, now) : estimate);
 
     if (stream) {
-      const [client, meter] = upstream.body.tee();
-      later(ctx, readUsageFromSSE(meter).then((u) => settle(db, user, admitted, price(u), u, { task, model })));
+      const bounded = boundLegacySSE(upstream.body);
+      const [client, meter] = bounded.body.tee();
+      later(ctx, readUsageFromSSE(meter).then(async (u) => {
+        // Retain first-autofill and ordinary error settlement. Only a byte cutoff
+        // discards provisional usage and keeps the already charged estimate.
+        const usage = await bounded.completed === "limited" ? null : u;
+        await settle(db, user, admitted, price(usage), usage, { task, model });
+      }));
       return new Response(client, {
         status: 200,
         headers: { ...headers, "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },
@@ -570,6 +702,7 @@ const safeRouteHandlers = {
 
   // Bruce's terminal (scripts/placement.mjs orders, pilot-code): the same admin rules as the placements.
   // Not tied to ordersOn, so pilot codes can be made before buying opens.
+  "POST /admin/topup-review": topupManualReviewHttp,
   "GET /admin/orders": async ({ request, db, env }) => {
     await requireAdmin(request, env);
     return json(await listOrders(db));
@@ -616,7 +749,7 @@ const exactRoutes = new Map(ROUTES.map(({ method, path }) => {
 async function route(request, env, ctx, d) {
   const url = new URL(request.url);
   const path = url.pathname.replace(/\/+$/, "") || "/";
-  const db = env.DB;
+  const db = request.method === "GET" && path === "/follows/unsubscribe" ? undefined : env.DB;
   const now = d.now();
   // Brand media has no account/session access, analytics, writes, or arbitrary upstream URLs.
   if (path.startsWith("/social-video/")) return socialVideo(request, d.fetch);
@@ -633,8 +766,11 @@ async function route(request, env, ctx, d) {
   throw new HttpError(404, "not_found", "No such endpoint");
 }
 
-// deps (tests only): { fetch, now: () => Date, config }
+// deps (tests only): { fetch, now: () => Date, config, followSignupRelease }
 export async function handle(request, env, ctx, deps = {}) {
+  // The terminal-only route handles its own method and origin policy before generic CORS.
+  if (new URL(request.url).pathname.replace(/\/+$/, "") === "/admin/topup-review")
+    return exactRoutes.get("POST /admin/topup-review")({ request, env });
   const d = { fetch: (...args) => fetch(...args), now: () => new Date(), config: CONFIG, ...deps };
   let res;
   try {
@@ -658,15 +794,112 @@ export async function handle(request, env, ctx, deps = {}) {
   return res;
 }
 
-export default {
-  fetch: (request, env, ctx) => handle(request, env, ctx),
-  scheduled(event, env, ctx) {
+// Optional trusted port only; no production binding or timeout is selected here.
+function maintenanceRecorder(env) {
+  try {
+    const binding = env.FOLLOW_MAINTENANCE_OBSERVATION;
+    if (!binding) return null;
+    const raw = env.FOLLOW_MAINTENANCE_OBSERVATION_TIMEOUT_MS;
+    if (typeof raw !== "string" || !/^[1-9][0-9]{0,4}$/.test(raw) || Number(raw) > 30000) return null;
+    const record = binding.record;
+    if (typeof record !== "function") return null;
+    const observe = createFollowMaintenanceObservation(value => Reflect.apply(record, binding, [value]));
+    return async (observation) => {
+      if (!observation) return;
+      let timer;
+      try {
+        // Bound only observation after work settles. A late recorder is not retried or recalled.
+        const timeout = new Promise(resolve => { timer = setTimeout(resolve, Number(raw)); });
+        await Promise.race([observe(observation), timeout]);
+      } finally { clearTimeout(timer); }
+    };
+  } catch { return null; }
+}
+
+const digestPromiseThen = Promise.prototype.then;
+const digestPromiseSpecies = Object.getOwnPropertyDescriptor(Promise, Symbol.species)?.get;
+
+function discardDigestPromise(value) {
+  // Observe accidental ordinary async returns without consulting caller-defined species.
+  if (!value || Object.getPrototypeOf(value) !== Promise.prototype ||
+      Object.hasOwn(value, "constructor") ||
+      Object.getOwnPropertyDescriptor(Promise.prototype, "constructor")?.value !== Promise ||
+      Object.getOwnPropertyDescriptor(Promise, Symbol.species)?.get !== digestPromiseSpecies) return;
+  try { Reflect.apply(digestPromiseThen, value, [undefined, () => {}]); } catch { /* Not a native promise. */ }
+}
+
+// Trusted synchronous dependency. The caller supplies an already platform-validated cron.
+// The default export supplies no digest authority.
+function scheduleFollowDigest(event, ctx, deps) {
+  try {
+    const slot = Object.getOwnPropertyDescriptor(deps, "followDigest");
+    if (!slot || !Object.hasOwn(slot, "value")) return;
+    const selected = slot.value;
+    if (!selected || ![Object.prototype, null].includes(Object.getPrototypeOf(selected))) return;
+    const cron = Object.getOwnPropertyDescriptor(selected, "cron");
+    if (!cron || !Object.hasOwn(cron, "value") || typeof cron.value !== "string" ||
+        cron.value.length > 128 || !/^[0-9*/,-]+(?: [0-9*/,-]+){4}$/.test(cron.value) ||
+        event?.cron !== cron.value) return;
+    const enabled = Object.getOwnPropertyDescriptor(selected, "enabled");
+    if (!enabled || !Object.hasOwn(enabled, "value") || enabled.value !== true) return;
+    if (Reflect.ownKeys(selected).sort().join(",") !== "cron,enabled,supply") return;
+    const supply = Object.getOwnPropertyDescriptor(selected, "supply");
+    if (!supply || !Object.hasOwn(supply, "value") || typeof supply.value !== "function") return;
+    const options = supply.value();
+    if (!options || ![Object.prototype, null].includes(Object.getPrototypeOf(options))) {
+      discardDigestPromise(options);
+      return;
+    }
+    const descriptors = Object.getOwnPropertyDescriptors(options);
+    const required = ["archive", "catalog", "db", "deadlineMs", "email", "enabled", "fetch", "key",
+      "limits", "monotonicNow", "now", "policy", "transportTimeoutMs"];
+    if (Reflect.ownKeys(descriptors).some((k) => typeof k !== "string" ||
+        (!required.includes(k) && k !== "relatedLimits")) ||
+        required.some((k) => !descriptors[k]) ||
+        Object.values(descriptors).some((d) => !d.enumerable || !Object.hasOwn(d, "value")) ||
+        descriptors.enabled.value !== true) {
+      discardDigestPromise(options);
+      return;
+    }
+    const captured = Object.fromEntries(Object.entries(descriptors).map(([k, d]) => [k, d.value]));
+    ctx.waitUntil(runFollowDigestRelease(captured));
+  } catch {
+    // No sensitive error, retry, provider fallback or second scheduled job.
+  }
+}
+
+const TOPUP_RECONCILIATION_DEADLINE_MS = 30_000;
+
+export function handleScheduled(event, env, ctx, deps = {}) {
     // The half-hourly trigger is the repository's clock (clock.js); the daily one is the cleanup.
     if (event && event.cron === CLOCK_CRON) {
       ctx.waitUntil(startCatchup(env).catch((e) => console.error("clock failed:", e && e.name)));
       if (env.EMPLOYER_POSTING_MAINTENANCE_ENABLED === "1") {
         ctx.waitUntil(maintainEmployerPostings(env.DB, { enabled: true }));
       }
+      if (env.TOPUP_RECONCILIATION_ENABLED !== "1") return;
+      const mode = env.STRIPE_TOPUP_MODE;
+      if (mode !== "test" && mode !== "live") return;
+      const db = env.DB;
+      const run = runTopupReconciliationScheduled(
+        event.cron,
+        {
+          enabled: true,
+          cron: CLOCK_CRON,
+          deadlineMs: TOPUP_RECONCILIATION_DEADLINE_MS,
+          limit: 1,
+          livemode: mode === "live",
+          maxRequests: 21,
+        },
+        {
+          cursor: createTopupReconciliationStorage(db, TOPUP_RECONCILIATION_DEADLINE_MS),
+          db,
+          env,
+          fetch,
+          monotonicNow: () => performance.now(),
+        },
+      );
+      ctx.waitUntil(run.then(({ status }) => console.info("top-up reconciliation", status)));
       return;
     }
     if (event && event.cron === STUDENT_BILLING_CRON) {
@@ -682,6 +915,56 @@ export default {
         if (env.EMPLOYER_REPORTS === "1") await processCampaignReports(env.DB, env, new Date());
       };
       ctx.waitUntil(reportJob());
+      return;
+    }
+    const followCron = env.FOLLOW_MAINTENANCE_CRON;
+    if (
+      typeof followCron === "string" &&
+      followCron.length > 0 &&
+      followCron !== "17 7 * * *" &&
+      event?.cron === followCron
+    ) {
+      if (env.FOLLOW_MAINTENANCE_ENABLED === "1") {
+        const record = maintenanceRecorder(env);
+        if (record) {
+          const measured = measureFollowScheduledMaintenance(env.DB, env.FOLLOW_MAINTENANCE_POLICY);
+          ctx.waitUntil(measured.then(({result}) => result));
+          ctx.waitUntil(measured.then(({observation}) => record(observation)));
+        } else {
+          ctx.waitUntil(runFollowScheduledMaintenance(env.DB, env.FOLLOW_MAINTENANCE_POLICY));
+        }
+      }
+      return;
+    }
+    const linksCron = env.FOLLOW_LINKS_CRON;
+    if (typeof linksCron === "string" && linksCron.length > 0 &&
+        ![CLOCK_CRON, STUDENT_BILLING_CRON, CAMPAIGN_REPORT_CRON, "17 7 * * *", followCron].includes(linksCron) &&
+        event?.cron === linksCron) {
+      if (env.FOLLOW_LINKS_ENABLED === "1") ctx.waitUntil(runFollowScheduledLinks(env));
+      return;
+    }
+    if (event?.cron !== "17 7 * * *") {
+      const archiveCron = env.FOLLOW_ARCHIVE_CRON;
+      if (
+        typeof archiveCron === "string" &&
+        archiveCron.length > 0 &&
+        event?.cron === archiveCron
+      ) {
+        if (env.FOLLOW_ARCHIVE_ENABLED === "1") ctx.waitUntil(
+          runFollowArchiveDeployment({
+            enabled: true,
+            get descriptor() {
+              return env.FOLLOW_ARCHIVE_RELEASE;
+            },
+            get db() {
+              return env.DB;
+            },
+            fetch,
+          }),
+        );
+        return;
+      }
+      scheduleFollowDigest(event, ctx, deps);
       return;
     }
     const now = new Date();
@@ -705,5 +988,9 @@ export default {
     };
     ctx.waitUntil(Promise.all([cleanup(env.DB, now), dropStale(env.DB, CONFIG, now), dropExpiredSessions(env.DB, now),
       dropOldLeads(env.DB, now), expireCampaignReportMail(env.DB, now), employerJobs()]));
-  },
+  }
+
+export default {
+  fetch: (request, env, ctx) => handle(request, env, ctx),
+  scheduled: (event, env, ctx) => handleScheduled(event, env, ctx),
 };

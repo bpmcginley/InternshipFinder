@@ -83,7 +83,7 @@ export async function getSessionTopupCheckout(
     const current = await select(fresh().toISOString(), before.revision).first();
     // The database await may outlast the exact matched session expiry.
     if (!current || !(Date.parse(current.expires) > +fresh())) return { status: "unavailable" };
-    return { status: "open", url: url.href };
+    return adapter.enabled === true ? { status: "open", url: url.href } : { status: "disabled" };
   } catch {
     // No provider errors, attempt records, tokens or identifiers cross this service boundary.
     return { status: "unavailable" };

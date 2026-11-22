@@ -2,6 +2,8 @@
 // changes are noticed, which copy wins, and that a restore on a new computer skips the Deep Dive.
 import test from "node:test";
 import assert from "node:assert/strict";
+import { setImmediate } from "node:timers/promises";
+import { mergeProfileEdits } from "../onboarding/profile.js";
 
 const store = (data) => ({
   async get(k) {
@@ -498,6 +500,230 @@ test("signing in on a new computer restores the Deep Dive, marks it finished and
   assert.equal(await S.takeRestored(), null); // once
   // Pulling again changes nothing.
   assert.equal((await S.syncNow()).state, "same");
+});
+
+for (const kind of ["GET", "PUT"]) {
+  test(`${kind} restore publishes profile and revision before an older onboarding save acquires the lock`, async () => {
+    const initial = filled({ updated: T1, synced: kind === "PUT" ? "old-hash" : null });
+    reset(initial);
+    const remote = S.toServer(S.syncedSubset(filled()));
+    remote.goals.career = "Restored goal";
+    routes[`${kind} /profile`] = () => [kind === "PUT" ? 409 : 200, { profile: remote, updated: T2 }];
+    const base = await loadStore();
+    const draft = structuredClone(base);
+    draft.profile.goals.career = "Stale onboarding edit";
+    const pageRevision = await S.restoredAt();
+
+    // The page and background use separate store module instances and one shared Web Lock.
+    const page = await import("../lib/store.js?context=restore-page");
+    const navigatorDescriptor = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+    let lockTail = Promise.resolve();
+    Object.defineProperty(globalThis, "navigator", {
+      configurable: true,
+      value: {
+        locks: {
+          request(name, fn) {
+            assert.equal(name, "internscout-store");
+            const locked = lockTail.then(fn, fn);
+            lockTail = locked.catch(() => {});
+            return locked;
+          },
+        },
+      },
+    });
+
+    const originalSet = chrome.storage.local.set;
+    const markerWrite = deferred(),
+      finishWrite = deferred();
+    const patchKeys = [];
+    chrome.storage.local.set = async (patch) => {
+      if (patch[S.RESTORED_KEY]?.updated === T2) {
+        patchKeys.push(Object.keys(patch).sort());
+        markerWrite.resolve();
+        await finishWrite.promise;
+      }
+      return originalSet(patch);
+    };
+    let pageEntered = false;
+    try {
+      const syncing = kind === "PUT" ? S.flush() : S.syncNow();
+      await markerWrite.promise;
+      const saving = page.updateStore(async (fresh) => {
+        pageEntered = true;
+        if ((await S.restoredAt()) !== pageRevision) return;
+        mergeProfileEdits(fresh.profile, base.profile, draft.profile);
+      });
+      await setImmediate();
+      const visibleWhileHeld = LOCAL.store.profile.goals.career;
+      const enteredWhileHeld = pageEntered;
+      finishWrite.resolve();
+      assert.deepEqual(await syncing, { state: "restored", updated: T2 });
+      await saving;
+      assert.equal(LOCAL.store.profile.goals.career, "Restored goal");
+      assert.equal(enteredWhileHeld, false);
+      assert.equal(visibleWhileHeld, base.profile.goals.career);
+      assert.deepEqual(patchKeys, [[S.RESTORED_KEY, "store"]]);
+      const revision = await S.restoredAt();
+      assert.ok(Number.isFinite(Date.parse(revision)));
+      assert.deepEqual(LOCAL[S.RESTORED_KEY], { updated: T2, at: revision, shown: false });
+      assert.equal(S.isLocalEdit(base, LOCAL.store), false);
+    } finally {
+      finishWrite.resolve();
+      chrome.storage.local.set = originalSet;
+      Object.defineProperty(globalThis, "navigator", navigatorDescriptor);
+    }
+  });
+}
+
+test("a rejected restore write leaves both the old profile and its old marker intact", async () => {
+  const initial = filled({ updated: T1 });
+  reset(initial);
+  const previous = { updated: T1, at: T1, shown: true };
+  LOCAL[S.RESTORED_KEY] = previous;
+  const remote = S.toServer(S.syncedSubset(filled()));
+  remote.goals.career = "Restored goal";
+  routes["GET /profile"] = () => [200, { profile: remote, updated: T2 }];
+  const originalSet = chrome.storage.local.set;
+  chrome.storage.local.set = async (patch) => {
+    if (patch[S.RESTORED_KEY]?.updated === T2) throw new Error("synthetic restore write failure");
+    return originalSet(patch);
+  };
+  try {
+    await assert.rejects(S.syncNow(), /synthetic restore write failure/);
+    assert.ok(
+      S.stableStringify(LOCAL.store) === S.stableStringify(initial),
+      "the local store is unchanged",
+    );
+    assert.deepEqual(LOCAL[S.RESTORED_KEY], previous);
+  } finally {
+    chrome.storage.local.set = originalSet;
+  }
+  assert.deepEqual(await S.syncNow(), { state: "restored", updated: T2 });
+  assert.equal(LOCAL.store.profile.goals.career, "Restored goal");
+  assert.equal(LOCAL[S.RESTORED_KEY].updated, T2);
+});
+
+test("a newer account copy that leaves the synced subset unchanged keeps the previous marker", async () => {
+  const initial = filled({ updated: T1 });
+  reset(initial);
+  const previous = { updated: T1, at: T1, shown: true };
+  LOCAL[S.RESTORED_KEY] = previous;
+  const remote = S.toServer(S.syncedSubset(filled({ onboarded: false })));
+  assert.equal(S.decide(initial, { profile: remote, updated: T2 }), "restore");
+  routes["GET /profile"] = () => [200, { profile: remote, updated: T2 }];
+  assert.deepEqual(await S.syncNow(), { state: "same", updated: T2 });
+  assert.equal(LOCAL.store.settings.profile_updated_at, T2);
+  assert.equal(LOCAL.store.settings.onboarded, true);
+  assert.deepEqual(LOCAL[S.RESTORED_KEY], previous);
+});
+
+test("changed restores get distinct revisions even under a fixed clock", async (t) => {
+  reset(filled({ updated: T1 }));
+  t.mock.method(Date, "now", () => Date.parse(T3));
+  LOCAL[S.RESTORED_KEY] = { updated: T1, at: T3, shown: true };
+  let remote = S.toServer(S.syncedSubset(filled()));
+  remote.goals.career = "First restored goal";
+  routes["GET /profile"] = () => [200, { profile: remote, updated: T2 }];
+  assert.equal((await S.syncNow()).state, "restored");
+  assert.equal(Date.parse(await S.restoredAt()), Date.parse(T3) + 1);
+
+  remote = S.toServer(S.syncedSubset(filled()));
+  remote.goals.career = "Second restored goal";
+  routes["GET /profile"] = () => [200, { profile: remote, updated: T3 }];
+  assert.equal((await S.syncNow()).state, "restored");
+  assert.equal(Date.parse(await S.restoredAt()), Date.parse(T3) + 2);
+});
+
+test("opting out during the restore revision read discards the old result", async () => {
+  const initial = filled({ updated: T1 });
+  reset(initial);
+  const previous = { updated: T1, at: T1, shown: true };
+  LOCAL[S.RESTORED_KEY] = previous;
+  const remote = S.toServer(S.syncedSubset(filled()));
+  remote.goals.career = "Retired goal";
+  routes["GET /profile"] = () => [200, { profile: remote, updated: T2 }];
+  routes["DELETE /profile"] = () => [200, { ok: true }];
+  const reading = deferred(),
+    release = deferred();
+  const originalGet = chrome.storage.local.get;
+  chrome.storage.local.get = async (key) => {
+    if (key === S.RESTORED_KEY) {
+      reading.resolve();
+      await release.promise;
+    }
+    return originalGet(key);
+  };
+  try {
+    const syncing = S.syncNow();
+    await reading.promise;
+    const disabling = S.setCloudSync(false);
+    release.resolve();
+    assert.deepEqual(await syncing, { state: "off" });
+    assert.deepEqual(await disabling, { ok: true });
+    assert.equal(LOCAL.store.profile.goals.career, initial.profile.goals.career);
+    assert.deepEqual(LOCAL[S.RESTORED_KEY], previous);
+  } finally {
+    release.resolve();
+    chrome.storage.local.get = originalGet;
+  }
+});
+
+test("only one simultaneous page claims the notice, and each reads the matching profile revision", async () => {
+  const initial = filled({ updated: T1 });
+  initial.profile.goals.career = "Restored goal";
+  reset(initial);
+  const marker = { updated: T1, at: T2, shown: false };
+  LOCAL[S.RESTORED_KEY] = marker;
+  const readers = await Promise.all([S.loadProfileWithRestore(), S.loadProfileWithRestore()]);
+  for (const { store, revision } of readers) {
+    assert.equal(store.profile.goals.career, "Restored goal");
+    assert.equal(revision, T2);
+  }
+  assert.deepEqual(readers.map(({ notice }) => notice), [marker, null]);
+  assert.deepEqual(LOCAL[S.RESTORED_KEY], { ...marker, shown: true });
+});
+
+test("a held old notice claim cannot hide a newer restore or pair it with the old profile", async () => {
+  const initial = filled({ updated: T1 });
+  initial.profile.goals.career = "Original goal";
+  reset(initial);
+  const previous = { updated: T1, at: T1, shown: false };
+  LOCAL[S.RESTORED_KEY] = previous;
+  const remote = S.toServer(S.syncedSubset(filled()));
+  remote.goals.career = "Restored goal";
+  routes["GET /profile"] = () => [200, { profile: remote, updated: T2 }];
+  const claiming = deferred(),
+    release = deferred();
+  const originalSet = chrome.storage.local.set;
+  chrome.storage.local.set = async (patch) => {
+    if (patch[S.RESTORED_KEY]?.at === previous.at && patch[S.RESTORED_KEY]?.shown) {
+      claiming.resolve();
+      await release.promise;
+    }
+    return originalSet(patch);
+  };
+  try {
+    const reading = S.loadProfileWithRestore();
+    await claiming.promise;
+    const syncing = S.syncNow();
+    await setImmediate();
+    const sentWhileHeld = calls.length;
+    release.resolve();
+    const old = await reading;
+    assert.equal(old.store.profile.goals.career, "Original goal");
+    assert.equal(old.revision, T1);
+    assert.deepEqual(old.notice, previous);
+    assert.deepEqual(await syncing, { state: "restored", updated: T2 });
+    assert.equal(sentWhileHeld, 0);
+    assert.equal(LOCAL[S.RESTORED_KEY].shown, false);
+    const current = await S.loadProfileWithRestore();
+    assert.equal(current.store.profile.goals.career, "Restored goal");
+    assert.equal(current.revision, current.notice.at);
+    assert.equal(current.notice.updated, T2);
+  } finally {
+    release.resolve();
+    chrome.storage.local.set = originalSet;
+  }
 });
 
 test("a newer local Deep Dive is pushed, and the time the Worker stored is what's kept", async () => {

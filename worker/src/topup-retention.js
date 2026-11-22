@@ -1,6 +1,121 @@
 // Trusted retention evidence only. No provider read, clock injection or scheduler.
 import { decideTopup } from "./topup-decisions.js";
 const initial = { deleted: false, fullRefund: false, loss: false, held: false, heldDisputeIds: [] };
+const enrollmentCaptures = new WeakMap();
+const settlementEnrollments = new WeakMap();
+const UTC = "strftime('%Y-%m-%dT%H:%M:%fZ','now')";
+const canonicalTime = (v) =>
+  typeof v === "string" &&
+  v.length === 24 &&
+  Number.isFinite(Date.parse(v)) &&
+  new Date(v).toISOString() === v;
+const data = (v, key) => Object.getOwnPropertyDescriptor(v, key)?.value;
+const receiptData = (v, key) => {
+  const d = Object.getOwnPropertyDescriptor(v, key);
+  if (!d || !Object.hasOwn(d, "value")) throw new Error();
+  return d.value;
+};
+function receiptArray(value) {
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) throw new Error();
+  const length = receiptData(value, "length");
+  if (length !== 0 && length !== 1) throw new Error();
+  return length ? [receiptData(value, "0")] : [];
+}
+
+// Explicit trusted pre-settlement capture, never a provider-history qualification API.
+// The opaque authority is local to this isolate and DB binding; serialization loses it.
+export async function captureTopupEnrollment(db, attempt, livemode, options = {}) {
+  try {
+    if (data(options, "enabled") !== true) return { status: "disabled" };
+    const id = data(attempt, "id"),
+      revision = data(attempt, "revision"),
+      created = data(attempt, "created"),
+      schema = data(options, "schemaKey");
+    if (
+      typeof livemode !== "boolean" ||
+      typeof id !== "string" ||
+      !/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/.test(id) ||
+      !Number.isSafeInteger(revision) ||
+      revision < 1 ||
+      !canonicalTime(created) ||
+      typeof schema !== "string" ||
+      !/^[A-Za-z0-9_.-]{1,64}$/.test(schema)
+    )
+      throw new Error();
+    const mode = livemode ? "live" : "test";
+    const rows = receiptArray(
+      await db.batch([
+        db
+          .prepare(
+            `SELECT c.mode,c.epoch,c.schema_key,c.starts_at,
+      c.covered_through,c.revision,${UTC} AS observed_at FROM topup_history_coverage c
+      WHERE c.mode=? AND c.schema_key=? AND c.health='qualified'
+      AND c.starts_at<=? AND c.covered_through>=? AND c.covered_through<=${UTC}
+      AND EXISTS(SELECT 1 FROM topup_checkout_attempts a JOIN topup_attempt_revisions r
+        ON r.attempt_id=a.id WHERE a.id=? AND r.revision=? AND a.created=?
+        AND a.state IN ('creating','open'))`,
+          )
+          .bind(mode, schema, created, created, id, revision, created),
+      ]),
+    );
+    if (rows.length !== 1) throw new Error();
+    const row = rows[0],
+      success = receiptData(row, "success"),
+      meta = receiptData(row, "meta"),
+      changes = receiptData(meta, "changes"),
+      results = receiptArray(receiptData(row, "results"));
+    if (success !== true || changes !== 0) throw new Error();
+    if (!results.length) return { status: "unproven" };
+    const value = results[0];
+    const keys = [
+      "mode",
+      "epoch",
+      "schema_key",
+      "starts_at",
+      "covered_through",
+      "revision",
+      "observed_at",
+    ];
+    if (!value || Reflect.ownKeys(value).length !== keys.length) throw new Error();
+    const c = Object.fromEntries(keys.map((key) => [key, data(value, key)]));
+    if (
+      c.mode !== mode ||
+      c.schema_key !== schema ||
+      typeof c.epoch !== "string" ||
+      !/^[a-f0-9]{32}$/.test(c.epoch) ||
+      !Number.isSafeInteger(c.revision) ||
+      c.revision < 1 ||
+      ![c.starts_at, c.covered_through, c.observed_at].every(canonicalTime) ||
+      c.starts_at > created ||
+      c.covered_through < created ||
+      c.covered_through > c.observed_at
+    )
+      throw new Error();
+    const token = Object.freeze({ status: "captured" });
+    enrollmentCaptures.set(token, { db, id, attemptRevision: revision, created, ...c });
+    return token;
+  } catch {
+    return { status: "unavailable" };
+  }
+}
+
+// Called synchronously at settlement entry: a capture finishing during awaited payment
+// hashing cannot become authority for that already-started settlement.
+export function topupEnrollmentForSettlement(db, token, attempt, livemode) {
+  const c = enrollmentCaptures.get(token);
+  if (
+    !c ||
+    c.db !== db ||
+    c.id !== attempt?.id ||
+    c.attemptRevision !== attempt?.revision ||
+    c.created !== attempt?.created ||
+    c.mode !== (livemode === true ? "live" : livemode === false ? "test" : null)
+  )
+    return null;
+  const bound = Object.freeze({});
+  settlementEnrollments.set(bound, c);
+  return bound;
+}
 
 // Validate complete lists even when the committed credit decision short-circuits a prior
 // refund/loss. Credit disposition alone says nothing about financial resolution.
@@ -115,13 +230,24 @@ export function topupRetentionStatement(
   resolved,
   historyProven = false,
   digest = null,
+  enrollment = null,
 ) {
+  const c = settlementEnrollments.get(enrollment);
+  const enrolled = c?.db === db;
   return db
     .prepare(
-      "INSERT INTO topup_retention(payment_hash,resolved_at,resolved_zero_since,history_proven,evidence_digest) " +
+      "INSERT INTO topup_retention(payment_hash,resolved_at,resolved_zero_since,history_proven,evidence_digest" +
+        (enrolled ? ",coverage_epoch" : "") +
+        ") " +
         "SELECT payment_hash,CASE WHEN ? THEN strftime('%Y-%m-%dT%H:%M:%fZ','now') END," +
         "CASE WHEN ? AND available+held=0 THEN strftime('%Y-%m-%dT%H:%M:%fZ','now') END " +
-        ",?,? FROM topup_purchases WHERE payment_hash=? AND changes()=1 " +
+        ",?,?" +
+        (enrolled
+          ? `,(SELECT epoch FROM topup_history_coverage WHERE mode=? AND epoch=?
+          AND schema_key=? AND starts_at=? AND covered_through=? AND revision=? AND health='qualified'
+          AND starts_at<=? AND covered_through>=? AND covered_through<=${UTC} AND ?<${UTC})`
+          : "") +
+        " FROM topup_purchases WHERE payment_hash=? AND changes()=1 " +
         "ON CONFLICT(payment_hash) DO UPDATE SET " +
         "history_proven=topup_retention.history_proven AND excluded.history_proven, " +
         "resolved_at=CASE WHEN excluded.resolved_at IS NOT NULL THEN CASE WHEN topup_retention.evidence_digest IS excluded.evidence_digest THEN COALESCE(topup_retention.resolved_at,excluded.resolved_at) ELSE excluded.resolved_at END END," +
@@ -133,6 +259,19 @@ export function topupRetentionStatement(
       Number(resolved),
       Number(historyProven && digest !== null),
       digest,
+      ...(enrolled
+        ? [
+            c.mode,
+            c.epoch,
+            c.schema_key,
+            c.starts_at,
+            c.covered_through,
+            c.revision,
+            c.created,
+            c.created,
+            c.observed_at,
+          ]
+        : []),
       paymentHash,
     );
 }

@@ -7,6 +7,7 @@ import { createControls } from "./controls.mjs";
 import { createRows } from "./rows.mjs";
 import { createNavigation } from "./navigation.mjs";
 import { createSetup } from "./setup.mjs";
+import { createDashboardFollow, createCompanyFollow } from "./follow.mjs";
 import { createDashboard } from "./dashboard.mjs";
 
 export function createApp(browser) {
@@ -77,6 +78,9 @@ export function createApp(browser) {
     IS, useMemo, h, MultiSelect, Sel, opt, useState, useRef, useEffect, scrollBehavior, cx, F,
   });
 
+  const DashboardFollow = createDashboardFollow(browser);
+  const CompanyFollow = createCompanyFollow(browser);
+
   const App = createDashboard(browser, {
     useRef, IS, useState, SKIP_KEY, LANDING_KEY, LS_KEY, SAVED_KEY, PAGE, readMyList,
     MYLIST_KEY, VISIT_KEY, useCallback, writeLocal, useEffect, bounded, useExtension, useMemo,
@@ -87,7 +91,7 @@ export function createApp(browser) {
     restoreArrivalAnchor, focusArrival, Setup, QuickProfile, STATE_LABEL, useNarrow, factsLine,
     matchControl, Why, prevent, PLACE_NOTICE_KEY, PlaceNotice, F, installUrl, SiteNav, ADMIN,
     AccountMenu, noCount, NOCOUNT_KEY, AllowancePanel, InviteBlock, Sel, opt, APP_STATES,
-    SearchBox, MultiSelect, ShareSearch, ListTable, Digest, Row, sinceVisit, Landing,
+    SearchBox, MultiSelect, ShareSearch, ListTable, Digest, Row, sinceVisit, Landing, DashboardFollow, CompanyFollow,
   });
 
   return {

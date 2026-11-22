@@ -439,6 +439,10 @@ export function loadStore() {
   return withStoreLock(loadStoreUnlocked);
 }
 
+export function readStoreWith(read) {
+  return withStoreLock(async () => read(await loadStoreUnlocked()));
+}
+
 export async function saveStore(s) {
   return withStoreLock(async () => {
     await chrome.storage.local.set({ store: s });
@@ -449,11 +453,12 @@ export async function saveStore(s) {
 // 2026-10-23: let sync consume its pending marker only after the revision is durably saved,
 // while still holding the same lock as noteEdit. was: no post-save locked callback.
 // Revert: remove the afterSave option together with sync's locked marker consumption.
-export async function updateStore(fn, { afterSave } = {}) {
+// storagePatch supplies related values for the same locked storage write.
+export async function updateStore(fn, { afterSave, storagePatch } = {}) {
   return withStoreLock(async () => {
     const s = await loadStoreUnlocked();
     const out = (await fn(s)) || s;
-    await chrome.storage.local.set({ store: out });
+    await chrome.storage.local.set({ ...storagePatch?.(), store: out });
     if (afterSave) await afterSave(out);
     return out;
   });

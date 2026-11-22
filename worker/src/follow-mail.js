@@ -5,6 +5,10 @@ import { addressOf } from "./mail.js";
 const ROLE_ID = /^[a-f0-9]{16}$/;
 const EMAIL = /^[^\s@<>,\x00-\x1f\x7f]+@[^\s@<>,\x00-\x1f\x7f]+\.[^\s@<>,\x00-\x1f\x7f]+$/;
 const FOLLOW_TOKEN = /[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}\.[a-f0-9]{64}/i;
+const ACTION_TOKEN = /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}\.[a-f0-9]{64}$/;
+const MANAGEMENT_ORIGIN = "https://internscout.org";
+const MANAGEMENT_PATH = "/follows/manage.html";
+const MANAGEMENT_PREFIX = `${MANAGEMENT_ORIGIN}${MANAGEMENT_PATH}#token=`;
 const invalid = () => {
   throw new Error("Invalid follow message input");
 };
@@ -53,7 +57,37 @@ function decodedLink(value) {
   }
 }
 
-function trustedLinks(origins, links) {
+// Capability characters are ASCII. Collapse nested percent escapes without reparsing the URL.
+function normalizedLinkAscii(value) {
+  const chars = [];
+  for (const char of value) {
+    chars.push(char);
+    while (chars.length >= 3 && chars.at(-3) === "%") {
+      const hex = chars.at(-2) + chars.at(-1);
+      if (!/^[0-7][0-9a-f]$/i.test(hex)) break;
+      chars.length -= 3;
+      chars.push(String.fromCharCode(Number.parseInt(hex, 16)));
+    }
+  }
+  return chars.join("").toLowerCase();
+}
+
+// Only body action slots may use the landing page's canonical purpose-specific fragment.
+function actionFragment(name, value, url) {
+  const purpose =
+    name === "confirmation" ? "confirm" : name === "deleteRequest" ? "delete-request" : null;
+  if (!purpose) invalid();
+  const prefix = `${url.origin}/follows/action.html#purpose=${purpose}&token=${purpose === "delete-request" ? "fd_" : ""}`;
+  if (!value.startsWith(prefix) || !ACTION_TOKEN.test(value.slice(prefix.length))) invalid();
+}
+
+function managementFragmentToken(value) {
+  if (typeof value !== "string" || !value.startsWith(MANAGEMENT_PREFIX)) return null;
+  const token = value.slice(MANAGEMENT_PREFIX.length);
+  return ACTION_TOKEN.test(token) ? token : null;
+}
+
+function trustedLinks(origins, links, withManagement) {
   if (!Array.isArray(origins) || !origins.length || !links) invalid();
   const allowed = new Set(
     origins.map((value) => {
@@ -62,15 +96,38 @@ function trustedLinks(origins, links) {
       return url.origin;
     }),
   );
-  return (name, publicLink = false) => {
-    const url = link(links[name]);
+  const management = withManagement ? links.management : undefined;
+  const managementToken = managementFragmentToken(management);
+  function urlFor(name, publicLink = false) {
+    const value = name === "management" ? management : links[name];
+    const url = link(value);
     if (!allowed.has(url.origin)) invalid();
-    if (publicLink ? FOLLOW_TOKEN.test(decodedLink(url.href)) : url.hash) invalid();
+    const managementPath = normalizedLinkAscii(url.pathname) === MANAGEMENT_PATH;
+    if (
+      managementToken &&
+      name !== "management" &&
+      normalizedLinkAscii(url.href).includes(managementToken)
+    )
+      invalid();
+    if (publicLink) {
+      if (managementPath || FOLLOW_TOKEN.test(decodedLink(url.href))) invalid();
+    } else {
+      const path = decodedLink(url.pathname);
+      if (
+        managementPath ||
+        (name === "management" && (url.origin === MANAGEMENT_ORIGIN || value.includes("#")))
+      ) {
+        if (name !== "management" || !managementToken) invalid();
+      } else if (path === "/follows/action.html" || value.includes("#")) {
+        actionFragment(name, value, url);
+      }
+    }
     return url.href;
-  };
+  }
+  return { urlFor, managementToken };
 }
 
-function roleLines(roles, seen, limit = Infinity) {
+function roleLines(roles, seen, limit = Infinity, selected = null) {
   if (!Array.isArray(roles)) invalid();
   const lines = [];
   for (const role of roles) {
@@ -81,6 +138,7 @@ function roleLines(roles, seen, limit = Infinity) {
     seen.ids.add(role.id);
     if (seen.urls.has(identity)) continue;
     seen.urls.add(identity);
+    selected?.push(role);
     lines.push(
       `${line(role.company_name, 200)}: ${line(role.title, 300)} (${line(role.location, 300)})`,
       posting.href,
@@ -88,6 +146,24 @@ function roleLines(roles, seen, limit = Infinity) {
     if (lines.length / 2 === limit) break;
   }
   return lines;
+}
+
+// Keep exact object identity and the same ordered posting deduplication as rendering.
+export function followMailDirectRoles(roles) {
+  const selected = [];
+  roleLines(roles, { ids: new Set(), urls: new Set() }, Infinity, selected);
+  return selected;
+}
+
+function rejectManagementInRoleLinks(lines, managementToken) {
+  for (let i = 1; i < lines.length; i += 2) {
+    const url = new URL(lines[i]);
+    if (
+      (managementToken && normalizedLinkAscii(url.href).includes(managementToken)) ||
+      (url.origin === MANAGEMENT_ORIGIN && normalizedLinkAscii(url.pathname) === MANAGEMENT_PATH)
+    )
+      invalid();
+  }
 }
 
 export function renderFollowMail(kind, input) {
@@ -102,7 +178,7 @@ export function renderFollowMail(kind, input) {
   mailAddress(typeof sender === "string" ? sender : sender.email);
   if (typeof sender !== "string") line(sender.name, 200);
   const envelope = { from: sender, to: mailAddress(to) };
-  const url = trustedLinks(origins, links);
+  const { urlFor: url, managementToken } = trustedLinks(origins, links, kind !== "confirm");
   const unsubscribe = url("unsubscribe");
   envelope.headers = {
     "List-Unsubscribe": `<${unsubscribe}>`,
@@ -133,6 +209,8 @@ export function renderFollowMail(kind, input) {
     subject = "New internships for your follows";
     lines = ["New roles matching your follows:", ...matches];
     const similar = roleLines(input.similar ?? [], seen, 2);
+    rejectManagementInRoleLinks(matches, managementToken);
+    rejectManagementInRoleLinks(similar, managementToken);
     if (similar.length)
       lines.push(similar.length === 2 ? "One similar role:" : "Two similar roles:", ...similar);
     lines.push(

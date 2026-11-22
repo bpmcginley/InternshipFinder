@@ -99,11 +99,13 @@ def select(workspace: Path, sha: str) -> Path:
     return directory
 
 
-def selection_marker(directory: Path, *, from_data: bool) -> str:
+def selection_marker(directory: Path, *, from_data: bool, upstream_run: str | None = None) -> str:
     checkout = directory.parents[1]
     commit, tree = (git_object(checkout, ref) for ref in ("HEAD", f"HEAD:{EXPORT.as_posix()}"))
     source = "data" if from_data else "main-fallback"
     marker = f"[listing-data] source={source} commit={commit} tree={tree}"
+    if upstream_run is not None:
+        return f"{marker} upstream_run={upstream_run}"
     if os.environ.get("GITHUB_EVENT_NAME") == "workflow_run":
         event_path = os.environ.get("GITHUB_EVENT_PATH")
         if event_path:
@@ -130,15 +132,41 @@ def git_object(checkout: Path, ref: str) -> str:
     return oid
 
 
+def catchup_pin(environ):
+    if environ.get("GITHUB_EVENT_NAME") != "repository_dispatch":
+        return None
+    commit = environ.get("CATCHUP_COMMIT", "")
+    tree = environ.get("CATCHUP_TREE", "")
+    run = environ.get("CATCHUP_UPSTREAM_RUN", "")
+    if not all(
+        re.fullmatch(r"[a-f0-9]{40}", value) for value in (commit, tree)
+    ) or not re.fullmatch(r"[1-9][0-9]{0,15}", run):
+        raise SystemExit("Automatic catch-up selection requires a verified publication.")
+    return commit, tree, run
+
+
+def require_catchup_tip(sha, pin):
+    if pin and sha != pin[0]:
+        raise SystemExit("Automatic catch-up publication is no longer the current data tip.")
+
+
 def main() -> None:
     workspace = Path(os.environ["GITHUB_WORKSPACE"]).resolve()
+    pin = catchup_pin(os.environ)
     if sys.argv[1] == "resolve":
-        output = f"sha={resolve(workspace)}"
+        sha = resolve(workspace)
+        require_catchup_tip(sha, pin)
+        output = f"sha={sha}"
     else:
         sha = os.environ["DATA_SHA"]
+        require_catchup_tip(sha, pin)
         directory = select(workspace, sha)
+        if pin and git_object(directory.parents[1], f"HEAD:{EXPORT.as_posix()}") != pin[1]:
+            raise SystemExit("Automatic catch-up public tree does not match its verified receipt.")
         output = f"directory={directory}"
-        print(selection_marker(directory, from_data=bool(sha)))
+        print(
+            selection_marker(directory, from_data=bool(sha), upstream_run=pin[2] if pin else None)
+        )
     with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as target:
         target.write(output + "\n")
 

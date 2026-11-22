@@ -22,7 +22,7 @@ const retry = (reason) => ({ disposition: "retry", reason });
 
 // Repeated identical current objects are harmless. Conflicting versions of one ID are not
 // ordered here: the caller must reread/reconcile them. Amounts include charged tax, not fees.
-function distinct(list, statuses, currency, captured) {
+function distinct(list, statuses, currency, maxAmount = Number.MAX_SAFE_INTEGER) {
   if (!Array.isArray(list)) return null;
   const byId = new Map();
   for (const item of list) {
@@ -32,7 +32,7 @@ function distinct(list, statuses, currency, captured) {
       !statuses.has(item.status) ||
       item.currency !== currency ||
       !positive(item.amount) ||
-      item.amount > captured
+      item.amount > maxAmount
     )
       return null;
     const old = byId.get(item.id);
@@ -83,12 +83,8 @@ export function decideTopup(snapshot) {
     return unresolved("invalid_payment");
   }
   const refunds = distinct(snapshot.refunds, REFUNDS, snapshot.currency, snapshot.capturedAmount);
-  const disputes = distinct(
-    snapshot.disputes,
-    DISPUTES,
-    snapshot.currency,
-    snapshot.capturedAmount,
-  );
+  // Stripe dispute amounts can exceed capture after currency conversion. Only status moves units.
+  const disputes = distinct(snapshot.disputes, DISPUTES, snapshot.currency);
   if (!refunds || !disputes) return unresolved("inconsistent_snapshot");
   let refunded = 0;
   for (const refund of refunds) {

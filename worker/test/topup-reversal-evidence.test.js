@@ -148,7 +148,11 @@ test("malformed paging, repeated IDs/cursors and unrelated objects fail closed",
   });
   assert.deepEqual(await run(loop), { status: "pending" });
   assert.equal(loop.calls.length, 3);
-  for (const change of [(v) => (v.data[0].livemode = true), (v) => (v.data[0].amount = 328)])
+  for (const change of [
+    (v) => (v.data[0].livemode = true),
+    (v) => (v.data[0].currency = "cad"),
+    (v) => (v.data[0].amount = Number.MAX_SAFE_INTEGER + 1),
+  ])
     assert.deepEqual(
       await run(
         provider([], [item("disputes", 1)], (v, kind) => {
@@ -157,6 +161,17 @@ test("malformed paging, repeated IDs/cursors and unrelated objects fail closed",
       ),
       { status: "pending" },
     );
+});
+test("verified disputes can exceed capture, while refunds stay bounded by the charge", async () => {
+  const amount = evidence.capturedAmount + 1;
+  const dispute = { ...item("disputes", 1, "needs_response"), amount };
+  const result = await run(provider([], [dispute]));
+  assert.equal(result.status, "reversal_evidence");
+  assert.deepEqual(result.disputes, [
+    { id: dispute.id, status: dispute.status, currency: dispute.currency, amount },
+  ]);
+  const refund = { ...item("refunds", 1, "succeeded"), amount };
+  assert.deepEqual(await run(provider([refund], [dispute])), { status: "pending" });
 });
 test("every existing policy status is supported without changing refund/dispute rules", async () => {
   for (const status of ["succeeded", "pending", "requires_action", "failed", "canceled"])

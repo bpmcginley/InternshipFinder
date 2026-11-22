@@ -57,7 +57,7 @@ Workers Logs stay off for the same reason.
 | `src/orders/` | Paid listings bought on the site: the order, email link, field cap, Checkout, review page, credits, daily cron (`ORDERS.md`) |
 | `src/mail.js` | Plain-text email over the Cloudflare Email Sending binding `EMAIL` (orders only) |
 | `scripts/placement.mjs` | Bruce's command line for the placement admin routes, plus `orders` and `pilot-code` (token from the environment) |
-| `src/config.js` | Models, per-task allowances, prices, rate limits. Edit here, then deploy |
+| `src/config.js` | Models, per-task allowances, prices, rate limits. Release via [Deploy](#deploy-bruce) |
 | `wrangler.toml` | Public vars (client IDs, origins, budget) and the D1 binding |
 
 ## Run locally
@@ -86,9 +86,11 @@ For `wrangler dev`, put local-only secrets in `worker/.dev.vars` (git-ignored), 
 Claude never handles keys. Run these yourself:
 
 1. `npx wrangler login`
-2. Create the database: `npx wrangler d1 create internscout`. Copy the `database_id` it prints into
-   `wrangler.toml` (the ID isn't secret).
-3. Create the tables: `npx wrangler d1 execute internscout --remote --file=schema.sql`
+2. For a new installation only, create the database with `npx wrangler d1 create internscout` and
+   configure its binding in `wrangler.toml`. Preserve the existing binding on a deployed installation.
+3. Review the exact release's ordered files in `migrations/` and the live migration ledger. Do not
+   initialize or upgrade a deployed database by executing `schema.sql`; it is the legacy parity
+   reference. Apply only the migration set approved for this release.
 4. Set the secrets. Each command prompts for the value:
    - `npx wrangler secret put GEMINI_API_KEY` (a paid-tier key, so Google doesn't train on prompts)
    - `npx wrangler secret put HASH_SALT` (any long random string; changing it resets everyone's usage)
@@ -101,31 +103,28 @@ Claude never handles keys. Run these yourself:
      Deep Dives students save to their account. Until it is set, saving is off (`/config` says
      `"sync": false`) and nothing breaks. Set it once and keep it: a new value makes every saved copy
      unreadable until that student saves again.
-5. `npm run deploy`. Note the `*.workers.dev` URL it prints. This applies `schema.sql` to the live
-   database first (every statement is `CREATE TABLE IF NOT EXISTS`, so it is safe to repeat) and then
-   deploys. Always deploy this way rather than with `wrangler deploy` on its own: a commit that adds a
-   table and code that reads it would otherwise ship without the table, and every request that
-   touches it would answer 500. That is exactly what happened to `/me` when the billing tables landed.
+5. Check pending migrations before choosing the deployment command:
 
-   <!-- "safe to repeat" is true and incomplete, and the gap only bites on a database that is already
-        live -- which is now the case. `CREATE TABLE IF NOT EXISTS` skips a table that exists; it never
-        adds a missing COLUMN to one. So a `plans` table created under an older shape survives this step
-        untouched, the deploy reports success, and every checkout then fails on the live site with "no
-        such column". Nothing in the deploy output says so. Added here because the read-only check costs
-        two seconds and the failure it prevents is a student's declined card. -->
-   **Before the first deploy after a schema change, read the live shapes and compare them to
-   `schema.sql` by eye.** `CREATE TABLE IF NOT EXISTS` adds a missing table but never a missing column,
-   so a table that already exists in an older shape is left as it was and the deploy still reports
-   success:
-
-   ```
-   npx wrangler d1 execute internscout --remote --command "SELECT name, sql FROM sqlite_master WHERE type='table'"
+   ```powershell
+   npx wrangler d1 migrations list internscout --remote
    ```
 
-   A table that is missing entirely will be created by step 5. A table that is present but short a
-   column has to be migrated by hand with `ALTER TABLE ... ADD COLUMN`, because nothing in this
-   repository will do it for you.
-6. Put that URL in `extension/lib/config.js` (`WORKER_URL`) and in the dashboard's `CONFIG.workerUrl`.
+   The `deploy` script in `package.json` runs `wrangler d1 migrations apply internscout --remote`,
+   then `deploy-backfills.sql`, then `wrangler deploy`. It applies **all pending migrations** from
+   the checked-out release. It does not execute `schema.sql`, and it is not a code-only or
+   configuration-only deployment command.
+
+   Run `npm run deploy` only when the entire pending set and backfills are approved. If a migration
+   is held for another package, stop and use the coordinated release procedure for the exact approved
+   code and existing schema. Do not apply the held migration merely to deploy unrelated code.
+   The package script deploys immediately after the database steps pass. When the release requires
+   ledger and schema verification before promotion, use a coordinated split procedure that stops
+   after the approved database steps, verifies them, and only then promotes the exact Worker.
+   Preserve a compatible prior Worker version and its bindings for rollback. A Worker rollback
+   does not undo D1 migrations.
+   Repair schema drift through a reviewed migration, not an ad hoc manual `ALTER TABLE`.
+
+6. Use the verified deployed Worker URL in the extension and dashboard configuration.
 7. GitHub repo secrets for the ingest workflow: `INTERNSCOUT_DEMAND_URL` (the Worker URL plus `/demand`)
    and `INTERNSCOUT_DEMAND_TOKEN` (the same value as `DEMAND_TOKEN`).
 
@@ -173,7 +172,7 @@ copy anywhere that calls InternScout simply free is now wrong.
 Two things still gate a tier even with payments on, and both are secrets rather than code: nothing is
 offered at all unless `STRIPE_SECRET_KEY` is set, and a tier is offered only while its own price id
 (`STRIPE_PRICE_ID` for Supporter, `STRIPE_PRICE_ID_PRO` for Pro) is set. Unsetting one hides that tier
-and makes its checkout 404 again, without a deploy.
+and makes its checkout 404 again once the updated binding configuration is live.
 
 The steps below are how this was turned on, and how to redo it against a new Stripe account or when
 rotating from test keys to live ones. Claude does none of them — keys stay with you.
@@ -210,7 +209,7 @@ Check `task_tokens` in D1 (cents per task and model) after a few weeks: if an ap
 under 2¢, the allowances can go up; if it costs more, lower them. Neither changes the margin, only how
 often a student meets the ceiling before the allowance. Changing a price means creating a new Stripe price and updating the matching
 secret (`STRIPE_PRICE_ID`, `STRIPE_PRICE_ID_PRO`), `PLANS` and the `*_PRICE_TEXT` vars together (step 2
-below), and deploying.
+below). Follow the [deployment procedure](#deploy-bruce).
 
 A tier is offered only when its own Stripe price id is set, so you can launch Supporter alone and add
 Pro later without touching code.
@@ -228,8 +227,11 @@ Pro later without touching code.
    `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`,
    `charge.refunded`, `charge.dispute.created`. The last two put a student back on free and cancel
    the subscription when the money goes back; leave them out and a refunded plan keeps its
-   allowance. Copy the signing secret and run `npx wrangler secret put STRIPE_WEBHOOK_SECRET`.
-5. Set `PAYMENTS_ENABLED = "1"` and a correct `SITE_URL` in `wrangler.toml`, then `npm run deploy`.
+   allowance. This is the subscription setup list, not the complete top-up event list. Preserve
+   existing employer and subscription events when adding the top-up families below. Copy the
+   endpoint's signing secret and run `npx wrangler secret put STRIPE_WEBHOOK_SECRET`.
+5. Set `PAYMENTS_ENABLED = "1"` and a correct `SITE_URL` in `wrangler.toml`, then follow the
+   [deployment procedure](#deploy-bruce), including review of every pending migration.
 6. Check it with a test card (`4242 4242 4242 4242`): `GET /me` should flip to `"plan": "supporter"`
    (or `"pro"`) with a larger allowance, switching tier in Stripe's portal should move it across, and
    cancelling should put it back to `free`.
@@ -243,8 +245,68 @@ activated at `dashboard.stripe.com/settings/managed-payments`, and each product 
 "Eligible for Managed Payments" (ours use `txcd_10105003`, AI as a service). Set it to `"0"` to send
 plain checkout sessions, where you owe the tax yourself.
 
-To switch them off again, set `PAYMENTS_ENABLED = "0"` and deploy. Existing subscribers keep their plan
-row but stop being charged only once you cancel their subscriptions in Stripe, so cancel there too.
+To switch subscription sales off again, set `PAYMENTS_ENABLED = "0"` through the
+[deployment procedure](#deploy-bruce). Existing subscribers keep their plan row but stop being
+charged only once you cancel their subscriptions in Stripe, so cancel there too.
+
+## One-time top-up activation (owner qualification required)
+
+Sales remain off until the exact release and private provider configuration are qualified. The
+existing configuration hint is not proof of a usable offer or successful payment. The native
+[sales-flow rehearsal](../notes/product/P-2.2be-sales-flow.md) uses synthetic responses through the
+actual routes. It cannot establish the production account, key permissions, webhook delivery or
+Managed Payments eligibility.
+
+Before enabling sales, verify these separately without printing secrets or private provider objects:
+
+- Confirm the intended Stripe account and mode with authorized provider access. Verify the exact
+  configured `STRIPE_PRICE_TOPUP` using the pinned API version in `src/billing.js`. Its active
+  one-time Price and Product, currency, amount, tax behavior and mode must satisfy
+  `prepareTopupStripe` in `src/topup-stripe.js` and the approved public terms. Confirm the account
+  and product support the existing `STRIPE_MANAGED_PAYMENTS` setting. A successful metadata read
+  does not prove Checkout creation is permitted.
+- Confirm the enabled endpoint is the intended Worker's `/billing/webhook`, in the intended mode
+  and with the qualified event schema. Verify the deployed `STRIPE_WEBHOOK_SECRET` corresponds to
+  that endpoint. Endpoint metadata alone does not prove secret equality or signed delivery. The
+  top-up Checkout families are `checkout.session.completed`, `checkout.session.async_payment_succeeded`,
+  `checkout.session.async_payment_failed` and `checkout.session.expired`. Also include the supported
+  reversal families in `src/topup-reversal-types.js`: `refund.created`, `refund.updated`,
+  `refund.failed`, `charge.refund.updated`, `charge.refunded`, and `charge.dispute.created`,
+  `charge.dispute.updated`, `charge.dispute.closed`, `charge.dispute.funds_withdrawn` and
+  `charge.dispute.funds_reinstated`. Keep existing subscription and employer events.
+- Confirm funded creation is ready with `FUNDED_RUNS_MODE=create`, `FUNDED_PURCHASES=1`, and explicit
+  `FUNDED_RESPONSE_MAX_BYTES`, `FUNDED_RESPONSE_EVENT_BYTES` and `FUNDED_RESPONSE_DEADLINE_MS`.
+  Qualify those bounds with the actual supported client. The event bound cannot exceed the body
+  bound. Existing allowance, pause, rate and spending limits still apply.
+- [Sales-provider correction #602](https://github.com/bpmcginley/InternshipFinder/pull/602) merged as
+  `0deb1ea1`. It requires `STRIPE_TOPUP_MODE` set to `test` or `live`, with no default, and a signing-key
+  presence gate for new sales. Before activation, verify the exact deployed Worker version includes
+  that correction. A repository merge alone does not establish enforcement in production. These
+  checks do not verify the real account or delivery by themselves.
+
+Use a separate Worker, D1 database and signed webhook endpoint for provider test mode. Purchased
+balances aggregate by user, so test and live purchases must not share the production database.
+Keep test credentials and events confined to that isolated environment.
+
+Read-only account, Price and endpoint checks can avoid creating a payment. Use the authorized
+provider interface and keep full responses private. Record only the expected checks and pass/fail
+results. Do not treat event resends, recovery POSTs or Checkout creation as read-only verification.
+A return URL or open Checkout does not confirm payment. Use the authenticated fresh balance and
+existing attached-checkout recovery behavior after verified settlement.
+
+To stop new top-up sales, set `TOPUPS_ENABLED=0` through the approved deployment procedure. Keep the
+historical Stripe key, Price and signing configuration so settlement, refunds, disputes and attached
+recovery continue. Do not disable all subscription payments just to stop top-up sales.
+
+To stop new funded AI generations, use `FUNDED_RUNS_MODE=drain` and retain valid response limits.
+Existing funded generations may continue under their original charge. This affects new AI runs
+beyond purchased runs. Do not revert to the legacy writer while funded generations can exist.
+The qualified create/drain and old-run continuation fixtures are in
+`test-support/ai-lifecycle.js`. No automatic down-migration or blanket legacy rollback is provided.
+
+Historical coverage and automatic erasure have a separate
+[approved proof requirement](../notes/product/P-2.2am-topup-history-design.md). An observed event
+inventory or successful sales rehearsal does not establish continuous coverage or authorize erasure.
 
 ## Paid listings ("placements"; off until you set ADMIN_TOKEN)
 
@@ -258,16 +320,17 @@ you switch a placement on. No student data is in either table, and no recruiter 
 **Turn it on (once, on your own machine; Claude does neither step):**
 
 1. `npx wrangler secret put ADMIN_TOKEN` (any long random string; it prompts for the value)
-2. `npm run deploy` (applies `schema.sql`, which creates the two tables, then deploys)
+2. Follow the [deployment procedure](#deploy-bruce) with the approved migration set and backfills.
 
-Then check the tables exist, because the schema step sometimes only prints a permission list:
+After the approved database steps, verify the placement schema objects:
 
 ```
 npx wrangler d1 execute internscout --remote --command "SELECT name FROM sqlite_master WHERE name LIKE 'placement%'"
 ```
 
 It should list `placements`, `placements_live`, `placement_log` and `placement_log_placement`. If not,
-run `npm run deploy` again.
+stop and reconcile the binding, migration ledger and expected schema through the coordinated release
+procedure. Do not rerun deployment to repair unexplained schema drift.
 
 **Day to day:** `scripts/placement.mjs` (no install). Put the same token in your shell's environment as
 `INTERNSCOUT_ADMIN_TOKEN` (for example in PowerShell, `$env:INTERNSCOUT_ADMIN_TOKEN = Read-Host`, then
@@ -299,7 +362,7 @@ binding, the `REVIEW_TO` secret, the Stripe webhook events) are in [ORDERS.md](O
 
 ## Changing limits
 
-- Allowances, models, prices and rate limits: `src/config.js`, then deploy.
+- Allowances, models, prices and rate limits: `src/config.js`, then follow [Deploy](#deploy-bruce).
 - Global monthly budget: `MONTHLY_BUDGET_CENTS` in `wrangler.toml` ($75). Keep the Google Cloud
   budget alert in step with it. It is the backstop that stops AI before a surprise bill arrives, so
   raise it and a per-student allowance together only once you have real usage numbers.

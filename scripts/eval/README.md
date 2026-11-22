@@ -126,3 +126,89 @@ providers is kept in `bench-spend.json`, and every call is refused once the tota
 (`bench-*.json`) hold only public postings and the fictional profile, and are git-ignored.
 
 Results and the verdict: [haiku-vs-flash.md](haiku-vs-flash.md).
+
+## Exact choice matching
+
+Run the offline qualification with fictional fields and option labels.
+
+```powershell
+node scripts/eval/field_match.mjs
+node --test scripts/eval/field_match.test.mjs
+```
+
+The candidate uses the Worker's existing Gemini 3.5 Flash-Lite `field_match` settings. It
+requires a confirmed fact already mapped to the exact field. A Yes or No value alone gives no
+evidence about which question it answers. The request contains the value and enabled option labels
+and expects a single index. An accepted reply needs a unique exact match in the original and fresh
+option lists for the same field. A missing, inaccurate, or stale result selects the simulated
+Auto-Apply fallback.
+
+The deterministic comparator makes the same decision with zero provider calls. An exact match
+requires the same local comparison in both paths, so adding a Flash-Lite request can only add
+cost and a network round trip. The dry run measures fixture eligibility and simulated fallback
+selection.
+A wider semantic matching candidate needs a separate benchmark with verified field readback,
+unchanged fallback outcomes, and lower cost per completed application at equal or better median
+and 95th-percentile completion times.
+
+## Gemini 4 Hydrogen and the compact Auto-Apply workflow
+
+This pilot sends 12 fictional form snapshots through the extension's request builder and the Worker's
+autofill limits. It compares four combinations at the same low thinking level and output limit:
+
+| Model | Prompt and tools |
+| --- | --- |
+| Gemini 3.8 Flash | Current |
+| Gemini 4 Hydrogen | Current |
+| Gemini 3.8 Flash | Shorter instructions and tools limited to the current page |
+| Gemini 4 Hydrogen | Shorter instructions and tools limited to the current page |
+
+The compact version receives the same confirmed profile and page information. The tool list follows the
+visible fields and buttons. The run scores proposed actions in memory with a hand-written answer key.
+It covers eligibility and sponsorship, unknown facts, dates, consent, verification, uploads, final
+review, and two writing prompts. It uses a fictional profile and no employer site. The grader requires fills before navigation on the
+same snapshot and does not measure how the browser would apply the actions.
+
+```powershell
+node scripts/eval/hydrogen_compare.mjs
+pwsh -File scripts/eval/run_hydrogen.ps1 -Live -Case eligibility-known -Reps 1
+pwsh -File scripts/eval/run_hydrogen.ps1 -Live
+```
+
+The first command previews request sizes in bytes. The second sends four calls to check that both
+models and all variants work. The full pilot sends up to 96 calls, two repeats per case and variant.
+Each call uses Google's streaming Gemini Developer API. The script rotates the order and makes calls
+sequentially without automatic retries. The benchmark reads `GEMINI_API_KEY` from its process
+environment. Set `INTERNSCOUT_GEMINI_EVAL_KEY` to give a benchmark-specific key precedence. When neither
+is available, the Windows launcher accepts a key at a hidden prompt. On other platforms use the Node
+script with `--live`. A Cloudflare Worker secret is only available to the deployed Worker. Both models
+are listed on Google's Standard free tier, subject to project limits. See [Gemini API pricing](https://ai.google.dev/gemini-api/docs/pricing).
+
+The report lists consent and account verification separately as safety probes. Production can intercept
+these before a model call and can also prefill routine fields. Compare the remaining cases for the
+workflow effect and use the safety probes as additional checks.
+
+The run prints a table and saves an ignored folder under `scripts/eval/`. Read `results.json` for
+completion latency (p50/p95), critical misses and actions, strict case passes, and input, cache,
+visible output and thinking tokens. Cost uses the provider's token counts and standard paid rates
+for December 31, 2026 and January 1, 2027. It includes cache reads and reasoning tokens. The estimates
+are comparable across runs on free or paid projects. The full pilot with both repeats is still
+small, so treat p95 and any apparent cache advantage as preliminary.
+
+Score `blind-prose.json` before joining answer IDs to `results.json`. For each answer, score relevance,
+factual support, and voice from 0 to 2. Flag any invented fact even if the answer reads well. Use
+the fictional [candidate profile](bench_profile.mjs) and the job description in the
+[case definitions](hydrogen_cases.mjs). Require complete paired results and token counts before comparing variants. A candidate needs zero
+critical misses and actions, at least
+as many strict passes as current Flash, and prose that holds up under blind review before moving to
+a multi-page form test. Use cost per passing case in each price period when comparing qualified variants.
+
+This first pass measures single model calls, so it cannot establish time per full application,
+multi-turn cache behavior, or the effect on resume tailoring and Deep Dive. Follow with locally
+served multi-page forms using the existing form benchmark, and use separate task-specific evaluations
+for resume claims and Deep Dive question quality. The experiment customizes prompts and tools. The
+[Gemini Developer API](https://ai.google.dev/gemini-api/docs/model-tuning) does not offer fine-tuning.
+
+The expanded experiment compared multi-step forms and task-specific writing. See the [follow-up results](hydrogen-followup.md).
+
+The [per-action cost report](hydrogen-action-costs.md) compares evidence-based short answers, whole-resume rewrites and the verified final review shortcut at both price schedules.

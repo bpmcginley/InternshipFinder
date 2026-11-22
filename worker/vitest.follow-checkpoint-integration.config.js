@@ -9,7 +9,10 @@ export default defineConfig({
       miniflare: {
         cf: false,
         compatibilityDate: "2026-09-01",
-        durableObjects: { CHECKPOINT: { className: "CheckpointIntegration", useSQLite: true } },
+        durableObjects: {
+          CHECKPOINT: { className: "CheckpointIntegration", useSQLite: true },
+          WITNESS: { className: "CheckpointWitnessCasFixture", useSQLite: true },
+        },
         r2Buckets: ["SLOTS"],
         outboundService() {
           throw new Error("External requests forbidden in checkpoint qualification");

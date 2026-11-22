@@ -50,9 +50,9 @@ export async function topupOfferResponse({
     const fresh = freshClock(clock);
     const identity = await authenticate(request, { DB: db }, { now: +fresh() });
     if (!identityLive(identity, fresh())) return response("auth", 401);
-    const offer = topupDisplayOffer(await prepareAdapter(identity, fresh));
+    const adapter = await prepareAdapter(identity, fresh);
     if (!identityLive(identity, fresh())) return response("auth", 401);
-    if (!offer) return response("disabled", 503);
+    if (!topupDisplayOffer(adapter)) return response("disabled", 503);
     // The verification await may overlap revocation or replacement of the original session.
     const current = await authenticate(request, { DB: db }, { now: +fresh() });
     const at = fresh();
@@ -63,7 +63,10 @@ export async function topupOfferResponse({
       current.tier !== identity.tier
     )
       return response("auth", 401);
-    return json({ enabled: true, offer }, 200, { "Cache-Control": "no-store" });
+    const offer = topupDisplayOffer(adapter);
+    return offer
+      ? json({ enabled: true, offer }, 200, { "Cache-Control": "no-store" })
+      : response("disabled", 503);
   } catch (error) {
     return boundaryError(error);
   }
@@ -92,6 +95,7 @@ export async function topupCheckoutResponse({
     if (prepareAdapter && !identityLive(identity, fresh())) return response("auth", 401);
     const result = await checkout(db, identity.user, token, verifiedAdapter, fresh);
     if (result?.status === "open") {
+      if (prepareAdapter && verifiedAdapter?.enabled !== true) return response("disabled", 503);
       // Only the verified service may authorize this URL; this is defensive output validation.
       if (
         typeof result.url !== "string" ||

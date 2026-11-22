@@ -6,11 +6,19 @@ This describes checked-in code, not deployed feature configuration. Shapes are d
 
 ## Route contract
 
-The router trims trailing slashes before exact matching. Global OPTIONS is handled first; the media prefix delegates validation and unsupported methods to social-video.js. The attached top-up recovery route returns 405 for other methods. Other unknown method/path pairs return 404. Common errors and CORS behavior remain documented below.
+The terminal top-up review route requires its exact path and handles methods before generic CORS. The remaining router trims trailing slashes before exact matching. Global OPTIONS is handled before normal dispatch; the media prefix delegates validation and unsupported methods to social-video.js. The attached top-up recovery route returns 405 for other methods. Other unknown method/path pairs return 404. Common errors and CORS behavior remain documented below.
 
 | Method and path | Authentication | Feature gate | Request shape | Response shape |
 |---|---|---|---|---|
-| `POST /follows/unsubscribe` | follow-unsubscribe-token | none; deletion remains available when signup or sending is off | Exactly one query parameter token=deletion-only UUID.secret; URL-encoded or multipart List-Unsubscribe=One-Click, at most 4,096 bytes with an absolute 5-second body-read deadline; no login, cookies or Origin required | Empty no-store 204 for deletion/replay/unknown/wrong-purpose; malformed 400; body timeout/capacity/storage 503 with Retry-After: 60; GET/HEAD fall through to 404 without mutation |
+| `POST /follows/confirm` | follow-action-token | none; authorizes only an existing confirmation credential | No query parameters. Exactly one confirmation token as a 101-byte text/plain body with an absolute 5-second read deadline. | Empty no-store 204 for confirmation, 410 for unavailable confirmation, 400 for malformed input, 503 with Retry-After: 60 for timeout/capacity/storage. GET/HEAD fall through to 404. |
+| `POST /follows/delete-request` | follow-action-token | none; deletion remains available when signup or sending is off | No query parameters. Exactly one fd_ request-deletion token as a 104-byte text/plain body with an absolute 5-second read deadline. | Empty no-store 204 for deletion/replay/unknown, 400 for malformed input, 503 with Retry-After: 60 for timeout/capacity/storage. GET/HEAD fall through to 404. |
+| `POST /follows/unsubscribe` | follow-unsubscribe-token | none; deletion remains available when signup or sending is off | Exactly one query parameter token=deletion-only UUID.secret; URL-encoded or multipart List-Unsubscribe=One-Click, at most 4,096 bytes with an absolute 5-second body-read deadline; no login, cookies or Origin required | Empty no-store 204 for deletion/replay/unknown/wrong-purpose; malformed 400; body timeout/capacity/storage 503 with Retry-After: 60; HEAD falls through to 404 without mutation |
+| `GET /follows/unsubscribe` | public | none; existing issued capabilities remain available | Exact path. Any query receives identical static HTML without storage access or credential reflection. Browser removes query/fragment before explicit action. | No-store HTML 200 with hashed CSP, no-referrer, frame-deny and noindex. Explicit button makes existing one-click POST; opening alone never unsubscribes. |
+| `POST /follows/manage/list` | follow-management-token + site-origin | FOLLOW_MANAGEMENT_ENABLED | UTF-8 JSON [managementToken, null or cursor]. No query or fragment. Up to 16 KiB and five seconds to read. | No-store JSON {scopes: [{scope_key, created, confirmed_at}], next} 200; empty 410 unavailable capability; 400 malformed, 403 Origin, 415 media type, 503 retryable; 404 when disabled. |
+| `POST /follows/manage/remove` | follow-management-token + site-origin | FOLLOW_MANAGEMENT_ENABLED | UTF-8 JSON [managementToken, scopeKey]. No query or fragment. Up to 16 KiB and five seconds to read. | No-store JSON {removed} 200; empty 400 malformed, 403 Origin, 415 media type, 503 retryable; 404 when disabled. |
+| `POST /follows/manage/delete` | follow-management-token + site-origin | FOLLOW_MANAGEMENT_ENABLED | UTF-8 JSON [managementToken]. No query or fragment. Up to 16 KiB and five seconds to read. | No-store JSON {deleted} 200; empty 400 malformed, 403 Origin, 415 media type, 503 retryable; 404 when disabled. |
+| `POST /follows/manage/request` | site-origin | FOLLOW_MANAGEMENT_ENABLED and FOLLOW_MANAGEMENT_REQUEST_ENABLED | UTF-8 JSON {email}. No query or fragment. Up to 16 KiB and five seconds to read. Requires explicit TTL and daily cap. | Empty no-store 202 for accepted, unknown or duplicate requests; 400 malformed, 403 Origin, 415 media type, 503 retryable; 404 when disabled. |
+| `POST /follows/signup` | site-origin | FOLLOW_SIGNUP_ENABLED and a current trusted release from FOLLOW_SIGNUP_RELEASE or the injected supplier | UTF-8 JSON {email, link, scope}. No query or fragment. Scope is a company key or exact field/state arrays. Explicit link=true requires a current non-refreshing session. Up to 16 KiB and five seconds to read. | Empty no-store 202 for accepted or duplicate signup; 400 invalid, 403 Origin, 415 media type, 503 unavailable, 404 without qualified opt-in. |
 | `GET /config` | public | none | none | JSON {providers: Provider[], allowance: PlanAllowances, payments: {enabled, plans}, topups?: true, paused: boolean, invite: {bonus, max}, sessions: true, sync: boolean} |
 | `GET /me` | user | none | none | JSON {month, plan, plan_renews, can_upgrade, upgrade_offer, can_manage, can_recover_topup?: true, tier, paused, allowance: {task: {used, limit, bonus?, purchased?}}} |
 | `POST /session` | provider-id | none | Authorization: Bearer provider ID token; no body | JSON {session, account, email, provider, tier, expires} |
@@ -53,16 +61,19 @@ The router trims trailing slashes before exact matching. Global OPTIONS is handl
 | `POST /employer/review` | review-signature | orders | Form {order, sig, action: approve\|refuse, reason?} | HTML decision result |
 | `GET /employer/credit` | credit-token | orders | Query {credit, t} | JSON {credit, status, amount, unused_days, role, choose_by, processing?, code?} |
 | `POST /employer/credit` | site-origin + credit-token | orders | JSON {credit, token, choice: refund\|credit} | JSON {done, amount, code?} |
+| `POST /admin/topup-review` | admin | TOPUP_MANUAL_REVIEW_ENABLED | Exact path without query. JSON [null] or [continuation cursor], up to 128 bytes. | Private no-store JSON {candidates, next}; 404 when disabled. No CORS or mutation. |
 | `GET /admin/orders` | admin | none | none | JSON {orders: [{id, created, status, package, start, amount, company, roles}]} |
 | `POST /admin/pilot-codes` | admin | none | Optional JSON {note?} | JSON {code, note, created, made, max} |
 | `GET /demand` | demand-token | none | Authorization: Bearer DEMAND_TOKEN | JSON {states: {[code]: number}, users: number, updated: ISO} |
-| `OPTIONS *` | public | none | Any path; handled before routing | 204, no body; allowed origins receive CORS headers |
+| `OPTIONS *` | public | none | Handled before normal routing, except the terminal top-up review path | 204, no body; allowed origins receive CORS headers |
 | `GET /social-video/*` | public | none | Dated lowercase MP4 filename, no query; optional single Range header | video/mp4 200 or 206; invalid files 404, unsupported methods 405, ranges 416, upstream failures 502 |
 | `HEAD /social-video/*` | public | none | Dated lowercase MP4 filename, no query; optional single Range header | Same successful media metadata as GET, no body; same validation and error statuses |
 | `* *` | public | none | Unmatched normalized method/path | 404 JSON {error: not_found, message}; not a catch-all authenticated route |
 
 ### Authentication keys
 
+- **follow-action-token:** Purpose-specific follow bearer in the POST body, checked against its stored hash.
+- **follow-management-token:** Purpose-specific management bearer in the JSON POST body, checked against its stored hash. Management routes require the exact https://internscout.org Origin and existing CORS permission.
 - **follow-unsubscribe-token:** Existing hashed, deletion-only follow token in the HTTPS URL query; never a confirmation, management or request-only deletion capability.
 - **public:** No sign-in required; route-specific validation still applies.
 - **user:** Provider ID token or live session bearer token, through the existing authenticateUser path.
@@ -93,7 +104,7 @@ dashboard (`docs/index.html`). Update the route data and these notes together, t
   `hpnbb…` is the Chrome Web Store copy, whose ID the store assigned.
   <!-- was: Methods `GET, POST, DELETE, OPTIONS`; headers `Authorization, Content-Type`. -->
   Methods `GET, POST, PUT, DELETE, OPTIONS` (`PUT` is for `PUT /profile`); headers `Authorization, Content-Type`.
-  A preflight (`OPTIONS`, any path) answers 204 with these headers for an allowed origin.
+  A preflight (`OPTIONS`) answers 204 with these headers for an allowed origin. The terminal-only top-up review route rejects browser origins without CORS.
 
 ## One-click follow unsubscribe
 

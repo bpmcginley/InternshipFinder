@@ -1,7 +1,7 @@
 // Dormant aggregate shared by future confirmation, management and digest send attempts.
-const observeSql =
-  "INSERT INTO follow_send_budget(slot,observed_at,attempts) VALUES (1,?,0) " +
-  "ON CONFLICT(slot) DO UPDATE SET observed_at=excluded.observed_at, attempts=CASE " +
+const observeSql = "INSERT INTO follow_send_budget(slot,observed_at,attempts) ";
+const observeUpdateSql =
+  " ON CONFLICT(slot) DO UPDATE SET observed_at=excluded.observed_at, attempts=CASE " +
   "WHEN substr(excluded.observed_at,1,10)=substr(follow_send_budget.observed_at,1,10) " +
   "THEN follow_send_budget.attempts ELSE 0 END " +
   "WHERE excluded.observed_at>=follow_send_budget.observed_at";
@@ -10,8 +10,17 @@ export const validFollowSendCap = (cap) => Number.isSafeInteger(cap) && cap > 0;
 export const followSendBudgetAvailable =
   "EXISTS (SELECT 1 FROM follow_send_budget WHERE slot=1 AND observed_at=? AND attempts<?)";
 
-export function observeFollowSendBudget(db, at) {
-  return db.prepare(observeSql).bind(at);
+export function observeFollowSendBudget(db, at, requireDatabaseDay = false) {
+  if (requireDatabaseDay) {
+    return db
+      .prepare(
+        observeSql +
+          "SELECT 1,?,0 WHERE ?<=strftime('%Y-%m-%dT%H:%M:%fZ','now') AND substr(?,1,10)=date('now')" +
+          observeUpdateSql,
+      )
+      .bind(at, at, at);
+  }
+  return db.prepare(observeSql + "VALUES (1,?,0)" + observeUpdateSql).bind(at);
 }
 
 export function debitFollowSendBudget(db, at, cap, requireClaim = false) {

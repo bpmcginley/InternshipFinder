@@ -10,6 +10,7 @@ export default defineConfig({
     wrangler: { configPath: "./wrangler.follow-checkpoint.toml" },
     miniflare: {
       bindings: {
+        FOLLOW_CHECKPOINT_ENABLED: "1",
         FOLLOW_CHECKPOINT_ORIGIN: "https://private-checkpoint.example.test",
         FOLLOW_CHECKPOINT_MAX_BYTES: "4096",
         FOLLOW_CHECKPOINT_WRITER_SHA256: digest("A"),
