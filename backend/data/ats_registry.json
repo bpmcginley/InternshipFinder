@@ -16386,6 +16386,12 @@
    "fails": 0,
    "added": "2026-09-18"
   },
+  "fiskars|wd3|FiskarsGroup": {
+   "name": "Fiskars Group",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-22"
+  },
   "fis|wd5|searchjobs": {
    "name": "Fidelity National Information Services",
    "quant": false,
@@ -18885,9 +18891,8 @@
   "nwis|wd12|NW": {
    "name": "Nightwing",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "nyp|wd1|nypcareers": {
    "name": "NewYork-Presbyterian",
@@ -20492,9 +20497,8 @@
   "symbotic|wd504|Symbotic": {
    "name": "Symbotic",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "synchronyfinancial|wd5|University": {
    "name": "Synchrony Financial",
