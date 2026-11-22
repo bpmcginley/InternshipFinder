@@ -25,6 +25,8 @@ import json
 import logging
 import os
 import sys
+import time
+import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -68,8 +70,16 @@ def _call(method: str, path: str, body: dict | None = None) -> dict:
         headers=headers,
         data=json.dumps(body).encode() if body is not None else None,
     )
-    with urllib.request.urlopen(req, timeout=30) as r:
-        raw = r.read()
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            raw = r.read()
+    except urllib.error.HTTPError as exc:
+        if method != "GET" or exc.code not in (502, 503, 504):
+            raise
+        exc.close()
+        time.sleep(1)
+        with urllib.request.urlopen(req, timeout=30) as r:
+            raw = r.read()
     return json.loads(raw) if raw else {}
 
 
