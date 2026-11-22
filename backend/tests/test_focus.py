@@ -41,6 +41,16 @@ def test_fields_with_no_search_bank_are_skipped():
     assert focus.thinnest([], majors) == []  # finance has no bank; it is searched elsewhere
 
 
+def test_persistent_low_yield_fields_resume_only_after_nearby_supply_recovers():
+    majors = MAJORS + [{"tags": ["museums", "theater", "biomedical"]}]
+    listings = [_x(["languages"])] * 9 + [_x(["museums", "theater"], key="TX")] * 20
+    assert {tag for tag, *_ in focus.search_targets(listings, majors)} == {
+        "biomedical",
+        "psychology",
+    }
+    assert ("languages", 10, 3) in focus.search_targets(listings + [_x(["languages"])], majors)
+
+
 def test_interleave_reaches_every_field_early():
     q = focus.interleave(["languages", "arts"])
     assert q[:2] == [focus.SEARCHES["languages"][0], focus.SEARCHES["arts"][0]]

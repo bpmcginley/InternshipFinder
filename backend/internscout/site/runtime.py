@@ -3634,6 +3634,7 @@ def _select_build_kinds(pages, listings, trackers, enough):
 
 
 def _finish_build(pages, live, by_company, cohorts, trackers, new, majors_made, facts, rep, updated):
+    _state().major_destinations = {name: path for path, name, _ in majors_made}
     _state().home_live_date = live.get("/") if isinstance(live, dict) else None
     _state().home = _hooks().home_browse(
         pages, by_company, cohorts.fields, cohorts.states, trackers, len(new) >= _state().min_open, len(majors_made)
@@ -3884,6 +3885,7 @@ class BuildState:
     digest_form: str = DIGEST_FORM
     tracker: tuple[str, str] | None = TRACKER
     employers: dict[str, str] = field(default_factory=dict)
+    major_destinations: dict[str, str] = field(default_factory=dict)
     texts: dict[str, str] = field(default_factory=dict)
     home: str = HOME
     home_live_date: str | None = HOME_LIVE_DATE

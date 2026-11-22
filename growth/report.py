@@ -277,9 +277,9 @@ def audience_section(site_dir: str) -> list[str]:
 
 def targeting_section(site_dir: str) -> list[str]:
     d = site_source.load(site_dir)
-    picks = focus.thinnest(d["listings"], d["majors"])
+    picks = focus.search_targets(d["listings"], d["majors"])
     if not picks:
-        return ["## Search targeting", "No field is thin enough to need focus searches.", ""]
+        return ["## Search targeting", "No eligible focus field; using configured searches.", ""]
     return [
         "## Search targeting",
         "The daily focus searches are going to: "
@@ -291,20 +291,20 @@ def targeting_section(site_dir: str) -> list[str]:
 
 def pages_section(site_dir: str) -> list[str]:
     pages = site_entry.build_snapshot(site_dir).pages
-    kinds = {"field or state": 0, "field in a state": 0, "major": 0, "employer": 0}
+    kinds = {"field or place": 0, "field in a place": 0, "major": 0, "employer": 0, "other": 0}
     for p in pages:
-        parts = p["path"].strip("/").split("/")
-        if len(parts) == 3 and parts[1] == "for":
-            kinds["major"] += 1
-        elif len(parts) == 3 and parts[1] == "at":
-            kinds["employer"] += 1
-        elif len(parts) == 3:
-            kinds["field in a state"] += 1
-        elif len(parts) == 2 and parts[1] not in ("for", "at", "new"):
-            kinds["field or state"] += 1
+        kind = p.get("kind")
+        if kind in ("field", "state"):
+            kinds["field or place"] += 1
+        elif kind == "combo":
+            kinds["field in a place"] += 1
+        elif kind in ("major", "employer"):
+            kinds[kind] += 1
+        else:
+            kinds["other"] += 1
     return [
         "## Landing pages",
-        f"{len(pages):,} pages from the current data: "
+        f"{len(pages):,} pages generated from the current data before deployment retention: "
         + ", ".join(f"{n:,} {k}" for k, n in kinds.items())
         + ".",
         "",

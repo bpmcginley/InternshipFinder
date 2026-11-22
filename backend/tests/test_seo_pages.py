@@ -521,6 +521,41 @@ def test_json_ld_cannot_be_broken_out_of(tmp_path):
     assert json.loads(block)["itemListElement"][-1]["name"] == evil
 
 
+@pytest.mark.parametrize(
+    "name,slug,tag,field_path",
+    [
+        ("Computer Science", "computer-science", "swe", "/internships/software-engineering/"),
+        (
+            "Statistics and Data Science",
+            "statistics-and-data-science",
+            "data",
+            "/internships/data-science/",
+        ),
+    ],
+)
+def test_folded_priority_major_url_redirects_to_its_current_catalog_destination(
+    tmp_path, name, slug, tag, field_path
+):
+    rows = [_row(index, tags=(tag,)) for index in range(15)]
+    site = _site(
+        tmp_path, {"MA": rows}, majors=[{"name": name, "tags": [tag], "level": "undergrad"}]
+    )
+    pages, state, hooks = _build_with_state(site)
+    alias = f"/internships/for/{slug}-majors/"
+    assert alias not in _paths(pages)
+    assert field_path in _paths(pages)
+
+    publish._write_site(site, pages, state, hooks)
+
+    redirect = (tmp_path / alias.strip("/") / "index.html").read_text(encoding="utf-8")
+    canonical = f"https://internscout.org{field_path}"
+    assert f'<meta http-equiv="refresh" content="0;url={canonical}">' in redirect
+    assert f'<link rel="canonical" href="{canonical}">' in redirect
+    assert f'<a href="{field_path}">' in redirect
+    assert alias not in (tmp_path / "sitemap.xml").read_text(encoding="utf-8")
+    assert alias not in (tmp_path / runtime.HELD_FILE).read_text(encoding="utf-8").splitlines()
+
+
 def test_a_placeholder_salary_is_not_pay(tmp_path):
     # 22 open listings said "$0.00 - $999.99 Hour" or "$0.00 /Yr" and were counted, and shown, as paid.
     for salary in ("$0.00 /Yr", "$0.00 - $999.99 Hour", "0", "$0 - $0"):

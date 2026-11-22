@@ -91,6 +91,9 @@ def main(argv: list[str]) -> int:
     if not new:
         target = "new sitemap" if os.environ.get("INTERNSCOUT_LOG_FORMAT") == "json" else args[1]
         console(f"[indexnow] {target} has no URLs; nothing sent")
+        if "--submit" in argv:
+            print("::error::The deployed sitemap has no valid site URLs; recrawl notification skipped")
+            return 1
         return 0
     urls = changed(old, new)
     added = sum(1 for u in urls if u not in old)

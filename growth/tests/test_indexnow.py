@@ -58,6 +58,14 @@ def test_the_key_file_is_published_with_the_key():
         assert f.read().strip() == indexnow.KEY
 
 
+def test_notification_fails_without_sending_when_new_sitemap_is_unreadable(tmp_path, monkeypatch):
+    old = _sitemap(tmp_path, "old.xml", {"https://internscout.org/": "2026-11-20"})
+    new = tmp_path / "new.xml"
+    new.write_text("not XML", encoding="utf-8")
+    monkeypatch.setattr(indexnow, "submit", lambda urls: pytest.fail("must not send false removals"))
+    assert indexnow.main(["indexnow.py", old, str(new), "--submit"]) == 1
+
+
 @pytest.mark.parametrize("statuses", [[200], [202], [200, 202]])
 def test_an_accepted_submission_keeps_the_notify_job_green(tmp_path, monkeypatch, statuses):
     old = _sitemap(tmp_path, "old.xml", {})

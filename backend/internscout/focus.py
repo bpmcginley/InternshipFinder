@@ -134,10 +134,15 @@ SEARCHES: dict[str, list[str]] = {
 HOME = set(HOME_STATE_CODES)
 FIELDS = 3  # fields focused on at once
 ENOUGH = 60  # a field with this many open roles nearby is not thin
+RECOVERY_MINIMUMS = {"languages": 10, "museums": 10, "theater": 10}
 
 
 def thinnest(
-    listings: list[dict], majors: list[dict], k: int = FIELDS
+    listings: list[dict],
+    majors: list[dict],
+    k: int = FIELDS,
+    *,
+    minimums: dict[str, int] | None = None,
 ) -> list[tuple[str, int, int]]:
     """(field, open nearby, majors that depend on it) for the k fields to focus on, neediest first.
 
@@ -148,13 +153,19 @@ def thinnest(
     depends = Counter(
         t for m in majors if m.get("level") in (None, "undergrad") for t in set(m.get("tags") or [])
     )
+    minimums = minimums or {}
     candidates = [
         (t, near.get(t, 0), n)
         for t, n in depends.items()
-        if t in SEARCHES and near.get(t, 0) < ENOUGH
+        if t in SEARCHES and minimums.get(t, 0) <= near.get(t, 0) < ENOUGH
     ]
     candidates.sort(key=lambda c: (-(c[2] / (c[1] + 1)), c[1], c[0]))
     return candidates[:k]
+
+
+def search_targets(listings: list[dict], majors: list[dict]) -> list[tuple[str, int, int]]:
+    """Hold persistent low-yield searches until the employer feed supplies a usable base."""
+    return thinnest(listings, majors, minimums=RECOVERY_MINIMUMS)
 
 
 def interleave(fields: list[str]) -> list[str]:
@@ -183,7 +194,7 @@ def choose(export_dir: str | None, fallback: list[str]) -> list[str]:
             d = load(site_dir)
         else:
             d = load(site_dir, data_dir=sibling)
-        picks = thinnest(d["listings"], d["majors"])
+        picks = search_targets(d["listings"], d["majors"])
     except Exception as e:  # never let targeting break an ingest
         console(
             f"[focus] could not read the last export ({type(e).__name__}); using the configured focus queries",
