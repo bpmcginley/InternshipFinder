@@ -6,3 +6,5 @@
 - Fail IndexNow notification if the newly deployed sitemap cannot supply valid site URLs. Do not send removal notifications from an invalid or empty snapshot.
 
 The golden build adds one Computer Science alias; the fixture does not need the Statistics and Data Science alias. Both alias paths have regression cases.
+
+Chrome received a 404 at both current public major URLs, then followed each alias to the expected canonical page in a local production-style build pinned to `6b381156e`. The comparison ran at 1280 and 375 pixels, in light and dark modes. [Computer Science screenshots](../product/screenshots/nov22-search/) show the previous not-found page and the destination after redirect. No sponsored placement or provider submission was exercised.
