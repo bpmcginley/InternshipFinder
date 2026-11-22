@@ -213,13 +213,16 @@ export function addJobs(list) {
 export function updateJob(id, patch) {
   return withLock(async () => {
     const q = await read();
-    if (!q.jobs[id]) return null;
-    const had = !!(q.jobs[id].tailored && q.jobs[id].tailored.file && q.jobs[id].tailored.file.b64);
-    Object.assign(q.jobs[id], typeof patch === "function" ? patch(q.jobs[id]) : patch, {
+    const job = q.jobs[id];
+    if (!job) return null;
+    const had = !!(job.tailored && job.tailored.file && job.tailored.file.b64);
+    const changes = typeof patch === "function" ? patch(job) : patch;
+    if (changes === null) return null;
+    Object.assign(job, changes, {
       updated: Date.now(),
     });
     await write(q, had ? null : id); // was: await write(q);
-    return q.jobs[id];
+    return job;
   });
 }
 

@@ -95,7 +95,8 @@ test("U7: the student is busy on a tab that holds a job waiting on them, and onl
 
 test("U7: the scheduler holds new jobs then, and tries again when the student moves on; nothing clicks or submits", () => {
   const sched = index.slice(index.indexOf("async function schedule()"), index.indexOf("// ---------- helpers"));
-  assert.match(sched, /chrome\.tabs\.query\(\{ active: true, lastFocusedWindow: true \}\)/);
+  assert.match(index, /const frontTabs = \(\) => chrome\.tabs\.query\(\{ active: true, lastFocusedWindow: true \}\)/);
+  assert.match(sched, /const \[front\] = await frontTabs\(\)/);
   assert.match(sched, /if \(front && studentBusyOn\(q, front\.id\)\) break;/);
   assert.match(index, /chrome\.tabs\.onActivated\.addListener\(async \(\{ tabId \}\) => \{\s*schedule\(\);/);
   assert.match(index, /if \(prev === "needs_you" \|\| prev === "ready_to_submit"\) schedule\(\);/);

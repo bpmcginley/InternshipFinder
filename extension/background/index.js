@@ -21,6 +21,7 @@ const PANEL = "sidepanel/sidepanel.html";
 const FEEDBACK_FORM = FEEDBACK_URL;
 const ports = new Set();
 const lastStatus = new Map();
+const frontTabs = () => chrome.tabs.query({ active: true, lastFocusedWindow: true }).catch(() => []);
 
 // ---------- scheduler ----------
 let scheduling = false, again = false;
@@ -37,7 +38,7 @@ async function schedule() {
       // U7: no new tab takes the screen while the student is answering or reviewing a job in the tab in
       // front. The queue goes on when they leave that tab or that job moves on (listeners below).
       if (active < max && q.order.some((id) => q.jobs[id] && q.jobs[id].status === "queued")) {
-        const [front] = await chrome.tabs.query({ active: true, lastFocusedWindow: true }).catch(() => []);
+        const [front] = await frontTabs();
         if (front && studentBusyOn(q, front.id)) break;
       }
       for (const id of q.order) {
@@ -96,12 +97,27 @@ function notify(j) {
   }, () => void chrome.runtime.lastError);
 }
 
-function watchSubmit(id, tabId) {
+/** @typedef {{ id: string, tabId: number, status: string, gen?: number, reason?: string }} ObservedJob */
+/** @param {ObservedJob | undefined | null} job @param {ObservedJob} expected */
+const sameJobStep = (job, expected) =>
+  !!job && job.tabId === expected.tabId && job.status === expected.status &&
+  (job.gen || 0) === (expected.gen || 0);
+
+/** @param {ObservedJob} expected */
+async function confirmSubmission(expected) {
+  if (!(await checkSubmitted(expected.tabId))) return;
+  /** @param {ObservedJob} job */
+  const submitCurrent = (job) => sameJobStep(job, expected)
+    ? { status: "submitted", activity: "", submitted_at: Date.now() }
+    : null;
+  await updateJob(expected.id, submitCurrent);
+}
+
+/** @param {ObservedJob} expected */
+function watchSubmit(expected) {
   for (const ms of [2500, 6000, 12000, 25000]) {
     setTimeout(async () => {
-      const j = await getJob(id);
-      if (!j || j.status !== "ready_to_submit") return;
-      if (await checkSubmitted(tabId)) await updateJob(id, { status: "submitted", activity: "", submitted_at: Date.now() });
+      if (sameJobStep(await getJob(expected.id), expected)) await confirmSubmission(expected);
     }, ms);
   }
 }
@@ -354,7 +370,7 @@ async function handle(m, sender, fromPage) {
     }
     case "maybe_submitted": {
       const j = sender.tab ? await jobForTab(sender.tab.id) : null;
-      if (j && j.status === "ready_to_submit") watchSubmit(j.id, sender.tab.id);
+      if (j && j.status === "ready_to_submit") watchSubmit(j);
       return { ok: true };
     }
     case "schedule":
@@ -406,9 +422,7 @@ chrome.webNavigation.onCompleted.addListener(async ({ tabId, frameId }) => {
   if (frameId !== 0) return;
   const j = await jobForTab(tabId);
   if (!j) return;
-  if (j.status === "ready_to_submit") {
-    if (await checkSubmitted(tabId)) await updateJob(j.id, { status: "submitted", activity: "", submitted_at: Date.now() });
-  }
+  if (j.status === "ready_to_submit") await confirmSubmission(j);
   if (j.status === "ready_to_submit" || j.status === "needs_you") {
     chrome.scripting.executeScript({ target: { tabId }, files: ["agent/guard.js", "agent/overlay.js"] }).catch(() => {});
   }
@@ -424,7 +438,12 @@ chrome.tabs.onActivated.addListener(async ({ tabId }) => {
   const first = (r) => String(r || "").split(".")[0];
   const asleep = (r) => [BACKGROUND_TAB_HELP, "Chrome puts a tab you've switched away from to sleep, and this page stopped drawing."].some((h) => first(h) === first(r));
   if (!j || j.status !== "needs_you" || !asleep(j.reason)) return;
-  setTimeout(() => control(j.id, "resume"), 800);
+  setTimeout(async () => {
+    const [front] = await frontTabs();
+    if (front?.id !== tabId) return;
+    const resumed = await resumeJob(j.id, undefined, (job) => sameJobStep(job, j) && job.reason === j.reason);
+    if (resumed) schedule();
+  }, 800);
 });
 
 chrome.tabs.onRemoved.addListener(async (tabId) => {
