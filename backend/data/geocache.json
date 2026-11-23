@@ -2843,6 +2843,10 @@
 ],
 "sophia antipolis|NY":null,
 "south central|PA":null,
+"south jersey|NJ":[
+39.7196,
+-75.1458
+],
 "south new jersey|NJ":null,
 "south new york city|NY":null,
 "south orange|NJ":[
@@ -2904,6 +2908,8 @@
 40.2162,
 -76.1552
 ],
+"strava new york|NY":null,
+"strava sf|NY":null,
 "strong memorial hospital|NY":null,
 "stroudsburg|PA":[
 40.9864,

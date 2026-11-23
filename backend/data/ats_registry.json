@@ -844,8 +844,9 @@
   "f7d8749a-72d6-407c-bf98-292ea630c73a": {
    "name": "Shield AI",
    "quant": false,
-   "fails": 0,
-   "added": "2026-10-28"
+   "fails": 1,
+   "added": "2026-10-28",
+   "last_fail": "2026-11-23"
   },
   "fab2": {
    "name": "fab2",
@@ -2474,6 +2475,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-10-08"
+  },
+  "strava": {
+   "name": "Strava",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-23"
   },
   "substrate": {
    "name": "Substrate",
@@ -8323,9 +8330,8 @@
   "careers-consoreng": {
    "name": "Consor",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-15",
-   "last_fail": "2026-11-23"
+   "fails": 0,
+   "added": "2026-09-15"
   },
   "careers-dartmouth-hitchcock": {
    "name": "Dartmouth Health",
@@ -8410,9 +8416,8 @@
   "careers-nacg": {
    "name": "North American Construction Group",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-15",
-   "last_fail": "2026-11-23"
+   "fails": 0,
+   "added": "2026-09-15"
   },
   "careers-nrdc": {
    "name": "NRDC",
@@ -8443,9 +8448,8 @@
   "careers-sdsurf": {
    "name": "SDSU Research Foundation",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-15",
-   "last_fail": "2026-11-23"
+   "fails": 0,
+   "added": "2026-09-15"
   },
   "careers-sevenhills": {
    "name": "Seven Hills Foundation",
