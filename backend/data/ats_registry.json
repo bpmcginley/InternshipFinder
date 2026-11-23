@@ -883,6 +883,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "first-resonance": {
+   "name": "First Resonance",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-23"
+  },
   "flagright.com": {
    "name": "Flagright",
    "quant": false,
@@ -19119,9 +19125,8 @@
   "ovative|wd12|ovative": {
    "name": "Ovative Group",
    "quant": false,
-   "fails": 1,
-   "added": "2026-10-05",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-10-05"
   },
   "ovintiv|wd3|ovintivcareers": {
    "name": "Ovintiv",
