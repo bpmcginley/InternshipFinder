@@ -2754,8 +2754,9 @@
   "Verne%20Robotics": {
    "name": "Verne Robotics",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-11-23"
   },
   "vital-lyfe": {
    "name": "VITAL LYFE",
@@ -3672,6 +3673,18 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "artefactlinkedin": {
+   "name": "Artefact",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-23"
+  },
+  "artefactnoram": {
+   "name": "Artefact",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-23"
+  },
   "artofproblemsolving": {
    "name": "Art of Problem Solving",
    "quant": false,
@@ -3887,9 +3900,9 @@
   "bcg": {
    "name": "Boston Consulting Group",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-11-22",
-   "last_fail": "2026-11-22"
+   "last_fail": "2026-11-23"
   },
   "betterhelpcom": {
    "name": "BetterHelp",
@@ -7199,9 +7212,9 @@
   "shein": {
    "name": "SHEIN",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-09-13",
-   "last_fail": "2026-11-22"
+   "last_fail": "2026-11-23"
   },
   "shield": {
    "name": "Shield",
@@ -13170,6 +13183,12 @@
    "fails": 0,
    "added": "2026-09-14"
   },
+  "mi-homes": {
+   "name": "M/I Homes",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-23"
+  },
   "mila-2": {
    "name": "Montreal Institute for Learning Algorithms",
    "quant": false,
@@ -18250,6 +18269,12 @@
    "added": "2026-09-18",
    "sector": "engineering_manufacturing"
   },
+  "megger|wd3|MeggerCareers": {
+   "name": "Megger",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-23"
+  },
   "meijer|wd5|Meijer": {
    "name": "Meijer",
    "quant": false,
@@ -19567,9 +19592,8 @@
   "realtyincome|wd108|realty_income_careers": {
    "name": "Realty Income",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "recar|wd108|SLATEcareers": {
    "name": "Slate Auto",
