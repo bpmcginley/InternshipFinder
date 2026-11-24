@@ -844,9 +844,9 @@
   "f7d8749a-72d6-407c-bf98-292ea630c73a": {
    "name": "Shield AI",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-10-28",
-   "last_fail": "2026-11-23"
+   "last_fail": "2026-11-24"
   },
   "fab2": {
    "name": "fab2",
@@ -2308,6 +2308,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "runna": {
+   "name": "Runna",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-24"
+  },
   "runway": {
    "name": "Runway",
    "quant": false,
@@ -2767,9 +2773,9 @@
   "Verne%20Robotics": {
    "name": "Verne Robotics",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-09-13",
-   "last_fail": "2026-11-23"
+   "last_fail": "2026-11-24"
   },
   "vital-lyfe": {
    "name": "VITAL LYFE",
@@ -4151,6 +4157,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-10-29"
+  },
+  "capitaltg": {
+   "name": "Capital Technology Group",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-24"
   },
   "capstoneinvestmentadvisors": {
    "name": "Capstone Investment Advisors",
@@ -8567,6 +8579,12 @@
    "fails": 0,
    "added": "2026-09-15"
   },
+  "hq-lifeway": {
+   "name": "Lifeway",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-24"
+  },
   "staff-emory": {
    "name": "Emory University",
    "quant": false,
@@ -9308,6 +9326,12 @@
    "fails": 0,
    "added": "2026-09-18",
    "sector": "behavioral_health"
+  },
+  "csptest2025": {
+   "name": "CornerStone Partners",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-24"
   },
   "d3engineering": {
    "name": "D3 Embedded",
@@ -10737,6 +10761,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "oliverwyman": {
+   "name": "Oliver Wyman",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-24"
   },
   "openx": {
    "name": "OpenX",
@@ -12941,6 +12971,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-14"
+  },
+  "blueprint-health": {
+   "name": "Blueprint AI (Mental Health)",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-24"
   },
   "bmlltech": {
    "name": "BMLL Technologies",
@@ -19420,6 +19456,12 @@
    "fails": 0,
    "added": "2026-10-02"
   },
+  "prismahealth|wd5|PrismaHealthCorporate": {
+   "name": "170 Prisma Health",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-24"
+  },
   "progyny|wd5|progyny": {
    "name": "Progyny",
    "quant": false,
@@ -19534,9 +19576,8 @@
   "radiancetech|wd12|Radiance_External": {
    "name": "Radiance Technologies",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "rakuten|wd1|Kobo": {
    "name": "Kobo",
