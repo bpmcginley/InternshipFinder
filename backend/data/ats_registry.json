@@ -5844,6 +5844,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "joblinks": {
+   "name": "AQR Capital Management",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-24"
+  },
   "jobsatphamily": {
    "name": "Phamily",
    "quant": false,
@@ -7528,6 +7534,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "studentprogram": {
+   "name": "Esri",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-24"
   },
   "studiokraftonboard": {
    "name": "KRAFTON",
