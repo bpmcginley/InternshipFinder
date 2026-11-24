@@ -3919,9 +3919,9 @@
   "bcg": {
    "name": "Boston Consulting Group",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-11-22",
-   "last_fail": "2026-11-23"
+   "last_fail": "2026-11-24"
   },
   "betterhelpcom": {
    "name": "BetterHelp",
@@ -4737,6 +4737,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "ecjobb": {
+   "name": "CarGurus",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-24"
+  },
   "edmentum": {
    "name": "edmentum",
    "quant": false,
@@ -4797,6 +4803,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "energysolutionsinternships": {
+   "name": "Energy Solutions",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-24"
   },
   "engineersgate": {
    "name": "Engineers Gate",
@@ -7243,9 +7255,9 @@
   "shein": {
    "name": "SHEIN",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-09-13",
-   "last_fail": "2026-11-23"
+   "last_fail": "2026-11-24"
   },
   "shield": {
    "name": "Shield",
@@ -7534,6 +7546,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "studentinternships": {
+   "name": "ISO New England",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-24"
   },
   "studentprogram": {
    "name": "Esri",
@@ -19356,6 +19374,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "plains|wd1|plains": {
+   "name": "Plains All American Pipeline",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-24"
   },
   "plantemoran|wd1|pmexternalcareers": {
    "name": "Plante Moran",

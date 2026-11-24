@@ -2688,6 +2688,10 @@
 -75.4584
 ],
 "roseland nj|NJ":null,
+"roselle|NJ":[
+40.6527,
+-74.2579
+],
 "roslyn heights|NY":[
 40.7887,
 -73.6474
@@ -3031,6 +3035,7 @@
 ],
 "us - bayonne center (njbay|NJ":null,
 "us - chestnut ridge|NY":null,
+"us - east coast|NY":null,
 "us - ny|NY":null,
 "us - pa|PA":null,
 "us - pittsburgh|PA":null,
