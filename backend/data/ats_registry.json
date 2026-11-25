@@ -19851,9 +19851,8 @@
   "rjet|wd108|External_Career_Site": {
    "name": "Republic Airways",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-18",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-09-18"
   },
   "rlicorp|wd1.myworkdaysite.com|RLI_Corp_Careers": {
    "name": "RLI",
