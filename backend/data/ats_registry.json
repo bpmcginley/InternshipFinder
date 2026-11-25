@@ -18600,9 +18600,8 @@
   "mrisoftware|wd501|External_CareerSite": {
    "name": "MRI Software",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "msd|wd5|searchjobs": {
    "name": "Merck",
@@ -21389,9 +21388,8 @@
   "vareximaging|wd103|External_Career_Site": {
    "name": "Varex Imaging Corporation",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "vbgov|wd5.myworkdaysite.com|City_Of_Virginia_Beach_Careers": {
    "name": "City of Virginia Beach",
