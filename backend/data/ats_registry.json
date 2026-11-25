@@ -844,9 +844,9 @@
   "f7d8749a-72d6-407c-bf98-292ea630c73a": {
    "name": "Shield AI",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-10-28",
-   "last_fail": "2026-11-24"
+   "last_fail": "2026-11-25"
   },
   "fab2": {
    "name": "fab2",
@@ -2773,9 +2773,9 @@
   "Verne%20Robotics": {
    "name": "Verne Robotics",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-09-13",
-   "last_fail": "2026-11-24"
+   "last_fail": "2026-11-25"
   },
   "vital-lyfe": {
    "name": "VITAL LYFE",
@@ -3323,6 +3323,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-10-01"
+  },
+  "5364856uhdfnvbkldfnbhrpkdfgbdvtyhro": {
+   "name": "Davidson Kempner",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-25"
   },
   "60decibelsinc": {
    "name": "60decibelsinc",
@@ -3915,13 +3921,6 @@
    "quant": false,
    "fails": 0,
    "added": "2026-11-05"
-  },
-  "bcg": {
-   "name": "Boston Consulting Group",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-11-22",
-   "last_fail": "2026-11-24"
   },
   "betterhelpcom": {
    "name": "BetterHelp",
@@ -6717,6 +6716,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "patientpointinviteonly": {
+   "name": "PatientPoint",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-25"
+  },
   "pdtpartners": {
    "name": "PDT Partners",
    "quant": true,
@@ -7137,6 +7142,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "sambanovasystems": {
+   "name": "SambaNova Systems",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-25"
+  },
   "samsara": {
    "name": "Samsara",
    "quant": false,
@@ -7251,13 +7262,6 @@
    "quant": false,
    "fails": 0,
    "added": "2026-11-09"
-  },
-  "shein": {
-   "name": "SHEIN",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-24"
   },
   "shield": {
    "name": "Shield",
@@ -8851,6 +8855,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-10-22"
+  },
+  "careers.kimley-horn.com": {
+   "name": "Kimley-Horn",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-25"
   },
   "careers.kindermorgan.com": {
    "name": "Kinder Morgan",
@@ -10931,6 +10941,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "reachpower": {
+   "name": "Reach Labs",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-25"
+  },
   "redhorsecorp": {
    "name": "Redhorse",
    "quant": false,
@@ -11031,8 +11047,9 @@
   "secureframe": {
    "name": "Secureframe",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-11-25"
   },
   "sep": {
    "name": "SEP",
@@ -11853,6 +11870,12 @@
    "fails": 0,
    "added": "2026-09-14"
   },
+  "fa-espx-saasfaprod1.fa.ocs.oraclecloud.com|CX_1001": {
+   "name": "Cummins Stránka pro zahájení kariéry",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-25"
+  },
   "fa-essf-saasfaprod1.fa.ocs.oraclecloud.com|CX_1": {
    "name": "Berkshire Hathaway Energy",
    "quant": false,
@@ -12606,6 +12629,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-14"
+  },
+  "the-tech": {
+   "name": "The Tech Interactive",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-25"
   },
   "theguarantors-open-positions": {
    "name": "TheGuarantors",

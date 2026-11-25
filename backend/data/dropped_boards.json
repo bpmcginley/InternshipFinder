@@ -78,6 +78,10 @@
    "on": "2026-11-10",
    "why": "dead"
   },
+  "bcg": {
+   "on": "2026-11-25",
+   "why": "dead"
+  },
   "breezeairways": {
    "on": "2026-10-15",
    "why": "dead"
@@ -136,6 +140,10 @@
   },
   "rdccareers": {
    "on": "2026-10-13",
+   "why": "dead"
+  },
+  "shein": {
+   "on": "2026-11-25",
    "why": "dead"
   },
   "superbet": {
@@ -666,6 +674,10 @@
   },
   "jobs-cesi": {
    "on": "2026-10-06",
+   "why": "robots"
+  },
+  "jobs-kinaxis": {
+   "on": "2026-11-25",
    "why": "robots"
   },
   "jobs-legrand": {
