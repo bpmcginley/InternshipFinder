@@ -469,6 +469,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "coderabbit": {
+   "name": "CodeRabbit",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-26"
+  },
   "cohere": {
    "name": "Cohere",
    "quant": false,
@@ -840,13 +846,6 @@
    "quant": false,
    "fails": 0,
    "added": "2026-11-10"
-  },
-  "f7d8749a-72d6-407c-bf98-292ea630c73a": {
-   "name": "Shield AI",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-10-28",
-   "last_fail": "2026-11-25"
   },
   "fab2": {
    "name": "fab2",
@@ -2770,13 +2769,6 @@
    "fails": 0,
    "added": "2026-09-13"
   },
-  "Verne%20Robotics": {
-   "name": "Verne Robotics",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-25"
-  },
   "vital-lyfe": {
    "name": "VITAL LYFE",
    "quant": false,
@@ -2890,6 +2882,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "xona-space": {
+   "name": "Xona Space Systems",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-26"
   },
   "xterra%20ai": {
    "name": "Xterra AI",
@@ -8407,8 +8405,9 @@
   "careers-here": {
    "name": "HERE Technologies",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-15"
+   "fails": 1,
+   "added": "2026-09-15",
+   "last_fail": "2026-11-26"
   },
   "careers-hexagonpositioning": {
    "name": "Hexagon AB",
@@ -8606,6 +8605,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-15"
+  },
+  "hmi-harvard": {
+   "name": "Harvard Companies",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-26"
   },
   "homeoffice-na-urbn": {
    "name": "URBN",
@@ -11047,9 +11052,9 @@
   "secureframe": {
    "name": "Secureframe",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-09-13",
-   "last_fail": "2026-11-25"
+   "last_fail": "2026-11-26"
   },
   "sep": {
    "name": "SEP",
@@ -12648,6 +12653,12 @@
    "fails": 0,
    "added": "2026-09-15"
   },
+  "tombrascareers": {
+   "name": "Tombras",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-26"
+  },
   "uhin-careers": {
    "name": "UHIN",
    "quant": false,
@@ -13134,6 +13145,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-14"
+  },
+  "digital-control": {
+   "name": "Digital Control",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-26"
   },
   "disa-technologies": {
    "name": "DISA Technologies",
