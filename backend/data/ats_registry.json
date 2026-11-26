@@ -3614,8 +3614,9 @@
   "aperaaiinc": {
    "name": "Apera AI",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-13"
+   "fails": 1,
+   "added": "2026-09-13",
+   "last_fail": "2026-11-26"
   },
   "apexcompanies": {
    "name": "Apex Companies",
@@ -4551,6 +4552,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-11-20"
+  },
+  "dept": {
+   "name": "DEPT",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-26"
   },
   "detroitlions": {
    "name": "Detroit Lions",
@@ -21440,9 +21447,8 @@
   "verdantas|wd108|Verdantas": {
    "name": "Verdantas",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "vermeer|wd5|externalcareersite": {
    "name": "Vermeer",
