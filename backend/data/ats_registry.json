@@ -17935,9 +17935,8 @@
   "ksmcpa|wd12|ksmcareers": {
    "name": "KSM",
    "quant": false,
-   "fails": 1,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-16"
+   "fails": 0,
+   "added": "2026-09-13"
   },
   "kyndryl|wd5|KyndrylEarlyCareers": {
    "name": "Kyndryl",
