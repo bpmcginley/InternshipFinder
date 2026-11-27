@@ -376,8 +376,9 @@
   "brightstar-ai": {
    "name": "Brightstar.AI",
    "quant": false,
-   "fails": 0,
-   "added": "2026-09-25"
+   "fails": 1,
+   "added": "2026-09-25",
+   "last_fail": "2026-11-27"
   },
   "build-ai": {
    "name": "Build AI",
@@ -3035,6 +3036,12 @@
    "fails": 0,
    "added": "2026-11-20"
   },
+  "encepta": {
+   "name": "Encepta",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-27"
+  },
   "euna": {
    "name": "EUNA Solutions",
    "quant": false,
@@ -5639,6 +5646,12 @@
    "fails": 0,
    "added": "2026-10-03"
   },
+  "iconiqhandshake": {
+   "name": "ICONIQ Capital",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-27"
+  },
   "ideo": {
    "name": "IDEO",
    "quant": false,
@@ -6856,6 +6869,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-18"
+  },
+  "pqshield": {
+   "name": "PQShield",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-27"
   },
   "practisinglawinstitute": {
    "name": "Practising Law Institute",
