@@ -3569,6 +3569,12 @@
    "added": "2026-09-13",
    "sector": "social_research"
   },
+  "americanpublichealthassociation": {
+   "name": "American Public Health Association",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-27"
+  },
   "amperesand": {
    "name": "Amperesand",
    "quant": false,
@@ -11058,9 +11064,9 @@
   "secureframe": {
    "name": "Secureframe",
    "quant": false,
-   "fails": 2,
+   "fails": 3,
    "added": "2026-09-13",
-   "last_fail": "2026-11-26"
+   "last_fail": "2026-11-27"
   },
   "sep": {
    "name": "SEP",
