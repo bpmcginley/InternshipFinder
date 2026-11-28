@@ -15569,6 +15569,12 @@
    "fails": 0,
    "added": "2026-09-17"
   },
+  "cityutilities|wd5|Careers": {
+   "name": "City Utilities of Springfield",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-28"
+  },
   "cityyear|wd5|CityYear": {
    "name": "City Year",
    "quant": false,
@@ -18504,6 +18510,12 @@
    "added": "2026-09-13",
    "sector": "education_research"
   },
+  "michaels|wd5|external": {
+   "name": "Michaels Stores",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-28"
+  },
   "michelinhr|wd3|Michelin": {
    "name": "Michelin",
    "quant": false,
@@ -19128,6 +19140,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-11-12"
+  },
+  "odl|wd5|odl": {
+   "name": "ODL",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-28"
   },
   "ohiohealth|wd5|OhioHealthJobs": {
    "name": "OhioHealth",
@@ -19869,6 +19887,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "revelyst|wd1|EXTERNAL_REVELYST": {
+   "name": "Revelyst",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-28"
+  },
   "revvity|wd103|External": {
    "name": "Revvity",
    "quant": false,
@@ -20252,6 +20276,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "servco|wd5|Servco_Careers": {
+   "name": "Servco",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-28"
   },
   "shakeshack|wd5|External": {
    "name": "Shake Shack",
@@ -20822,6 +20852,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "tcbrands|wd1|TravisMathew-Careers": {
+   "name": "TravisMathew",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-28"
+  },
   "tcenergy|wd3|CAREER_SITE_TC": {
    "name": "TC Energy",
    "quant": false,
@@ -21320,6 +21356,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "unum|wd1|External": {
+   "name": "Unum Group",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-28"
   },
   "uottawa|wd3|uOttawa_External_Career_Site": {
    "name": "University of Ottawa",
