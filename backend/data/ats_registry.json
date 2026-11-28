@@ -376,9 +376,9 @@
   "brightstar-ai": {
    "name": "Brightstar.AI",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-09-25",
-   "last_fail": "2026-11-27"
+   "last_fail": "2026-11-28"
   },
   "build-ai": {
    "name": "Build AI",
@@ -721,6 +721,13 @@
    "quant": false,
    "fails": 0,
    "added": "2026-09-13"
+  },
+  "egra": {
+   "name": "Egra",
+   "quant": false,
+   "fails": 1,
+   "added": "2026-11-28",
+   "last_fail": "2026-11-28"
   },
   "eigen-labs": {
    "name": "Eigen Labs",
@@ -3006,6 +3013,12 @@
    "fails": 0,
    "added": "2026-11-17"
   },
+  "carfaxcanada": {
+   "name": "CARFAX Canada",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-28"
+  },
   "cetci": {
    "name": "Critical Environment Technologies",
    "quant": false,
@@ -3084,6 +3097,12 @@
    "fails": 0,
    "added": "2026-09-18",
    "sector": "social_research"
+  },
+  "intercept": {
+   "name": "Intercept",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-28"
   },
   "ipconfigure": {
    "name": "IPConfigure",
@@ -3627,9 +3646,9 @@
   "aperaaiinc": {
    "name": "Apera AI",
    "quant": false,
-   "fails": 1,
+   "fails": 2,
    "added": "2026-09-13",
-   "last_fail": "2026-11-26"
+   "last_fail": "2026-11-28"
   },
   "apexcompanies": {
    "name": "Apex Companies",
@@ -11080,13 +11099,6 @@
    "fails": 0,
    "added": "2026-10-14"
   },
-  "secureframe": {
-   "name": "Secureframe",
-   "quant": false,
-   "fails": 3,
-   "added": "2026-09-13",
-   "last_fail": "2026-11-27"
-  },
   "sep": {
    "name": "SEP",
    "quant": false,
@@ -17422,6 +17434,12 @@
    "fails": 0,
    "added": "2026-09-13"
   },
+  "ia|wd3|Professional": {
+   "name": "iA Financial Group",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-28"
+  },
   "iberdrola|wd3|iberdrola": {
    "name": "Iberdrola Group",
    "quant": false,
@@ -19175,10 +19193,9 @@
   "oregonstate|wd501|OSU_Careers_Site": {
    "name": "Oregon State University",
    "quant": false,
-   "fails": 1,
+   "fails": 0,
    "added": "2026-11-15",
-   "sector": "education_research",
-   "last_fail": "2026-11-16"
+   "sector": "education_research"
   },
   "oregon|wd5|sor_external_career_site": {
    "name": "Oregon State Government",
@@ -21078,6 +21095,12 @@
    "quant": false,
    "fails": 0,
    "added": "2026-11-12"
+  },
+  "trinzic|wd115|Trinzic_Careers": {
+   "name": "Trinzic",
+   "quant": false,
+   "fails": 0,
+   "added": "2026-11-28"
   },
   "troweprice|wd5|TRowePrice": {
    "name": "T. Rowe Price",
